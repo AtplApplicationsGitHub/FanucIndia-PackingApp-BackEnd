@@ -3,14 +3,16 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Copy the package.json and package-lock.json
 COPY package*.json ./
+
+# Install dependencies
 RUN npm install
 
-# Copy all the source files
+# Copy the rest of the application files
 COPY . .
 
-# Build the NestJS app
+# Build the NestJS app (output goes to dist/)
 RUN npm run build
 
 # Stage 2: Production image
@@ -22,11 +24,11 @@ WORKDIR /app
 COPY --from=builder /app/package*.json ./
 RUN npm install --only=production
 
-# Copy the built app from the builder stage
-COPY --from=builder /app/dist ./dist
+# Copy the dist folder from the builder stage
+COPY --from=builder /app/dist /app/dist
 
-# Expose the port the app will run on
-EXPOSE 3010
+# Expose the port
+EXPOSE 3000
 
-# Start the application
+# Start the app using the compiled main.js file
 CMD ["node", "dist/main"]
