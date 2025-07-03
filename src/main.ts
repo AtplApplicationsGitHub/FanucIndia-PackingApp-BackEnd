@@ -50,11 +50,11 @@ async function bootstrap() {
   appFinal.useGlobalFilters(new AllExceptionsFilter());
 
   appFinal.enableCors({
-    origin: ['http://localhost:5173'],
+    origin: ['https://fanuc.goval.app:5173'],
     credentials: true,
   });
 
   // 5. Start server
-  await appFinal.listen(process.env.PORT ?? 3000);
+  await appFinal.listen(process.env.PORT ?? 3010);
 }
 bootstrap();
