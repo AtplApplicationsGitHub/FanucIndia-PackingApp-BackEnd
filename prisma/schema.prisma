@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  sales
+  admin
+}
+
+model User {
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  password    String
+  role        UserRole     @default(sales)  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  salesOrders SalesOrder[]
+}
+
+model Product {
+  id          Int          @id @default(autoincrement())
+  name        String
+  code        String?
+  salesOrders SalesOrder[]
+}
+
+model Transporter {
+  id          Int          @id @default(autoincrement())
+  name        String
+  salesOrders SalesOrder[]
+}
+
+model PlantCode {
+  id          Int          @id @default(autoincrement())
+  code        String
+  description String?
+  salesOrders SalesOrder[]
+}
+
+model SalesZone {
+  id          Int          @id @default(autoincrement())
+  name        String
+  salesOrders SalesOrder[]
+}
+
+model PackConfig {
+  id          Int          @id @default(autoincrement())
+  configName  String
+  salesOrders SalesOrder[]
+}
+
+model SalesOrder {
+  id               Int         @id @default(autoincrement())
+  userId           Int
+  productId        Int
+  saleOrderNumber  String
+  outboundDelivery String
+  transferOrder    String
+  deliveryDate     DateTime
+  transporterId    Int
+  plantCodeId      Int
+  paymentClearance Boolean
+  salesZoneId      Int
+  packConfigId     Int
+  specialRemarks   String?
+  status           String      @default("MD")
+  priority         Int?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  packConfig       PackConfig  @relation(fields: [packConfigId], references: [id])
+  plantCode        PlantCode   @relation(fields: [plantCodeId], references: [id])
+  product          Product     @relation(fields: [productId], references: [id])
+  salesZone        SalesZone   @relation(fields: [salesZoneId], references: [id])
+  transporter      Transporter @relation(fields: [transporterId], references: [id])
+  user             User        @relation(fields: [userId], references: [id])
+}
