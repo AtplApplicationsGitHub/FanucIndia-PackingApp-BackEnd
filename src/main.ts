@@ -4,30 +4,33 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import * as fs from 'fs';
-
 import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
-  // 1. Create an initial app to get ConfigService
+  // 1. Create initial app to get ConfigService
   const app = await NestFactory.create(AppModule);
-
   const configService = app.get(ConfigService);
 
-  // 2. Read HTTPS cert/key paths from .env
-  const httpsKeyPath = configService.get<string>('/etc/letsencrypt/live/fanuc.goval.app/fullchain.pem');
-  const httpsCertPath = configService.get<string>('/etc/letsencrypt/live/fanuc.goval.app/privkey.pem');
+  // 2. Read HTTPS cert/key paths from .env or environment
+  const httpsKeyPath = configService.get<string>('SSL_KEY_PATH');
+  const httpsCertPath = configService.get<string>('SSL_CERT_PATH');
 
-  // 3. Prepare HTTPS options (read files synchronously)
-  const httpsOptions = {
-    key: fs.readFileSync(httpsKeyPath),
-    cert: fs.readFileSync(httpsCertPath),
-  };
+  // 3. Prepare HTTPS options only if both are set
+  let httpsOptions: { key?: Buffer; cert?: Buffer } | undefined = undefined;
+  if (httpsKeyPath && httpsCertPath) {
+    httpsOptions = {
+      key: fs.readFileSync(httpsKeyPath),
+      cert: fs.readFileSync(httpsCertPath),
+    };
+  }
 
-  // 4. Close the first app instance, then create the HTTPS app
+  // 4. Close the initial app, create HTTPS or HTTP app accordingly
   await app.close();
-  const httpsApp = await NestFactory.create(AppModule, { httpsOptions });
 
-  httpsApp.useGlobalPipes(
+  // If HTTPS options are set, use HTTPS, else fallback to HTTP (useful for local/testing)
+  const appFinal = await NestFactory.create(AppModule, httpsOptions ? { httpsOptions } : {});
+
+  appFinal.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
@@ -41,16 +44,17 @@ async function bootstrap() {
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-  const document = SwaggerModule.createDocument(httpsApp, config);
-  SwaggerModule.setup('api', httpsApp, document);
+  const document = SwaggerModule.createDocument(appFinal, config);
+  SwaggerModule.setup('api', appFinal, document);
 
-  httpsApp.useGlobalFilters(new AllExceptionsFilter());
+  appFinal.useGlobalFilters(new AllExceptionsFilter());
 
-  httpsApp.enableCors({
-    origin: ['https://fanuc.goval.app:5173'],
+  appFinal.enableCors({
+    origin: ['http://localhost:5173'],
     credentials: true,
   });
 
-  await httpsApp.listen(process.env.PORT ?? 3010);
+  // 5. Start server
+  await appFinal.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
