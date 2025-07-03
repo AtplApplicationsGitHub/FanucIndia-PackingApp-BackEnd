@@ -50,7 +50,7 @@ async function bootstrap() {
   appFinal.useGlobalFilters(new AllExceptionsFilter());
 
   appFinal.enableCors({
-    origin: ['https://fanuc.goval.app:5173'],
+    origin: ['https://fanuc.goval.app:444'],
     credentials: true,
   });
 
