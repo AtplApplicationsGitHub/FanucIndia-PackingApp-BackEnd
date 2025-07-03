@@ -21,4 +21,5 @@
     "noFallthroughCasesInSwitch": false
   },
   "include": ["src", "prisma"]          // <-- add this if missing
+  "exclude": ["node_modules", "dist"]
 }
