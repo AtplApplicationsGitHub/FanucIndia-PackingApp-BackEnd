@@ -12,7 +12,7 @@ COPY . .
 
 # Build the NestJS app
 RUN npm run build
-
+RUN ls /app/dist
 # Stage 2: Production image
 FROM node:18-alpine
 
@@ -23,7 +23,7 @@ COPY --from=builder /app/package*.json ./
 RUN npm install
 
 # Copy the built app from the builder stage
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/dist /app/dist
 
 # Expose the port the app will run on
 EXPOSE 3010
