@@ -47,7 +47,7 @@ async function bootstrap() {
   httpsApp.useGlobalFilters(new AllExceptionsFilter());
 
   httpsApp.enableCors({
-    origin: ['http://localhost:5173'],
+    origin: ['https://fanuc.goval.app:5173'],
     credentials: true,
   });
 
