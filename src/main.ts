@@ -51,6 +51,6 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await httpsApp.listen(process.env.PORT ?? 3000);
+  await httpsApp.listen(process.env.PORT ?? 3010);
 }
 bootstrap();
