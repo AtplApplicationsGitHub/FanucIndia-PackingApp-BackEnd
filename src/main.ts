@@ -14,8 +14,8 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   // 2. Read HTTPS cert/key paths from .env
-  const httpsKeyPath = configService.get<string>('SSL_KEY_PATH');
-  const httpsCertPath = configService.get<string>('SSL_CERT_PATH');
+  const httpsKeyPath = configService.get<string>('/etc/letsencrypt/live/fanuc.goval.app/fullchain.pem');
+  const httpsCertPath = configService.get<string>('/etc/letsencrypt/live/fanuc.goval.app/privkey.pem');
 
   // 3. Prepare HTTPS options (read files synchronously)
   const httpsOptions = {
