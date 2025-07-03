@@ -26,7 +26,7 @@ RUN npm install
 COPY --from=builder /app/dist ./dist
 
 # Expose the port the app will run on
-EXPOSE 3000
+EXPOSE 3010
 
 # Start the application
 CMD ["node", "dist/main.js"]
