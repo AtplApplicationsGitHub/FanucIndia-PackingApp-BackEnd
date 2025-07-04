@@ -4,33 +4,16 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import * as fs from 'fs';
-import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
-  // 1. Create initial app to get ConfigService
-  const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
+  const httpsOptions = {
+    key: fs.readFileSync('/etc/letsencrypt/live/fanuc.goval.app/privkey.pem'),
+    cert: fs.readFileSync('/etc/letsencrypt/live/fanuc.goval.app/fullchain.pem'),
+  };
 
-  // 2. Read HTTPS cert/key paths from .env or environment
-  const httpsKeyPath = configService.get<string>('SSL_KEY_PATH');
-  const httpsCertPath = configService.get<string>('SSL_CERT_PATH');
+  const app = await NestFactory.create(AppModule, { httpsOptions });
 
-  // 3. Prepare HTTPS options only if both are set
-  let httpsOptions: { key?: Buffer; cert?: Buffer } | undefined = undefined;
-  if (httpsKeyPath && httpsCertPath) {
-    httpsOptions = {
-      key: fs.readFileSync(httpsKeyPath),
-      cert: fs.readFileSync(httpsCertPath),
-    };
-  }
-
-  // 4. Close the initial app, create HTTPS or HTTP app accordingly
-  await app.close();
-
-  // If HTTPS options are set, use HTTPS, else fallback to HTTP (useful for local/testing)
-  const appFinal = await NestFactory.create(AppModule, httpsOptions ? { httpsOptions } : {});
-
-  appFinal.useGlobalPipes(
+  app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
@@ -44,17 +27,16 @@ async function bootstrap() {
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-  const document = SwaggerModule.createDocument(appFinal, config);
-  SwaggerModule.setup('api', appFinal, document);
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
 
-  appFinal.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(new AllExceptionsFilter());
 
-  appFinal.enableCors({
-    origin: ['http://localhost:5173'],
+  app.enableCors({
+    origin: ['https://fanuc.goval.app:444'],
     credentials: true,
   });
 
-  // 5. Start server
-  await appFinal.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
