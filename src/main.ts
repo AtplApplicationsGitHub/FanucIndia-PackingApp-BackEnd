@@ -4,6 +4,7 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import * as fs from 'fs';
+import { ConfigService } from '@nestjs/config';  // <-- Import ConfigService
 
 async function bootstrap() {
   const httpsOptions = {
@@ -12,6 +13,13 @@ async function bootstrap() {
   };
 
   const app = await NestFactory.create(AppModule, { httpsOptions });
+
+  // Get ConfigService instance from the app context
+  const configService = app.get(ConfigService);
+
+  // Fetch and log DATABASE_URL
+  const databaseUrl = configService.get<string>('DATABASE_URL');
+  console.log('Database URL:', databaseUrl);
 
   app.useGlobalPipes(
     new ValidationPipe({
