@@ -55,8 +55,8 @@ async function bootstrap() {
   listenApp.useGlobalFilters(new AllExceptionsFilter());
 
   listenApp.enableCors({
-    // origin: ['https://fanuc.goval.app:444'],
-    origin: ['http://localhost:5173'],
+    origin: ['https://fanuc.goval.app:444'],
+    // origin: ['http://localhost:5173'],
     credentials: true,
   });
 
