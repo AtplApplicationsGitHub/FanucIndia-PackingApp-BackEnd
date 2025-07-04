@@ -16,12 +16,15 @@ WORKDIR /app
 # Install only the production dependencies
 COPY --from=builder /app/package*.json ./
 RUN npm install --only=production
-# Run prisma generate to create Prisma client in the production environment
-RUN npx prisma generate
 # Copy the built app (including dist/ folder) from the builder stage
 COPY --from=builder /app/dist /app/dist
-# Debugging step: Verify the contents of the dist folder
+# Copy the prisma folder (including schema.prisma) from the builder stage
+COPY --from=builder /app/prisma /app/prisma
+# Run prisma generate to create Prisma client in the production environment
+RUN npx prisma generate
+# Debugging step: Verify the contents of the dist folder and prisma folder
 RUN ls -l /app/dist
+RUN ls -l /app/prisma
 # Expose the port the app will run on
 EXPOSE 3010
 # Start the application using the compiled main.js file
