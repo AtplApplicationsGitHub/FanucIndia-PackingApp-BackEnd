@@ -45,16 +45,23 @@ async function bootstrap() {
     const configService = app.get(config_1.ConfigService);
     const httpsKeyPath = configService.get('SSL_KEY_PATH');
     const httpsCertPath = configService.get('SSL_CERT_PATH');
-    let httpsOptions = undefined;
-    if (httpsKeyPath && httpsCertPath) {
-        httpsOptions = {
+    const isSSL = httpsKeyPath && httpsCertPath;
+    let listenApp = app;
+    if (isSSL) {
+        console.log('SSL enabled: Starting in HTTPS mode');
+        const httpsOptions = {
             key: fs.readFileSync(httpsKeyPath),
             cert: fs.readFileSync(httpsCertPath),
         };
+        await app.close();
+        listenApp = await core_1.NestFactory.create(app_module_1.AppModule, { httpsOptions });
     }
-    await app.close();
-    const appFinal = await core_1.NestFactory.create(app_module_1.AppModule, httpsOptions ? { httpsOptions } : {});
-    appFinal.useGlobalPipes(new common_1.ValidationPipe({
+    else {
+        console.log('SSL not set: Starting in HTTP mode (local/dev)');
+    }
+    const databaseUrl = listenApp.get(config_1.ConfigService).get('DATABASE_URL');
+    console.log('Database URL:', databaseUrl);
+    listenApp.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
@@ -65,14 +72,14 @@ async function bootstrap() {
         .setVersion('1.0')
         .addBearerAuth()
         .build();
-    const document = swagger_1.SwaggerModule.createDocument(appFinal, config);
-    swagger_1.SwaggerModule.setup('api', appFinal, document);
-    appFinal.useGlobalFilters(new all_exceptions_filter_1.AllExceptionsFilter());
-    appFinal.enableCors({
+    const document = swagger_1.SwaggerModule.createDocument(listenApp, config);
+    swagger_1.SwaggerModule.setup('api', listenApp, document);
+    listenApp.useGlobalFilters(new all_exceptions_filter_1.AllExceptionsFilter());
+    listenApp.enableCors({
         origin: ['http://localhost:5173'],
         credentials: true,
     });
-    await appFinal.listen(process.env.PORT ?? 3000);
+    await listenApp.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

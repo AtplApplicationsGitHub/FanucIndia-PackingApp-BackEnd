@@ -7,40 +7,35 @@ import * as fs from 'fs';
 import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
-  // Create the app instance (needed to access ConfigService)
+  // Always create the app first (we need ConfigService)
   const app = await NestFactory.create(AppModule);
-
-  // Get ConfigService instance from the app context
   const configService = app.get(ConfigService);
 
-  // Fetch SSL paths from .env
   const httpsKeyPath = configService.get<string>('SSL_KEY_PATH');
   const httpsCertPath = configService.get<string>('SSL_CERT_PATH');
+  const isSSL = httpsKeyPath && httpsCertPath;
 
-  // Log the fetched values (for debugging)
-  console.log('SSL_KEY_PATH:', httpsKeyPath);
-  console.log('SSL_CERT_PATH:', httpsCertPath);
+  let listenApp = app;
 
-  // Throw a clear error if not set
-  if (!httpsKeyPath || !httpsCertPath) {
-    throw new Error('SSL_KEY_PATH and SSL_CERT_PATH must be set in your environment!');
+  if (isSSL) {
+    // If SSL is configured, close HTTP app and start HTTPS app
+    console.log('SSL enabled: Starting in HTTPS mode');
+    const httpsOptions = {
+      key: fs.readFileSync(httpsKeyPath!),
+      cert: fs.readFileSync(httpsCertPath!),
+    };
+    await app.close();
+    listenApp = await NestFactory.create(AppModule, { httpsOptions });
+  } else {
+    // No SSL: run in HTTP mode (good for local/dev)
+    console.log('SSL not set: Starting in HTTP mode (local/dev)');
   }
 
-  // Prepare HTTPS options
-  const httpsOptions = {
-    key: fs.readFileSync(httpsKeyPath),
-    cert: fs.readFileSync(httpsCertPath),
-  };
-
-  // Close the first app instance and create HTTPS app
-  await app.close();
-  const httpsApp = await NestFactory.create(AppModule, { httpsOptions });
-
-  // Log DATABASE_URL (for debugging)
-  const databaseUrl = httpsApp.get(ConfigService).get<string>('DATABASE_URL');
+  // Print useful config for debugging
+  const databaseUrl = listenApp.get(ConfigService).get<string>('DATABASE_URL');
   console.log('Database URL:', databaseUrl);
 
-  httpsApp.useGlobalPipes(
+  listenApp.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
@@ -54,16 +49,18 @@ async function bootstrap() {
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-  const document = SwaggerModule.createDocument(httpsApp, config);
-  SwaggerModule.setup('api', httpsApp, document);
+  const document = SwaggerModule.createDocument(listenApp, config);
+  SwaggerModule.setup('api', listenApp, document);
 
-  httpsApp.useGlobalFilters(new AllExceptionsFilter());
+  listenApp.useGlobalFilters(new AllExceptionsFilter());
 
-  httpsApp.enableCors({
-    origin: ['https://fanuc.goval.app:444'],
+  listenApp.enableCors({
+    // origin: ['https://fanuc.goval.app:444'],
+    origin: ['http://localhost:5173'],
     credentials: true,
   });
 
-  await httpsApp.listen(process.env.PORT ?? 3000);
+  await listenApp.listen(process.env.PORT ?? 3000);
 }
+
 bootstrap();

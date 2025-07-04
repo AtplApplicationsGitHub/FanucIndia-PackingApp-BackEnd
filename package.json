@@ -50,6 +50,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
+    "@types/lodash.debounce": "^4.0.9",
     "@types/multer": "^1.4.13",
     "@types/node": "^22.10.7",
     "@types/supertest": "^6.0.2",
