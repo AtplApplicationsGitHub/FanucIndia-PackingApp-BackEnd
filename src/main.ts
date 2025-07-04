@@ -4,24 +4,43 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import * as fs from 'fs';
-import { ConfigService } from '@nestjs/config';  // <-- Import ConfigService
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
-  const httpsOptions = {
-    key: fs.readFileSync('/etc/letsencrypt/live/fanuc.goval.app/privkey.pem'),
-    cert: fs.readFileSync('/etc/letsencrypt/live/fanuc.goval.app/fullchain.pem'),
-  };
-
-  const app = await NestFactory.create(AppModule, { httpsOptions });
+  // Create the app instance (needed to access ConfigService)
+  const app = await NestFactory.create(AppModule);
 
   // Get ConfigService instance from the app context
   const configService = app.get(ConfigService);
 
-  // Fetch and log DATABASE_URL
-  const databaseUrl = configService.get<string>('DATABASE_URL');
+  // Fetch SSL paths from .env
+  const httpsKeyPath = configService.get<string>('SSL_KEY_PATH');
+  const httpsCertPath = configService.get<string>('SSL_CERT_PATH');
+
+  // Log the fetched values (for debugging)
+  console.log('SSL_KEY_PATH:', httpsKeyPath);
+  console.log('SSL_CERT_PATH:', httpsCertPath);
+
+  // Throw a clear error if not set
+  if (!httpsKeyPath || !httpsCertPath) {
+    throw new Error('SSL_KEY_PATH and SSL_CERT_PATH must be set in your environment!');
+  }
+
+  // Prepare HTTPS options
+  const httpsOptions = {
+    key: fs.readFileSync(httpsKeyPath),
+    cert: fs.readFileSync(httpsCertPath),
+  };
+
+  // Close the first app instance and create HTTPS app
+  await app.close();
+  const httpsApp = await NestFactory.create(AppModule, { httpsOptions });
+
+  // Log DATABASE_URL (for debugging)
+  const databaseUrl = httpsApp.get(ConfigService).get<string>('DATABASE_URL');
   console.log('Database URL:', databaseUrl);
 
-  app.useGlobalPipes(
+  httpsApp.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
@@ -35,16 +54,16 @@ async function bootstrap() {
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  const document = SwaggerModule.createDocument(httpsApp, config);
+  SwaggerModule.setup('api', httpsApp, document);
 
-  app.useGlobalFilters(new AllExceptionsFilter());
+  httpsApp.useGlobalFilters(new AllExceptionsFilter());
 
-  app.enableCors({
+  httpsApp.enableCors({
     origin: ['https://fanuc.goval.app:444'],
     credentials: true,
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  await httpsApp.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
