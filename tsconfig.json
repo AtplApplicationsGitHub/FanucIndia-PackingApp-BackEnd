@@ -26,6 +26,7 @@
 {
 
   "compilerOptions": {
+<<<<<<< HEAD
 
     "module": "commonjs",                    // CommonJS module format
 
@@ -71,6 +72,30 @@
 
   "exclude": ["node_modules", "dist"]         // Exclude node_modules and dist from compilation
 
+=======
+    "module": "commonjs",                    // CommonJS module format
+    "moduleResolution": "node",              // Use Node.js module resolution
+    "target": "ES2023",                      // Set target to ES2023
+    "declaration": true,                     // Generate declaration files (.d.ts)
+    "removeComments": true,                  // Remove comments in output
+    "emitDecoratorMetadata": true,           // Enable metadata for decorators
+    "experimentalDecorators": true,          // Enable experimental decorators
+    "allowSyntheticDefaultImports": true,    // Allow synthetic default imports
+    "esModuleInterop": true,                 // Enable interoperability between CommonJS and ES modules
+    "sourceMap": true,                       // Generate source maps
+    "outDir": "./dist",                      // Output compiled files to the dist folder
+    "baseUrl": "./",                         // Base URL for module resolution
+    "incremental": true,                     // Enable incremental compilation
+    "skipLibCheck": true,                    // Skip checking types in libraries
+    "strictNullChecks": true,                // Enable strict null checks
+    "forceConsistentCasingInFileNames": true, // Enforce consistent casing in file names
+    "noImplicitAny": false,                  // Allow 'any' type
+    "strictBindCallApply": false,            // Disable strict checks for bind, call, and apply
+    "noFallthroughCasesInSwitch": false      // Allow fallthrough in switch statements
+  },
+  "include": ["src", "prisma"],               // Include 'src' and 'prisma' folders
+  "exclude": ["node_modules", "dist"]         // Exclude node_modules and dist from compilation
+>>>>>>> 29a724e55bbbc909436c4ab4e594daf120bab36b
 }
 
  
