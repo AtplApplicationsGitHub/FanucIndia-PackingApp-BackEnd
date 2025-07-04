@@ -21,4 +21,4 @@ RUN ls -l /app/dist
 # Expose the port the app will run on
 EXPOSE 3010
 # Start the application using the compiled main.js file
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
