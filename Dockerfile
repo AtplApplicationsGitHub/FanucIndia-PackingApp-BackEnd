@@ -11,7 +11,7 @@ RUN npx prisma generate
 # Build the NestJS app (this will generate the dist/ folder)
 RUN npm run build
 # Stage 2: Production image
-FROM node:22-alpine
+FROM node:22-slim
 WORKDIR /app
 # Install only the production dependencies
 COPY --from=builder /app/package*.json ./
