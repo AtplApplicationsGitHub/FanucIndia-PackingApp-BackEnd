@@ -1,5 +1,5 @@
 # Stage 1: Build the NestJS application
-FROM node:22-alpine AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 # Install dependencies
 COPY package*.json ./
@@ -15,7 +15,7 @@ FROM node:22-alpine
 WORKDIR /app
 # Install only the production dependencies
 COPY --from=builder /app/package*.json ./
-RUN npm install --only=production
+RUN npm ci --omit=dev
 # Copy the built app (including dist/ folder) from the builder stage
 COPY --from=builder /app/dist /app/dist
 # Copy the prisma folder (including schema.prisma) from the builder stage
