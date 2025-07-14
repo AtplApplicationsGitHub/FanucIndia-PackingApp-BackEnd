@@ -47,7 +47,6 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma.service");
 const bcrypt = __importStar(require("bcryptjs"));
 const jwt_1 = require("@nestjs/jwt");
-const client_1 = require("@prisma/client");
 let AuthService = class AuthService {
     prisma;
     jwtService;
@@ -66,7 +65,7 @@ let AuthService = class AuthService {
             data: {
                 email: dto.email,
                 password: hash,
-                role: client_1.UserRole.sales,
+                role: dto.role ?? 'sales',
             },
         });
         return {
@@ -80,24 +79,35 @@ let AuthService = class AuthService {
         const user = await this.prisma.user.findUnique({
             where: { email: dto.email },
         });
-        if (!user)
+        if (!user) {
             throw new common_1.UnauthorizedException('Invalid credentials');
-        if (user.role !== dto.role) {
-            throw new common_1.UnauthorizedException(`This user does not have access to the ${dto.role} portal`);
         }
         const valid = await bcrypt.compare(dto.password, user.password);
-        if (!valid)
+        if (!valid) {
             throw new common_1.UnauthorizedException('Invalid credentials');
-        const payload = { sub: user.id, email: user.email, role: user.role };
-        const access_token = this.jwtService.sign(payload);
+        }
+        const token = await this.jwtService.signAsync({
+            sub: user.id,
+            email: user.email,
+            role: user.role,
+        });
         return {
-            access_token,
+            accessToken: token,
             user: {
                 id: user.id,
                 email: user.email,
                 role: user.role,
             },
         };
+    }
+    async checkEmailExists(email) {
+        if (!email)
+            return false;
+        const user = await this.prisma.user.findUnique({
+            where: { email: email.toLowerCase() },
+            select: { id: true },
+        });
+        return !!user;
     }
 };
 exports.AuthService = AuthService;

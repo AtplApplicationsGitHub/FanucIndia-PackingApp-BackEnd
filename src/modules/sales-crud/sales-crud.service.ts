@@ -13,7 +13,6 @@ export class SalesCrudService {
 
   async create(dto: CreateSalesCrudDto, userId: number) {
     try {
-      // Fix: Convert deliveryDate to full ISO string if it's not already
       const deliveryDate =
         dto.deliveryDate && dto.deliveryDate.length === 10
           ? new Date(dto.deliveryDate).toISOString()
@@ -60,7 +59,7 @@ export class SalesCrudService {
     if (!order || order.userId !== userId) {
       throw new ForbiddenException('You can only update your own orders');
     }
-    // TODO: add business rule for time limit check here
+    
     return this.prisma.salesOrder.update({
       where: { id },
       data: dto,
@@ -72,7 +71,7 @@ export class SalesCrudService {
     if (!order || order.userId !== userId) {
       throw new ForbiddenException('You can only delete your own orders');
     }
-    // TODO: add business rule for time limit check here
+    
     return this.prisma.salesOrder.delete({ where: { id } });
   }
 }

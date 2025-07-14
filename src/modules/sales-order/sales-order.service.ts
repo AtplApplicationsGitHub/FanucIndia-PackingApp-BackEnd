@@ -20,7 +20,6 @@ export class SalesOrderService {
     const workbook = new Workbook();
     const worksheet = workbook.addWorksheet('Bulk Import');
 
-    // Define columns
     worksheet.columns = [
       { header: 'Product', key: 'product' },
       { header: 'Sale Order Number', key: 'saleOrderNumber' },
@@ -35,15 +34,12 @@ export class SalesOrderService {
       { header: 'Special Remarks', key: 'specialRemarks' },
     ];
 
-    // Number of rows to pre-populate validations for
     const rowCount = 100;
 
-    // Add empty rows for user to fill
     for (let i = 0; i < rowCount; i++) {
       worksheet.addRow({});
     }
 
-    // Helper to apply dropdown validation to a column
     const applyDropdown = (colKey: string, values: string[]) => {
       for (let row = 2; row <= rowCount + 1; row++) {
         worksheet.getCell(
@@ -56,15 +52,13 @@ export class SalesOrderService {
       }
     };
 
-    // Add data validation for dropdown columns
     applyDropdown('product', lookups.products);
     applyDropdown('transporter', lookups.transporters);
     applyDropdown('plantCode', lookups.plantCodes);
     applyDropdown('salesZone', lookups.salesZones);
     applyDropdown('packConfig', lookups.packConfigs);
-    applyDropdown('paymentClearance', ['Yes', 'No']); // for Payment Clearance
+    applyDropdown('paymentClearance', ['Yes', 'No']); 
 
-    // Set HTTP response headers
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -87,7 +81,6 @@ export class SalesOrderService {
       throw new BadRequestException('Invalid template format');
     }
 
-    // Fetch lookups from DB
     const [products, transporters, plantCodes, salesZones, packConfigs] = await Promise.all([
       prisma.product.findMany(),
       prisma.transporter.findMany(),
@@ -96,7 +89,6 @@ export class SalesOrderService {
       prisma.packConfig.findMany(),
     ]);
 
-    // Build name/code → id maps
     const productMap = new Map(products.map(p => [p.name.trim(), p.id]));
     const transporterMap = new Map(transporters.map(t => [t.name.trim(), t.id]));
     const plantCodeMap = new Map(plantCodes.map(pc => [pc.code.trim(), pc.id]));
@@ -107,7 +99,7 @@ export class SalesOrderService {
     const errors: any[] = [];
 
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber === 1) return; // Skip header
+      if (rowNumber === 1) return;
 
       const [
         product,
@@ -125,7 +117,6 @@ export class SalesOrderService {
 
       if (!product && !saleOrderNumber) return;
 
-      // Map and validate all required fields
       const productId = productMap.get((product || '').toString().trim());
       const transporterId = transporterMap.get((transporter || '').toString().trim());
       const plantCodeId = plantCodeMap.get((plantCode || '').toString().trim());

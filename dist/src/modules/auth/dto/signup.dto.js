@@ -15,6 +15,7 @@ const swagger_1 = require("@nestjs/swagger");
 class SignupDto {
     email;
     password;
+    role;
 }
 exports.SignupDto = SignupDto;
 __decorate([
@@ -23,9 +24,20 @@ __decorate([
     __metadata("design:type", String)
 ], SignupDto.prototype, "email", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'password123', minLength: 6, description: 'Password (min 6 chars)' }),
+    (0, swagger_1.ApiProperty)({ example: 'password123', minLength: 8, description: 'Password (min 8 chars)' }),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MinLength)(6),
+    (0, class_validator_1.MinLength)(8),
     __metadata("design:type", String)
 ], SignupDto.prototype, "password", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        example: 'sales',
+        description: 'User role (sales or admin only)',
+        enum: ['sales', 'admin'],
+        default: 'sales',
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsIn)(['sales', 'admin'], { message: 'role must be either sales or admin' }),
+    __metadata("design:type", String)
+], SignupDto.prototype, "role", void 0);
 //# sourceMappingURL=signup.dto.js.map

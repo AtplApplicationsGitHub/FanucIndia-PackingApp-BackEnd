@@ -34,7 +34,7 @@ export declare class AdminOrderController {
                 id: number;
                 email: string;
                 password: string;
-                role: import(".prisma/client").$Enums.UserRole;
+                role: string;
                 createdAt: Date;
                 updatedAt: Date;
             };

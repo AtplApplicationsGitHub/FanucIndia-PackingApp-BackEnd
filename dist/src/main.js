@@ -48,7 +48,6 @@ async function bootstrap() {
     const isSSL = httpsKeyPath && httpsCertPath;
     let listenApp = app;
     if (isSSL) {
-        console.log('SSL enabled: Starting in HTTPS mode');
         const httpsOptions = {
             key: fs.readFileSync(httpsKeyPath),
             cert: fs.readFileSync(httpsCertPath),
@@ -56,11 +55,7 @@ async function bootstrap() {
         await app.close();
         listenApp = await core_1.NestFactory.create(app_module_1.AppModule, { httpsOptions });
     }
-    else {
-        console.log('SSL not set: Starting in HTTP mode (local/dev)');
-    }
     const databaseUrl = listenApp.get(config_1.ConfigService).get('DATABASE_URL');
-    console.log('Database URL:', databaseUrl);
     listenApp.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
@@ -76,10 +71,10 @@ async function bootstrap() {
     swagger_1.SwaggerModule.setup('api', listenApp, document);
     listenApp.useGlobalFilters(new all_exceptions_filter_1.AllExceptionsFilter());
     listenApp.enableCors({
-        origin: ['http://localhost:5173'],
+        origin: ['http://localhost:3000', 'https://fanuc.goval.app:444'],
         credentials: true,
     });
-    await listenApp.listen(process.env.PORT ?? 3000);
+    await listenApp.listen(process.env.PORT ?? 3001);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

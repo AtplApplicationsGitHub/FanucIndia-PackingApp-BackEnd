@@ -9,15 +9,16 @@ export declare class AuthService {
     signup(dto: SignupDto): Promise<{
         id: number;
         email: string;
-        role: import(".prisma/client").$Enums.UserRole;
+        role: string;
         createdAt: Date;
     }>;
     login(dto: LoginDto): Promise<{
-        access_token: string;
+        accessToken: string;
         user: {
             id: number;
             email: string;
-            role: import(".prisma/client").$Enums.UserRole;
+            role: string;
         };
     }>;
+    checkEmailExists(email: string): Promise<boolean>;
 }

@@ -30,6 +30,12 @@ let AuthController = class AuthController {
     login(dto) {
         return this.authService.login(dto);
     }
+    async checkEmail(email) {
+        if (!email)
+            return { exists: false };
+        const exists = await this.authService.checkEmailExists(email);
+        return { exists };
+    }
 };
 exports.AuthController = AuthController;
 __decorate([
@@ -48,6 +54,14 @@ __decorate([
     __metadata("design:paramtypes", [login_dto_1.LoginDto]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "login", null);
+__decorate([
+    (0, public_decorator_1.Public)(),
+    (0, common_1.Get)('check-email'),
+    __param(0, (0, common_1.Query)('email')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "checkEmail", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Auth'),
     (0, common_1.Controller)('auth'),

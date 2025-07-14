@@ -8,7 +8,6 @@ import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
-import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -28,7 +27,7 @@ export class AuthService {
       data: {
         email: dto.email,
         password: hash,
-        role: UserRole.sales,
+        role: dto.role ?? 'sales',
       },
     });
 
@@ -44,28 +43,38 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    // Add this check!
-    if (user.role !== dto.role) {
-      throw new UnauthorizedException(
-        `This user does not have access to the ${dto.role} portal`,
-      );
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!valid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
-    const access_token = this.jwtService.sign(payload);
+    const token = await this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    });
 
     return {
-      access_token,
+      accessToken: token,
       user: {
         id: user.id,
         email: user.email,
         role: user.role,
       },
     };
+  }
+
+  async checkEmailExists(email: string): Promise<boolean> {
+    if (!email) return false;
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: { id: true },
+    });
+    return !!user;
   }
 }

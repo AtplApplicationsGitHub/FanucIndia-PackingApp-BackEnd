@@ -12,11 +12,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoginDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
-const client_1 = require("@prisma/client");
 class LoginDto {
     email;
     password;
-    role;
 }
 exports.LoginDto = LoginDto;
 __decorate([
@@ -29,13 +27,4 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], LoginDto.prototype, "password", void 0);
-__decorate([
-    (0, swagger_1.ApiProperty)({
-        example: 'admin',
-        description: "Login portal role ('admin' or 'sales')",
-        enum: client_1.UserRole,
-    }),
-    (0, class_validator_1.IsEnum)(client_1.UserRole),
-    __metadata("design:type", String)
-], LoginDto.prototype, "role", void 0);
 //# sourceMappingURL=login.dto.js.map

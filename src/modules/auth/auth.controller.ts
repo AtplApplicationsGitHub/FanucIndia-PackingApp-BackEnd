@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
@@ -20,5 +20,13 @@ export class AuthController {
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Public()
+  @Get('check-email')
+  async checkEmail(@Query('email') email: string) {
+    if (!email) return { exists: false };
+    const exists = await this.authService.checkEmailExists(email);
+    return { exists };
   }
 }

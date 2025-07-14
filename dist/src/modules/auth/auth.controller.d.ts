@@ -7,15 +7,18 @@ export declare class AuthController {
     signup(dto: SignupDto): Promise<{
         id: number;
         email: string;
-        role: import(".prisma/client").$Enums.UserRole;
+        role: string;
         createdAt: Date;
     }>;
     login(dto: LoginDto): Promise<{
-        access_token: string;
+        accessToken: string;
         user: {
             id: number;
             email: string;
-            role: import(".prisma/client").$Enums.UserRole;
+            role: string;
         };
+    }>;
+    checkEmail(email: string): Promise<{
+        exists: boolean;
     }>;
 }

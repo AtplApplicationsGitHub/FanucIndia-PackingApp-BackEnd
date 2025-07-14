@@ -54,7 +54,6 @@ export class AdminOrderService {
     const skip = isFilterActive ? 0 : (parsedPage - 1) * parsedLimit;
     const take = isFilterActive ? total : parsedLimit;
 
-    // === MAIN CHANGE: Add include ===
     const data = await this.prisma.salesOrder.findMany({
       where,
       orderBy: { [sortField]: orderDirection },

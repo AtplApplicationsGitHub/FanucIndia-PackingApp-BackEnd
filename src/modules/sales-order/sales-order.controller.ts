@@ -24,11 +24,10 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 export class SalesOrderController {
   constructor(private readonly salesOrderService: SalesOrderService) {}
 
-  // Excel Template Download
   @Get('template')
   @Roles('sales')
   async downloadTemplate(@Res() res: Response) {
-    // TODO: Fetch these from lookup tables for production; for now, use dummy values
+
     const products = ['Robo X1', 'Robo Y2', 'Robo Z3'];
     const transporters = ['BlueDart', 'DHL', 'FedEx'];
     const plantCodes = ['PL001', 'PL002', 'PL003'];
@@ -49,7 +48,6 @@ export class SalesOrderController {
     });
   }
 
-  // Excel Bulk Import Upload
   @Post('import')
   @Roles('sales')
   @UseInterceptors(FileInterceptor('file'))

@@ -28,11 +28,11 @@ import { APP_GUARD, Reflector } from '@nestjs/core';
     Reflector,
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard, // Protects all routes by default
+      useClass: JwtAuthGuard, 
     },
     {
       provide: APP_GUARD,
-      useClass: RolesGuard, // Role-based guard for @Roles()
+      useClass: RolesGuard, 
     },
   ],
   controllers: [AuthController],
