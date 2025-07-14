@@ -175,7 +175,6 @@ export class SalesOrderService {
 
     const inserted = await prisma.salesOrder.createMany({
       data: ordersToInsert,
-      skipDuplicates: true,
     });
 
     return {

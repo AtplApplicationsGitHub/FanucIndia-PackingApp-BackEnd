@@ -142,7 +142,6 @@ let SalesOrderService = class SalesOrderService {
         }
         const inserted = await prisma.salesOrder.createMany({
             data: ordersToInsert,
-            skipDuplicates: true,
         });
         return {
             message: `Inserted ${inserted.count} orders. ${errors.length > 0 ? 'Some rows had errors.' : ''}`,
