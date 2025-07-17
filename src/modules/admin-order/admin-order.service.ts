@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { UpdateAdminOrderDto } from './dto/update-admin-order.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AdminOrderService {
@@ -16,71 +17,87 @@ export class AdminOrderService {
       sortOrder = 'asc',
     } = query;
 
-    const parsedPage = Number(page) > 0 ? Number(page) : 1;
-    const parsedLimit =
-      Number(limit) > 0 && Number(limit) <= 100 ? Number(limit) : 20;
+    // Normalize pagination
+    const parsedPage  = Number(page)  > 0 ? Number(page)  : 1;
+    const parsedLimit = Number(limit) > 0 && Number(limit) <= 100 ? Number(limit) : 20;
 
-    const allowedSortFields = [
-      'createdAt',
-      'priority',
-      'status',
-      'deliveryDate',
-      'product',
-    ];
+    // Validate sorting
+    const allowedSortFields = ['createdAt', 'priority', 'status', 'deliveryDate'];
     const allowedSortOrders = ['asc', 'desc'];
-    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
-    const orderDirection = allowedSortOrders.includes(sortOrder)
-      ? sortOrder
-      : 'asc';
+    const sortField      = allowedSortFields.includes(sortBy)    ? sortBy    : 'createdAt';
+    const orderDirection = allowedSortOrders.includes(sortOrder) ? sortOrder : 'asc';
 
+    // Build filters
     const where: any = {};
-
     if (product) {
+      // Note: removed `mode: 'insensitive'` because nullable String filters don't support it
       where.product = {
-        name: { contains: product, mode: 'insensitive' },
+        is: {
+          name: {
+            contains: product,
+          },
+        },
       };
     }
-
     if (date) {
-      const start = new Date(date + 'T00:00:00');
-      const end = new Date(start);
+      const start = new Date(`${date}T00:00:00`);
+      const end   = new Date(start);
       end.setDate(end.getDate() + 1);
       where.deliveryDate = { gte: start, lt: end };
     }
 
-    const total = await this.prisma.salesOrder.count({ where });
+    try {
+      // 1) Count total
+      const total = await this.prisma.salesOrder.count({ where });
 
-    const isFilterActive = !!product || !!date;
-    const skip = isFilterActive ? 0 : (parsedPage - 1) * parsedLimit;
-    const take = isFilterActive ? total : parsedLimit;
+      // 2) Early return if none
+      if (total === 0) {
+        return { total: 0, page: 1, limit: 0, data: [] };
+      }
 
-    const data = await this.prisma.salesOrder.findMany({
-      where,
-      orderBy: { [sortField]: orderDirection },
-      skip,
-      take,
-      include: {
-        product: true,
-        transporter: true,
-        plantCode: true,
-        salesZone: true,
-        packConfig: true,
-        user: true,
-      },
-    });
+      const isFilterActive = !!product || !!date;
+      const skip = isFilterActive ? 0 : (parsedPage - 1) * parsedLimit;
+      const take = isFilterActive ? total : parsedLimit;
 
-    return {
-      total,
-      page: isFilterActive ? 1 : parsedPage,
-      limit: isFilterActive ? total : parsedLimit,
-      data,
-    };
+      // 3) Fetch data
+      const data = await this.prisma.salesOrder.findMany({
+        where,
+        orderBy: { [sortField]: orderDirection },
+        skip,
+        take,
+        include: {
+          user:        { select: { id: true, email: true } },
+          product:     { select: { id: true, name: true, code: true } },
+          transporter: { select: { id: true, name: true } },
+          plantCode:   { select: { id: true, code: true, description: true } },
+          salesZone:   { select: { id: true, name: true } },
+          packConfig:  { select: { id: true, configName: true } },
+          terminal: { select: { id: true, name: true } },
+        },
+      });
+
+      return {
+        total,
+        page:  isFilterActive ? 1 : parsedPage,
+        limit: isFilterActive ? total : parsedLimit,
+        data,
+      };
+    } catch (err) {
+
+      // If it's a Prisma validation error, return its message
+      if (err instanceof Prisma.PrismaClientValidationError) {
+        throw new BadRequestException(err.message);
+      }
+      // Otherwise a generic message
+      throw new BadRequestException('Failed to fetch sales orders.');
+    }
   }
 
   async update(id: number, dto: UpdateAdminOrderDto) {
     const order = await this.prisma.salesOrder.findUnique({ where: { id } });
-    if (!order) throw new NotFoundException('Order not found');
-
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
     return this.prisma.salesOrder.update({
       where: { id },
       data: dto,

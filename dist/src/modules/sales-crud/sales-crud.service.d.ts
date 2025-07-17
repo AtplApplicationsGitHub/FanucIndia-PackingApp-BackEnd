@@ -20,6 +20,9 @@ export declare class SalesCrudService {
         plantCodeId: number;
         salesZoneId: number;
         packConfigId: number;
+        terminalId: number | null;
+        customerId: number | null;
+        printerId: number | null;
         status: string;
         priority: number | null;
     }>;
@@ -62,6 +65,9 @@ export declare class SalesCrudService {
         plantCodeId: number;
         salesZoneId: number;
         packConfigId: number;
+        terminalId: number | null;
+        customerId: number | null;
+        printerId: number | null;
         status: string;
         priority: number | null;
     })[]>;
@@ -81,6 +87,9 @@ export declare class SalesCrudService {
         plantCodeId: number;
         salesZoneId: number;
         packConfigId: number;
+        terminalId: number | null;
+        customerId: number | null;
+        printerId: number | null;
         status: string;
         priority: number | null;
     }>;
@@ -100,6 +109,9 @@ export declare class SalesCrudService {
         plantCodeId: number;
         salesZoneId: number;
         packConfigId: number;
+        terminalId: number | null;
+        customerId: number | null;
+        printerId: number | null;
         status: string;
         priority: number | null;
     }>;
@@ -119,6 +131,9 @@ export declare class SalesCrudService {
         plantCodeId: number;
         salesZoneId: number;
         packConfigId: number;
+        terminalId: number | null;
+        customerId: number | null;
+        printerId: number | null;
         status: string;
         priority: number | null;
     }>;

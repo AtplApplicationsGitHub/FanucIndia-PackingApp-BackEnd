@@ -23,6 +23,10 @@ export class SalesCrudService {
           ...dto,
           deliveryDate,
           userId,
+          status: "R105",        
+          terminalId: null,         
+          customerId: null,
+          printerId: null,
         },
       });
       return result;

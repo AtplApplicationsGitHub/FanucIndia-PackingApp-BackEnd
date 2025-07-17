@@ -33,11 +33,11 @@ export declare class AdminOrderController {
             user: {
                 id: number;
                 email: string;
-                password: string;
-                role: string;
-                createdAt: Date;
-                updatedAt: Date;
             };
+            terminal: {
+                id: number;
+                name: string;
+            } | null;
         } & {
             saleOrderNumber: string;
             outboundDelivery: string;
@@ -54,6 +54,9 @@ export declare class AdminOrderController {
             plantCodeId: number;
             salesZoneId: number;
             packConfigId: number;
+            terminalId: number | null;
+            customerId: number | null;
+            printerId: number | null;
             status: string;
             priority: number | null;
         })[];
@@ -74,6 +77,9 @@ export declare class AdminOrderController {
         plantCodeId: number;
         salesZoneId: number;
         packConfigId: number;
+        terminalId: number | null;
+        customerId: number | null;
+        printerId: number | null;
         status: string;
         priority: number | null;
     }>;

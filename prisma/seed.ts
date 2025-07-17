@@ -42,6 +42,33 @@ async function main() {
     ],
   });
 
+  // Insert Terminals
+  await prisma.terminal.createMany({
+    data: [
+      { name: 'Terminal A' },
+      { name: 'Terminal B' },
+      { name: 'Terminal C' },
+    ],
+  });
+
+  // Insert Customers
+  await prisma.customer.createMany({
+    data: [
+      { name: 'AA', address: 'India' },
+      { name: 'BB', address: 'USA' },
+      { name: 'CC', address: 'UK' },
+    ],
+  });
+
+  // Insert Printers
+  await prisma.printer.createMany({
+    data: [
+      { name: 'Printer 1' },
+      { name: 'Printer 2' },
+      { name: 'Printer 3' },
+    ],
+  });
+
   const adminEmail = 'admin@fanuc.com';
   const adminPassword = 'FanucAdmin123';
 

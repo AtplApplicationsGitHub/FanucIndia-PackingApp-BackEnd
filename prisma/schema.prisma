@@ -11,7 +11,7 @@ model User {
   id          Int          @id @default(autoincrement())
   email       String       @unique
   password    String
-  role        String     @default("sales")  
+  role        String       @default("sales")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   salesOrders SalesOrder[]
@@ -49,6 +49,25 @@ model PackConfig {
   salesOrders SalesOrder[]
 }
 
+model Terminal {
+  id          Int          @id @default(autoincrement())
+  name        String
+  salesOrders SalesOrder[]
+}
+
+model Customer {
+  id          Int          @id @default(autoincrement())
+  name        String
+  address     String
+  salesOrders SalesOrder[]
+}
+
+model Printer {
+  id          Int          @id @default(autoincrement())
+  name        String
+  salesOrders SalesOrder[]
+}
+
 model SalesOrder {
   id               Int         @id @default(autoincrement())
   userId           Int
@@ -62,8 +81,11 @@ model SalesOrder {
   paymentClearance Boolean
   salesZoneId      Int
   packConfigId     Int
+  terminalId        Int?
+  customerId        Int?
+  printerId         Int?
   specialRemarks   String?
-  status           String      @default("MD")
+  status           String  
   priority         Int?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -72,5 +94,8 @@ model SalesOrder {
   product          Product     @relation(fields: [productId], references: [id])
   salesZone        SalesZone   @relation(fields: [salesZoneId], references: [id])
   transporter      Transporter @relation(fields: [transporterId], references: [id])
+  terminal          Terminal?    @relation(fields: [terminalId], references: [id])
+  customer          Customer?    @relation(fields: [customerId], references: [id])
+  printer           Printer?     @relation(fields: [printerId], references: [id])
   user             User        @relation(fields: [userId], references: [id])
 }

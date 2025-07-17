@@ -70,6 +70,27 @@ async function main() {
             { configName: '4 SO# 1 Box' },
         ],
     });
+    await prisma.terminal.createMany({
+        data: [
+            { name: 'Terminal A' },
+            { name: 'Terminal B' },
+            { name: 'Terminal C' },
+        ],
+    });
+    await prisma.customer.createMany({
+        data: [
+            { name: 'AA', address: 'India' },
+            { name: 'BB', address: 'USA' },
+            { name: 'CC', address: 'UK' },
+        ],
+    });
+    await prisma.printer.createMany({
+        data: [
+            { name: 'Printer 1' },
+            { name: 'Printer 2' },
+            { name: 'Printer 3' },
+        ],
+    });
     const adminEmail = 'admin@fanuc.com';
     const adminPassword = 'FanucAdmin123';
     const existingAdmin = await prisma.user.findUnique({

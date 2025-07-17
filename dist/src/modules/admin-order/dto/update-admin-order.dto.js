@@ -15,10 +15,22 @@ const swagger_1 = require("@nestjs/swagger");
 class UpdateAdminOrderDto {
     status;
     priority;
+    terminalId;
+    saleOrderNumber;
+    outboundDelivery;
+    transferOrder;
+    deliveryDate;
+    specialRemarks;
+    productId;
+    transporterId;
+    plantCodeId;
+    paymentClearance;
+    salesZoneId;
+    packConfigId;
 }
 exports.UpdateAdminOrderDto = UpdateAdminOrderDto;
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'MD', description: 'Order status' }),
+    (0, swagger_1.ApiPropertyOptional)({ example: 'R105', description: 'Order status' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
@@ -29,4 +41,76 @@ __decorate([
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
 ], UpdateAdminOrderDto.prototype, "priority", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 1, description: 'Terminal ID' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], UpdateAdminOrderDto.prototype, "terminalId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'SO123456', description: 'Sale Order Number' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "saleOrderNumber", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'OB7890', description: 'Outbound Delivery' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "outboundDelivery", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'TR999', description: 'Transfer Order' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "transferOrder", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: '2025-07-18', description: 'Delivery Date (ISO)' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "deliveryDate", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Delivery is urgent', description: 'Special Remarks' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "specialRemarks", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 1, description: 'Product ID' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], UpdateAdminOrderDto.prototype, "productId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 2, description: 'Transporter ID' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], UpdateAdminOrderDto.prototype, "transporterId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 3, description: 'Plant Code ID' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], UpdateAdminOrderDto.prototype, "plantCodeId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: true, description: 'Payment Clearance' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateAdminOrderDto.prototype, "paymentClearance", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 4, description: 'Sales Zone ID' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], UpdateAdminOrderDto.prototype, "salesZoneId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 5, description: 'Pack Config ID' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], UpdateAdminOrderDto.prototype, "packConfigId", void 0);
 //# sourceMappingURL=update-admin-order.dto.js.map
