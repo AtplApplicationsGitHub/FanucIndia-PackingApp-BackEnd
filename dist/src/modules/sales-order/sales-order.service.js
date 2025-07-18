@@ -12,7 +12,7 @@ const exceljs_1 = require("exceljs");
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 let SalesOrderService = class SalesOrderService {
-    async generateBulkTemplate(res, lookups) {
+    async generateBulkTemplate(res) {
         const workbook = new exceljs_1.Workbook();
         const worksheet = workbook.addWorksheet('Bulk Import');
         worksheet.columns = [
@@ -29,9 +29,20 @@ let SalesOrderService = class SalesOrderService {
             { header: 'Special Remarks', key: 'specialRemarks' },
         ];
         const rowCount = 100;
-        for (let i = 0; i < rowCount; i++) {
+        const [products, transporters, plantCodes, salesZones, packConfigs] = await Promise.all([
+            prisma.product.findMany({ orderBy: { name: 'asc' } }),
+            prisma.transporter.findMany({ orderBy: { name: 'asc' } }),
+            prisma.plantCode.findMany({ orderBy: { code: 'asc' } }),
+            prisma.salesZone.findMany({ orderBy: { name: 'asc' } }),
+            prisma.packConfig.findMany({ orderBy: { configName: 'asc' } }),
+        ]);
+        const productNames = products.map((p) => p.name);
+        const transporterNames = transporters.map((t) => t.name);
+        const plantCodeCodes = plantCodes.map((p) => p.code);
+        const salesZoneNames = salesZones.map((s) => s.name);
+        const packConfigNames = packConfigs.map((p) => p.configName);
+        for (let i = 0; i < rowCount; i++)
             worksheet.addRow({});
-        }
         const applyDropdown = (colKey, values) => {
             for (let row = 2; row <= rowCount + 1; row++) {
                 worksheet.getCell(`${worksheet.getColumn(colKey).letter}${row}`).dataValidation = {
@@ -41,11 +52,11 @@ let SalesOrderService = class SalesOrderService {
                 };
             }
         };
-        applyDropdown('product', lookups.products);
-        applyDropdown('transporter', lookups.transporters);
-        applyDropdown('plantCode', lookups.plantCodes);
-        applyDropdown('salesZone', lookups.salesZones);
-        applyDropdown('packConfig', lookups.packConfigs);
+        applyDropdown('product', productNames);
+        applyDropdown('transporter', transporterNames);
+        applyDropdown('plantCode', plantCodeCodes);
+        applyDropdown('salesZone', salesZoneNames);
+        applyDropdown('packConfig', packConfigNames);
         applyDropdown('paymentClearance', ['Yes', 'No']);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', 'attachment; filename="sales_bulk_template.xlsx"');
@@ -66,11 +77,11 @@ let SalesOrderService = class SalesOrderService {
             prisma.salesZone.findMany(),
             prisma.packConfig.findMany(),
         ]);
-        const productMap = new Map(products.map(p => [p.name.trim(), p.id]));
-        const transporterMap = new Map(transporters.map(t => [t.name.trim(), t.id]));
-        const plantCodeMap = new Map(plantCodes.map(pc => [pc.code.trim(), pc.id]));
-        const salesZoneMap = new Map(salesZones.map(sz => [sz.name.trim(), sz.id]));
-        const packConfigMap = new Map(packConfigs.map(pc => [pc.configName.trim(), pc.id]));
+        const productMap = new Map(products.map((p) => [p.name.trim(), p.id]));
+        const transporterMap = new Map(transporters.map((t) => [t.name.trim(), t.id]));
+        const plantCodeMap = new Map(plantCodes.map((pc) => [pc.code.trim(), pc.id]));
+        const salesZoneMap = new Map(salesZones.map((sz) => [sz.name.trim(), sz.id]));
+        const packConfigMap = new Map(packConfigs.map((pc) => [pc.configName.trim(), pc.id]));
         const ordersToInsert = [];
         const errors = [];
         worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
@@ -99,7 +110,10 @@ let SalesOrderService = class SalesOrderService {
                 errList.push('Invalid transporter');
             if (!plantCodeId)
                 errList.push('Invalid plantCode');
-            if (paymentClearance !== 'Yes' && paymentClearance !== 'No' && paymentClearance !== true && paymentClearance !== false)
+            if (paymentClearance !== 'Yes' &&
+                paymentClearance !== 'No' &&
+                paymentClearance !== true &&
+                paymentClearance !== false)
                 errList.push('Invalid paymentClearance (must be Yes or No)');
             if (!salesZoneId)
                 errList.push('Invalid salesZone');
@@ -116,7 +130,10 @@ let SalesOrderService = class SalesOrderService {
                     throw new Error();
             }
             catch {
-                errors.push({ row: rowNumber, errors: ['Invalid deliveryDate format'] });
+                errors.push({
+                    row: rowNumber,
+                    errors: ['Invalid deliveryDate format'],
+                });
                 return;
             }
             ordersToInsert.push({

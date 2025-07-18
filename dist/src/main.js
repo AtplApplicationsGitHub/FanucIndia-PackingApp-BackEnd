@@ -74,7 +74,7 @@ async function bootstrap() {
         origin: ['http://localhost:3000', 'https://fanuc.goval.app:444'],
         credentials: true,
     });
-    await listenApp.listen(process.env.PORT ?? 3001);
+    await listenApp.listen(process.env.PORT ?? 3010);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

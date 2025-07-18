@@ -8,7 +8,7 @@ import {
   UseGuards,
   UseInterceptors,
   HttpException,
-  HttpStatus
+  HttpStatus,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { SalesOrderService } from './sales-order.service';
@@ -27,37 +27,19 @@ export class SalesOrderController {
   @Get('template')
   @Roles('sales')
   async downloadTemplate(@Res() res: Response) {
-
-    const products = ['Robo X1', 'Robo Y2', 'Robo Z3'];
-    const transporters = ['BlueDart', 'DHL', 'FedEx'];
-    const plantCodes = ['PL001', 'PL002', 'PL003'];
-    const salesZones = ['North', 'South', 'East', 'West'];
-    const packConfigs = [
-      '1 SO# 1 Box',
-      '2 SO# 1 Box',
-      '3 SO# 1 Box',
-      '4 SO# 1 Box',
-    ];
-
-    await this.salesOrderService.generateBulkTemplate(res, {
-      products,
-      transporters,
-      plantCodes,
-      salesZones,
-      packConfigs,
-    });
+    await this.salesOrderService.generateBulkTemplate(res);
   }
 
   @Post('import')
   @Roles('sales')
   @UseInterceptors(FileInterceptor('file'))
-  async bulkImport(
-    @UploadedFile() file: any, 
-    @Req() req: any,
-  ) {
+  async bulkImport(@UploadedFile() file: any, @Req() req: any) {
     if (!file) {
       throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
     }
-    return this.salesOrderService.importBulkOrders(file.buffer, req.user['userId']);
+    return this.salesOrderService.importBulkOrders(
+      file.buffer,
+      req.user['userId'],
+    );
   }
 }

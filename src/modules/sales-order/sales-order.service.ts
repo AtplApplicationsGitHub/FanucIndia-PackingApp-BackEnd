@@ -7,16 +7,7 @@ const prisma = new PrismaClient();
 
 @Injectable()
 export class SalesOrderService {
-  async generateBulkTemplate(
-    res: Response,
-    lookups: {
-      products: string[];
-      transporters: string[];
-      plantCodes: string[];
-      salesZones: string[];
-      packConfigs: string[];
-    },
-  ) {
+  async generateBulkTemplate(res: Response) {
     const workbook = new Workbook();
     const worksheet = workbook.addWorksheet('Bulk Import');
 
@@ -36,9 +27,24 @@ export class SalesOrderService {
 
     const rowCount = 100;
 
-    for (let i = 0; i < rowCount; i++) {
-      worksheet.addRow({});
-    }
+    // Fetch fresh lookups from DB
+    const [products, transporters, plantCodes, salesZones, packConfigs] =
+      await Promise.all([
+        prisma.product.findMany({ orderBy: { name: 'asc' } }),
+        prisma.transporter.findMany({ orderBy: { name: 'asc' } }),
+        prisma.plantCode.findMany({ orderBy: { code: 'asc' } }),
+        prisma.salesZone.findMany({ orderBy: { name: 'asc' } }),
+        prisma.packConfig.findMany({ orderBy: { configName: 'asc' } }),
+      ]);
+
+    const productNames = products.map((p) => p.name);
+    const transporterNames = transporters.map((t) => t.name);
+    const plantCodeCodes = plantCodes.map((p) => p.code);
+    const salesZoneNames = salesZones.map((s) => s.name);
+    const packConfigNames = packConfigs.map((p) => p.configName);
+
+    // Add rows
+    for (let i = 0; i < rowCount; i++) worksheet.addRow({});
 
     const applyDropdown = (colKey: string, values: string[]) => {
       for (let row = 2; row <= rowCount + 1; row++) {
@@ -52,12 +58,12 @@ export class SalesOrderService {
       }
     };
 
-    applyDropdown('product', lookups.products);
-    applyDropdown('transporter', lookups.transporters);
-    applyDropdown('plantCode', lookups.plantCodes);
-    applyDropdown('salesZone', lookups.salesZones);
-    applyDropdown('packConfig', lookups.packConfigs);
-    applyDropdown('paymentClearance', ['Yes', 'No']); 
+    applyDropdown('product', productNames);
+    applyDropdown('transporter', transporterNames);
+    applyDropdown('plantCode', plantCodeCodes);
+    applyDropdown('salesZone', salesZoneNames);
+    applyDropdown('packConfig', packConfigNames);
+    applyDropdown('paymentClearance', ['Yes', 'No']);
 
     res.setHeader(
       'Content-Type',
@@ -81,19 +87,28 @@ export class SalesOrderService {
       throw new BadRequestException('Invalid template format');
     }
 
-    const [products, transporters, plantCodes, salesZones, packConfigs] = await Promise.all([
-      prisma.product.findMany(),
-      prisma.transporter.findMany(),
-      prisma.plantCode.findMany(),
-      prisma.salesZone.findMany(),
-      prisma.packConfig.findMany(),
-    ]);
+    const [products, transporters, plantCodes, salesZones, packConfigs] =
+      await Promise.all([
+        prisma.product.findMany(),
+        prisma.transporter.findMany(),
+        prisma.plantCode.findMany(),
+        prisma.salesZone.findMany(),
+        prisma.packConfig.findMany(),
+      ]);
 
-    const productMap = new Map(products.map(p => [p.name.trim(), p.id]));
-    const transporterMap = new Map(transporters.map(t => [t.name.trim(), t.id]));
-    const plantCodeMap = new Map(plantCodes.map(pc => [pc.code.trim(), pc.id]));
-    const salesZoneMap = new Map(salesZones.map(sz => [sz.name.trim(), sz.id]));
-    const packConfigMap = new Map(packConfigs.map(pc => [pc.configName.trim(), pc.id]));
+    const productMap = new Map(products.map((p) => [p.name.trim(), p.id]));
+    const transporterMap = new Map(
+      transporters.map((t) => [t.name.trim(), t.id]),
+    );
+    const plantCodeMap = new Map(
+      plantCodes.map((pc) => [pc.code.trim(), pc.id]),
+    );
+    const salesZoneMap = new Map(
+      salesZones.map((sz) => [sz.name.trim(), sz.id]),
+    );
+    const packConfigMap = new Map(
+      packConfigs.map((pc) => [pc.configName.trim(), pc.id]),
+    );
 
     const ordersToInsert: any[] = [];
     const errors: any[] = [];
@@ -118,10 +133,14 @@ export class SalesOrderService {
       if (!product && !saleOrderNumber) return;
 
       const productId = productMap.get((product || '').toString().trim());
-      const transporterId = transporterMap.get((transporter || '').toString().trim());
+      const transporterId = transporterMap.get(
+        (transporter || '').toString().trim(),
+      );
       const plantCodeId = plantCodeMap.get((plantCode || '').toString().trim());
       const salesZoneId = salesZoneMap.get((salesZone || '').toString().trim());
-      const packConfigId = packConfigMap.get((packConfig || '').toString().trim());
+      const packConfigId = packConfigMap.get(
+        (packConfig || '').toString().trim(),
+      );
 
       const errList: string[] = [];
       if (!productId) errList.push('Invalid product');
@@ -131,7 +150,12 @@ export class SalesOrderService {
       if (!deliveryDate) errList.push('Missing deliveryDate');
       if (!transporterId) errList.push('Invalid transporter');
       if (!plantCodeId) errList.push('Invalid plantCode');
-      if (paymentClearance !== 'Yes' && paymentClearance !== 'No' && paymentClearance !== true && paymentClearance !== false)
+      if (
+        paymentClearance !== 'Yes' &&
+        paymentClearance !== 'No' &&
+        paymentClearance !== true &&
+        paymentClearance !== false
+      )
         errList.push('Invalid paymentClearance (must be Yes or No)');
       if (!salesZoneId) errList.push('Invalid salesZone');
       if (!packConfigId) errList.push('Invalid packConfig');
@@ -146,7 +170,10 @@ export class SalesOrderService {
         deliveryDateISO = new Date(deliveryDate);
         if (isNaN(deliveryDateISO.getTime())) throw new Error();
       } catch {
-        errors.push({ row: rowNumber, errors: ['Invalid deliveryDate format'] });
+        errors.push({
+          row: rowNumber,
+          errors: ['Invalid deliveryDate format'],
+        });
         return;
       }
 
@@ -158,7 +185,8 @@ export class SalesOrderService {
         deliveryDate: deliveryDateISO,
         transporterId,
         plantCodeId,
-        paymentClearance: paymentClearance === 'Yes' || paymentClearance === true,
+        paymentClearance:
+          paymentClearance === 'Yes' || paymentClearance === true,
         salesZoneId,
         packConfigId,
         specialRemarks: specialRemarks ? specialRemarks.toString() : undefined,

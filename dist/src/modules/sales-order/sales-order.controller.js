@@ -25,23 +25,7 @@ let SalesOrderController = class SalesOrderController {
         this.salesOrderService = salesOrderService;
     }
     async downloadTemplate(res) {
-        const products = ['Robo X1', 'Robo Y2', 'Robo Z3'];
-        const transporters = ['BlueDart', 'DHL', 'FedEx'];
-        const plantCodes = ['PL001', 'PL002', 'PL003'];
-        const salesZones = ['North', 'South', 'East', 'West'];
-        const packConfigs = [
-            '1 SO# 1 Box',
-            '2 SO# 1 Box',
-            '3 SO# 1 Box',
-            '4 SO# 1 Box',
-        ];
-        await this.salesOrderService.generateBulkTemplate(res, {
-            products,
-            transporters,
-            plantCodes,
-            salesZones,
-            packConfigs,
-        });
+        await this.salesOrderService.generateBulkTemplate(res);
     }
     async bulkImport(file, req) {
         if (!file) {
