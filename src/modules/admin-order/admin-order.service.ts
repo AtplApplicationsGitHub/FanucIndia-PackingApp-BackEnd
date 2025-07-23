@@ -32,49 +32,48 @@ export class AdminOrderService {
       'deliveryDate',
     ];
     const allowedSortOrders = ['asc', 'desc'];
-    const sortField =
-      allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
-    const orderDirection =
-      allowedSortOrders.includes(sortOrder) ? sortOrder : 'asc';
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const orderDirection = allowedSortOrders.includes(sortOrder)
+      ? sortOrder
+      : 'asc';
 
     const where: Prisma.SalesOrderWhereInput = {};
 
-    // Text & related-model search
     if (search) {
       const lower = search.toLowerCase();
       const num = Number(search);
 
       where.OR = [
-        { user:        { is: { name:           { contains: search } } } },
-        { product:     { is: { name:           { contains: search } } } },
-        { transporter: { is: { name:           { contains: search } } } },
-        { plantCode:   { is: { code:           { contains: search } } } },
-        { salesZone:   { is: { name:           { contains: search } } } },
-        { packConfig:  { is: { configName:     { contains: search } } } },
+        { user: { is: { name: { contains: search } } } },
+        { product: { is: { name: { contains: search } } } },
+        { transporter: { is: { name: { contains: search } } } },
+        { plantCode: { is: { code: { contains: search } } } },
+        { salesZone: { is: { name: { contains: search } } } },
+        { packConfig: { is: { configName: { contains: search } } } },
 
         { saleOrderNumber: { contains: search } },
         { outboundDelivery: { contains: search } },
-        { transferOrder:    { contains: search } },
-        { status:           { contains: search } },
-        { specialRemarks:   { contains: search } },
+        { transferOrder: { contains: search } },
+        { status: { contains: search } },
+        { specialRemarks: { contains: search } },
 
         ...(lower === 'yes' || lower === 'no'
           ? [{ paymentClearance: { equals: lower === 'yes' } }]
           : []),
-        ...(!isNaN(num)
-          ? [{ priority: { equals: num } }]
-          : []),
+        ...(!isNaN(num) ? [{ priority: { equals: num } }] : []),
       ];
     }
 
-    // Date filter (local midnight)
     if (date) {
-      // date string in YYYY-MM-DD
       const [y, m, d] = date.split('-').map(Number);
-      // local midnight
-      const start = new Date(y, m - 1, d, 0, 0, 0);
-      const end = new Date(y, m - 1, d + 1, 0, 0, 0);
-      where.deliveryDate = { gte: start, lt: end };
+
+      const startUtc = new Date(
+        Date.UTC(y, m - 1, d, 0, 0, 0) - 5.5 * 60 * 60 * 1000,
+      );
+      const endUtc = new Date(
+        Date.UTC(y, m - 1, d, 23, 59, 59, 999) - 5.5 * 60 * 60 * 1000,
+      );
+      where.deliveryDate = { gte: startUtc, lte: endUtc };
     }
 
     try {
@@ -93,13 +92,13 @@ export class AdminOrderService {
         skip,
         take,
         include: {
-          user:        { select: { id: true, name: true, email: true } },
-          product:     { select: { id: true, name: true, code: true } },
+          user: { select: { id: true, name: true, email: true } },
+          product: { select: { id: true, name: true, code: true } },
           transporter: { select: { id: true, name: true } },
-          plantCode:   { select: { id: true, code: true, description: true } },
-          salesZone:   { select: { id: true, name: true } },
-          packConfig:  { select: { id: true, configName: true } },
-          terminal:    { select: { id: true, name: true } },
+          plantCode: { select: { id: true, code: true, description: true } },
+          salesZone: { select: { id: true, name: true } },
+          packConfig: { select: { id: true, configName: true } },
+          terminal: { select: { id: true, name: true } },
         },
       });
 

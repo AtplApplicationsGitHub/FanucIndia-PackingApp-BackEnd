@@ -30,7 +30,9 @@ let AdminOrderService = class AdminOrderService {
         ];
         const allowedSortOrders = ['asc', 'desc'];
         const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
-        const orderDirection = allowedSortOrders.includes(sortOrder) ? sortOrder : 'asc';
+        const orderDirection = allowedSortOrders.includes(sortOrder)
+            ? sortOrder
+            : 'asc';
         const where = {};
         if (search) {
             const lower = search.toLowerCase();
@@ -50,16 +52,14 @@ let AdminOrderService = class AdminOrderService {
                 ...(lower === 'yes' || lower === 'no'
                     ? [{ paymentClearance: { equals: lower === 'yes' } }]
                     : []),
-                ...(!isNaN(num)
-                    ? [{ priority: { equals: num } }]
-                    : []),
+                ...(!isNaN(num) ? [{ priority: { equals: num } }] : []),
             ];
         }
         if (date) {
             const [y, m, d] = date.split('-').map(Number);
-            const start = new Date(y, m - 1, d, 0, 0, 0);
-            const end = new Date(y, m - 1, d + 1, 0, 0, 0);
-            where.deliveryDate = { gte: start, lt: end };
+            const startUtc = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - 5.5 * 60 * 60 * 1000);
+            const endUtc = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) - 5.5 * 60 * 60 * 1000);
+            where.deliveryDate = { gte: startUtc, lte: endUtc };
         }
         try {
             const total = await this.prisma.salesOrder.count({ where });
