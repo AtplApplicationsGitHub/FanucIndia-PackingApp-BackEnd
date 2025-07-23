@@ -31,13 +31,15 @@ let SalesOrderController = class SalesOrderController {
         if (!file) {
             throw new common_1.HttpException('No file uploaded', common_1.HttpStatus.BAD_REQUEST);
         }
-        return this.salesOrderService.importBulkOrders(file.buffer, req.user['userId']);
+        return this.salesOrderService.importBulkOrders(file.buffer, req.user.userId);
     }
 };
 exports.SalesOrderController = SalesOrderController;
 __decorate([
     (0, common_1.Get)('template'),
     (0, roles_decorator_1.Roles)('sales'),
+    (0, swagger_1.ApiOperation)({ summary: 'Download sales order Excel template' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Excel file downloaded' }),
     __param(0, (0, common_1.Res)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -47,6 +49,27 @@ __decorate([
     (0, common_1.Post)('import'),
     (0, roles_decorator_1.Roles)('sales'),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
+    (0, swagger_1.ApiOperation)({ summary: 'Import bulk sales orders via Excel file' }),
+    (0, swagger_1.ApiConsumes)('multipart/form-data'),
+    (0, swagger_1.ApiBody)({
+        schema: {
+            type: 'object',
+            properties: {
+                file: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+        },
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 201,
+        description: 'Sales orders imported successfully',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 400,
+        description: 'No file uploaded or invalid format',
+    }),
     __param(0, (0, common_1.UploadedFile)()),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),

@@ -23,6 +23,11 @@ export class UpdateAdminOrderDto {
   @IsInt()
   terminalId?: number;
 
+  @ApiPropertyOptional({ example: 1, description: 'Customer ID (lookup)' })
+  @IsInt()
+  @IsOptional()
+  customerId?: number;
+
   @ApiPropertyOptional({ example: 'SO123456', description: 'Sale Order Number' })
   @IsOptional()
   @IsString()

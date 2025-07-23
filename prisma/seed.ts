@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+
 const prisma = new PrismaClient();
 
 async function main() {
@@ -11,10 +12,12 @@ async function main() {
       { name: 'Robo Z3', code: 'Z3' },
     ],
   });
+
   // Insert Transporters
   await prisma.transporter.createMany({
     data: [{ name: 'BlueDart' }, { name: 'DHL' }, { name: 'FedEx' }],
   });
+
   // Insert Plant Codes
   await prisma.plantCode.createMany({
     data: [
@@ -23,6 +26,7 @@ async function main() {
       { code: 'PL003', description: 'Plant 3' },
     ],
   });
+
   // Insert Sales Zones
   await prisma.salesZone.createMany({
     data: [
@@ -32,6 +36,7 @@ async function main() {
       { name: 'West' },
     ],
   });
+
   // Insert Packing Configs
   await prisma.packConfig.createMany({
     data: [
@@ -71,6 +76,7 @@ async function main() {
 
   const adminEmail = 'admin@fanuc.com';
   const adminPassword = 'FanucAdmin123';
+  const adminName = 'FanucAdmin';
 
   const existingAdmin = await prisma.user.findUnique({
     where: { email: adminEmail },
@@ -79,9 +85,29 @@ async function main() {
   if (!existingAdmin) {
     await prisma.user.create({
       data: {
+        name: adminName,
         email: adminEmail,
         password: await bcrypt.hash(adminPassword, 10),
         role: 'admin',
+      },
+    });
+  }
+
+  const salesEmail = 'user1@example.com';
+  const salesPassword = 'Demo123!@#';
+  const salesName = 'User 1';
+
+  const existingSalesUser = await prisma.user.findUnique({
+    where: { email: salesEmail },
+  });
+
+  if (!existingSalesUser) {
+    await prisma.user.create({
+      data: {
+        name: salesName,
+        email: salesEmail,
+        password: await bcrypt.hash(salesPassword, 10),
+        role: 'sales',
       },
     });
   }

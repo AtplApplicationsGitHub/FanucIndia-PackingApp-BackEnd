@@ -44,6 +44,10 @@ export class CreateSalesCrudDto {
   @IsInt()
   packConfigId: number;
 
+  @ApiProperty({ example: 1, description: 'Customer ID (lookup)' })
+  @IsInt()
+  customerId: number;
+
   @ApiPropertyOptional({ example: 'Handle with care', description: 'Special Remarks (optional)' })
   @IsString()
   @IsOptional()

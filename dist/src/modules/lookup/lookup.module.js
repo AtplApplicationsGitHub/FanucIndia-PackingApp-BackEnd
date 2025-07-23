@@ -10,14 +10,13 @@ exports.LookupModule = void 0;
 const common_1 = require("@nestjs/common");
 const lookup_controller_1 = require("./lookup.controller");
 const lookup_service_1 = require("./lookup.service");
-const prisma_service_1 = require("../../prisma.service");
 let LookupModule = class LookupModule {
 };
 exports.LookupModule = LookupModule;
 exports.LookupModule = LookupModule = __decorate([
     (0, common_1.Module)({
         controllers: [lookup_controller_1.LookupController],
-        providers: [lookup_service_1.LookupService, prisma_service_1.PrismaService],
+        providers: [lookup_service_1.LookupService],
         exports: [lookup_service_1.LookupService],
     })
 ], LookupModule);

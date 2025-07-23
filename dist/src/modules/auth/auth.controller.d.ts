@@ -6,6 +6,7 @@ export declare class AuthController {
     constructor(authService: AuthService);
     signup(dto: SignupDto): Promise<{
         id: number;
+        name: string;
         email: string;
         role: string;
         createdAt: Date;
@@ -14,11 +15,14 @@ export declare class AuthController {
         accessToken: string;
         user: {
             id: number;
+            name: string;
             email: string;
             role: string;
         };
     }>;
     checkEmail(email: string): Promise<{
         exists: boolean;
-    }>;
+    }> | {
+        exists: boolean;
+    };
 }

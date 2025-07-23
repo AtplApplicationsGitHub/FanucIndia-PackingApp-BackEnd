@@ -23,6 +23,7 @@ class CreateSalesCrudDto {
     paymentClearance;
     salesZoneId;
     packConfigId;
+    customerId;
     specialRemarks;
 }
 exports.CreateSalesCrudDto = CreateSalesCrudDto;
@@ -76,6 +77,11 @@ __decorate([
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
 ], CreateSalesCrudDto.prototype, "packConfigId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 1, description: 'Customer ID (lookup)' }),
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], CreateSalesCrudDto.prototype, "customerId", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 'Handle with care', description: 'Special Remarks (optional)' }),
     (0, class_validator_1.IsString)(),

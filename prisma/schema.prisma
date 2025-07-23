@@ -9,6 +9,7 @@ datasource db {
 
 model User {
   id          Int          @id @default(autoincrement())
+  name        String
   email       String       @unique
   password    String
   role        String       @default("sales")
@@ -81,21 +82,38 @@ model SalesOrder {
   paymentClearance Boolean
   salesZoneId      Int
   packConfigId     Int
-  terminalId        Int?
-  customerId        Int?
-  printerId         Int?
+  terminalId       Int?
+  customerId       Int?
+  printerId        Int?
   specialRemarks   String?
-  status           String  
+  status           String      @default("R105")
   priority         Int?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+  customer         Customer?   @relation(fields: [customerId], references: [id])
   packConfig       PackConfig  @relation(fields: [packConfigId], references: [id])
   plantCode        PlantCode   @relation(fields: [plantCodeId], references: [id])
+  printer          Printer?    @relation(fields: [printerId], references: [id])
   product          Product     @relation(fields: [productId], references: [id])
   salesZone        SalesZone   @relation(fields: [salesZoneId], references: [id])
+  terminal         Terminal?   @relation(fields: [terminalId], references: [id])
   transporter      Transporter @relation(fields: [transporterId], references: [id])
-  terminal          Terminal?    @relation(fields: [terminalId], references: [id])
-  customer          Customer?    @relation(fields: [customerId], references: [id])
-  printer           Printer?     @relation(fields: [printerId], references: [id])
   user             User        @relation(fields: [userId], references: [id])
+}
+
+model ERP_Material_Data {
+  ID                   BigInt  @id(map: "PK_ERP_Material_Data") @default(autoincrement())
+  saleOrderNumber      String? @db.NVarChar(500)
+  transferOrder        String?
+  CustomerName         String?
+  Machine_Model        String?
+  Material_Code        String?
+  Material_Description String?
+  Batch_No             String? @db.NVarChar(100)
+  SO_Donor_Batch       String? @db.NVarChar(100)
+  Cert_No              String? @db.NVarChar(100)
+  Bin_No               String? @db.NVarChar(100)
+  A_D_F                String? @db.NVarChar(100)
+  Required_Qty         Int?
+  Status               String? @db.NVarChar(100)
 }

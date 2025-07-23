@@ -10,14 +10,13 @@ exports.SalesCrudModule = void 0;
 const common_1 = require("@nestjs/common");
 const sales_crud_controller_1 = require("./sales-crud.controller");
 const sales_crud_service_1 = require("./sales-crud.service");
-const prisma_service_1 = require("../../prisma.service");
 let SalesCrudModule = class SalesCrudModule {
 };
 exports.SalesCrudModule = SalesCrudModule;
 exports.SalesCrudModule = SalesCrudModule = __decorate([
     (0, common_1.Module)({
         controllers: [sales_crud_controller_1.SalesCrudController],
-        providers: [sales_crud_service_1.SalesCrudService, prisma_service_1.PrismaService],
+        providers: [sales_crud_service_1.SalesCrudService],
         exports: [sales_crud_service_1.SalesCrudService],
     })
 ], SalesCrudModule);

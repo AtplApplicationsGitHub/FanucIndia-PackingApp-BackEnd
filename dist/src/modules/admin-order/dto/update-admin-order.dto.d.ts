@@ -2,6 +2,7 @@ export declare class UpdateAdminOrderDto {
     status?: string;
     priority?: number;
     terminalId?: number;
+    customerId?: number;
     saleOrderNumber?: string;
     outboundDelivery?: string;
     transferOrder?: string;

@@ -22,60 +22,152 @@ let SalesCrudService = class SalesCrudService {
             const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10
                 ? new Date(dto.deliveryDate).toISOString()
                 : dto.deliveryDate;
-            const result = await this.prisma.salesOrder.create({
+            return await this.prisma.salesOrder.create({
                 data: {
                     ...dto,
                     deliveryDate,
                     userId,
-                    status: "R105",
+                    status: 'R105',
                     terminalId: null,
-                    customerId: null,
+                    customerId: dto.customerId,
                     printerId: null,
                 },
+                include: { customer: true },
             });
-            return result;
         }
         catch (error) {
-            throw error;
+            throw new common_1.InternalServerErrorException('Failed to create sales order', error.message);
         }
     }
     async findAll(userId, query) {
-        const results = await this.prisma.salesOrder.findMany({
-            where: { userId },
+        try {
+            const { search } = query;
+            const where = { userId };
+            if (search) {
+                where.OR = [
+                    { saleOrderNumber: { contains: search } },
+                    { outboundDelivery: { contains: search } },
+                    { transferOrder: { contains: search } },
+                    { status: { contains: search } },
+                    { specialRemarks: { contains: search } },
+                    ...(search.toLowerCase() === 'true' || search.toLowerCase() === 'false'
+                        ? [{ paymentClearance: search.toLowerCase() === 'true' }]
+                        : []),
+                    {
+                        customer: {
+                            is: { name: { contains: search } },
+                        },
+                    },
+                    {
+                        product: {
+                            is: { name: { contains: search } },
+                        },
+                    },
+                    {
+                        transporter: {
+                            is: { name: { contains: search } },
+                        },
+                    },
+                    {
+                        plantCode: {
+                            is: { code: { contains: search } },
+                        },
+                    },
+                    {
+                        salesZone: {
+                            is: { name: { contains: search } },
+                        },
+                    },
+                    {
+                        packConfig: {
+                            is: { configName: { contains: search } },
+                        },
+                    },
+                ];
+            }
+            return await this.prisma.salesOrder.findMany({
+                where,
+                orderBy: { createdAt: 'asc' },
+                include: {
+                    customer: true,
+                    product: true,
+                    transporter: true,
+                    plantCode: true,
+                    salesZone: true,
+                    packConfig: true,
+                },
+            });
+        }
+        catch (error) {
+            throw new common_1.InternalServerErrorException('Failed to fetch sales orders', error.message);
+        }
+    }
+    async findOne(id, userId) {
+        const order = await this.prisma.salesOrder.findUnique({
+            where: { id },
             include: {
+                customer: true,
                 product: true,
                 transporter: true,
                 plantCode: true,
                 salesZone: true,
                 packConfig: true,
             },
-            orderBy: { createdAt: 'asc' },
         });
-        return results;
-    }
-    async findOne(id, userId) {
-        const order = await this.prisma.salesOrder.findUnique({ where: { id } });
         if (!order || order.userId !== userId) {
-            throw new common_1.NotFoundException('Order not found');
+            throw new common_1.NotFoundException('Sales order not found or access denied');
         }
         return order;
     }
     async update(id, dto, userId) {
-        const order = await this.prisma.salesOrder.findUnique({ where: { id } });
-        if (!order || order.userId !== userId) {
-            throw new common_1.ForbiddenException('You can only update your own orders');
-        }
-        return this.prisma.salesOrder.update({
+        const existing = await this.prisma.salesOrder.findUnique({
             where: { id },
-            data: dto,
         });
+        if (!existing) {
+            throw new common_1.NotFoundException('Sales order not found');
+        }
+        if (existing.userId !== userId) {
+            throw new common_1.ForbiddenException('You do not have permission to update this order');
+        }
+        try {
+            const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10
+                ? new Date(dto.deliveryDate).toISOString()
+                : dto.deliveryDate;
+            return await this.prisma.salesOrder.update({
+                where: { id },
+                data: { ...dto, deliveryDate },
+                include: {
+                    customer: true,
+                    product: true,
+                    transporter: true,
+                    plantCode: true,
+                    salesZone: true,
+                    packConfig: true,
+                },
+            });
+        }
+        catch (error) {
+            throw new common_1.InternalServerErrorException('Failed to update sales order', error.message);
+        }
     }
     async remove(id, userId) {
-        const order = await this.prisma.salesOrder.findUnique({ where: { id } });
-        if (!order || order.userId !== userId) {
-            throw new common_1.ForbiddenException('You can only delete your own orders');
+        const existing = await this.prisma.salesOrder.findUnique({
+            where: { id },
+        });
+        if (!existing) {
+            throw new common_1.NotFoundException('Sales order not found');
         }
-        return this.prisma.salesOrder.delete({ where: { id } });
+        if (existing.userId !== userId) {
+            throw new common_1.ForbiddenException('You do not have permission to delete this order');
+        }
+        try {
+            return await this.prisma.salesOrder.delete({
+                where: { id },
+            });
+        }
+        catch (error) {
+            throw new common_1.InternalServerErrorException('Failed to delete sales order', error.message);
+        }
     }
 };
 exports.SalesCrudService = SalesCrudService;

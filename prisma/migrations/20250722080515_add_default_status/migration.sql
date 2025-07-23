@@ -3,7 +3,7 @@ BEGIN TRY
 BEGIN TRAN;
 
 -- AlterTable
-ALTER TABLE [dbo].[SalesOrder] DROP CONSTRAINT [SalesOrder_status_df];
+ALTER TABLE [dbo].[SalesOrder] ADD CONSTRAINT [SalesOrder_status_df] DEFAULT 'R105' FOR [status];
 
 COMMIT TRAN;
 

@@ -13,11 +13,17 @@ exports.SignupDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 class SignupDto {
+    name;
     email;
     password;
     role;
 }
 exports.SignupDto = SignupDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'John Doe', description: 'Full name of the user' }),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SignupDto.prototype, "name", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({ example: 'test@mail.com', description: 'User email address' }),
     (0, class_validator_1.IsEmail)(),

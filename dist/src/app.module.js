@@ -15,12 +15,14 @@ const auth_module_1 = require("./modules/auth/auth.module");
 const lookup_module_1 = require("./modules/lookup/lookup.module");
 const sales_crud_module_1 = require("./modules/sales-crud/sales-crud.module");
 const admin_order_module_1 = require("./modules/admin-order/admin-order.module");
+const prisma_module_1 = require("./prisma.module");
+const user_module_1 = require("./modules/user/user.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [sales_order_module_1.SalesOrderModule, auth_module_1.AuthModule, lookup_module_1.LookupModule, sales_crud_module_1.SalesCrudModule, admin_order_module_1.AdminOrderModule],
+        imports: [prisma_module_1.PrismaModule, sales_order_module_1.SalesOrderModule, auth_module_1.AuthModule, lookup_module_1.LookupModule, sales_crud_module_1.SalesCrudModule, admin_order_module_1.AdminOrderModule, user_module_1.UserModule],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],
     })

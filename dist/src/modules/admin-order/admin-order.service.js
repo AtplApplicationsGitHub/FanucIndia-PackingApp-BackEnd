@@ -19,27 +19,46 @@ let AdminOrderService = class AdminOrderService {
         this.prisma = prisma;
     }
     async findAll(query) {
-        const { page = 1, limit = 20, product, date, sortBy = 'createdAt', sortOrder = 'asc', } = query;
+        const { page = 1, limit = 20, search, date, sortBy = 'createdAt', sortOrder = 'asc', } = query;
         const parsedPage = Number(page) > 0 ? Number(page) : 1;
         const parsedLimit = Number(limit) > 0 && Number(limit) <= 100 ? Number(limit) : 20;
-        const allowedSortFields = ['createdAt', 'priority', 'status', 'deliveryDate'];
+        const allowedSortFields = [
+            'createdAt',
+            'priority',
+            'status',
+            'deliveryDate',
+        ];
         const allowedSortOrders = ['asc', 'desc'];
         const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
         const orderDirection = allowedSortOrders.includes(sortOrder) ? sortOrder : 'asc';
         const where = {};
-        if (product) {
-            where.product = {
-                is: {
-                    name: {
-                        contains: product,
-                    },
-                },
-            };
+        if (search) {
+            const lower = search.toLowerCase();
+            const num = Number(search);
+            where.OR = [
+                { user: { is: { name: { contains: search } } } },
+                { product: { is: { name: { contains: search } } } },
+                { transporter: { is: { name: { contains: search } } } },
+                { plantCode: { is: { code: { contains: search } } } },
+                { salesZone: { is: { name: { contains: search } } } },
+                { packConfig: { is: { configName: { contains: search } } } },
+                { saleOrderNumber: { contains: search } },
+                { outboundDelivery: { contains: search } },
+                { transferOrder: { contains: search } },
+                { status: { contains: search } },
+                { specialRemarks: { contains: search } },
+                ...(lower === 'yes' || lower === 'no'
+                    ? [{ paymentClearance: { equals: lower === 'yes' } }]
+                    : []),
+                ...(!isNaN(num)
+                    ? [{ priority: { equals: num } }]
+                    : []),
+            ];
         }
         if (date) {
-            const start = new Date(`${date}T00:00:00`);
-            const end = new Date(start);
-            end.setDate(end.getDate() + 1);
+            const [y, m, d] = date.split('-').map(Number);
+            const start = new Date(y, m - 1, d, 0, 0, 0);
+            const end = new Date(y, m - 1, d + 1, 0, 0, 0);
             where.deliveryDate = { gte: start, lt: end };
         }
         try {
@@ -47,7 +66,7 @@ let AdminOrderService = class AdminOrderService {
             if (total === 0) {
                 return { total: 0, page: 1, limit: 0, data: [] };
             }
-            const isFilterActive = !!product || !!date;
+            const isFilterActive = !!search || !!date;
             const skip = isFilterActive ? 0 : (parsedPage - 1) * parsedLimit;
             const take = isFilterActive ? total : parsedLimit;
             const data = await this.prisma.salesOrder.findMany({
@@ -56,7 +75,7 @@ let AdminOrderService = class AdminOrderService {
                 skip,
                 take,
                 include: {
-                    user: { select: { id: true, email: true } },
+                    user: { select: { id: true, name: true, email: true } },
                     product: { select: { id: true, name: true, code: true } },
                     transporter: { select: { id: true, name: true } },
                     plantCode: { select: { id: true, code: true, description: true } },
@@ -84,10 +103,15 @@ let AdminOrderService = class AdminOrderService {
         if (!order) {
             throw new common_1.NotFoundException('Order not found');
         }
-        return this.prisma.salesOrder.update({
-            where: { id },
-            data: dto,
-        });
+        return this.prisma.salesOrder.update({ where: { id }, data: dto });
+    }
+    async remove(id) {
+        const order = await this.prisma.salesOrder.findUnique({ where: { id } });
+        if (!order) {
+            throw new common_1.NotFoundException('Sales order not found');
+        }
+        await this.prisma.salesOrder.delete({ where: { id } });
+        return { message: 'Sales order deleted successfully' };
     }
 };
 exports.AdminOrderService = AdminOrderService;

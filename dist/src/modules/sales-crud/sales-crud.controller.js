@@ -45,6 +45,9 @@ exports.SalesCrudController = SalesCrudController;
 __decorate([
     (0, common_1.Post)(),
     (0, roles_decorator_1.Roles)('sales'),
+    (0, swagger_1.ApiOperation)({ summary: 'Create a new sales order' }),
+    (0, swagger_1.ApiBody)({ type: create_sales_crud_dto_1.CreateSalesCrudDto }),
+    (0, swagger_1.ApiResponse)({ status: 201, description: 'Sales order created successfully' }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
@@ -54,6 +57,8 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)('sales'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get all sales orders for the user' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales orders retrieved' }),
     __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -62,6 +67,10 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id'),
     (0, roles_decorator_1.Roles)('sales'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get a specific sales order by ID' }),
+    (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order found' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Sales order not found' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
@@ -71,6 +80,11 @@ __decorate([
 __decorate([
     (0, common_1.Put)(':id'),
     (0, roles_decorator_1.Roles)('sales'),
+    (0, swagger_1.ApiOperation)({ summary: 'Update a specific sales order by ID' }),
+    (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
+    (0, swagger_1.ApiBody)({ type: update_sales_crud_dto_1.UpdateSalesCrudDto }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order updated' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Sales order not found' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.Req)()),
@@ -81,6 +95,10 @@ __decorate([
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, roles_decorator_1.Roles)('sales'),
+    (0, swagger_1.ApiOperation)({ summary: 'Delete a sales order by ID' }),
+    (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order deleted' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Sales order not found' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),

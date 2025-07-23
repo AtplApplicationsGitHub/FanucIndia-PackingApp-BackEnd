@@ -8,6 +8,7 @@ export declare class AuthService {
     constructor(prisma: PrismaService, jwtService: JwtService);
     signup(dto: SignupDto): Promise<{
         id: number;
+        name: string;
         email: string;
         role: string;
         createdAt: Date;
@@ -16,6 +17,7 @@ export declare class AuthService {
         accessToken: string;
         user: {
             id: number;
+            name: string;
             email: string;
             role: string;
         };

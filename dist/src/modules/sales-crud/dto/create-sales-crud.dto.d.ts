@@ -9,5 +9,6 @@ export declare class CreateSalesCrudDto {
     paymentClearance: boolean;
     salesZoneId: number;
     packConfigId: number;
+    customerId: number;
     specialRemarks?: string;
 }

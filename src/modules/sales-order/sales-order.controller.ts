@@ -10,12 +10,20 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { Response, Request } from 'express';
+import { Response } from 'express';
 import { SalesOrderService } from './sales-order.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
+import { AuthRequest } from '../auth/types/auth-request.type';
 
 @ApiTags('Sales Order Bulk Import')
 @ApiBearerAuth()
@@ -26,6 +34,8 @@ export class SalesOrderController {
 
   @Get('template')
   @Roles('sales')
+  @ApiOperation({ summary: 'Download sales order Excel template' })
+  @ApiResponse({ status: 200, description: 'Excel file downloaded' })
   async downloadTemplate(@Res() res: Response) {
     await this.salesOrderService.generateBulkTemplate(res);
   }
@@ -33,13 +43,38 @@ export class SalesOrderController {
   @Post('import')
   @Roles('sales')
   @UseInterceptors(FileInterceptor('file'))
-  async bulkImport(@UploadedFile() file: any, @Req() req: any) {
+  @ApiOperation({ summary: 'Import bulk sales orders via Excel file' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Sales orders imported successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'No file uploaded or invalid format',
+  })
+  async bulkImport(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: AuthRequest,
+  ) {
     if (!file) {
       throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
     }
+
     return this.salesOrderService.importBulkOrders(
       file.buffer,
-      req.user['userId'],
+      req.user.userId,
     );
   }
 }

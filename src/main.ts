@@ -23,9 +23,7 @@ async function bootstrap() {
     };
     await app.close();
     listenApp = await NestFactory.create(AppModule, { httpsOptions });
-  } 
-
-  const databaseUrl = listenApp.get(ConfigService).get<string>('DATABASE_URL');
+  }
 
   listenApp.useGlobalPipes(
     new ValidationPipe({
@@ -47,7 +45,7 @@ async function bootstrap() {
   listenApp.useGlobalFilters(new AllExceptionsFilter());
 
   listenApp.enableCors({
-    origin: ['http://localhost:3000','https://fanuc.goval.app:444'],
+    origin: ['http://localhost:3000', 'https://fanuc.goval.app:444'],
     credentials: true,
   });
 

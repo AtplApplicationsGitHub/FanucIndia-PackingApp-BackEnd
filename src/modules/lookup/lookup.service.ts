@@ -1,178 +1,159 @@
-import { Injectable, BadRequestException  } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+
+import { CreateProductDto } from './dto/createProductDto';
+import { UpdateProductDto } from './dto/updateProductDto';
+import { CreateTransporterDto } from './dto/createTransporterDto';
+import { UpdateTransporterDto } from './dto/updateTransporterDto';
+import { CreatePlantCodeDto } from './dto/createPlantCodeDto';
+import { UpdatePlantCodeDto } from './dto/updatePlantCodeDto';
+import { CreateSalesZoneDto } from './dto/createSalesZoneDto';
+import { UpdateSalesZoneDto } from './dto/updateSalesZoneDto';
+import { CreatePackConfigDto } from './dto/createPackConfigDto';
+import { UpdatePackConfigDto } from './dto/updatePackConfigDto';
+import { CreateTerminalDto } from './dto/createTerminalDto';
+import { UpdateTerminalDto } from './dto/updateTerminalDto';
+import { CreateCustomerDto } from './dto/createCustomerDto';
+import { UpdateCustomerDto } from './dto/updateCustomerDto';
+import { CreatePrinterDto } from './dto/createPrinterDto';
+import { UpdatePrinterDto } from './dto/updatePrinterDto';
 
 @Injectable()
 export class LookupService {
   constructor(private prisma: PrismaService) {}
 
+  // PRODUCTS
   getProducts() {
     return this.prisma.product.findMany({ orderBy: { name: 'asc' } });
   }
-  createProduct(dto: { name: string; code: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    if (!dto.code || !dto.code.trim()) throw new Error('Code is required');
-    return this.prisma.product.create({
-      data: { name: dto.name.trim(), code: dto.code.trim() },
-    });
+
+  createProduct(dto: CreateProductDto) {
+    return this.prisma.product.create({ data: dto });
   }
-  updateProduct(id: number, dto: { name: string; code: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    if (!dto.code || !dto.code.trim()) throw new Error('Code is required');
-    return this.prisma.product.update({
-      where: { id },
-      data: { name: dto.name.trim(), code: dto.code.trim() },
-    });
+
+  updateProduct(id: number, dto: UpdateProductDto) {
+    return this.prisma.product.update({ where: { id }, data: dto });
   }
-  async deleteProduct(id: number) {
-    const usageCount = await this.prisma.salesOrder.count({
-      where: { productId: id }
-    });
-    if (usageCount > 0) {
-      throw new BadRequestException(
-        'Cannot delete: This product is used in one or more orders.'
-      );
-    }
+
+  deleteProduct(id: number) {
     return this.prisma.product.delete({ where: { id } });
   }
 
+  // TRANSPORTERS
   getTransporters() {
     return this.prisma.transporter.findMany({ orderBy: { name: 'asc' } });
   }
-  createTransporter(dto: { name: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    return this.prisma.transporter.create({ data: { name: dto.name.trim() } });
+
+  createTransporter(dto: CreateTransporterDto) {
+    return this.prisma.transporter.create({ data: dto });
   }
-  updateTransporter(id: number, dto: { name: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    return this.prisma.transporter.update({
-      where: { id },
-      data: { name: dto.name.trim() },
-    });
+
+  updateTransporter(id: number, dto: UpdateTransporterDto) {
+    return this.prisma.transporter.update({ where: { id }, data: dto });
   }
+
   deleteTransporter(id: number) {
     return this.prisma.transporter.delete({ where: { id } });
   }
 
+  // PLANT CODES
   getPlantCodes() {
     return this.prisma.plantCode.findMany({ orderBy: { code: 'asc' } });
   }
-  createPlantCode(dto: { code: string; description: string }) {
-    if (!dto.code || !dto.code.trim()) throw new Error('Code is required');
-    if (!dto.description || !dto.description.trim())
-      throw new Error('Description is required');
-    return this.prisma.plantCode.create({
-      data: { code: dto.code.trim(), description: dto.description.trim() },
-    });
+
+  createPlantCode(dto: CreatePlantCodeDto) {
+    return this.prisma.plantCode.create({ data: dto });
   }
-  updatePlantCode(id: number, dto: { code: string; description: string }) {
-    if (!dto.code || !dto.code.trim()) throw new Error('Code is required');
-    if (!dto.description || !dto.description.trim())
-      throw new Error('Description is required');
-    return this.prisma.plantCode.update({
-      where: { id },
-      data: { code: dto.code.trim(), description: dto.description.trim() },
-    });
+
+  updatePlantCode(id: number, dto: UpdatePlantCodeDto) {
+    return this.prisma.plantCode.update({ where: { id }, data: dto });
   }
+
   deletePlantCode(id: number) {
     return this.prisma.plantCode.delete({ where: { id } });
   }
 
+  // SALES ZONES
   getSalesZones() {
     return this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } });
   }
-  createSalesZone(dto: { name: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    return this.prisma.salesZone.create({ data: { name: dto.name.trim() } });
+
+  createSalesZone(dto: CreateSalesZoneDto) {
+    return this.prisma.salesZone.create({ data: dto });
   }
-  updateSalesZone(id: number, dto: { name: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    return this.prisma.salesZone.update({
-      where: { id },
-      data: { name: dto.name.trim() },
-    });
+
+  updateSalesZone(id: number, dto: UpdateSalesZoneDto) {
+    return this.prisma.salesZone.update({ where: { id }, data: dto });
   }
+
   deleteSalesZone(id: number) {
     return this.prisma.salesZone.delete({ where: { id } });
   }
 
+  // PACK CONFIGS
   getPackConfigs() {
     return this.prisma.packConfig.findMany({ orderBy: { configName: 'asc' } });
   }
-  createPackConfig(dto: { configName: string }) {
-    if (!dto.configName || !dto.configName.trim())
-      throw new Error('Config Name is required');
-    return this.prisma.packConfig.create({
-      data: { configName: dto.configName.trim() },
-    });
+
+  createPackConfig(dto: CreatePackConfigDto) {
+    return this.prisma.packConfig.create({ data: dto });
   }
-  updatePackConfig(id: number, dto: { configName: string }) {
-    if (!dto.configName || !dto.configName.trim())
-      throw new Error('Config Name is required');
-    return this.prisma.packConfig.update({
-      where: { id },
-      data: { configName: dto.configName.trim() },
-    });
+
+  updatePackConfig(id: number, dto: UpdatePackConfigDto) {
+    return this.prisma.packConfig.update({ where: { id }, data: dto });
   }
+
   deletePackConfig(id: number) {
     return this.prisma.packConfig.delete({ where: { id } });
   }
 
+  // TERMINALS
   getTerminals() {
     return this.prisma.terminal.findMany({ orderBy: { name: 'asc' } });
   }
-  createTerminal(dto: { name: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    return this.prisma.terminal.create({ data: { name: dto.name.trim() } });
+
+  createTerminal(dto: CreateTerminalDto) {
+    return this.prisma.terminal.create({ data: dto });
   }
-  updateTerminal(id: number, dto: { name: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    return this.prisma.terminal.update({
-      where: { id },
-      data: { name: dto.name.trim() },
-    });
+
+  updateTerminal(id: number, dto: UpdateTerminalDto) {
+    return this.prisma.terminal.update({ where: { id }, data: dto });
   }
+
   deleteTerminal(id: number) {
     return this.prisma.terminal.delete({ where: { id } });
   }
 
+  // CUSTOMERS
   getCustomers() {
     return this.prisma.customer.findMany({ orderBy: { name: 'asc' } });
   }
-  createCustomer(dto: { name: string; address: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    if (!dto.address || !dto.address.trim())
-      throw new Error('Address is required');
-    return this.prisma.customer.create({
-      data: { name: dto.name.trim(), address: dto.address.trim() },
-    });
+
+  createCustomer(dto: CreateCustomerDto) {
+    return this.prisma.customer.create({ data: dto });
   }
-  updateCustomer(id: number, dto: { name: string; address: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    if (!dto.address || !dto.address.trim())
-      throw new Error('Address is required');
-    return this.prisma.customer.update({
-      where: { id },
-      data: { name: dto.name.trim(), address: dto.address.trim() },
-    });
+
+  updateCustomer(id: number, dto: UpdateCustomerDto) {
+    return this.prisma.customer.update({ where: { id }, data: dto });
   }
+
   deleteCustomer(id: number) {
     return this.prisma.customer.delete({ where: { id } });
   }
 
+  // PRINTERS
   getPrinters() {
     return this.prisma.printer.findMany({ orderBy: { name: 'asc' } });
   }
-  createPrinter(dto: { name: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    return this.prisma.printer.create({ data: { name: dto.name.trim() } });
+
+  createPrinter(dto: CreatePrinterDto) {
+    return this.prisma.printer.create({ data: dto });
   }
-  updatePrinter(id: number, dto: { name: string }) {
-    if (!dto.name || !dto.name.trim()) throw new Error('Name is required');
-    return this.prisma.printer.update({
-      where: { id },
-      data: { name: dto.name.trim() },
-    });
+
+  updatePrinter(id: number, dto: UpdatePrinterDto) {
+    return this.prisma.printer.update({ where: { id }, data: dto });
   }
+
   deletePrinter(id: number) {
     return this.prisma.printer.delete({ where: { id } });
   }

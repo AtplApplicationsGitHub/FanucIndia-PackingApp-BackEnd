@@ -1,12 +1,16 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { Workbook } from 'exceljs';
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { PrismaService } from '../../prisma.service';
 
 @Injectable()
 export class SalesOrderService {
+  constructor(private readonly prisma: PrismaService) {}
+
   async generateBulkTemplate(res: Response) {
     const workbook = new Workbook();
     const worksheet = workbook.addWorksheet('Bulk Import');
@@ -22,58 +26,48 @@ export class SalesOrderService {
       { header: 'Payment Clearance', key: 'paymentClearance' },
       { header: 'Sales Zone', key: 'salesZone' },
       { header: 'Packing Config', key: 'packConfig' },
+      { header: 'Customer', key: 'customer' },
       { header: 'Special Remarks', key: 'specialRemarks' },
     ];
 
     const rowCount = 100;
 
-    // Fetch fresh lookups from DB
-    const [products, transporters, plantCodes, salesZones, packConfigs] =
-      await Promise.all([
-        prisma.product.findMany({ orderBy: { name: 'asc' } }),
-        prisma.transporter.findMany({ orderBy: { name: 'asc' } }),
-        prisma.plantCode.findMany({ orderBy: { code: 'asc' } }),
-        prisma.salesZone.findMany({ orderBy: { name: 'asc' } }),
-        prisma.packConfig.findMany({ orderBy: { configName: 'asc' } }),
-      ]);
+    const [products, transporters, plantCodes, salesZones, packConfigs, customers,] = await Promise.all([
+      this.prisma.product.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.transporter.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.plantCode.findMany({ orderBy: { code: 'asc' } }),
+      this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.packConfig.findMany({ orderBy: { configName: 'asc' } }),
+      this.prisma.customer.findMany({ orderBy: { name: 'asc' } }),
+    ]);
 
-    const productNames = products.map((p) => p.name);
-    const transporterNames = transporters.map((t) => t.name);
-    const plantCodeCodes = plantCodes.map((p) => p.code);
-    const salesZoneNames = salesZones.map((s) => s.name);
-    const packConfigNames = packConfigs.map((p) => p.configName);
+    const dropdowns = {
+      product: products.map(p => p.name),
+      transporter: transporters.map(t => t.name),
+      plantCode: plantCodes.map(p => p.code),
+      salesZone: salesZones.map(s => s.name),
+      packConfig: packConfigs.map(p => p.configName),
+      paymentClearance: ['Yes', 'No'],
+      customer: customers.map(c => c.name),
+    };
 
-    // Add rows
     for (let i = 0; i < rowCount; i++) worksheet.addRow({});
 
-    const applyDropdown = (colKey: string, values: string[]) => {
+    for (const [colKey, values] of Object.entries(dropdowns)) {
       for (let row = 2; row <= rowCount + 1; row++) {
-        worksheet.getCell(
-          `${worksheet.getColumn(colKey).letter}${row}`,
-        ).dataValidation = {
+        worksheet.getCell(`${worksheet.getColumn(colKey).letter}${row}`).dataValidation = {
           type: 'list',
           allowBlank: true,
           formulae: [`"${values.join(',')}"`],
         };
       }
-    };
-
-    applyDropdown('product', productNames);
-    applyDropdown('transporter', transporterNames);
-    applyDropdown('plantCode', plantCodeCodes);
-    applyDropdown('salesZone', salesZoneNames);
-    applyDropdown('packConfig', packConfigNames);
-    applyDropdown('paymentClearance', ['Yes', 'No']);
+    }
 
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename="sales_bulk_template.xlsx"',
-    );
-
+    res.setHeader('Content-Disposition', 'attachment; filename="sales_bulk_template.xlsx"');
     await workbook.xlsx.write(res);
     res.end();
   }
@@ -87,28 +81,23 @@ export class SalesOrderService {
       throw new BadRequestException('Invalid template format');
     }
 
-    const [products, transporters, plantCodes, salesZones, packConfigs] =
-      await Promise.all([
-        prisma.product.findMany(),
-        prisma.transporter.findMany(),
-        prisma.plantCode.findMany(),
-        prisma.salesZone.findMany(),
-        prisma.packConfig.findMany(),
-      ]);
+    const [products, transporters, plantCodes, salesZones, packConfigs, customers] = await Promise.all([
+      this.prisma.product.findMany(),
+      this.prisma.transporter.findMany(),
+      this.prisma.plantCode.findMany(),
+      this.prisma.salesZone.findMany(),
+      this.prisma.packConfig.findMany(),
+      this.prisma.customer.findMany(),
+    ]);
 
-    const productMap = new Map(products.map((p) => [p.name.trim(), p.id]));
-    const transporterMap = new Map(
-      transporters.map((t) => [t.name.trim(), t.id]),
-    );
-    const plantCodeMap = new Map(
-      plantCodes.map((pc) => [pc.code.trim(), pc.id]),
-    );
-    const salesZoneMap = new Map(
-      salesZones.map((sz) => [sz.name.trim(), sz.id]),
-    );
-    const packConfigMap = new Map(
-      packConfigs.map((pc) => [pc.configName.trim(), pc.id]),
-    );
+    const maps = {
+      product: new Map(products.map(p => [p.name.trim(), p.id])),
+      transporter: new Map(transporters.map(t => [t.name.trim(), t.id])),
+      plantCode: new Map(plantCodes.map(pc => [pc.code.trim(), pc.id])),
+      salesZone: new Map(salesZones.map(sz => [sz.name.trim(), sz.id])),
+      packConfig: new Map(packConfigs.map(pc => [pc.configName.trim(), pc.id])),
+      customer: new Map(customers.map(c => [c.name.trim(), c.id])),
+    };
 
     const ordersToInsert: any[] = [];
     const errors: any[] = [];
@@ -127,22 +116,19 @@ export class SalesOrderService {
         paymentClearance,
         salesZone,
         packConfig,
+        customer,
         specialRemarks,
       ] = (row.values as any[]).slice(1);
 
-      if (!product && !saleOrderNumber) return;
-
-      const productId = productMap.get((product || '').toString().trim());
-      const transporterId = transporterMap.get(
-        (transporter || '').toString().trim(),
-      );
-      const plantCodeId = plantCodeMap.get((plantCode || '').toString().trim());
-      const salesZoneId = salesZoneMap.get((salesZone || '').toString().trim());
-      const packConfigId = packConfigMap.get(
-        (packConfig || '').toString().trim(),
-      );
-
       const errList: string[] = [];
+
+      const productId = maps.product.get((product || '').toString().trim());
+      const transporterId = maps.transporter.get((transporter || '').toString().trim());
+      const plantCodeId = maps.plantCode.get((plantCode || '').toString().trim());
+      const salesZoneId = maps.salesZone.get((salesZone || '').toString().trim());
+      const packConfigId = maps.packConfig.get((packConfig || '').toString().trim());
+      const customerId = maps.customer.get((customer || '').toString().trim());
+
       if (!productId) errList.push('Invalid product');
       if (!saleOrderNumber) errList.push('Missing saleOrderNumber');
       if (!outboundDelivery) errList.push('Missing outboundDelivery');
@@ -150,30 +136,23 @@ export class SalesOrderService {
       if (!deliveryDate) errList.push('Missing deliveryDate');
       if (!transporterId) errList.push('Invalid transporter');
       if (!plantCodeId) errList.push('Invalid plantCode');
-      if (
-        paymentClearance !== 'Yes' &&
-        paymentClearance !== 'No' &&
-        paymentClearance !== true &&
-        paymentClearance !== false
-      )
+      if (!['Yes', 'No', true, false].includes(paymentClearance))
         errList.push('Invalid paymentClearance (must be Yes or No)');
       if (!salesZoneId) errList.push('Invalid salesZone');
       if (!packConfigId) errList.push('Invalid packConfig');
+      if (!customerId) errList.push('Invalid customer');
 
-      if (errList.length > 0) {
-        errors.push({ row: rowNumber, errors: errList });
-        return;
+      let deliveryDateISO: Date | null = null;
+      try {
+        const parsed = new Date(deliveryDate);
+        if (isNaN(parsed.getTime())) throw new Error();
+        deliveryDateISO = parsed;
+      } catch {
+        errList.push('Invalid deliveryDate format');
       }
 
-      let deliveryDateISO: Date;
-      try {
-        deliveryDateISO = new Date(deliveryDate);
-        if (isNaN(deliveryDateISO.getTime())) throw new Error();
-      } catch {
-        errors.push({
-          row: rowNumber,
-          errors: ['Invalid deliveryDate format'],
-        });
+      if (!deliveryDateISO || errList.length > 0) {
+        errors.push({ row: rowNumber, errors: errList });
         return;
       }
 
@@ -185,10 +164,10 @@ export class SalesOrderService {
         deliveryDate: deliveryDateISO,
         transporterId,
         plantCodeId,
-        paymentClearance:
-          paymentClearance === 'Yes' || paymentClearance === true,
+        paymentClearance: paymentClearance === 'Yes' || paymentClearance === true,
         salesZoneId,
         packConfigId,
+        customerId,
         specialRemarks: specialRemarks ? specialRemarks.toString() : undefined,
         userId,
       });
@@ -201,15 +180,16 @@ export class SalesOrderService {
       });
     }
 
-    const inserted = await prisma.salesOrder.createMany({
-      data: ordersToInsert,
-    });
-
-    return {
-      message: `Inserted ${inserted.count} orders. ${errors.length > 0 ? 'Some rows had errors.' : ''}`,
-      errors,
-      insertedCount: inserted.count,
-      preview: ordersToInsert.slice(0, 5),
-    };
+    try {
+      const inserted = await this.prisma.salesOrder.createMany({ data: ordersToInsert });
+      return {
+        message: `Inserted ${inserted.count} orders. ${errors.length > 0 ? 'Some rows had errors.' : ''}`,
+        errors,
+        insertedCount: inserted.count,
+        preview: ordersToInsert.slice(0, 5),
+      };
+    } catch (error) {
+      throw new InternalServerErrorException('Database insertion failed', error.message);
+    }
   }
 }

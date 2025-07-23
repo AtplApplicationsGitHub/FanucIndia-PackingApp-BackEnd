@@ -16,6 +16,7 @@ class UpdateAdminOrderDto {
     status;
     priority;
     terminalId;
+    customerId;
     saleOrderNumber;
     outboundDelivery;
     transferOrder;
@@ -47,6 +48,12 @@ __decorate([
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
 ], UpdateAdminOrderDto.prototype, "terminalId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 1, description: 'Customer ID (lookup)' }),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdateAdminOrderDto.prototype, "customerId", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 'SO123456', description: 'Sale Order Number' }),
     (0, class_validator_1.IsOptional)(),

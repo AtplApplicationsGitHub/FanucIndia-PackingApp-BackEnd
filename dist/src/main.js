@@ -55,7 +55,6 @@ async function bootstrap() {
         await app.close();
         listenApp = await core_1.NestFactory.create(app_module_1.AppModule, { httpsOptions });
     }
-    const databaseUrl = listenApp.get(config_1.ConfigService).get('DATABASE_URL');
     listenApp.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,

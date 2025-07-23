@@ -2,6 +2,10 @@ import { IsEmail, IsString, MinLength, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SignupDto {
+  @ApiProperty({ example: 'John Doe', description: 'Full name of the user' })
+  @IsString()
+  name: string;
+
   @ApiProperty({ example: 'test@mail.com', description: 'User email address' })
   @IsEmail()
   email: string;
@@ -21,3 +25,4 @@ export class SignupDto {
   @IsIn(['sales', 'admin'], { message: 'role must be either sales or admin' })
   role: string;
 }
+

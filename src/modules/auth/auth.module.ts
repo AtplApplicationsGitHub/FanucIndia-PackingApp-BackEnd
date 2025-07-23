@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { PrismaService } from '../../prisma.service';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './jwt.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -16,14 +15,13 @@ import { APP_GUARD, Reflector } from '@nestjs/core';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '7d' },
+        signOptions: { expiresIn: '2h' },
       }),
       inject: [ConfigService],
     }),
   ],
   providers: [
     AuthService,
-    PrismaService,
     JwtStrategy,
     Reflector,
     {

@@ -6,9 +6,11 @@ import { AuthModule } from './modules/auth/auth.module';
 import { LookupModule } from './modules/lookup/lookup.module';
 import { SalesCrudModule } from './modules/sales-crud/sales-crud.module';
 import { AdminOrderModule } from './modules/admin-order/admin-order.module';
+import { PrismaModule } from './prisma.module';
+import { UserModule } from './modules/user/user.module';
 
 @Module({
-  imports: [SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule],
+  imports: [PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule],
   controllers: [AppController],
   providers: [AppService],
 })

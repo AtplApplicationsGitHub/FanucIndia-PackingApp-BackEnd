@@ -30,17 +30,22 @@ let AuthController = class AuthController {
     login(dto) {
         return this.authService.login(dto);
     }
-    async checkEmail(email) {
+    checkEmail(email) {
         if (!email)
             return { exists: false };
-        const exists = await this.authService.checkEmailExists(email);
-        return { exists };
+        return this.authService
+            .checkEmailExists(email)
+            .then((exists) => ({ exists }));
     }
 };
 exports.AuthController = AuthController;
 __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Post)('signup'),
+    (0, swagger_1.ApiOperation)({ summary: 'Register a new user (sales or admin)' }),
+    (0, swagger_1.ApiBody)({ type: signup_dto_1.SignupDto }),
+    (0, swagger_1.ApiResponse)({ status: 201, description: 'User signed up successfully' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Validation failed' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [signup_dto_1.SignupDto]),
@@ -49,6 +54,13 @@ __decorate([
 __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Post)('login'),
+    (0, swagger_1.ApiOperation)({ summary: 'Login an existing user and receive JWT' }),
+    (0, swagger_1.ApiBody)({ type: login_dto_1.LoginDto }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Login successful, returns JWT token',
+    }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'Invalid email or password' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [login_dto_1.LoginDto]),
@@ -57,10 +69,21 @@ __decorate([
 __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Get)('check-email'),
+    (0, swagger_1.ApiOperation)({ summary: 'Check if an email is already registered' }),
+    (0, swagger_1.ApiQuery)({
+        name: 'email',
+        required: true,
+        description: 'Email to check',
+        type: String,
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Returns whether email exists or not',
+    }),
     __param(0, (0, common_1.Query)('email')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
+    __metadata("design:returntype", void 0)
 ], AuthController.prototype, "checkEmail", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Auth'),
