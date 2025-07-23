@@ -8,81 +8,81 @@ export declare class AdminOrderController {
         page: number;
         limit: number;
         data: ({
-            packConfig: {
+            user: {
                 id: number;
-                configName: string;
-            };
-            plantCode: {
-                id: number;
-                code: string;
-                description: string | null;
+                name: string;
+                email: string;
             };
             product: {
                 id: number;
                 name: string;
                 code: string | null;
             };
+            transporter: {
+                id: number;
+                name: string;
+            };
+            plantCode: {
+                id: number;
+                code: string;
+                description: string | null;
+            };
             salesZone: {
                 id: number;
                 name: string;
+            };
+            packConfig: {
+                id: number;
+                configName: string;
             };
             terminal: {
                 id: number;
                 name: string;
             } | null;
-            transporter: {
-                id: number;
-                name: string;
-            };
-            user: {
-                id: number;
-                name: string;
-                email: string;
-            };
         } & {
-            id: number;
-            userId: number;
-            productId: number;
             saleOrderNumber: string;
             outboundDelivery: string;
             transferOrder: string;
             deliveryDate: Date;
-            transporterId: number;
-            plantCodeId: number;
             paymentClearance: boolean;
-            salesZoneId: number;
-            packConfigId: number;
-            terminalId: number | null;
-            customerId: number | null;
-            printerId: number | null;
             specialRemarks: string | null;
-            status: string;
-            priority: number | null;
+            id: number;
             createdAt: Date;
             updatedAt: Date;
+            productId: number;
+            transporterId: number;
+            plantCodeId: number;
+            salesZoneId: number;
+            packConfigId: number;
+            customerId: number | null;
+            userId: number;
+            terminalId: number | null;
+            printerId: number | null;
+            status: string;
+            priority: number | null;
         })[];
     }>;
     update(id: number, dto: UpdateAdminOrderDto): Promise<{
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
-        transporterId: number;
-        plantCodeId: number;
         paymentClearance: boolean;
-        salesZoneId: number;
-        packConfigId: number;
-        terminalId: number | null;
-        customerId: number | null;
-        printerId: number | null;
         specialRemarks: string | null;
-        status: string;
-        priority: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
+        productId: number;
+        transporterId: number;
+        plantCodeId: number;
+        salesZoneId: number;
+        packConfigId: number;
+        customerId: number | null;
+        userId: number;
+        terminalId: number | null;
+        printerId: number | null;
+        status: string;
+        priority: number | null;
     }>;
     remove(id: number): Promise<{
         message: string;

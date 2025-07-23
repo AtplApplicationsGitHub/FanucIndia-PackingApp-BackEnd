@@ -11,199 +11,199 @@ export declare class SalesCrudService {
             address: string;
         } | null;
     } & {
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
-        transporterId: number;
-        plantCodeId: number;
         paymentClearance: boolean;
-        salesZoneId: number;
-        packConfigId: number;
-        terminalId: number | null;
-        customerId: number | null;
-        printerId: number | null;
         specialRemarks: string | null;
-        status: string;
-        priority: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
+        productId: number;
+        transporterId: number;
+        plantCodeId: number;
+        salesZoneId: number;
+        packConfigId: number;
+        customerId: number | null;
+        userId: number;
+        terminalId: number | null;
+        printerId: number | null;
+        status: string;
+        priority: number | null;
     }>;
     findAll(userId: number, query: {
         search?: string;
     }): Promise<({
-        customer: {
+        product: {
             id: number;
             name: string;
-            address: string;
-        } | null;
-        packConfig: {
+            code: string | null;
+        };
+        transporter: {
             id: number;
-            configName: string;
+            name: string;
         };
         plantCode: {
             id: number;
             code: string;
             description: string | null;
         };
-        product: {
-            id: number;
-            name: string;
-            code: string | null;
-        };
         salesZone: {
             id: number;
             name: string;
         };
-        transporter: {
+        packConfig: {
+            id: number;
+            configName: string;
+        };
+        customer: {
             id: number;
             name: string;
-        };
+            address: string;
+        } | null;
     } & {
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
-        transporterId: number;
-        plantCodeId: number;
         paymentClearance: boolean;
-        salesZoneId: number;
-        packConfigId: number;
-        terminalId: number | null;
-        customerId: number | null;
-        printerId: number | null;
         specialRemarks: string | null;
-        status: string;
-        priority: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
+        productId: number;
+        transporterId: number;
+        plantCodeId: number;
+        salesZoneId: number;
+        packConfigId: number;
+        customerId: number | null;
+        userId: number;
+        terminalId: number | null;
+        printerId: number | null;
+        status: string;
+        priority: number | null;
     })[]>;
     findOne(id: number, userId: number): Promise<{
-        customer: {
+        product: {
             id: number;
             name: string;
-            address: string;
-        } | null;
-        packConfig: {
+            code: string | null;
+        };
+        transporter: {
             id: number;
-            configName: string;
+            name: string;
         };
         plantCode: {
             id: number;
             code: string;
             description: string | null;
         };
-        product: {
-            id: number;
-            name: string;
-            code: string | null;
-        };
         salesZone: {
             id: number;
             name: string;
         };
-        transporter: {
+        packConfig: {
+            id: number;
+            configName: string;
+        };
+        customer: {
             id: number;
             name: string;
-        };
+            address: string;
+        } | null;
     } & {
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
-        transporterId: number;
-        plantCodeId: number;
         paymentClearance: boolean;
-        salesZoneId: number;
-        packConfigId: number;
-        terminalId: number | null;
-        customerId: number | null;
-        printerId: number | null;
         specialRemarks: string | null;
-        status: string;
-        priority: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
+        productId: number;
+        transporterId: number;
+        plantCodeId: number;
+        salesZoneId: number;
+        packConfigId: number;
+        customerId: number | null;
+        userId: number;
+        terminalId: number | null;
+        printerId: number | null;
+        status: string;
+        priority: number | null;
     }>;
     update(id: number, dto: UpdateSalesCrudDto, userId: number): Promise<{
-        customer: {
+        product: {
             id: number;
             name: string;
-            address: string;
-        } | null;
-        packConfig: {
+            code: string | null;
+        };
+        transporter: {
             id: number;
-            configName: string;
+            name: string;
         };
         plantCode: {
             id: number;
             code: string;
             description: string | null;
         };
-        product: {
-            id: number;
-            name: string;
-            code: string | null;
-        };
         salesZone: {
             id: number;
             name: string;
         };
-        transporter: {
+        packConfig: {
+            id: number;
+            configName: string;
+        };
+        customer: {
             id: number;
             name: string;
-        };
+            address: string;
+        } | null;
     } & {
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
-        transporterId: number;
-        plantCodeId: number;
         paymentClearance: boolean;
-        salesZoneId: number;
-        packConfigId: number;
-        terminalId: number | null;
-        customerId: number | null;
-        printerId: number | null;
         specialRemarks: string | null;
-        status: string;
-        priority: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
+        productId: number;
+        transporterId: number;
+        plantCodeId: number;
+        salesZoneId: number;
+        packConfigId: number;
+        customerId: number | null;
+        userId: number;
+        terminalId: number | null;
+        printerId: number | null;
+        status: string;
+        priority: number | null;
     }>;
     remove(id: number, userId: number): Promise<{
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
-        transporterId: number;
-        plantCodeId: number;
         paymentClearance: boolean;
-        salesZoneId: number;
-        packConfigId: number;
-        terminalId: number | null;
-        customerId: number | null;
-        printerId: number | null;
         specialRemarks: string | null;
-        status: string;
-        priority: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
+        productId: number;
+        transporterId: number;
+        plantCodeId: number;
+        salesZoneId: number;
+        packConfigId: number;
+        customerId: number | null;
+        userId: number;
+        terminalId: number | null;
+        printerId: number | null;
+        status: string;
+        priority: number | null;
     }>;
 }
