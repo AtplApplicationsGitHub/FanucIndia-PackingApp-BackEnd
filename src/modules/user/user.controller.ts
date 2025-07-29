@@ -1,4 +1,15 @@
-import { Controller, Post, Get, Patch, Delete, Body, Param, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  ParseIntPipe,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import {
@@ -8,6 +19,8 @@ import {
   ApiBody,
   ApiParam,
 } from '@nestjs/swagger';
+import { Request } from 'express';
+import { AuthRequest } from '../auth/types/auth-request.type'; // Adjust path if needed
 
 @ApiTags('Users')
 @Controller('users')
@@ -36,10 +49,7 @@ export class UserController {
   @ApiBody({ type: UpdateUserDto })
   @ApiResponse({ status: 200, description: 'User updated successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateUserDto,
-  ) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
     return this.userService.update(id, dto);
   }
 
@@ -48,7 +58,11 @@ export class UserController {
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    const currentUserId = req.user.userId; // Now FULLY typed and safe!
+    if (id === currentUserId) {
+      throw new ForbiddenException('You cannot delete your own admin account.');
+    }
     return this.userService.remove(id);
   }
 }

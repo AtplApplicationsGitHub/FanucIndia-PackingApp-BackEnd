@@ -6,6 +6,7 @@ import {
   Param,
   Put,
   Delete,
+  Query,
   Req,
   UseGuards,
   ParseIntPipe,
@@ -42,10 +43,19 @@ export class SalesCrudController {
 
   @Get()
   @Roles('sales')
-  @ApiOperation({ summary: 'Get all sales orders for the user' })
+  @ApiOperation({ summary: 'Get paginated sales orders for the user' })
   @ApiResponse({ status: 200, description: 'Sales orders retrieved' })
-  findAll(@Req() req) {
-    return this.service.findAll(req.user.userId, req.query);
+  async findAll(
+    @Req() req,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('search') search?: string,
+  ) {
+    const pageNumber = Number(page) || 1;
+    const pageSize = Number(limit) || 10;
+    const userId = req.user.userId;
+
+    return this.service.getPaginatedOrders(pageNumber, pageSize, userId, search);
   }
 
   @Get(':id')

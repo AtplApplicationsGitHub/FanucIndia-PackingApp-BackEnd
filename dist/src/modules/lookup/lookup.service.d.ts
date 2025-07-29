@@ -33,11 +33,11 @@ export declare class LookupService {
         name: string;
         code: string | null;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    deleteProduct(id: number): import(".prisma/client").Prisma.Prisma__ProductClient<{
+    deleteProduct(id: number): Promise<{
         id: number;
         name: string;
         code: string | null;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    }>;
     getTransporters(): import(".prisma/client").Prisma.PrismaPromise<{
         id: number;
         name: string;
@@ -50,10 +50,10 @@ export declare class LookupService {
         id: number;
         name: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    deleteTransporter(id: number): import(".prisma/client").Prisma.Prisma__TransporterClient<{
+    deleteTransporter(id: number): Promise<{
         id: number;
         name: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    }>;
     getPlantCodes(): import(".prisma/client").Prisma.PrismaPromise<{
         id: number;
         code: string;
@@ -69,11 +69,11 @@ export declare class LookupService {
         code: string;
         description: string | null;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    deletePlantCode(id: number): import(".prisma/client").Prisma.Prisma__PlantCodeClient<{
+    deletePlantCode(id: number): Promise<{
         id: number;
         code: string;
         description: string | null;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    }>;
     getSalesZones(): import(".prisma/client").Prisma.PrismaPromise<{
         id: number;
         name: string;
@@ -86,10 +86,10 @@ export declare class LookupService {
         id: number;
         name: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    deleteSalesZone(id: number): import(".prisma/client").Prisma.Prisma__SalesZoneClient<{
+    deleteSalesZone(id: number): Promise<{
         id: number;
         name: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    }>;
     getPackConfigs(): import(".prisma/client").Prisma.PrismaPromise<{
         id: number;
         configName: string;
@@ -102,10 +102,10 @@ export declare class LookupService {
         id: number;
         configName: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    deletePackConfig(id: number): import(".prisma/client").Prisma.Prisma__PackConfigClient<{
+    deletePackConfig(id: number): Promise<{
         id: number;
         configName: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    }>;
     getTerminals(): import(".prisma/client").Prisma.PrismaPromise<{
         id: number;
         name: string;
@@ -118,10 +118,10 @@ export declare class LookupService {
         id: number;
         name: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    deleteTerminal(id: number): import(".prisma/client").Prisma.Prisma__TerminalClient<{
+    deleteTerminal(id: number): Promise<{
         id: number;
         name: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    }>;
     getCustomers(): import(".prisma/client").Prisma.PrismaPromise<{
         id: number;
         name: string;
@@ -137,11 +137,11 @@ export declare class LookupService {
         name: string;
         address: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    deleteCustomer(id: number): import(".prisma/client").Prisma.Prisma__CustomerClient<{
+    deleteCustomer(id: number): Promise<{
         id: number;
         name: string;
         address: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    }>;
     getPrinters(): import(".prisma/client").Prisma.PrismaPromise<{
         id: number;
         name: string;
@@ -154,8 +154,8 @@ export declare class LookupService {
         id: number;
         name: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    deletePrinter(id: number): import(".prisma/client").Prisma.Prisma__PrinterClient<{
+    deletePrinter(id: number): Promise<{
         id: number;
         name: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    }>;
 }

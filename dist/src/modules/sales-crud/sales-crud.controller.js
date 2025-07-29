@@ -28,8 +28,11 @@ let SalesCrudController = class SalesCrudController {
     create(dto, req) {
         return this.service.create(dto, req.user.userId);
     }
-    findAll(req) {
-        return this.service.findAll(req.user.userId, req.query);
+    async findAll(req, page = '1', limit = '10', search) {
+        const pageNumber = Number(page) || 1;
+        const pageSize = Number(limit) || 10;
+        const userId = req.user.userId;
+        return this.service.getPaginatedOrders(pageNumber, pageSize, userId, search);
     }
     findOne(id, req) {
         return this.service.findOne(id, req.user.userId);
@@ -57,12 +60,15 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)('sales'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get all sales orders for the user' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Get paginated sales orders for the user' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales orders retrieved' }),
     __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)('page')),
+    __param(2, (0, common_1.Query)('limit')),
+    __param(3, (0, common_1.Query)('search')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [Object, String, String, String]),
+    __metadata("design:returntype", Promise)
 ], SalesCrudController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)(':id'),

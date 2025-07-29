@@ -31,7 +31,11 @@ let UserController = class UserController {
     update(id, dto) {
         return this.userService.update(id, dto);
     }
-    remove(id) {
+    remove(id, req) {
+        const currentUserId = req.user.userId;
+        if (id === currentUserId) {
+            throw new common_1.ForbiddenException('You cannot delete your own admin account.');
+        }
         return this.userService.remove(id);
     }
 };
@@ -75,8 +79,9 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 200, description: 'User deleted successfully' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'User not found' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], UserController.prototype, "remove", null);
 exports.UserController = UserController = __decorate([

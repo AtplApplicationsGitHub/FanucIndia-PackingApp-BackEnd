@@ -45,10 +45,7 @@ export class SalesCrudService {
    * Fetch all sales orders for a given user,
    * optionally filtering by multiple fields via `?search=…`
    */
-  async findAll(
-    userId: number,
-    query: { search?: string }
-  ) {
+  async findAll(userId: number, query: { search?: string }) {
     try {
       const { search } = query;
       const where: any = { userId };
@@ -71,7 +68,8 @@ export class SalesCrudService {
           { specialRemarks: { contains: search } },
 
           // Boolean paymentClearance (match "true" or "false")
-          ...(search.toLowerCase() === 'true' || search.toLowerCase() === 'false'
+          ...(search.toLowerCase() === 'true' ||
+          search.toLowerCase() === 'false'
             ? [{ paymentClearance: search.toLowerCase() === 'true' }]
             : []),
 
@@ -153,19 +151,13 @@ export class SalesCrudService {
     });
 
     if (!order || order.userId !== userId) {
-      throw new NotFoundException(
-        'Sales order not found or access denied',
-      );
+      throw new NotFoundException('Sales order not found or access denied');
     }
 
     return order;
   }
 
-  async update(
-    id: number,
-    dto: UpdateSalesCrudDto,
-    userId: number,
-  ) {
+  async update(id: number, dto: UpdateSalesCrudDto, userId: number) {
     const existing = await this.prisma.salesOrder.findUnique({
       where: { id },
     });
@@ -229,5 +221,62 @@ export class SalesCrudService {
         error.message,
       );
     }
+  }
+
+  async getPaginatedOrders(
+    page: number,
+    limit: number,
+    userId: number,
+    search?: string,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const whereClause: any = { userId };
+
+    if (search) {
+      const s = { contains: search }; 
+
+      whereClause.OR = [
+        { saleOrderNumber: s },
+        { outboundDelivery: s },
+        { transferOrder: s },
+        { status: s },
+        { specialRemarks: s },
+        ...(['true', 'false'].includes(search.toLowerCase())
+          ? [{ paymentClearance: search.toLowerCase() === 'true' }]
+          : []),
+
+        // === relational filters – NOTE the “equals” wrapper ===
+        { customer: { is: { name: s } } },
+        { product: { is: { name: s } } },
+        { transporter: { is: { name: s } } },
+        { plantCode: { is: { code: s } } },
+        { salesZone: { is: { name: s } } },
+        { packConfig: { is: { configName: s } } },
+      ];
+    }
+
+    const [orders, totalCount] = await this.prisma.$transaction([
+      this.prisma.salesOrder.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'asc' },
+        include: {
+          customer: true,
+          product: true,
+          transporter: true,
+          plantCode: true,
+          salesZone: true,
+          packConfig: true,
+        },
+      }),
+      this.prisma.salesOrder.count({ where: whereClause }),
+    ]);
+
+    return {
+      orders,
+      totalCount,
+    };
   }
 }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import * as bcrypt from 'bcryptjs';
@@ -8,7 +12,9 @@ export class UserService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateUserDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (existing) throw new BadRequestException('Email already registered');
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
@@ -72,6 +78,29 @@ export class UserService {
   async remove(id: number) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
+
+    // Last admin check
+    if (user.role === 'admin') {
+      const adminCount = await this.prisma.user.count({
+        where: { role: 'admin' },
+      });
+      if (adminCount <= 1) {
+        throw new BadRequestException(
+          'At least one admin must remain in the system.',
+        );
+      }
+    }
+
+    // Check for related sales orders BEFORE delete
+    const salesOrderCount = await this.prisma.salesOrder.count({
+      where: { userId: id },
+    });
+    if (salesOrderCount > 0) {
+      throw new BadRequestException(
+        'Cannot delete user: this user has existing sales orders.',
+      );
+    }
+
     await this.prisma.user.delete({ where: { id } });
     return { message: 'User deleted successfully' };
   }

@@ -52,7 +52,9 @@ let UserService = class UserService {
         this.prisma = prisma;
     }
     async create(dto) {
-        const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+        const existing = await this.prisma.user.findUnique({
+            where: { email: dto.email },
+        });
         if (existing)
             throw new common_1.BadRequestException('Email already registered');
         const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -114,6 +116,20 @@ let UserService = class UserService {
         const user = await this.prisma.user.findUnique({ where: { id } });
         if (!user)
             throw new common_1.NotFoundException('User not found');
+        if (user.role === 'admin') {
+            const adminCount = await this.prisma.user.count({
+                where: { role: 'admin' },
+            });
+            if (adminCount <= 1) {
+                throw new common_1.BadRequestException('At least one admin must remain in the system.');
+            }
+        }
+        const salesOrderCount = await this.prisma.salesOrder.count({
+            where: { userId: id },
+        });
+        if (salesOrderCount > 0) {
+            throw new common_1.BadRequestException('Cannot delete user: this user has existing sales orders.');
+        }
         await this.prisma.user.delete({ where: { id } });
         return { message: 'User deleted successfully' };
     }

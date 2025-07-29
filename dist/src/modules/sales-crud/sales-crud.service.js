@@ -50,7 +50,8 @@ let SalesCrudService = class SalesCrudService {
                     { transferOrder: { contains: search } },
                     { status: { contains: search } },
                     { specialRemarks: { contains: search } },
-                    ...(search.toLowerCase() === 'true' || search.toLowerCase() === 'false'
+                    ...(search.toLowerCase() === 'true' ||
+                        search.toLowerCase() === 'false'
                         ? [{ paymentClearance: search.toLowerCase() === 'true' }]
                         : []),
                     {
@@ -168,6 +169,50 @@ let SalesCrudService = class SalesCrudService {
         catch (error) {
             throw new common_1.InternalServerErrorException('Failed to delete sales order', error.message);
         }
+    }
+    async getPaginatedOrders(page, limit, userId, search) {
+        const skip = (page - 1) * limit;
+        const whereClause = { userId };
+        if (search) {
+            const s = { contains: search };
+            whereClause.OR = [
+                { saleOrderNumber: s },
+                { outboundDelivery: s },
+                { transferOrder: s },
+                { status: s },
+                { specialRemarks: s },
+                ...(['true', 'false'].includes(search.toLowerCase())
+                    ? [{ paymentClearance: search.toLowerCase() === 'true' }]
+                    : []),
+                { customer: { is: { name: s } } },
+                { product: { is: { name: s } } },
+                { transporter: { is: { name: s } } },
+                { plantCode: { is: { code: s } } },
+                { salesZone: { is: { name: s } } },
+                { packConfig: { is: { configName: s } } },
+            ];
+        }
+        const [orders, totalCount] = await this.prisma.$transaction([
+            this.prisma.salesOrder.findMany({
+                where: whereClause,
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'asc' },
+                include: {
+                    customer: true,
+                    product: true,
+                    transporter: true,
+                    plantCode: true,
+                    salesZone: true,
+                    packConfig: true,
+                },
+            }),
+            this.prisma.salesOrder.count({ where: whereClause }),
+        ]);
+        return {
+            orders,
+            totalCount,
+        };
     }
 };
 exports.SalesCrudService = SalesCrudService;

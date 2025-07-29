@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { BadRequestException } from '@nestjs/common';
 
 import { CreateProductDto } from './dto/createProductDto';
 import { UpdateProductDto } from './dto/updateProductDto';
@@ -35,8 +36,18 @@ export class LookupService {
     return this.prisma.product.update({ where: { id }, data: dto });
   }
 
-  deleteProduct(id: number) {
-    return this.prisma.product.delete({ where: { id } });
+  async deleteProduct(id: number) {
+    try {
+      return await this.prisma.product.delete({ where: { id } });
+    } catch (error) {
+      console.error('Delete error:', error);
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete product: One or more orders depend on this product.'
+        );
+      }
+      throw error;
+    }
   }
 
   // TRANSPORTERS
@@ -52,8 +63,17 @@ export class LookupService {
     return this.prisma.transporter.update({ where: { id }, data: dto });
   }
 
-  deleteTransporter(id: number) {
-    return this.prisma.transporter.delete({ where: { id } });
+  async deleteTransporter(id: number) {
+    try {
+      return await this.prisma.transporter.delete({ where: { id } });
+    } catch (error) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete transporter: One or more orders depend on this transporter.'
+        );
+      }
+      throw error;
+    }
   }
 
   // PLANT CODES
@@ -69,8 +89,17 @@ export class LookupService {
     return this.prisma.plantCode.update({ where: { id }, data: dto });
   }
 
-  deletePlantCode(id: number) {
-    return this.prisma.plantCode.delete({ where: { id } });
+  async deletePlantCode(id: number) {
+    try {
+      return await this.prisma.plantCode.delete({ where: { id } });
+    } catch (error) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete plant code: One or more orders depend on this plant code.'
+        );
+      }
+      throw error;
+    }
   }
 
   // SALES ZONES
@@ -86,8 +115,17 @@ export class LookupService {
     return this.prisma.salesZone.update({ where: { id }, data: dto });
   }
 
-  deleteSalesZone(id: number) {
-    return this.prisma.salesZone.delete({ where: { id } });
+  async deleteSalesZone(id: number) {
+    try {
+      return await this.prisma.salesZone.delete({ where: { id } });
+    } catch (error) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete sales zone: One or more orders depend on this sales zone.'
+        );
+      }
+      throw error;
+    }
   }
 
   // PACK CONFIGS
@@ -103,8 +141,17 @@ export class LookupService {
     return this.prisma.packConfig.update({ where: { id }, data: dto });
   }
 
-  deletePackConfig(id: number) {
-    return this.prisma.packConfig.delete({ where: { id } });
+  async deletePackConfig(id: number) {
+    try {
+      return await this.prisma.packConfig.delete({ where: { id } });
+    } catch (error) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete packing configuration: One or more orders depend on this value.'
+        );
+      }
+      throw error;
+    }
   }
 
   // TERMINALS
@@ -120,8 +167,17 @@ export class LookupService {
     return this.prisma.terminal.update({ where: { id }, data: dto });
   }
 
-  deleteTerminal(id: number) {
-    return this.prisma.terminal.delete({ where: { id } });
+  async deleteTerminal(id: number) {
+    try {
+      return await this.prisma.terminal.delete({ where: { id } });
+    } catch (error) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete terminal: One or more orders depend on this terminal.'
+        );
+      }
+      throw error;
+    }
   }
 
   // CUSTOMERS
@@ -137,8 +193,17 @@ export class LookupService {
     return this.prisma.customer.update({ where: { id }, data: dto });
   }
 
-  deleteCustomer(id: number) {
-    return this.prisma.customer.delete({ where: { id } });
+  async deleteCustomer(id: number) {
+    try {
+      return await this.prisma.customer.delete({ where: { id } });
+    } catch (error) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete customer: One or more orders depend on this customer.'
+        );
+      }
+      throw error;
+    }
   }
 
   // PRINTERS
@@ -154,7 +219,16 @@ export class LookupService {
     return this.prisma.printer.update({ where: { id }, data: dto });
   }
 
-  deletePrinter(id: number) {
-    return this.prisma.printer.delete({ where: { id } });
+  async deletePrinter(id: number) {
+    try {
+      return await this.prisma.printer.delete({ where: { id } });
+    } catch (error) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete printer: One or more entities depend on this printer.'
+        );
+      }
+      throw error;
+    }
   }
 }
