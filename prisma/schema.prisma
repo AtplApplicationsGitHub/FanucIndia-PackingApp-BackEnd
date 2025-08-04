@@ -61,6 +61,7 @@ model Customer {
   name        String
   address     String
   salesOrders SalesOrder[]
+  erpMaterials ERP_Material_Data[]  @relation("Customer_ERP_Material_Data")
 }
 
 model Printer {
@@ -70,12 +71,14 @@ model Printer {
 }
 
 model SalesOrder {
-  id               Int         @id @default(autoincrement())
-  userId           Int
-  productId        Int
-  saleOrderNumber  String
-  outboundDelivery String
-  transferOrder    String
+  id        Int @id @default(autoincrement())
+  userId    Int
+  productId Int
+
+  saleOrderNumber  String @unique @db.NVarChar(500)
+  outboundDelivery String @unique @db.NVarChar(500)
+  transferOrder    String @unique @db.NVarChar(500)
+
   deliveryDate     DateTime
   transporterId    Int
   plantCodeId      Int
@@ -86,34 +89,50 @@ model SalesOrder {
   customerId       Int?
   printerId        Int?
   specialRemarks   String?
-  status           String      @default("R105")
+  status           String   @default("R105")
   priority         Int?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  customer         Customer?   @relation(fields: [customerId], references: [id])
-  packConfig       PackConfig  @relation(fields: [packConfigId], references: [id])
-  plantCode        PlantCode   @relation(fields: [plantCodeId], references: [id])
-  printer          Printer?    @relation(fields: [printerId], references: [id])
-  product          Product     @relation(fields: [productId], references: [id])
-  salesZone        SalesZone   @relation(fields: [salesZoneId], references: [id])
-  terminal         Terminal?   @relation(fields: [terminalId], references: [id])
-  transporter      Transporter @relation(fields: [transporterId], references: [id])
-  user             User        @relation(fields: [userId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  customer    Customer?   @relation(fields: [customerId], references: [id])
+  packConfig  PackConfig  @relation(fields: [packConfigId], references: [id])
+  plantCode   PlantCode   @relation(fields: [plantCodeId], references: [id])
+  printer     Printer?    @relation(fields: [printerId], references: [id])
+  product     Product     @relation(fields: [productId], references: [id])
+  salesZone   SalesZone   @relation(fields: [salesZoneId], references: [id])
+  terminal    Terminal?   @relation(fields: [terminalId], references: [id])
+  transporter Transporter @relation(fields: [transporterId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+
+  materialByNumber   ERP_Material_Data[] @relation("SO_By_Number")
+  materialByTransfer ERP_Material_Data[] @relation("SO_By_Transfer")
+  materialByOBD      ERP_Material_Data[] @relation("SO_By_OBD")
 }
 
 model ERP_Material_Data {
   ID                   BigInt  @id(map: "PK_ERP_Material_Data") @default(autoincrement())
-  saleOrderNumber      String? @db.NVarChar(500)
-  transferOrder        String?
-  CustomerName         String?
+  
+  saleOrderNumber      String?  @db.NVarChar(500)
+  customerId           Int?
+  transferOrder        String?  @db.NVarChar(500)
+  FG_OBD               String?  @db.NVarChar(500)
   Machine_Model        String?
-  Material_Code        String?
-  Material_Description String?
-  Batch_No             String? @db.NVarChar(100)
-  SO_Donor_Batch       String? @db.NVarChar(100)
-  Cert_No              String? @db.NVarChar(100)
-  Bin_No               String? @db.NVarChar(100)
-  A_D_F                String? @db.NVarChar(100)
-  Required_Qty         Int?
+  CNC_Serial_No        String?  @db.NVarChar(100)
+
+  Material_Code        String
+  Material_Description String
+  Batch_No             String  @db.NVarChar(100)
+  SO_Donor_Batch       String  @db.NVarChar(100)
+  Cert_No              String  @db.NVarChar(100)
+  Bin_No               String  @db.NVarChar(100)
+  A_D_F                String  @db.NVarChar(100)
+  Required_Qty         Int
+  Issue_stage          Int     @default(0)
+  Packing_stage        Int     @default(0)
   Status               String? @db.NVarChar(100)
+
+  salesOrderByNumber   SalesOrder? @relation("SO_By_Number", fields: [saleOrderNumber], references: [saleOrderNumber], onUpdate: NoAction, onDelete: NoAction)
+  salesOrderByTransfer SalesOrder? @relation("SO_By_Transfer", fields: [transferOrder], references: [transferOrder], onUpdate: NoAction, onDelete: NoAction)
+  salesOrderByOBD      SalesOrder? @relation("SO_By_OBD", fields: [FG_OBD], references: [outboundDelivery], onUpdate: NoAction, onDelete: NoAction)
+  customer             Customer? @relation("Customer_ERP_Material_Data", fields: [customerId], references: [id], onUpdate: NoAction, onDelete: NoAction)
 }

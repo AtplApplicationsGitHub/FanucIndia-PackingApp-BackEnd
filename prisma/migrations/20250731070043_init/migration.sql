@@ -79,9 +79,9 @@ CREATE TABLE [dbo].[SalesOrder] (
     [id] INT NOT NULL IDENTITY(1,1),
     [userId] INT NOT NULL,
     [productId] INT NOT NULL,
-    [saleOrderNumber] NVARCHAR(1000) NOT NULL,
-    [outboundDelivery] NVARCHAR(1000) NOT NULL,
-    [transferOrder] NVARCHAR(1000) NOT NULL,
+    [saleOrderNumber] NVARCHAR(500) NOT NULL,
+    [outboundDelivery] NVARCHAR(500) NOT NULL,
+    [transferOrder] NVARCHAR(500) NOT NULL,
     [deliveryDate] DATETIME2 NOT NULL,
     [transporterId] INT NOT NULL,
     [plantCodeId] INT NOT NULL,
@@ -92,28 +92,35 @@ CREATE TABLE [dbo].[SalesOrder] (
     [customerId] INT,
     [printerId] INT,
     [specialRemarks] NVARCHAR(1000),
-    [status] NVARCHAR(1000) NOT NULL,
+    [status] NVARCHAR(1000) NOT NULL CONSTRAINT [SalesOrder_status_df] DEFAULT 'R105',
     [priority] INT,
     [createdAt] DATETIME2 NOT NULL CONSTRAINT [SalesOrder_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
     [updatedAt] DATETIME2 NOT NULL,
-    CONSTRAINT [SalesOrder_pkey] PRIMARY KEY CLUSTERED ([id])
+    CONSTRAINT [SalesOrder_pkey] PRIMARY KEY CLUSTERED ([id]),
+    CONSTRAINT [SalesOrder_saleOrderNumber_key] UNIQUE NONCLUSTERED ([saleOrderNumber]),
+    CONSTRAINT [SalesOrder_outboundDelivery_key] UNIQUE NONCLUSTERED ([outboundDelivery]),
+    CONSTRAINT [SalesOrder_transferOrder_key] UNIQUE NONCLUSTERED ([transferOrder])
 );
 
 -- CreateTable
 CREATE TABLE [dbo].[ERP_Material_Data] (
     [ID] BIGINT NOT NULL IDENTITY(1,1),
     [saleOrderNumber] NVARCHAR(500),
-    [transferOrder] NVARCHAR(1000),
-    [CustomerName] NVARCHAR(1000),
+    [customerId] INT,
+    [transferOrder] NVARCHAR(500),
+    [FG_OBD] NVARCHAR(500),
     [Machine_Model] NVARCHAR(1000),
-    [Material_Code] NVARCHAR(1000),
-    [Material_Description] NVARCHAR(1000),
-    [Batch_No] NVARCHAR(100),
-    [SO_Donor_Batch] NVARCHAR(100),
-    [Cert_No] NVARCHAR(100),
-    [Bin_No] NVARCHAR(100),
-    [A_D_F] NVARCHAR(100),
-    [Required_Qty] INT,
+    [CNC_Serial_No] NVARCHAR(100),
+    [Material_Code] NVARCHAR(1000) NOT NULL,
+    [Material_Description] NVARCHAR(1000) NOT NULL,
+    [Batch_No] NVARCHAR(100) NOT NULL,
+    [SO_Donor_Batch] NVARCHAR(100) NOT NULL,
+    [Cert_No] NVARCHAR(100) NOT NULL,
+    [Bin_No] NVARCHAR(100) NOT NULL,
+    [A_D_F] NVARCHAR(100) NOT NULL,
+    [Required_Qty] INT NOT NULL,
+    [Issue_stage] INT NOT NULL CONSTRAINT [ERP_Material_Data_Issue_stage_df] DEFAULT 0,
+    [Packing_stage] INT NOT NULL CONSTRAINT [ERP_Material_Data_Packing_stage_df] DEFAULT 0,
     [Status] NVARCHAR(100),
     CONSTRAINT [PK_ERP_Material_Data] PRIMARY KEY CLUSTERED ([ID])
 );
@@ -144,6 +151,18 @@ ALTER TABLE [dbo].[SalesOrder] ADD CONSTRAINT [SalesOrder_transporterId_fkey] FO
 
 -- AddForeignKey
 ALTER TABLE [dbo].[SalesOrder] ADD CONSTRAINT [SalesOrder_userId_fkey] FOREIGN KEY ([userId]) REFERENCES [dbo].[User]([id]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [dbo].[ERP_Material_Data] ADD CONSTRAINT [ERP_Material_Data_saleOrderNumber_fkey] FOREIGN KEY ([saleOrderNumber]) REFERENCES [dbo].[SalesOrder]([saleOrderNumber]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE [dbo].[ERP_Material_Data] ADD CONSTRAINT [ERP_Material_Data_transferOrder_fkey] FOREIGN KEY ([transferOrder]) REFERENCES [dbo].[SalesOrder]([transferOrder]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE [dbo].[ERP_Material_Data] ADD CONSTRAINT [ERP_Material_Data_FG_OBD_fkey] FOREIGN KEY ([FG_OBD]) REFERENCES [dbo].[SalesOrder]([outboundDelivery]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE [dbo].[ERP_Material_Data] ADD CONSTRAINT [ERP_Material_Data_customerId_fkey] FOREIGN KEY ([customerId]) REFERENCES [dbo].[Customer]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 COMMIT TRAN;
 

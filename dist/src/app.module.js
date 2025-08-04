@@ -17,12 +17,13 @@ const sales_crud_module_1 = require("./modules/sales-crud/sales-crud.module");
 const admin_order_module_1 = require("./modules/admin-order/admin-order.module");
 const prisma_module_1 = require("./prisma.module");
 const user_module_1 = require("./modules/user/user.module");
+const erp_material_data_module_1 = require("./modules/erp-material-data/erp-material-data.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, sales_order_module_1.SalesOrderModule, auth_module_1.AuthModule, lookup_module_1.LookupModule, sales_crud_module_1.SalesCrudModule, admin_order_module_1.AdminOrderModule, user_module_1.UserModule],
+        imports: [prisma_module_1.PrismaModule, sales_order_module_1.SalesOrderModule, auth_module_1.AuthModule, lookup_module_1.LookupModule, sales_crud_module_1.SalesCrudModule, admin_order_module_1.AdminOrderModule, user_module_1.UserModule, erp_material_data_module_1.ErpMaterialDataModule],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],
     })
