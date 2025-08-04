@@ -19,7 +19,7 @@ let AdminOrderService = class AdminOrderService {
         this.prisma = prisma;
     }
     async findAll(query) {
-        const { page = 1, limit = 20, search, date, sortBy = 'createdAt', sortOrder = 'asc', } = query;
+        const { page = 1, limit = 20, search, date, sortBy = 'createdAt', sortOrder = 'desc', } = query;
         const parsedPage = Number(page) > 0 ? Number(page) : 1;
         const parsedLimit = Number(limit) > 0 && Number(limit) <= 100 ? Number(limit) : 20;
         const allowedSortFields = [
@@ -32,7 +32,7 @@ let AdminOrderService = class AdminOrderService {
         const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
         const orderDirection = allowedSortOrders.includes(sortOrder)
             ? sortOrder
-            : 'asc';
+            : 'desc';
         const where = {};
         if (search) {
             const lower = search.toLowerCase();

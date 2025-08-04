@@ -18,7 +18,7 @@ export class AdminOrderService {
       search,
       date,
       sortBy = 'createdAt',
-      sortOrder = 'asc',
+      sortOrder = 'desc',
     } = query;
 
     const parsedPage = Number(page) > 0 ? Number(page) : 1;
@@ -35,7 +35,7 @@ export class AdminOrderService {
     const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
     const orderDirection = allowedSortOrders.includes(sortOrder)
       ? sortOrder
-      : 'asc';
+      : 'desc';
 
     const where: Prisma.SalesOrderWhereInput = {};
 

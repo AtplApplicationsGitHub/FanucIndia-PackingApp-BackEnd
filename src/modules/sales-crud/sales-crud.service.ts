@@ -119,7 +119,7 @@ export class SalesCrudService {
 
       return await this.prisma.salesOrder.findMany({
         where,
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: 'desc' },
         include: {
           customer: true,
           product: true,
@@ -261,7 +261,7 @@ export class SalesCrudService {
         where: whereClause,
         skip,
         take: limit,
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: 'desc' },
         include: {
           customer: true,
           product: true,
