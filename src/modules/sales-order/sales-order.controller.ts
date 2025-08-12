@@ -9,6 +9,7 @@ import {
   UseInterceptors,
   HttpException,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { SalesOrderService } from './sales-order.service';
@@ -24,6 +25,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { AuthRequest } from '../auth/types/auth-request.type';
+import { Buffer } from 'buffer';
 
 @ApiTags('Sales Order Bulk Import')
 @ApiBearerAuth()
@@ -36,8 +38,18 @@ export class SalesOrderController {
   @Roles('sales')
   @ApiOperation({ summary: 'Download sales order Excel template' })
   @ApiResponse({ status: 200, description: 'Excel file downloaded' })
+  @ApiResponse({ status: 500, description: 'Failed to generate or send template' })
   async downloadTemplate(@Res() res: Response) {
-    await this.salesOrderService.generateBulkTemplate(res);
+    try {
+      await this.salesOrderService.generateBulkTemplate(res);
+    } catch (err: any) {
+      const status =
+        err instanceof HttpException ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+      throw new HttpException(
+        err.message || 'Failed to download template',
+        status,
+      );
+    }
   }
 
   @Post('import')
@@ -49,32 +61,39 @@ export class SalesOrderController {
     schema: {
       type: 'object',
       properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
+        file: { type: 'string', format: 'binary' },
       },
     },
   })
-  @ApiResponse({
-    status: 201,
-    description: 'Sales orders imported successfully',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'No file uploaded or invalid format',
-  })
+  @ApiResponse({ status: 201, description: 'Sales orders imported successfully' })
+  @ApiResponse({ status: 400, description: 'No file uploaded or invalid format' })
+  @ApiResponse({ status: 409, description: 'Duplicate orders detected' })
+  @ApiResponse({ status: 500, description: 'Failed to import sales orders' })
   async bulkImport(
     @UploadedFile() file: Express.Multer.File,
     @Req() req: AuthRequest,
   ) {
     if (!file) {
-      throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('No file uploaded');
     }
 
-    return this.salesOrderService.importBulkOrders(
-      file.buffer,
-      req.user.userId,
-    );
+    const buf = Buffer.isBuffer(file.buffer)
+      ? file.buffer
+      : Buffer.from(file.buffer);
+
+    try {
+      return await this.salesOrderService.importBulkOrders(
+        buf,
+        req.user.userId,
+      );
+    } catch (err: any) {
+      if (err.status && err.response) {
+        throw err;
+      }
+      throw new HttpException(
+        err.message || 'Failed to import sales orders',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

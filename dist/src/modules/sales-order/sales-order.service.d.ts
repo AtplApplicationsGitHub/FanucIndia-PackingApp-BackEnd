@@ -4,10 +4,12 @@ export declare class SalesOrderService {
     private readonly prisma;
     constructor(prisma: PrismaService);
     generateBulkTemplate(res: Response): Promise<void>;
-    importBulkOrders(fileBuffer: Buffer, userId: number): Promise<{
+    importBulkOrders(fileBuffer: any, userId: number): Promise<{
         message: string;
-        errors: any[];
+        errors: {
+            row: number;
+            errors: string[];
+        }[];
         insertedCount: number;
-        preview: any[];
     }>;
 }

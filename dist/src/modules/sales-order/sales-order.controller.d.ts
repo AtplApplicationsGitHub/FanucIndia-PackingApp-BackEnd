@@ -7,8 +7,10 @@ export declare class SalesOrderController {
     downloadTemplate(res: Response): Promise<void>;
     bulkImport(file: Express.Multer.File, req: AuthRequest): Promise<{
         message: string;
-        errors: any[];
+        errors: {
+            row: number;
+            errors: string[];
+        }[];
         insertedCount: number;
-        preview: any[];
     }>;
 }

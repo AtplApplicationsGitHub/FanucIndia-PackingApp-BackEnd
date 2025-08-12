@@ -5,4 +5,6 @@ export declare class ErpMaterialDataService {
     getMaterialsByOrderId(orderId: number): Promise<any>;
     incrementIssueStage(orderId: number, materialCode: string): Promise<any>;
     updateIssueStage(orderId: number, materialCode: string, newIssueStage: number): Promise<any>;
+    incrementPackingStage(orderId: number, materialCode: string): Promise<any>;
+    updatePackingStage(orderId: number, materialCode: string, newPackingStage: number): Promise<any>;
 }

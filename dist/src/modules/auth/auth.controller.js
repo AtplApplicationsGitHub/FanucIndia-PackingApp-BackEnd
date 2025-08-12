@@ -24,18 +24,18 @@ let AuthController = class AuthController {
     constructor(authService) {
         this.authService = authService;
     }
-    signup(dto) {
-        return this.authService.signup(dto);
+    signup(dto, req) {
+        return this.authService.signup(dto, req);
     }
-    login(dto) {
-        return this.authService.login(dto);
+    login(dto, req) {
+        return this.authService.login(dto, req);
     }
     checkEmail(email) {
         if (!email)
             return { exists: false };
-        return this.authService
-            .checkEmailExists(email)
-            .then((exists) => ({ exists }));
+        return this.authService.checkEmailExists(email).then((exists) => ({
+            exists,
+        }));
     }
 };
 exports.AuthController = AuthController;
@@ -45,10 +45,11 @@ __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Register a new user (sales or admin)' }),
     (0, swagger_1.ApiBody)({ type: signup_dto_1.SignupDto }),
     (0, swagger_1.ApiResponse)({ status: 201, description: 'User signed up successfully' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Validation failed' }),
+    (0, swagger_1.ApiResponse)({ status: 409, description: 'Email already in use' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [signup_dto_1.SignupDto]),
+    __metadata("design:paramtypes", [signup_dto_1.SignupDto, Object]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "signup", null);
 __decorate([
@@ -62,8 +63,9 @@ __decorate([
     }),
     (0, swagger_1.ApiResponse)({ status: 401, description: 'Invalid email or password' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [login_dto_1.LoginDto]),
+    __metadata("design:paramtypes", [login_dto_1.LoginDto, Object]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "login", null);
 __decorate([

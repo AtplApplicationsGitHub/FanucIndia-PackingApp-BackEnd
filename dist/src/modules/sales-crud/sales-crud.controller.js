@@ -28,11 +28,10 @@ let SalesCrudController = class SalesCrudController {
     create(dto, req) {
         return this.service.create(dto, req.user.userId);
     }
-    async findAll(req, page = '1', limit = '10', search) {
+    findAll(req, page = '1', limit = '10', search) {
         const pageNumber = Number(page) || 1;
         const pageSize = Number(limit) || 10;
-        const userId = req.user.userId;
-        return this.service.getPaginatedOrders(pageNumber, pageSize, userId, search);
+        return this.service.getPaginatedOrders(pageNumber, pageSize, req.user.userId, search);
     }
     findOne(id, req) {
         return this.service.findOne(id, req.user.userId);
@@ -51,6 +50,10 @@ __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Create a new sales order' }),
     (0, swagger_1.ApiBody)({ type: create_sales_crud_dto_1.CreateSalesCrudDto }),
     (0, swagger_1.ApiResponse)({ status: 201, description: 'Sales order created successfully' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Bad request (validation/business error)' }),
+    (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden' }),
+    (0, swagger_1.ApiResponse)({ status: 409, description: 'Conflict (duplicate order)' }),
+    (0, swagger_1.ApiResponse)({ status: 500, description: 'Internal server error' }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
@@ -61,14 +64,19 @@ __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)('sales'),
     (0, swagger_1.ApiOperation)({ summary: 'Get paginated sales orders for the user' }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, example: 1 }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, example: 10 }),
+    (0, swagger_1.ApiQuery)({ name: 'search', required: false, example: 'SO123' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales orders retrieved' }),
+    (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden' }),
+    (0, swagger_1.ApiResponse)({ status: 500, description: 'Internal server error' }),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Query)('page')),
     __param(2, (0, common_1.Query)('limit')),
     __param(3, (0, common_1.Query)('search')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, String, String]),
-    __metadata("design:returntype", Promise)
+    __metadata("design:returntype", void 0)
 ], SalesCrudController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)(':id'),
@@ -76,7 +84,9 @@ __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Get a specific sales order by ID' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order found' }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: 'Sales order not found' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Not found or access denied' }),
+    (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden' }),
+    (0, swagger_1.ApiResponse)({ status: 500, description: 'Internal server error' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
@@ -90,7 +100,11 @@ __decorate([
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     (0, swagger_1.ApiBody)({ type: update_sales_crud_dto_1.UpdateSalesCrudDto }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order updated' }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: 'Sales order not found' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Bad request (validation/business error)' }),
+    (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Not found' }),
+    (0, swagger_1.ApiResponse)({ status: 409, description: 'Conflict (unique constraint)' }),
+    (0, swagger_1.ApiResponse)({ status: 500, description: 'Internal server error' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.Req)()),
@@ -104,7 +118,9 @@ __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Delete a sales order by ID' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order deleted' }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: 'Sales order not found' }),
+    (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Not found' }),
+    (0, swagger_1.ApiResponse)({ status: 500, description: 'Internal server error' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),

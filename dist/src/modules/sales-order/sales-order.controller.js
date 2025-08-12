@@ -19,19 +19,37 @@ const platform_express_1 = require("@nestjs/platform-express");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const roles_decorator_1 = require("../auth/roles.decorator");
 const swagger_1 = require("@nestjs/swagger");
+const buffer_1 = require("buffer");
 let SalesOrderController = class SalesOrderController {
     salesOrderService;
     constructor(salesOrderService) {
         this.salesOrderService = salesOrderService;
     }
     async downloadTemplate(res) {
-        await this.salesOrderService.generateBulkTemplate(res);
+        try {
+            await this.salesOrderService.generateBulkTemplate(res);
+        }
+        catch (err) {
+            const status = err instanceof common_1.HttpException ? err.getStatus() : common_1.HttpStatus.INTERNAL_SERVER_ERROR;
+            throw new common_1.HttpException(err.message || 'Failed to download template', status);
+        }
     }
     async bulkImport(file, req) {
         if (!file) {
-            throw new common_1.HttpException('No file uploaded', common_1.HttpStatus.BAD_REQUEST);
+            throw new common_1.BadRequestException('No file uploaded');
         }
-        return this.salesOrderService.importBulkOrders(file.buffer, req.user.userId);
+        const buf = buffer_1.Buffer.isBuffer(file.buffer)
+            ? file.buffer
+            : buffer_1.Buffer.from(file.buffer);
+        try {
+            return await this.salesOrderService.importBulkOrders(buf, req.user.userId);
+        }
+        catch (err) {
+            if (err.status && err.response) {
+                throw err;
+            }
+            throw new common_1.HttpException(err.message || 'Failed to import sales orders', common_1.HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 };
 exports.SalesOrderController = SalesOrderController;
@@ -40,6 +58,7 @@ __decorate([
     (0, roles_decorator_1.Roles)('sales'),
     (0, swagger_1.ApiOperation)({ summary: 'Download sales order Excel template' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Excel file downloaded' }),
+    (0, swagger_1.ApiResponse)({ status: 500, description: 'Failed to generate or send template' }),
     __param(0, (0, common_1.Res)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -55,21 +74,14 @@ __decorate([
         schema: {
             type: 'object',
             properties: {
-                file: {
-                    type: 'string',
-                    format: 'binary',
-                },
+                file: { type: 'string', format: 'binary' },
             },
         },
     }),
-    (0, swagger_1.ApiResponse)({
-        status: 201,
-        description: 'Sales orders imported successfully',
-    }),
-    (0, swagger_1.ApiResponse)({
-        status: 400,
-        description: 'No file uploaded or invalid format',
-    }),
+    (0, swagger_1.ApiResponse)({ status: 201, description: 'Sales orders imported successfully' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'No file uploaded or invalid format' }),
+    (0, swagger_1.ApiResponse)({ status: 409, description: 'Duplicate orders detected' }),
+    (0, swagger_1.ApiResponse)({ status: 500, description: 'Failed to import sales orders' }),
     __param(0, (0, common_1.UploadedFile)()),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),

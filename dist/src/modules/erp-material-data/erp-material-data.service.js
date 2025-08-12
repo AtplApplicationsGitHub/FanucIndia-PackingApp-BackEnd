@@ -19,7 +19,10 @@ function convertBigIntToString(obj) {
     else if (obj && typeof obj === 'object') {
         const res = {};
         for (const [key, value] of Object.entries(obj)) {
-            res[key] = typeof value === 'bigint' ? value.toString() : convertBigIntToString(value);
+            res[key] =
+                typeof value === 'bigint'
+                    ? value.toString()
+                    : convertBigIntToString(value);
         }
         return res;
     }
@@ -33,7 +36,11 @@ let ErpMaterialDataService = class ErpMaterialDataService {
     async getMaterialsByOrderId(orderId) {
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: { id: orderId },
-            select: { saleOrderNumber: true, transferOrder: true, outboundDelivery: true },
+            select: {
+                saleOrderNumber: true,
+                transferOrder: true,
+                outboundDelivery: true,
+            },
         });
         if (!salesOrder)
             throw new common_1.NotFoundException('Sales Order not found');
@@ -52,7 +59,11 @@ let ErpMaterialDataService = class ErpMaterialDataService {
     async incrementIssueStage(orderId, materialCode) {
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: { id: orderId },
-            select: { saleOrderNumber: true, transferOrder: true, outboundDelivery: true },
+            select: {
+                saleOrderNumber: true,
+                transferOrder: true,
+                outboundDelivery: true,
+            },
         });
         if (!salesOrder)
             throw new common_1.NotFoundException('Sales Order not found');
@@ -101,7 +112,11 @@ let ErpMaterialDataService = class ErpMaterialDataService {
     async updateIssueStage(orderId, materialCode, newIssueStage) {
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: { id: orderId },
-            select: { saleOrderNumber: true, transferOrder: true, outboundDelivery: true },
+            select: {
+                saleOrderNumber: true,
+                transferOrder: true,
+                outboundDelivery: true,
+            },
         });
         if (!salesOrder)
             throw new common_1.NotFoundException('Sales Order not found');
@@ -147,6 +162,87 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         return convertBigIntToString({
             message: 'Issue_stage updated successfully',
             allCompleted,
+            updatedMaterial,
+        });
+    }
+    async incrementPackingStage(orderId, materialCode) {
+        const salesOrder = await this.prisma.salesOrder.findUnique({
+            where: { id: orderId },
+            select: {
+                saleOrderNumber: true,
+                transferOrder: true,
+                outboundDelivery: true,
+            },
+        });
+        if (!salesOrder)
+            throw new common_1.NotFoundException('Sales Order not found');
+        const material = await this.prisma.eRP_Material_Data.findFirst({
+            where: {
+                Material_Code: materialCode,
+                OR: [
+                    { saleOrderNumber: salesOrder.saleOrderNumber },
+                    { transferOrder: salesOrder.transferOrder },
+                    { FG_OBD: salesOrder.outboundDelivery },
+                ],
+            },
+        });
+        if (!material)
+            throw new common_1.NotFoundException('Material with specified code not found for this order.');
+        const cap = Math.min(material.Required_Qty, material.Issue_stage);
+        if (material.Packing_stage >= cap) {
+            throw new common_1.BadRequestException('Cannot exceed the min(Required_Qty, Issue_stage) cap');
+        }
+        const updatedMaterial = await this.prisma.eRP_Material_Data.update({
+            where: { ID: material.ID },
+            data: {
+                Packing_stage: { increment: 1 },
+                UpdatedDate: new Date(),
+            },
+        });
+        return convertBigIntToString({
+            message: 'Packing_stage incremented successfully',
+            updatedMaterial,
+        });
+    }
+    async updatePackingStage(orderId, materialCode, newPackingStage) {
+        if (newPackingStage < 0) {
+            throw new common_1.BadRequestException('Packing_stage cannot be negative');
+        }
+        const salesOrder = await this.prisma.salesOrder.findUnique({
+            where: { id: orderId },
+            select: {
+                saleOrderNumber: true,
+                transferOrder: true,
+                outboundDelivery: true,
+            },
+        });
+        if (!salesOrder)
+            throw new common_1.NotFoundException('Sales Order not found');
+        const material = await this.prisma.eRP_Material_Data.findFirst({
+            where: {
+                Material_Code: materialCode,
+                OR: [
+                    { saleOrderNumber: salesOrder.saleOrderNumber },
+                    { transferOrder: salesOrder.transferOrder },
+                    { FG_OBD: salesOrder.outboundDelivery },
+                ],
+            },
+        });
+        if (!material)
+            throw new common_1.NotFoundException('Material with specified code not found for this order.');
+        const cap = Math.min(material.Required_Qty, material.Issue_stage);
+        if (newPackingStage > cap) {
+            throw new common_1.BadRequestException(`Packing_stage cannot exceed min(Required_Qty, Issue_stage) = ${cap}`);
+        }
+        const updatedMaterial = await this.prisma.eRP_Material_Data.update({
+            where: { ID: material.ID },
+            data: {
+                Packing_stage: newPackingStage,
+                UpdatedDate: new Date(),
+            },
+        });
+        return convertBigIntToString({
+            message: 'Packing_stage updated successfully',
             updatedMaterial,
         });
     }

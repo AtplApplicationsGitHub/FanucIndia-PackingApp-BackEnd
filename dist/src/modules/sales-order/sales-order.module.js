@@ -10,13 +10,14 @@ exports.SalesOrderModule = void 0;
 const common_1 = require("@nestjs/common");
 const sales_order_controller_1 = require("./sales-order.controller");
 const sales_order_service_1 = require("./sales-order.service");
+const prisma_service_1 = require("../../prisma.service");
 let SalesOrderModule = class SalesOrderModule {
 };
 exports.SalesOrderModule = SalesOrderModule;
 exports.SalesOrderModule = SalesOrderModule = __decorate([
     (0, common_1.Module)({
         controllers: [sales_order_controller_1.SalesOrderController],
-        providers: [sales_order_service_1.SalesOrderService],
+        providers: [sales_order_service_1.SalesOrderService, prisma_service_1.PrismaService],
     })
 ], SalesOrderModule);
 //# sourceMappingURL=sales-order.module.js.map

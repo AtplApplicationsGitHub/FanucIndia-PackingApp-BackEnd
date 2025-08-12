@@ -8,22 +8,32 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AllExceptionsFilter = void 0;
 const common_1 = require("@nestjs/common");
+const logger_1 = require("./logger");
 let AllExceptionsFilter = class AllExceptionsFilter {
     catch(exception, host) {
         const ctx = host.switchToHttp();
-        const response = ctx.getResponse();
-        const request = ctx.getRequest();
+        const req = ctx.getRequest();
+        const res = ctx.getResponse();
         const status = exception instanceof common_1.HttpException
             ? exception.getStatus()
             : common_1.HttpStatus.INTERNAL_SERVER_ERROR;
-        const message = exception instanceof common_1.HttpException
+        const responsePayload = exception instanceof common_1.HttpException
             ? exception.getResponse()
-            : exception;
-        response.status(status).json({
-            statusCode: status,
-            timestamp: new Date().toISOString(),
-            path: request.url,
-            message,
+            : {
+                code: 'INTERNAL_ERROR',
+                message: 'Something went wrong. Please try again later.',
+            };
+        logger_1.logger.error({
+            component: 'exception-filter',
+            status,
+            path: req.url,
+            requestId: req.headers['x-request-id'],
+            code: responsePayload.code,
+        }, exception instanceof Error ? exception.stack : String(exception));
+        res.status(status).json({
+            code: responsePayload.code,
+            message: responsePayload.message,
+            details: responsePayload.details ?? null,
         });
     }
 };

@@ -23,6 +23,7 @@ import {
   ApiResponse,
   ApiBody,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 
 @ApiTags('Sales Orders')
@@ -37,6 +38,10 @@ export class SalesCrudController {
   @ApiOperation({ summary: 'Create a new sales order' })
   @ApiBody({ type: CreateSalesCrudDto })
   @ApiResponse({ status: 201, description: 'Sales order created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request (validation/business error)' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 409, description: 'Conflict (duplicate order)' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   create(@Body() dto: CreateSalesCrudDto, @Req() req) {
     return this.service.create(dto, req.user.userId);
   }
@@ -44,8 +49,13 @@ export class SalesCrudController {
   @Get()
   @Roles('sales')
   @ApiOperation({ summary: 'Get paginated sales orders for the user' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  @ApiQuery({ name: 'search', required: false, example: 'SO123' })
   @ApiResponse({ status: 200, description: 'Sales orders retrieved' })
-  async findAll(
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  findAll(
     @Req() req,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
@@ -53,9 +63,12 @@ export class SalesCrudController {
   ) {
     const pageNumber = Number(page) || 1;
     const pageSize = Number(limit) || 10;
-    const userId = req.user.userId;
-
-    return this.service.getPaginatedOrders(pageNumber, pageSize, userId, search);
+    return this.service.getPaginatedOrders(
+      pageNumber,
+      pageSize,
+      req.user.userId,
+      search,
+    );
   }
 
   @Get(':id')
@@ -63,8 +76,13 @@ export class SalesCrudController {
   @ApiOperation({ summary: 'Get a specific sales order by ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, description: 'Sales order found' })
-  @ApiResponse({ status: 404, description: 'Sales order not found' })
-  findOne(@Param('id', ParseIntPipe) id: number, @Req() req) {
+  @ApiResponse({ status: 404, description: 'Not found or access denied' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req,
+  ) {
     return this.service.findOne(id, req.user.userId);
   }
 
@@ -74,7 +92,11 @@ export class SalesCrudController {
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdateSalesCrudDto })
   @ApiResponse({ status: 200, description: 'Sales order updated' })
-  @ApiResponse({ status: 404, description: 'Sales order not found' })
+  @ApiResponse({ status: 400, description: 'Bad request (validation/business error)' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Not found' })
+  @ApiResponse({ status: 409, description: 'Conflict (unique constraint)' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateSalesCrudDto,
@@ -88,8 +110,13 @@ export class SalesCrudController {
   @ApiOperation({ summary: 'Delete a sales order by ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, description: 'Sales order deleted' })
-  @ApiResponse({ status: 404, description: 'Sales order not found' })
-  remove(@Param('id', ParseIntPipe) id: number, @Req() req) {
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Not found' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req,
+  ) {
     return this.service.remove(id, req.user.userId);
   }
 }

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SalesOrderModule } from './modules/sales-order/sales-order.module';
@@ -9,9 +10,11 @@ import { AdminOrderModule } from './modules/admin-order/admin-order.module';
 import { PrismaModule } from './prisma.module';
 import { UserModule } from './modules/user/user.module';
 import { ErpMaterialDataModule } from './modules/erp-material-data/erp-material-data.module';
+import { ErpMaterialFileModule } from './modules/erp-material-file/erp-material-file.module';
+import { SftpModule } from './modules/sftp/sftp.module';
 
 @Module({
-  imports: [PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule,],
   controllers: [AppController],
   providers: [AppService],
 })

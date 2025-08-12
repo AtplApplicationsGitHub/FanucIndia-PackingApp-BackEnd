@@ -36,16 +36,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@nestjs/core");
 const app_module_1 = require("./app.module");
 const all_exceptions_filter_1 = require("./common/all-exceptions.filter");
+const pino_logger_service_1 = require("./common/pino-logger.service");
 const swagger_1 = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const fs = __importStar(require("fs"));
 const config_1 = require("@nestjs/config");
 async function bootstrap() {
-    const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    const app = await core_1.NestFactory.create(app_module_1.AppModule, { logger: false });
     const configService = app.get(config_1.ConfigService);
     const httpsKeyPath = configService.get('SSL_KEY_PATH');
     const httpsCertPath = configService.get('SSL_CERT_PATH');
-    const isSSL = httpsKeyPath && httpsCertPath;
+    const isSSL = !!(httpsKeyPath && httpsCertPath);
     let listenApp = app;
     if (isSSL) {
         const httpsOptions = {
@@ -53,20 +54,22 @@ async function bootstrap() {
             cert: fs.readFileSync(httpsCertPath),
         };
         await app.close();
-        listenApp = await core_1.NestFactory.create(app_module_1.AppModule, { httpsOptions });
+        listenApp = await core_1.NestFactory.create(app_module_1.AppModule, { httpsOptions, logger: false });
     }
+    const pinoAdapter = new pino_logger_service_1.PinoLogger();
+    listenApp.useLogger(pinoAdapter);
     listenApp.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
     }));
-    const config = new swagger_1.DocumentBuilder()
+    const swaggerConfig = new swagger_1.DocumentBuilder()
         .setTitle('Fanuc Packing App API')
         .setDescription('API documentation for Fanuc Packing Web & Mobile App')
         .setVersion('1.0')
         .addBearerAuth()
         .build();
-    const document = swagger_1.SwaggerModule.createDocument(listenApp, config);
+    const document = swagger_1.SwaggerModule.createDocument(listenApp, swaggerConfig);
     swagger_1.SwaggerModule.setup('api', listenApp, document);
     listenApp.useGlobalFilters(new all_exceptions_filter_1.AllExceptionsFilter());
     listenApp.enableCors({
@@ -74,6 +77,7 @@ async function bootstrap() {
         credentials: true,
     });
     await listenApp.listen(process.env.PORT ?? 3010);
+    pinoAdapter.log('Application started', 'bootstrap');
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

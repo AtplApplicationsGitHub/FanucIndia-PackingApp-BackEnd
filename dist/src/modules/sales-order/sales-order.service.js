@@ -13,77 +13,107 @@ exports.SalesOrderService = void 0;
 const common_1 = require("@nestjs/common");
 const exceljs_1 = require("exceljs");
 const prisma_service_1 = require("../../prisma.service");
+const client_1 = require("@prisma/client");
 let SalesOrderService = class SalesOrderService {
     prisma;
     constructor(prisma) {
         this.prisma = prisma;
     }
     async generateBulkTemplate(res) {
-        const workbook = new exceljs_1.Workbook();
-        const worksheet = workbook.addWorksheet('Bulk Import');
-        worksheet.columns = [
-            { header: 'Product', key: 'product' },
-            { header: 'Sale Order Number', key: 'saleOrderNumber' },
-            { header: 'Outbound Delivery', key: 'outboundDelivery' },
-            { header: 'Transfer Order', key: 'transferOrder' },
-            { header: 'Delivery Date', key: 'deliveryDate' },
-            { header: 'Transporter', key: 'transporter' },
-            { header: 'Plant Code', key: 'plantCode' },
-            { header: 'Payment Clearance', key: 'paymentClearance' },
-            { header: 'Sales Zone', key: 'salesZone' },
-            { header: 'Packing Config', key: 'packConfig' },
-            { header: 'Customer', key: 'customer' },
-            { header: 'Special Remarks', key: 'specialRemarks' },
-        ];
-        const rowCount = 100;
-        const [products, transporters, plantCodes, salesZones, packConfigs, customers,] = await Promise.all([
-            this.prisma.product.findMany({ orderBy: { name: 'asc' } }),
-            this.prisma.transporter.findMany({ orderBy: { name: 'asc' } }),
-            this.prisma.plantCode.findMany({ orderBy: { code: 'asc' } }),
-            this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } }),
-            this.prisma.packConfig.findMany({ orderBy: { configName: 'asc' } }),
-            this.prisma.customer.findMany({ orderBy: { name: 'asc' } }),
-        ]);
-        const dropdowns = {
-            product: products.map(p => p.name),
-            transporter: transporters.map(t => t.name),
-            plantCode: plantCodes.map(p => p.code),
-            salesZone: salesZones.map(s => s.name),
-            packConfig: packConfigs.map(p => p.configName),
-            paymentClearance: ['Yes', 'No'],
-            customer: customers.map(c => c.name),
-        };
-        for (let i = 0; i < rowCount; i++)
-            worksheet.addRow({});
-        for (const [colKey, values] of Object.entries(dropdowns)) {
-            for (let row = 2; row <= rowCount + 1; row++) {
-                worksheet.getCell(`${worksheet.getColumn(colKey).letter}${row}`).dataValidation = {
-                    type: 'list',
-                    allowBlank: true,
-                    formulae: [`"${values.join(',')}"`],
-                };
+        try {
+            const workbook = new exceljs_1.Workbook();
+            const worksheet = workbook.addWorksheet('Bulk Import');
+            worksheet.columns = [
+                { header: 'Product', key: 'product' },
+                { header: 'Sale Order Number', key: 'saleOrderNumber' },
+                { header: 'Outbound Delivery', key: 'outboundDelivery' },
+                { header: 'Transfer Order', key: 'transferOrder' },
+                { header: 'Delivery Date', key: 'deliveryDate' },
+                { header: 'Transporter', key: 'transporter' },
+                { header: 'Plant Code', key: 'plantCode' },
+                { header: 'Payment Clearance', key: 'paymentClearance' },
+                { header: 'Sales Zone', key: 'salesZone' },
+                { header: 'Packing Config', key: 'packConfig' },
+                { header: 'Customer', key: 'customer' },
+                { header: 'Special Remarks', key: 'specialRemarks' },
+            ];
+            const [products, transporters, plantCodes, salesZones, packConfigs, customers,] = await Promise.all([
+                this.prisma.product.findMany({ orderBy: { name: 'asc' } }),
+                this.prisma.transporter.findMany({ orderBy: { name: 'asc' } }),
+                this.prisma.plantCode.findMany({ orderBy: { code: 'asc' } }),
+                this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } }),
+                this.prisma.packConfig.findMany({ orderBy: { configName: 'asc' } }),
+                this.prisma.customer.findMany({ orderBy: { name: 'asc' } }),
+            ]);
+            const dropdowns = {
+                product: products.map(p => p.name),
+                transporter: transporters.map(t => t.name),
+                plantCode: plantCodes.map(p => p.code),
+                salesZone: salesZones.map(s => s.name),
+                packConfig: packConfigs.map(p => p.configName),
+                paymentClearance: ['Yes', 'No'],
+                customer: customers.map(c => c.name),
+            };
+            const ROW_COUNT = 100;
+            for (let i = 0; i < ROW_COUNT; i++)
+                worksheet.addRow({});
+            for (const [colKey, values] of Object.entries(dropdowns)) {
+                const letter = worksheet.getColumn(colKey).letter;
+                for (let row = 2; row <= ROW_COUNT + 1; row++) {
+                    worksheet.getCell(`${letter}${row}`).dataValidation = {
+                        type: 'list',
+                        allowBlank: true,
+                        formulae: [`"${values.join(',')}"`],
+                    };
+                }
             }
+            res
+                .status(200)
+                .set({
+                'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition': 'attachment; filename="sales_bulk_template.xlsx"',
+            });
+            await workbook.xlsx.write(res);
+            res.end();
         }
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename="sales_bulk_template.xlsx"');
-        await workbook.xlsx.write(res);
-        res.end();
+        catch (err) {
+            throw new common_1.InternalServerErrorException('Failed to generate Excel template', err.message);
+        }
     }
     async importBulkOrders(fileBuffer, userId) {
-        const workbook = new exceljs_1.Workbook();
-        await workbook.xlsx.load(fileBuffer);
+        let workbook;
+        try {
+            workbook = new exceljs_1.Workbook();
+            await workbook.xlsx.load(fileBuffer);
+        }
+        catch (err) {
+            throw new common_1.BadRequestException('Invalid Excel file format', err.message);
+        }
         const worksheet = workbook.getWorksheet('Bulk Import');
         if (!worksheet) {
             throw new common_1.BadRequestException('Invalid template format');
         }
-        const [products, transporters, plantCodes, salesZones, packConfigs, customers] = await Promise.all([
-            this.prisma.product.findMany(),
-            this.prisma.transporter.findMany(),
-            this.prisma.plantCode.findMany(),
-            this.prisma.salesZone.findMany(),
-            this.prisma.packConfig.findMany(),
-            this.prisma.customer.findMany(),
-        ]);
+        let products, transporters, plantCodes, salesZones, packConfigs, customers;
+        try {
+            [
+                products,
+                transporters,
+                plantCodes,
+                salesZones,
+                packConfigs,
+                customers,
+            ] = await Promise.all([
+                this.prisma.product.findMany(),
+                this.prisma.transporter.findMany(),
+                this.prisma.plantCode.findMany(),
+                this.prisma.salesZone.findMany(),
+                this.prisma.packConfig.findMany(),
+                this.prisma.customer.findMany(),
+            ]);
+        }
+        catch (err) {
+            throw new common_1.InternalServerErrorException('Failed to retrieve reference data', err.message);
+        }
         const maps = {
             product: new Map(products.map(p => [p.name.trim(), p.id])),
             transporter: new Map(transporters.map(t => [t.name.trim(), t.id])),
@@ -98,7 +128,7 @@ let SalesOrderService = class SalesOrderService {
             if (rowNumber === 1)
                 return;
             const [product, saleOrderNumber, outboundDelivery, transferOrder, deliveryDate, transporter, plantCode, paymentClearance, salesZone, packConfig, customer, specialRemarks,] = row.values.slice(1);
-            const errList = [];
+            const rowErrors = [];
             const productId = maps.product.get((product || '').toString().trim());
             const transporterId = maps.transporter.get((transporter || '').toString().trim());
             const plantCodeId = maps.plantCode.get((plantCode || '').toString().trim());
@@ -106,56 +136,57 @@ let SalesOrderService = class SalesOrderService {
             const packConfigId = maps.packConfig.get((packConfig || '').toString().trim());
             const customerId = maps.customer.get((customer || '').toString().trim());
             if (!productId)
-                errList.push('Invalid product');
+                rowErrors.push('Invalid product');
             if (!saleOrderNumber)
-                errList.push('Missing saleOrderNumber');
+                rowErrors.push('Missing saleOrderNumber');
             if (!outboundDelivery)
-                errList.push('Missing outboundDelivery');
+                rowErrors.push('Missing outboundDelivery');
             if (!transferOrder)
-                errList.push('Missing transferOrder');
+                rowErrors.push('Missing transferOrder');
             if (!deliveryDate)
-                errList.push('Missing deliveryDate');
+                rowErrors.push('Missing deliveryDate');
             if (!transporterId)
-                errList.push('Invalid transporter');
+                rowErrors.push('Invalid transporter');
             if (!plantCodeId)
-                errList.push('Invalid plantCode');
+                rowErrors.push('Invalid plantCode');
             if (!['Yes', 'No', true, false].includes(paymentClearance))
-                errList.push('Invalid paymentClearance (must be Yes or No)');
+                rowErrors.push('Invalid paymentClearance (must be Yes or No)');
             if (!salesZoneId)
-                errList.push('Invalid salesZone');
+                rowErrors.push('Invalid salesZone');
             if (!packConfigId)
-                errList.push('Invalid packConfig');
+                rowErrors.push('Invalid packConfig');
             if (!customerId)
-                errList.push('Invalid customer');
-            let deliveryDateISO = null;
-            try {
-                const parsed = new Date(deliveryDate);
-                if (isNaN(parsed.getTime()))
-                    throw new Error();
-                deliveryDateISO = parsed;
+                rowErrors.push('Invalid customer');
+            let deliveryDateObj = null;
+            if (deliveryDate) {
+                const dt = new Date(deliveryDate);
+                if (isNaN(dt.getTime())) {
+                    rowErrors.push('Invalid deliveryDate format');
+                }
+                else {
+                    deliveryDateObj = dt;
+                }
             }
-            catch {
-                errList.push('Invalid deliveryDate format');
+            if (rowErrors.length) {
+                errors.push({ row: rowNumber, errors: rowErrors });
             }
-            if (!deliveryDateISO || errList.length > 0) {
-                errors.push({ row: rowNumber, errors: errList });
-                return;
+            else {
+                ordersToInsert.push({
+                    productId,
+                    saleOrderNumber: saleOrderNumber.toString(),
+                    outboundDelivery: outboundDelivery.toString(),
+                    transferOrder: transferOrder.toString(),
+                    deliveryDate: deliveryDateObj,
+                    transporterId,
+                    plantCodeId,
+                    paymentClearance: paymentClearance === 'Yes' || paymentClearance === true,
+                    salesZoneId,
+                    packConfigId,
+                    customerId,
+                    specialRemarks: specialRemarks?.toString(),
+                    userId,
+                });
             }
-            ordersToInsert.push({
-                productId,
-                saleOrderNumber: saleOrderNumber.toString(),
-                outboundDelivery: outboundDelivery.toString(),
-                transferOrder: transferOrder.toString(),
-                deliveryDate: deliveryDateISO,
-                transporterId,
-                plantCodeId,
-                paymentClearance: paymentClearance === 'Yes' || paymentClearance === true,
-                salesZoneId,
-                packConfigId,
-                customerId,
-                specialRemarks: specialRemarks ? specialRemarks.toString() : undefined,
-                userId,
-            });
         });
         if (ordersToInsert.length === 0) {
             throw new common_1.BadRequestException({
@@ -164,16 +195,21 @@ let SalesOrderService = class SalesOrderService {
             });
         }
         try {
-            const inserted = await this.prisma.salesOrder.createMany({ data: ordersToInsert });
+            const result = await this.prisma.salesOrder.createMany({
+                data: ordersToInsert,
+            });
             return {
-                message: `Inserted ${inserted.count} orders. ${errors.length > 0 ? 'Some rows had errors.' : ''}`,
+                message: `Inserted ${result.count} orders.`,
                 errors,
-                insertedCount: inserted.count,
-                preview: ordersToInsert.slice(0, 5),
+                insertedCount: result.count,
             };
         }
-        catch (error) {
-            throw new common_1.InternalServerErrorException('Database insertion failed', error.message);
+        catch (err) {
+            if (err instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+                err.code === 'P2002') {
+                throw new common_1.ConflictException('Duplicate order detected in import; ensure each saleOrderNumber is unique.');
+            }
+            throw new common_1.InternalServerErrorException('Database insertion failed', err.message);
         }
     }
 };

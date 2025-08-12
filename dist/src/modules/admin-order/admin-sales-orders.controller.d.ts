@@ -16,6 +16,7 @@ export declare class AdminSalesOrdersController {
         paymentClearance: boolean;
         specialRemarks: string | null;
         id: number;
+        userId: number;
         createdAt: Date;
         updatedAt: Date;
         productId: number;
@@ -24,7 +25,6 @@ export declare class AdminSalesOrdersController {
         salesZoneId: number;
         packConfigId: number;
         customerId: number | null;
-        userId: number;
         terminalId: number | null;
         printerId: number | null;
         status: string;

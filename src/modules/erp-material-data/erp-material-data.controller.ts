@@ -17,6 +17,8 @@ import {
 import { ErpMaterialDataService } from './erp-material-data.service';
 import { UpdateIssueStageDto } from './dto/update-issue-stage.dto';
 import { IncrementIssueStageDto } from './dto/increment-issue-stage.dto';
+import { UpdatePackingStageDto } from './dto/update-packing-stage.dto';
+import { IncrementPackingStageDto } from './dto/increment-packing-stage.dto';
 
 @ApiTags('ERP Material Data')
 @Controller('admin/orders/:orderId/erp-materials')
@@ -80,6 +82,41 @@ export class ErpMaterialDataController {
       orderId,
       body.materialCode,
       body.issueStage,
+    );
+  }
+
+    @ApiOperation({ summary: 'Increment packing stage for a material code' })
+  @ApiParam({ name: 'orderId', type: Number, description: 'Sales Order ID' })
+  @ApiBody({ type: IncrementPackingStageDto })
+  @ApiResponse({ status: 200, description: 'Packing stage incremented successfully.' })
+  @ApiResponse({ status: 400, description: 'Cannot exceed the min(Required_Qty, Issue_stage) cap.' })
+  @ApiResponse({ status: 404, description: 'Order or Material not found.' })
+  @Post('increment-packing-stage')
+  incrementPackingStage(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body() body: IncrementPackingStageDto,
+  ) {
+    return this.erpMaterialDataService.incrementPackingStage(
+      orderId,
+      body.materialCode,
+    );
+  }
+
+  @ApiOperation({ summary: 'Update packing stage for a material code (inline edit)' })
+  @ApiParam({ name: 'orderId', type: Number, description: 'Sales Order ID' })
+  @ApiBody({ type: UpdatePackingStageDto })
+  @ApiResponse({ status: 200, description: 'Packing stage updated successfully.' })
+  @ApiResponse({ status: 400, description: 'Cannot exceed the min(Required_Qty, Issue_stage) cap.' })
+  @ApiResponse({ status: 404, description: 'Order or Material not found.' })
+  @Patch('update-packing-stage')
+  updatePackingStage(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body() body: UpdatePackingStageDto,
+  ) {
+    return this.erpMaterialDataService.updatePackingStage(
+      orderId,
+      body.materialCode,
+      body.packingStage,
     );
   }
 }

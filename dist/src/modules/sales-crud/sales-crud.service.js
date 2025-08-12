@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SalesCrudService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma.service");
+const client_1 = require("@prisma/client");
 let SalesCrudService = class SalesCrudService {
     prisma;
     constructor(prisma) {
@@ -35,8 +36,13 @@ let SalesCrudService = class SalesCrudService {
                 include: { customer: true },
             });
         }
-        catch (error) {
-            throw new common_1.InternalServerErrorException('Failed to create sales order', error.message);
+        catch (err) {
+            if (err instanceof client_1.Prisma.PrismaClientKnownRequestError) {
+                if (err.code === 'P2002') {
+                    throw new common_1.ConflictException('A sales order with that reference already exists.');
+                }
+            }
+            throw new common_1.InternalServerErrorException('Failed to create sales order.', err.message);
         }
     }
     async findAll(userId, query) {
@@ -44,46 +50,22 @@ let SalesCrudService = class SalesCrudService {
             const { search } = query;
             const where = { userId };
             if (search) {
+                const s = { contains: search };
                 where.OR = [
-                    { saleOrderNumber: { contains: search } },
-                    { outboundDelivery: { contains: search } },
-                    { transferOrder: { contains: search } },
-                    { status: { contains: search } },
-                    { specialRemarks: { contains: search } },
-                    ...(search.toLowerCase() === 'true' ||
-                        search.toLowerCase() === 'false'
+                    { saleOrderNumber: s },
+                    { outboundDelivery: s },
+                    { transferOrder: s },
+                    { status: s },
+                    { specialRemarks: s },
+                    ...(['true', 'false'].includes(search.toLowerCase())
                         ? [{ paymentClearance: search.toLowerCase() === 'true' }]
                         : []),
-                    {
-                        customer: {
-                            is: { name: { contains: search } },
-                        },
-                    },
-                    {
-                        product: {
-                            is: { name: { contains: search } },
-                        },
-                    },
-                    {
-                        transporter: {
-                            is: { name: { contains: search } },
-                        },
-                    },
-                    {
-                        plantCode: {
-                            is: { code: { contains: search } },
-                        },
-                    },
-                    {
-                        salesZone: {
-                            is: { name: { contains: search } },
-                        },
-                    },
-                    {
-                        packConfig: {
-                            is: { configName: { contains: search } },
-                        },
-                    },
+                    { customer: { is: { name: s } } },
+                    { product: { is: { name: s } } },
+                    { transporter: { is: { name: s } } },
+                    { plantCode: { is: { code: s } } },
+                    { salesZone: { is: { name: s } } },
+                    { packConfig: { is: { configName: s } } },
                 ];
             }
             return await this.prisma.salesOrder.findMany({
@@ -99,36 +81,41 @@ let SalesCrudService = class SalesCrudService {
                 },
             });
         }
-        catch (error) {
-            throw new common_1.InternalServerErrorException('Failed to fetch sales orders', error.message);
+        catch (err) {
+            throw new common_1.InternalServerErrorException('Failed to fetch sales orders.', err.message);
         }
     }
     async findOne(id, userId) {
-        const order = await this.prisma.salesOrder.findUnique({
-            where: { id },
-            include: {
-                customer: true,
-                product: true,
-                transporter: true,
-                plantCode: true,
-                salesZone: true,
-                packConfig: true,
-            },
-        });
-        if (!order || order.userId !== userId) {
-            throw new common_1.NotFoundException('Sales order not found or access denied');
+        try {
+            const order = await this.prisma.salesOrder.findUnique({
+                where: { id },
+                include: {
+                    customer: true,
+                    product: true,
+                    transporter: true,
+                    plantCode: true,
+                    salesZone: true,
+                    packConfig: true,
+                },
+            });
+            if (!order || order.userId !== userId) {
+                throw new common_1.NotFoundException('Sales order not found or access denied.');
+            }
+            return order;
         }
-        return order;
+        catch (err) {
+            if (err instanceof common_1.NotFoundException)
+                throw err;
+            throw new common_1.InternalServerErrorException('Failed to retrieve sales order.', err.message);
+        }
     }
     async update(id, dto, userId) {
-        const existing = await this.prisma.salesOrder.findUnique({
-            where: { id },
-        });
+        const existing = await this.prisma.salesOrder.findUnique({ where: { id } });
         if (!existing) {
-            throw new common_1.NotFoundException('Sales order not found');
+            throw new common_1.NotFoundException('Sales order not found.');
         }
         if (existing.userId !== userId) {
-            throw new common_1.ForbiddenException('You do not have permission to update this order');
+            throw new common_1.ForbiddenException('You do not have permission to update this order.');
         }
         try {
             const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10
@@ -147,72 +134,81 @@ let SalesCrudService = class SalesCrudService {
                 },
             });
         }
-        catch (error) {
-            throw new common_1.InternalServerErrorException('Failed to update sales order', error.message);
+        catch (err) {
+            if (err instanceof client_1.Prisma.PrismaClientKnownRequestError) {
+                if (err.code === 'P2025') {
+                    throw new common_1.NotFoundException('Sales order not found.');
+                }
+                if (err.code === 'P2002') {
+                    throw new common_1.ConflictException('Update would violate a unique constraint.');
+                }
+            }
+            throw new common_1.InternalServerErrorException('Failed to update sales order.', err.message);
         }
     }
     async remove(id, userId) {
-        const existing = await this.prisma.salesOrder.findUnique({
-            where: { id },
-        });
+        const existing = await this.prisma.salesOrder.findUnique({ where: { id } });
         if (!existing) {
-            throw new common_1.NotFoundException('Sales order not found');
+            throw new common_1.NotFoundException('Sales order not found.');
         }
         if (existing.userId !== userId) {
-            throw new common_1.ForbiddenException('You do not have permission to delete this order');
+            throw new common_1.ForbiddenException('You do not have permission to delete this order.');
         }
         try {
-            return await this.prisma.salesOrder.delete({
-                where: { id },
-            });
+            await this.prisma.salesOrder.delete({ where: { id } });
         }
-        catch (error) {
-            throw new common_1.InternalServerErrorException('Failed to delete sales order', error.message);
+        catch (err) {
+            if (err instanceof client_1.Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+                throw new common_1.NotFoundException('Sales order not found.');
+            }
+            throw new common_1.InternalServerErrorException('Failed to delete sales order.', err.message);
         }
     }
     async getPaginatedOrders(page, limit, userId, search) {
-        const skip = (page - 1) * limit;
-        const whereClause = { userId };
-        if (search) {
-            const s = { contains: search };
-            whereClause.OR = [
-                { saleOrderNumber: s },
-                { outboundDelivery: s },
-                { transferOrder: s },
-                { status: s },
-                { specialRemarks: s },
-                ...(['true', 'false'].includes(search.toLowerCase())
-                    ? [{ paymentClearance: search.toLowerCase() === 'true' }]
-                    : []),
-                { customer: { is: { name: s } } },
-                { product: { is: { name: s } } },
-                { transporter: { is: { name: s } } },
-                { plantCode: { is: { code: s } } },
-                { salesZone: { is: { name: s } } },
-                { packConfig: { is: { configName: s } } },
-            ];
+        try {
+            const skip = (page - 1) * limit;
+            const whereClause = { userId };
+            if (search) {
+                const s = { contains: search };
+                whereClause.OR = [
+                    { saleOrderNumber: s },
+                    { outboundDelivery: s },
+                    { transferOrder: s },
+                    { status: s },
+                    { specialRemarks: s },
+                    ...(['true', 'false'].includes(search.toLowerCase())
+                        ? [{ paymentClearance: search.toLowerCase() === 'true' }]
+                        : []),
+                    { customer: { is: { name: s } } },
+                    { product: { is: { name: s } } },
+                    { transporter: { is: { name: s } } },
+                    { plantCode: { is: { code: s } } },
+                    { salesZone: { is: { name: s } } },
+                    { packConfig: { is: { configName: s } } },
+                ];
+            }
+            const [orders, totalCount] = await this.prisma.$transaction([
+                this.prisma.salesOrder.findMany({
+                    where: whereClause,
+                    skip,
+                    take: limit,
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        customer: true,
+                        product: true,
+                        transporter: true,
+                        plantCode: true,
+                        salesZone: true,
+                        packConfig: true,
+                    },
+                }),
+                this.prisma.salesOrder.count({ where: whereClause }),
+            ]);
+            return { orders, totalCount };
         }
-        const [orders, totalCount] = await this.prisma.$transaction([
-            this.prisma.salesOrder.findMany({
-                where: whereClause,
-                skip,
-                take: limit,
-                orderBy: { createdAt: 'desc' },
-                include: {
-                    customer: true,
-                    product: true,
-                    transporter: true,
-                    plantCode: true,
-                    salesZone: true,
-                    packConfig: true,
-                },
-            }),
-            this.prisma.salesOrder.count({ where: whereClause }),
-        ]);
-        return {
-            orders,
-            totalCount,
-        };
+        catch (err) {
+            throw new common_1.InternalServerErrorException('Failed to fetch paginated sales orders.', err.message);
+        }
     }
 };
 exports.SalesCrudService = SalesCrudService;

@@ -47,6 +47,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma.service");
 const bcrypt = __importStar(require("bcryptjs"));
 const jwt_1 = require("@nestjs/jwt");
+const logger_1 = require("../../common/logger");
 let AuthService = class AuthService {
     prisma;
     jwtService;
@@ -54,17 +55,28 @@ let AuthService = class AuthService {
         this.prisma = prisma;
         this.jwtService = jwtService;
     }
-    async signup(dto) {
+    async signup(dto, req) {
+        const email = dto.email.toLowerCase();
         const existing = await this.prisma.user.findUnique({
-            where: { email: dto.email },
+            where: { email },
         });
-        if (existing)
-            throw new common_1.ConflictException('Email already registered');
+        if (existing) {
+            (0, logger_1.logAuthFailure)({
+                code: 'USER_ALREADY_EXISTS',
+                message: 'Email already in use',
+                ip: req.ip ?? 'unknown',
+                requestId: String(req.headers['x-request-id'] ?? ''),
+            });
+            throw new common_1.ConflictException({
+                code: 'USER_ALREADY_EXISTS',
+                message: 'Email already in use',
+            });
+        }
         const hash = await bcrypt.hash(dto.password, 10);
         const user = await this.prisma.user.create({
             data: {
                 name: dto.name,
-                email: dto.email,
+                email,
                 password: hash,
                 role: dto.role ?? 'sales',
             },
@@ -77,16 +89,36 @@ let AuthService = class AuthService {
             createdAt: user.createdAt,
         };
     }
-    async login(dto) {
+    async login(dto, req) {
+        const email = dto.email.toLowerCase();
         const user = await this.prisma.user.findUnique({
-            where: { email: dto.email },
+            where: { email },
         });
         if (!user) {
-            throw new common_1.UnauthorizedException('Invalid credentials');
+            (0, logger_1.logAuthFailure)({
+                code: 'INVALID_CREDENTIALS',
+                message: 'Invalid credentials',
+                ip: req.ip ?? 'unknown',
+                requestId: String(req.headers['x-request-id'] ?? ''),
+            });
+            throw new common_1.UnauthorizedException({
+                code: 'INVALID_CREDENTIALS',
+                message: 'Invalid credentials',
+            });
         }
         const valid = await bcrypt.compare(dto.password, user.password);
         if (!valid) {
-            throw new common_1.UnauthorizedException('Invalid credentials');
+            (0, logger_1.logAuthFailure)({
+                code: 'INVALID_CREDENTIALS',
+                message: 'Invalid credentials',
+                ip: req.ip ?? 'unknown',
+                userId: String(user.id),
+                requestId: String(req.headers['x-request-id'] ?? ''),
+            });
+            throw new common_1.UnauthorizedException({
+                code: 'INVALID_CREDENTIALS',
+                message: 'Invalid credentials',
+            });
         }
         const token = await this.jwtService.signAsync({
             sub: user.id,
