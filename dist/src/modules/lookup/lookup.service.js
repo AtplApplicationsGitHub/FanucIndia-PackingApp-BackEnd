@@ -119,26 +119,6 @@ let LookupService = class LookupService {
             throw error;
         }
     }
-    getTerminals() {
-        return this.prisma.terminal.findMany({ orderBy: { name: 'asc' } });
-    }
-    createTerminal(dto) {
-        return this.prisma.terminal.create({ data: dto });
-    }
-    updateTerminal(id, dto) {
-        return this.prisma.terminal.update({ where: { id }, data: dto });
-    }
-    async deleteTerminal(id) {
-        try {
-            return await this.prisma.terminal.delete({ where: { id } });
-        }
-        catch (error) {
-            if (error.code === 'P2003') {
-                throw new common_2.BadRequestException('Cannot delete terminal: One or more orders depend on this terminal.');
-            }
-            throw error;
-        }
-    }
     getCustomers() {
         return this.prisma.customer.findMany({ orderBy: { name: 'asc' } });
     }

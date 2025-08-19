@@ -27,8 +27,6 @@ const createSalesZoneDto_1 = require("./dto/createSalesZoneDto");
 const updateSalesZoneDto_1 = require("./dto/updateSalesZoneDto");
 const createPackConfigDto_1 = require("./dto/createPackConfigDto");
 const updatePackConfigDto_1 = require("./dto/updatePackConfigDto");
-const createTerminalDto_1 = require("./dto/createTerminalDto");
-const updateTerminalDto_1 = require("./dto/updateTerminalDto");
 const createCustomerDto_1 = require("./dto/createCustomerDto");
 const updateCustomerDto_1 = require("./dto/updateCustomerDto");
 const createPrinterDto_1 = require("./dto/createPrinterDto");
@@ -97,18 +95,6 @@ let LookupController = class LookupController {
     }
     deletePackConfig(id) {
         return this.lookupService.deletePackConfig(id);
-    }
-    getTerminals() {
-        return this.lookupService.getTerminals();
-    }
-    createTerminal(dto) {
-        return this.lookupService.createTerminal(dto);
-    }
-    updateTerminal(id, dto) {
-        return this.lookupService.updateTerminal(id, dto);
-    }
-    deleteTerminal(id) {
-        return this.lookupService.deleteTerminal(id);
     }
     getCustomers() {
         return this.lookupService.getCustomers();
@@ -318,42 +304,6 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], LookupController.prototype, "deletePackConfig", null);
-__decorate([
-    (0, common_1.Get)('terminals'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get all terminals' }),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
-], LookupController.prototype, "getTerminals", null);
-__decorate([
-    (0, common_1.Post)('terminals'),
-    (0, swagger_1.ApiOperation)({ summary: 'Create a terminal' }),
-    (0, swagger_1.ApiBody)({ type: createTerminalDto_1.CreateTerminalDto }),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [createTerminalDto_1.CreateTerminalDto]),
-    __metadata("design:returntype", void 0)
-], LookupController.prototype, "createTerminal", null);
-__decorate([
-    (0, common_1.Patch)('terminals/:id'),
-    (0, swagger_1.ApiOperation)({ summary: 'Update a terminal' }),
-    (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
-    (0, swagger_1.ApiBody)({ type: updateTerminalDto_1.UpdateTerminalDto }),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, updateTerminalDto_1.UpdateTerminalDto]),
-    __metadata("design:returntype", void 0)
-], LookupController.prototype, "updateTerminal", null);
-__decorate([
-    (0, common_1.Delete)('terminals/:id'),
-    (0, swagger_1.ApiOperation)({ summary: 'Delete a terminal' }),
-    (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
-    __metadata("design:returntype", void 0)
-], LookupController.prototype, "deleteTerminal", null);
 __decorate([
     (0, common_1.Get)('customers'),
     (0, swagger_1.ApiOperation)({ summary: 'Get all customers' }),

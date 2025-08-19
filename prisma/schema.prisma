@@ -8,14 +8,15 @@ datasource db {
 }
 
 model User {
-  id          Int          @id @default(autoincrement())
-  name        String
-  email       String       @unique
-  password    String
-  role        String       @default("sales")
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  salesOrders SalesOrder[]
+  id             Int          @id @default(autoincrement())
+  name           String
+  email          String       @unique
+  password       String
+  role           String       @default("sales")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  salesOrders    SalesOrder[] @relation("CreatedOrders")
+  assignedOrders SalesOrder[] @relation("AssignedOrders") 
 }
 
 model Product {
@@ -50,12 +51,6 @@ model PackConfig {
   salesOrders SalesOrder[]
 }
 
-model Terminal {
-  id          Int          @id @default(autoincrement())
-  name        String
-  salesOrders SalesOrder[]
-}
-
 model Customer {
   id           Int                 @id @default(autoincrement())
   name         String
@@ -71,39 +66,38 @@ model Printer {
 }
 
 model SalesOrder {
-  id                 Int                 @id @default(autoincrement())
-  userId             Int
-  productId          Int
-  saleOrderNumber    String              @unique @db.NVarChar(500)
-  outboundDelivery   String              @unique @db.NVarChar(500)
-  transferOrder      String              @unique @db.NVarChar(500)
-  deliveryDate       DateTime
-  transporterId      Int
-  plantCodeId        Int
-  paymentClearance   Boolean
-  salesZoneId        Int
-  packConfigId       Int
-  terminalId         Int?
-  customerId         Int?
-  printerId          Int?
-  specialRemarks     String?
-  status             String              @default("R105")
-  priority           Int?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  materialByOBD      ERP_Material_Data[] @relation("SO_By_OBD")
-  materialByNumber   ERP_Material_Data[] @relation("SO_By_Number")
+  id                  Int                 @id @default(autoincrement())
+  userId              Int
+  productId           Int
+  saleOrderNumber     String              @unique @db.NVarChar(500)
+  outboundDelivery    String              @unique @db.NVarChar(500)
+  transferOrder       String              @unique @db.NVarChar(500)
+  deliveryDate        DateTime
+  transporterId       Int
+  plantCodeId         Int
+  paymentClearance    Boolean
+  salesZoneId         Int
+  packConfigId        Int
+  assignedUserId      Int? // New field for the assigned user's ID
+  customerId          Int?
+  printerId           Int?
+  specialRemarks      String?
+  fgLocation          String?
+  status              String              @default("R105")
+  priority            Int?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  materialData        ERP_Material_Data[]
   materialFilesByNumber ERP_Material_File[] @relation("SO_File_By_Number")
-  materialByTransfer ERP_Material_Data[] @relation("SO_By_Transfer")
-  customer           Customer?           @relation(fields: [customerId], references: [id])
-  packConfig         PackConfig          @relation(fields: [packConfigId], references: [id])
-  plantCode          PlantCode           @relation(fields: [plantCodeId], references: [id])
-  printer            Printer?            @relation(fields: [printerId], references: [id])
-  product            Product             @relation(fields: [productId], references: [id])
-  salesZone          SalesZone           @relation(fields: [salesZoneId], references: [id])
-  terminal           Terminal?           @relation(fields: [terminalId], references: [id])
-  transporter        Transporter         @relation(fields: [transporterId], references: [id])
-  user               User                @relation(fields: [userId], references: [id])
+  customer            Customer?           @relation(fields: [customerId], references: [id])
+  packConfig          PackConfig          @relation(fields: [packConfigId], references: [id])
+  plantCode           PlantCode           @relation(fields: [plantCodeId], references: [id])
+  printer             Printer?            @relation(fields: [printerId], references: [id])
+  product             Product             @relation(fields: [productId], references: [id])
+  salesZone           SalesZone           @relation(fields: [salesZoneId], references: [id])
+  assignedUser        User?               @relation("AssignedOrders", fields: [assignedUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transporter         Transporter         @relation(fields: [transporterId], references: [id])
+  user                User                @relation("CreatedOrders", fields: [userId], references: [id])
 }
 
 model ERP_Material_Data {
@@ -128,9 +122,7 @@ model ERP_Material_Data {
   UpdatedDate          DateTime?   @db.DateTime
   UpdatedBy            String?     @db.NVarChar(50)
   customer             Customer?   @relation("Customer_ERP_Material_Data", fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  salesOrderByOBD      SalesOrder? @relation("SO_By_OBD", fields: [FG_OBD], references: [outboundDelivery], onDelete: NoAction, onUpdate: NoAction)
-  salesOrderByNumber   SalesOrder? @relation("SO_By_Number", fields: [saleOrderNumber], references: [saleOrderNumber], onDelete: NoAction, onUpdate: NoAction)
-  salesOrderByTransfer SalesOrder? @relation("SO_By_Transfer", fields: [transferOrder], references: [transferOrder], onDelete: NoAction, onUpdate: NoAction)
+  salesOrder           SalesOrder? @relation(fields: [saleOrderNumber], references: [saleOrderNumber], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model ERPMaterialLog {

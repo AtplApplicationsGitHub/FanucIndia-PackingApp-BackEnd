@@ -29,7 +29,7 @@ let SalesCrudService = class SalesCrudService {
                     deliveryDate,
                     userId,
                     status: 'R105',
-                    terminalId: null,
+                    assignedUserId: null,
                     customerId: dto.customerId,
                     printerId: null,
                 },
@@ -110,12 +110,9 @@ let SalesCrudService = class SalesCrudService {
         }
     }
     async update(id, dto, userId) {
-        const existing = await this.prisma.salesOrder.findUnique({ where: { id } });
+        const existing = await this.prisma.salesOrder.findFirst({ where: { id, userId } });
         if (!existing) {
-            throw new common_1.NotFoundException('Sales order not found.');
-        }
-        if (existing.userId !== userId) {
-            throw new common_1.ForbiddenException('You do not have permission to update this order.');
+            throw new common_1.NotFoundException('Sales order not found or access denied.');
         }
         try {
             const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10
@@ -147,12 +144,9 @@ let SalesCrudService = class SalesCrudService {
         }
     }
     async remove(id, userId) {
-        const existing = await this.prisma.salesOrder.findUnique({ where: { id } });
+        const existing = await this.prisma.salesOrder.findFirst({ where: { id, userId } });
         if (!existing) {
-            throw new common_1.NotFoundException('Sales order not found.');
-        }
-        if (existing.userId !== userId) {
-            throw new common_1.ForbiddenException('You do not have permission to delete this order.');
+            throw new common_1.NotFoundException('Sales order not found or access denied.');
         }
         try {
             await this.prisma.salesOrder.delete({ where: { id } });

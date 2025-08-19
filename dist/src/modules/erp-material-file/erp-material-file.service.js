@@ -50,6 +50,44 @@ const sftp_service_1 = require("../sftp/sftp.service");
 const path = __importStar(require("path"));
 const crypto_1 = require("crypto");
 const fs = __importStar(require("fs"));
+async function verifyFileAccess(prisma, fileId, userId, userRole) {
+    if (userRole === 'admin' || userRole === 'sales') {
+        const file = await prisma.eRP_Material_File.findUnique({ where: { ID: fileId } });
+        if (!file)
+            throw new common_1.NotFoundException('File not found.');
+        return file;
+    }
+    const file = await prisma.eRP_Material_File.findUnique({
+        where: { ID: fileId },
+        include: {
+            salesOrderByNumber: true,
+        },
+    });
+    if (!file) {
+        throw new common_1.NotFoundException('File not found.');
+    }
+    if (!file.salesOrderByNumber || file.salesOrderByNumber.assignedUserId !== userId) {
+        throw new common_1.ForbiddenException('You do not have permission to access this file.');
+    }
+    return file;
+}
+async function verifySaleOrderAccess(prisma, saleOrderNumber, userId, userRole) {
+    if (userRole === 'admin' || userRole === 'sales') {
+        const order = await prisma.salesOrder.findUnique({ where: { saleOrderNumber } });
+        if (!order)
+            throw new common_1.NotFoundException(`Sales Order ${saleOrderNumber} not found.`);
+        return;
+    }
+    const order = await prisma.salesOrder.findFirst({
+        where: {
+            saleOrderNumber: saleOrderNumber,
+            assignedUserId: userId,
+        },
+    });
+    if (!order) {
+        throw new common_1.ForbiddenException(`You do not have permission to access files for Sales Order ${saleOrderNumber}.`);
+    }
+}
 function sanitize(name) {
     return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
@@ -75,7 +113,7 @@ let ErpMaterialFileService = class ErpMaterialFileService {
         this.prisma = prisma;
         this.sftp = sftp;
     }
-    async list(query) {
+    async list(query, userId, userRole) {
         const { page = 1, limit = 20, search, saleOrderNumber, sortBy = 'createdAt', sortOrder = 'desc', } = query;
         const skip = (page - 1) * limit;
         const where = {
@@ -90,6 +128,13 @@ let ErpMaterialFileService = class ErpMaterialFileService {
                 }
                 : {}),
         };
+        if (userRole === 'user') {
+            where.salesOrderByNumber = {
+                is: {
+                    assignedUserId: userId,
+                }
+            };
+        }
         const [items, total] = await this.prisma.$transaction([
             this.prisma.eRP_Material_File.findMany({
                 where,
@@ -107,16 +152,12 @@ let ErpMaterialFileService = class ErpMaterialFileService {
             meta: { page, limit, total, pages: Math.ceil(total / limit) },
         });
     }
-    async get(id) {
-        const row = await this.prisma.eRP_Material_File.findUnique({
-            where: { ID: id },
-            include: { salesOrderByNumber: true },
-        });
-        if (!row)
-            throw new common_1.NotFoundException('ERP material file not found.');
+    async get(id, userId, userRole) {
+        const row = await verifyFileAccess(this.prisma, id, userId, userRole);
         return normalizeBigInt(row);
     }
-    async listBySaleOrderNumber(soNumber) {
+    async listBySaleOrderNumber(soNumber, userId, userRole) {
+        await verifySaleOrderAccess(this.prisma, soNumber, userId, userRole);
         const items = await this.prisma.eRP_Material_File.findMany({
             where: { saleOrderNumber: soNumber },
             orderBy: { createdAt: 'desc' },
@@ -126,12 +167,8 @@ let ErpMaterialFileService = class ErpMaterialFileService {
     async create(_dto) {
         throw new common_1.BadRequestException('Direct creation is disabled. Use /v1/erp-material-files/upload to create records.');
     }
-    async update(id, dto) {
-        const existing = await this.prisma.eRP_Material_File.findUnique({
-            where: { ID: id },
-        });
-        if (!existing)
-            throw new common_1.NotFoundException('ERP material file not found.');
+    async update(id, dto, userId, userRole) {
+        const existing = await verifyFileAccess(this.prisma, id, userId, userRole);
         try {
             const updated = await this.prisma.eRP_Material_File.update({
                 where: { ID: id },
@@ -155,23 +192,26 @@ let ErpMaterialFileService = class ErpMaterialFileService {
             throw new common_1.InternalServerErrorException('Failed to update ERP material file.');
         }
     }
-    async remove(id) {
-        const existing = await this.prisma.eRP_Material_File.findUnique({
-            where: { ID: id },
-        });
-        if (!existing)
-            throw new common_1.NotFoundException('ERP material file not found.');
+    async remove(id, userId, userRole) {
+        const existing = await verifyFileAccess(this.prisma, id, userId, userRole);
         try {
             if (existing.sftpPath) {
                 await this.sftp.delete(existing.sftpPath);
             }
         }
         catch (e) {
+            console.warn('SFTP delete failed but proceeding with DB cleanup', e);
         }
         await this.prisma.eRP_Material_File.delete({ where: { ID: id } });
         return { success: true };
     }
-    async uploadAndCreate(files, opts) {
+    async uploadAndCreate(files, opts, userId, userRole) {
+        if (opts.saleOrderNumber) {
+            await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
+        }
+        else if (userRole === 'user') {
+            throw new common_1.ForbiddenException("You must specify a Sale Order Number for an order assigned to you.");
+        }
         const baseDir = process.env.SFTP_BASE_DIR || '/fanuc/order-attachments';
         const soDir = opts.saleOrderNumber
             ? sanitize(opts.saleOrderNumber)

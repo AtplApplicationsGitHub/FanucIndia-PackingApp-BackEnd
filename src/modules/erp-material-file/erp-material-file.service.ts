@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
@@ -14,6 +15,60 @@ import * as fs from 'fs';
 import { CreateErpMaterialFileDto } from './dto/create-erp-material-file.dto';
 import { UpdateErpMaterialFileDto } from './dto/update-erp-material-file.dto';
 import { QueryErpMaterialFileDto } from './dto/query-erp-material-file.dto';
+
+async function verifyFileAccess(
+  prisma: PrismaService,
+  fileId: number,
+  userId: number,
+  userRole: string,
+) {
+  if (userRole === 'admin' || userRole === 'sales') {
+    const file = await prisma.eRP_Material_File.findUnique({ where: { ID: fileId } });
+    if (!file) throw new NotFoundException('File not found.');
+    return file;
+  }
+
+  const file = await prisma.eRP_Material_File.findUnique({
+    where: { ID: fileId },
+    include: {
+      salesOrderByNumber: true,
+    },
+  });
+
+  if (!file) {
+    throw new NotFoundException('File not found.');
+  }
+
+  if (!file.salesOrderByNumber || file.salesOrderByNumber.assignedUserId !== userId) {
+    throw new ForbiddenException('You do not have permission to access this file.');
+  }
+
+  return file;
+}
+
+async function verifySaleOrderAccess(
+  prisma: PrismaService,
+  saleOrderNumber: string,
+  userId: number,
+  userRole: string,
+) {
+  if (userRole === 'admin' || userRole === 'sales') {
+    const order = await prisma.salesOrder.findUnique({ where: { saleOrderNumber } });
+    if (!order) throw new NotFoundException(`Sales Order ${saleOrderNumber} not found.`);
+    return;
+  }
+
+  const order = await prisma.salesOrder.findFirst({
+    where: {
+      saleOrderNumber: saleOrderNumber,
+      assignedUserId: userId,
+    },
+  });
+
+  if (!order) {
+    throw new ForbiddenException(`You do not have permission to access files for Sales Order ${saleOrderNumber}.`);
+  }
+}
 
 function sanitize(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -39,7 +94,7 @@ export class ErpMaterialFileService {
     private readonly sftp: SftpService,
   ) {}
 
-  async list(query: QueryErpMaterialFileDto) {
+  async list(query: QueryErpMaterialFileDto, userId: number, userRole: string) {
     const {
       page = 1,
       limit = 20,
@@ -64,6 +119,14 @@ export class ErpMaterialFileService {
         : {}),
     };
 
+    if (userRole === 'user') {
+        where.salesOrderByNumber = {
+            is: {
+                assignedUserId: userId,
+            }
+        }
+    }
+
     const [items, total] = await this.prisma.$transaction([
       this.prisma.eRP_Material_File.findMany({
         where,
@@ -83,16 +146,13 @@ export class ErpMaterialFileService {
     });
   }
 
-  async get(id: number) {
-    const row = await this.prisma.eRP_Material_File.findUnique({
-      where: { ID: id },
-      include: { salesOrderByNumber: true },
-    });
-    if (!row) throw new NotFoundException('ERP material file not found.');
+  async get(id: number, userId: number, userRole: string) {
+    const row = await verifyFileAccess(this.prisma, id, userId, userRole);
     return normalizeBigInt(row);
   }
 
-  async listBySaleOrderNumber(soNumber: string) {
+  async listBySaleOrderNumber(soNumber: string, userId: number, userRole: string) {
+    await verifySaleOrderAccess(this.prisma, soNumber, userId, userRole);
     const items = await this.prisma.eRP_Material_File.findMany({
       where: { saleOrderNumber: soNumber },
       orderBy: { createdAt: 'desc' },
@@ -106,11 +166,8 @@ export class ErpMaterialFileService {
     );
   }
 
-  async update(id: number, dto: UpdateErpMaterialFileDto) {
-    const existing = await this.prisma.eRP_Material_File.findUnique({
-      where: { ID: id },
-    });
-    if (!existing) throw new NotFoundException('ERP material file not found.');
+  async update(id: number, dto: UpdateErpMaterialFileDto, userId: number, userRole: string) {
+    const existing = await verifyFileAccess(this.prisma, id, userId, userRole);
 
     try {
       const updated = await this.prisma.eRP_Material_File.update({
@@ -143,19 +200,15 @@ export class ErpMaterialFileService {
     }
   }
 
-  async remove(id: number) {
-    const existing = await this.prisma.eRP_Material_File.findUnique({
-      where: { ID: id },
-    });
-    if (!existing) throw new NotFoundException('ERP material file not found.');
+  async remove(id: number, userId: number, userRole: string) {
+    const existing = await verifyFileAccess(this.prisma, id, userId, userRole);
 
-    // Try delete the remote file first (don’t block DB cleanup if SFTP fails)
     try {
       if (existing.sftpPath) {
         await this.sftp.delete(existing.sftpPath);
       }
     } catch (e) {
-      // Optionally log: console.warn('SFTP delete failed', e);
+      console.warn('SFTP delete failed but proceeding with DB cleanup', e);
     }
 
     await this.prisma.eRP_Material_File.delete({ where: { ID: id } });
@@ -165,22 +218,26 @@ export class ErpMaterialFileService {
   async uploadAndCreate(
     files: Express.Multer.File[],
     opts: { saleOrderNumber: string | null; description: string | null },
+    userId: number,
+    userRole: string,
   ) {
-    const baseDir = process.env.SFTP_BASE_DIR || '/fanuc/order-attachments';
+    if (opts.saleOrderNumber) {
+        await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
+    } else if (userRole === 'user') {
+        throw new ForbiddenException("You must specify a Sale Order Number for an order assigned to you.");
+    }
 
-    // keep the sanitizer you already added
+    const baseDir = process.env.SFTP_BASE_DIR || '/fanuc/order-attachments';
     const soDir = opts.saleOrderNumber
       ? sanitize(opts.saleOrderNumber)
       : 'misc';
-
-    // ⬇⬇⬇ CHANGED: removed year/month/day nesting
     const remoteDir = path.posix.join(baseDir, soDir);
 
     const created: any[] = [];
     try {
       for (const f of files) {
         const checksum = await sha256File(f.path);
-        const remoteName = f.filename; // unique + sanitized by Multer
+        const remoteName = f.filename;
         const remotePath = path.posix.join(remoteDir, remoteName);
 
         await this.sftp.put(f.path, remotePath);

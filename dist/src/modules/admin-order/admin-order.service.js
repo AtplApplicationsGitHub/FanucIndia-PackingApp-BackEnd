@@ -44,6 +44,7 @@ let AdminOrderService = class AdminOrderService {
                 { plantCode: { is: { code: { contains: search } } } },
                 { salesZone: { is: { name: { contains: search } } } },
                 { packConfig: { is: { configName: { contains: search } } } },
+                { assignedUser: { is: { name: { contains: search } } } },
                 { saleOrderNumber: { contains: search } },
                 { outboundDelivery: { contains: search } },
                 { transferOrder: { contains: search } },
@@ -81,7 +82,7 @@ let AdminOrderService = class AdminOrderService {
                     plantCode: { select: { id: true, code: true, description: true } },
                     salesZone: { select: { id: true, name: true } },
                     packConfig: { select: { id: true, configName: true } },
-                    terminal: { select: { id: true, name: true } },
+                    assignedUser: { select: { id: true, name: true } },
                 },
             });
             return {

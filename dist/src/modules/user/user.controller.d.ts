@@ -12,7 +12,7 @@ export declare class UserController {
         createdAt: Date;
         updatedAt: Date;
     }>;
-    findAll(): Promise<{
+    findAll(role?: 'admin' | 'sales' | 'user'): Promise<{
         id: number;
         name: string;
         email: string;

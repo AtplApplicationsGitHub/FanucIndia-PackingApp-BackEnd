@@ -25,8 +25,8 @@ let UserController = class UserController {
     create(dto) {
         return this.userService.create(dto);
     }
-    findAll() {
-        return this.userService.findAll();
+    findAll(role) {
+        return this.userService.findAll(role);
     }
     update(id, dto) {
         return this.userService.update(id, dto);
@@ -54,9 +54,11 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({ summary: 'Get all users (Admin only)' }),
+    (0, swagger_1.ApiQuery)({ name: 'role', required: false, type: String, description: 'Filter by user role' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'List of all users' }),
+    __param(0, (0, common_1.Query)('role')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], UserController.prototype, "findAll", null);
 __decorate([

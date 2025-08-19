@@ -9,8 +9,6 @@ import { CreateSalesZoneDto } from './dto/createSalesZoneDto';
 import { UpdateSalesZoneDto } from './dto/updateSalesZoneDto';
 import { CreatePackConfigDto } from './dto/createPackConfigDto';
 import { UpdatePackConfigDto } from './dto/updatePackConfigDto';
-import { CreateTerminalDto } from './dto/createTerminalDto';
-import { UpdateTerminalDto } from './dto/updateTerminalDto';
 import { CreateCustomerDto } from './dto/createCustomerDto';
 import { UpdateCustomerDto } from './dto/updateCustomerDto';
 import { CreatePrinterDto } from './dto/createPrinterDto';
@@ -105,22 +103,6 @@ export declare class LookupController {
     deletePackConfig(id: number): Promise<{
         id: number;
         configName: string;
-    }>;
-    getTerminals(): import(".prisma/client").Prisma.PrismaPromise<{
-        id: number;
-        name: string;
-    }[]>;
-    createTerminal(dto: CreateTerminalDto): import(".prisma/client").Prisma.Prisma__TerminalClient<{
-        id: number;
-        name: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    updateTerminal(id: number, dto: UpdateTerminalDto): import(".prisma/client").Prisma.Prisma__TerminalClient<{
-        id: number;
-        name: string;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
-    deleteTerminal(id: number): Promise<{
-        id: number;
-        name: string;
     }>;
     getCustomers(): import(".prisma/client").Prisma.PrismaPromise<{
         id: number;

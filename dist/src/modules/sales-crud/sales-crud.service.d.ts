@@ -27,8 +27,9 @@ export declare class SalesCrudService {
         salesZoneId: number;
         packConfigId: number;
         customerId: number | null;
-        terminalId: number | null;
+        assignedUserId: number | null;
         printerId: number | null;
+        fgLocation: string | null;
         status: string;
         priority: number | null;
     }>;
@@ -79,8 +80,9 @@ export declare class SalesCrudService {
         salesZoneId: number;
         packConfigId: number;
         customerId: number | null;
-        terminalId: number | null;
+        assignedUserId: number | null;
         printerId: number | null;
+        fgLocation: string | null;
         status: string;
         priority: number | null;
     })[]>;
@@ -129,8 +131,9 @@ export declare class SalesCrudService {
         salesZoneId: number;
         packConfigId: number;
         customerId: number | null;
-        terminalId: number | null;
+        assignedUserId: number | null;
         printerId: number | null;
+        fgLocation: string | null;
         status: string;
         priority: number | null;
     }>;
@@ -179,8 +182,9 @@ export declare class SalesCrudService {
         salesZoneId: number;
         packConfigId: number;
         customerId: number | null;
-        terminalId: number | null;
+        assignedUserId: number | null;
         printerId: number | null;
+        fgLocation: string | null;
         status: string;
         priority: number | null;
     }>;
@@ -231,8 +235,9 @@ export declare class SalesCrudService {
             salesZoneId: number;
             packConfigId: number;
             customerId: number | null;
-            terminalId: number | null;
+            assignedUserId: number | null;
             printerId: number | null;
+            fgLocation: string | null;
             status: string;
             priority: number | null;
         })[];

@@ -75,8 +75,13 @@ let UserService = class UserService {
             },
         });
     }
-    async findAll() {
+    async findAll(role) {
+        const where = {};
+        if (role) {
+            where.role = role;
+        }
         return this.prisma.user.findMany({
+            where,
             select: {
                 id: true,
                 name: true,

@@ -12,6 +12,8 @@ import {
   UseInterceptors,
   BadRequestException,
   Res,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -31,6 +33,8 @@ import { UpdateErpMaterialFileDto } from './dto/update-erp-material-file.dto';
 import { QueryErpMaterialFileDto } from './dto/query-erp-material-file.dto';
 import { Response } from 'express';
 import { SftpService } from '../sftp/sftp.service';
+import { AuthRequest } from '../auth/types/auth-request.type';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 const MAX_UPLOAD_BYTES = Number(
   process.env.MAX_UPLOAD_BYTES || 50 * 1024 * 1024,
@@ -50,6 +54,7 @@ function sanitizeBase(name: string) {
 
 @ApiTags('erp-material-files')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller({ path: 'v1/erp-material-files', version: '1' })
 export class ErpMaterialFileController {
   constructor(
@@ -58,61 +63,71 @@ export class ErpMaterialFileController {
   ) {}
 
   @Get()
-  @Roles('sales', 'admin')
+  @Roles('sales', 'admin', 'user')
   @ApiOperation({
     summary: 'List ERP material files with pagination, search & filters',
   })
-  async list(@Query() query: QueryErpMaterialFileDto) {
-    return this.service.list(query);
+  async list(@Query() query: QueryErpMaterialFileDto, @Req() req: AuthRequest) {
+    const { userId, role } = req.user;
+    return this.service.list(query, userId, role);
   }
 
   @Get('by-sale-order/:saleOrderNumber')
-  @Roles('sales', 'admin')
+  @Roles('sales', 'admin', 'user')
   @ApiOperation({ summary: 'List files by exact sale order number' })
   @ApiParam({ name: 'saleOrderNumber', type: String })
-  async listBySaleOrder(@Param('saleOrderNumber') saleOrderNumber: string) {
-    return this.service.listBySaleOrderNumber(saleOrderNumber);
+  async listBySaleOrder(
+      @Param('saleOrderNumber') saleOrderNumber: string,
+      @Req() req: AuthRequest
+    ) {
+    const { userId, role } = req.user;
+    return this.service.listBySaleOrderNumber(saleOrderNumber, userId, role);
   }
 
   @Get(':id')
-  @Roles('sales', 'admin')
+  @Roles('sales', 'admin', 'user')
   @ApiOperation({ summary: 'Get a file record by ID' })
   @ApiParam({ name: 'id', type: Number })
-  async get(@Param('id', ParseIntPipe) id: number) {
-    return this.service.get(id);
+  async get(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    const { userId, role } = req.user;
+    return this.service.get(id, userId, role);
   }
 
   @Post()
-  @Roles('sales', 'admin')
+  @Roles('sales', 'admin', 'user')
   @ApiOperation({ summary: 'Create a file record (metadata only)' })
   async create(@Body() dto: CreateErpMaterialFileDto) {
     return this.service.create(dto);
   }
 
   @Put(':id')
-  @Roles('sales', 'admin')
+  @Roles('sales', 'admin', 'user')
   @ApiOperation({ summary: 'Update a file record' })
   @ApiParam({ name: 'id', type: Number })
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateErpMaterialFileDto,
+    @Req() req: AuthRequest
   ) {
-    return this.service.update(id, dto);
+    const { userId, role } = req.user;
+    return this.service.update(id, dto, userId, role);
   }
 
   @Delete(':id')
-  @Roles('sales', 'admin')
+  @Roles('sales', 'admin', 'user')
   @ApiOperation({ summary: 'Delete a file record' })
   @ApiParam({ name: 'id', type: Number })
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.service.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    const { userId, role } = req.user;
+    return this.service.remove(id, userId, role);
   }
 
   @Get(':id/download')
-  @Roles('sales', 'admin')
+  @Roles('sales', 'admin', 'user')
   @ApiOperation({ summary: 'Stream file content (inline if supported)' })
-  async download(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const row = await this.service.get(id); // has sftpPath, fileName, mimeType, fileSizeBytes
+  async download(@Param('id', ParseIntPipe) id: number, @Res() res: Response, @Req() req: AuthRequest) {
+    const { userId, role } = req.user;
+    const row = await this.service.get(id, userId, role);
     try {
       const data = await this.sftp.getStream(row.sftpPath);
 
@@ -133,7 +148,7 @@ export class ErpMaterialFileController {
   }
 
   @Post('upload')
-  @Roles('sales', 'admin')
+  @Roles('sales', 'admin', 'user')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Upload one or more files to SFTP and create DB rows',
@@ -157,14 +172,21 @@ export class ErpMaterialFileController {
     @UploadedFiles() files: Express.Multer.File[],
     @Body('saleOrderNumber') saleOrderNumber?: string,
     @Body('description') description?: string,
+    @Req() req?: AuthRequest,
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException('No files received');
     }
+    
+    if (!req?.user) {
+        throw new BadRequestException('User information not available');
+    }
+
+    const { userId, role } = req.user;
 
     return this.service.uploadAndCreate(files, {
       saleOrderNumber: saleOrderNumber?.trim() || null,
       description: description?.trim() || null,
-    });
+    }, userId, role);
   }
 }

@@ -7,18 +7,18 @@ export declare class ErpMaterialFileService {
     private readonly prisma;
     private readonly sftp;
     constructor(prisma: PrismaService, sftp: SftpService);
-    list(query: QueryErpMaterialFileDto): Promise<any>;
-    get(id: number): Promise<any>;
-    listBySaleOrderNumber(soNumber: string): Promise<any>;
+    list(query: QueryErpMaterialFileDto, userId: number, userRole: string): Promise<any>;
+    get(id: number, userId: number, userRole: string): Promise<any>;
+    listBySaleOrderNumber(soNumber: string, userId: number, userRole: string): Promise<any>;
     create(_dto: CreateErpMaterialFileDto): Promise<void>;
-    update(id: number, dto: UpdateErpMaterialFileDto): Promise<any>;
-    remove(id: number): Promise<{
+    update(id: number, dto: UpdateErpMaterialFileDto, userId: number, userRole: string): Promise<any>;
+    remove(id: number, userId: number, userRole: string): Promise<{
         success: boolean;
     }>;
     uploadAndCreate(files: Express.Multer.File[], opts: {
         saleOrderNumber: string | null;
         description: string | null;
-    }): Promise<{
+    }, userId: number, userRole: string): Promise<{
         success: boolean;
         items: any[];
     }>;

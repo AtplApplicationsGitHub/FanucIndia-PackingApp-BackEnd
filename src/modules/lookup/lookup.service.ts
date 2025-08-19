@@ -12,8 +12,6 @@ import { CreateSalesZoneDto } from './dto/createSalesZoneDto';
 import { UpdateSalesZoneDto } from './dto/updateSalesZoneDto';
 import { CreatePackConfigDto } from './dto/createPackConfigDto';
 import { UpdatePackConfigDto } from './dto/updatePackConfigDto';
-import { CreateTerminalDto } from './dto/createTerminalDto';
-import { UpdateTerminalDto } from './dto/updateTerminalDto';
 import { CreateCustomerDto } from './dto/createCustomerDto';
 import { UpdateCustomerDto } from './dto/updateCustomerDto';
 import { CreatePrinterDto } from './dto/createPrinterDto';
@@ -148,32 +146,6 @@ export class LookupService {
       if (error.code === 'P2003') {
         throw new BadRequestException(
           'Cannot delete packing configuration: One or more orders depend on this value.'
-        );
-      }
-      throw error;
-    }
-  }
-
-  // TERMINALS
-  getTerminals() {
-    return this.prisma.terminal.findMany({ orderBy: { name: 'asc' } });
-  }
-
-  createTerminal(dto: CreateTerminalDto) {
-    return this.prisma.terminal.create({ data: dto });
-  }
-
-  updateTerminal(id: number, dto: UpdateTerminalDto) {
-    return this.prisma.terminal.update({ where: { id }, data: dto });
-  }
-
-  async deleteTerminal(id: number) {
-    try {
-      return await this.prisma.terminal.delete({ where: { id } });
-    } catch (error) {
-      if (error.code === 'P2003') {
-        throw new BadRequestException(
-          'Cannot delete terminal: One or more orders depend on this terminal.'
         );
       }
       throw error;

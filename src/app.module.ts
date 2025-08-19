@@ -12,9 +12,10 @@ import { UserModule } from './modules/user/user.module';
 import { ErpMaterialDataModule } from './modules/erp-material-data/erp-material-data.module';
 import { ErpMaterialFileModule } from './modules/erp-material-file/erp-material-file.module';
 import { SftpModule } from './modules/sftp/sftp.module';
+import { UserDashboardModule } from './modules/user-dashboard/user-dashboard.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule,],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule,],
   controllers: [AppController],
   providers: [AppService],
 })

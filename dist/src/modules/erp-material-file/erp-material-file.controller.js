@@ -58,6 +58,7 @@ const create_erp_material_file_dto_1 = require("./dto/create-erp-material-file.d
 const update_erp_material_file_dto_1 = require("./dto/update-erp-material-file.dto");
 const query_erp_material_file_dto_1 = require("./dto/query-erp-material-file.dto");
 const sftp_service_1 = require("../sftp/sftp.service");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 50 * 1024 * 1024);
 function splitExt(name) {
     const i = name.lastIndexOf('.');
@@ -78,26 +79,32 @@ let ErpMaterialFileController = class ErpMaterialFileController {
         this.service = service;
         this.sftp = sftp;
     }
-    async list(query) {
-        return this.service.list(query);
+    async list(query, req) {
+        const { userId, role } = req.user;
+        return this.service.list(query, userId, role);
     }
-    async listBySaleOrder(saleOrderNumber) {
-        return this.service.listBySaleOrderNumber(saleOrderNumber);
+    async listBySaleOrder(saleOrderNumber, req) {
+        const { userId, role } = req.user;
+        return this.service.listBySaleOrderNumber(saleOrderNumber, userId, role);
     }
-    async get(id) {
-        return this.service.get(id);
+    async get(id, req) {
+        const { userId, role } = req.user;
+        return this.service.get(id, userId, role);
     }
     async create(dto) {
         return this.service.create(dto);
     }
-    async update(id, dto) {
-        return this.service.update(id, dto);
+    async update(id, dto, req) {
+        const { userId, role } = req.user;
+        return this.service.update(id, dto, userId, role);
     }
-    async remove(id) {
-        return this.service.remove(id);
+    async remove(id, req) {
+        const { userId, role } = req.user;
+        return this.service.remove(id, userId, role);
     }
-    async download(id, res) {
-        const row = await this.service.get(id);
+    async download(id, res, req) {
+        const { userId, role } = req.user;
+        const row = await this.service.get(id, userId, role);
         try {
             const data = await this.sftp.getStream(row.sftpPath);
             res.setHeader('Content-Type', row.mimeType ?? 'application/octet-stream');
@@ -113,51 +120,58 @@ let ErpMaterialFileController = class ErpMaterialFileController {
             res.status(404).send('File not found');
         }
     }
-    async upload(files, saleOrderNumber, description) {
+    async upload(files, saleOrderNumber, description, req) {
         if (!files || files.length === 0) {
             throw new common_1.BadRequestException('No files received');
         }
+        if (!req?.user) {
+            throw new common_1.BadRequestException('User information not available');
+        }
+        const { userId, role } = req.user;
         return this.service.uploadAndCreate(files, {
             saleOrderNumber: saleOrderNumber?.trim() || null,
             description: description?.trim() || null,
-        });
+        }, userId, role);
     }
 };
 exports.ErpMaterialFileController = ErpMaterialFileController;
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)('sales', 'admin'),
+    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
     (0, swagger_1.ApiOperation)({
         summary: 'List ERP material files with pagination, search & filters',
     }),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [query_erp_material_file_dto_1.QueryErpMaterialFileDto]),
+    __metadata("design:paramtypes", [query_erp_material_file_dto_1.QueryErpMaterialFileDto, Object]),
     __metadata("design:returntype", Promise)
 ], ErpMaterialFileController.prototype, "list", null);
 __decorate([
     (0, common_1.Get)('by-sale-order/:saleOrderNumber'),
-    (0, roles_decorator_1.Roles)('sales', 'admin'),
+    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
     (0, swagger_1.ApiOperation)({ summary: 'List files by exact sale order number' }),
     (0, swagger_1.ApiParam)({ name: 'saleOrderNumber', type: String }),
     __param(0, (0, common_1.Param)('saleOrderNumber')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], ErpMaterialFileController.prototype, "listBySaleOrder", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, roles_decorator_1.Roles)('sales', 'admin'),
+    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
     (0, swagger_1.ApiOperation)({ summary: 'Get a file record by ID' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], ErpMaterialFileController.prototype, "get", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)('sales', 'admin'),
+    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
     (0, swagger_1.ApiOperation)({ summary: 'Create a file record (metadata only)' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -166,38 +180,41 @@ __decorate([
 ], ErpMaterialFileController.prototype, "create", null);
 __decorate([
     (0, common_1.Put)(':id'),
-    (0, roles_decorator_1.Roles)('sales', 'admin'),
+    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
     (0, swagger_1.ApiOperation)({ summary: 'Update a file record' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, update_erp_material_file_dto_1.UpdateErpMaterialFileDto]),
+    __metadata("design:paramtypes", [Number, update_erp_material_file_dto_1.UpdateErpMaterialFileDto, Object]),
     __metadata("design:returntype", Promise)
 ], ErpMaterialFileController.prototype, "update", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    (0, roles_decorator_1.Roles)('sales', 'admin'),
+    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
     (0, swagger_1.ApiOperation)({ summary: 'Delete a file record' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], ErpMaterialFileController.prototype, "remove", null);
 __decorate([
     (0, common_1.Get)(':id/download'),
-    (0, roles_decorator_1.Roles)('sales', 'admin'),
+    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
     (0, swagger_1.ApiOperation)({ summary: 'Stream file content (inline if supported)' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Res)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:paramtypes", [Number, Object, Object]),
     __metadata("design:returntype", Promise)
 ], ErpMaterialFileController.prototype, "download", null);
 __decorate([
     (0, common_1.Post)('upload'),
-    (0, roles_decorator_1.Roles)('sales', 'admin'),
+    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
     (0, swagger_1.ApiConsumes)('multipart/form-data'),
     (0, swagger_1.ApiOperation)({
         summary: 'Upload one or more files to SFTP and create DB rows',
@@ -218,13 +235,15 @@ __decorate([
     __param(0, (0, common_1.UploadedFiles)()),
     __param(1, (0, common_1.Body)('saleOrderNumber')),
     __param(2, (0, common_1.Body)('description')),
+    __param(3, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Array, String, String]),
+    __metadata("design:paramtypes", [Array, String, String, Object]),
     __metadata("design:returntype", Promise)
 ], ErpMaterialFileController.prototype, "upload", null);
 exports.ErpMaterialFileController = ErpMaterialFileController = __decorate([
     (0, swagger_1.ApiTags)('erp-material-files'),
     (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)({ path: 'v1/erp-material-files', version: '1' }),
     __metadata("design:paramtypes", [erp_material_file_service_1.ErpMaterialFileService,
         sftp_service_1.SftpService])

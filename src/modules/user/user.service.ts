@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import * as bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UserService {
@@ -36,8 +37,14 @@ export class UserService {
     });
   }
 
-  async findAll() {
+  async findAll(role?: 'admin' | 'sales' | 'user') {
+    const where: Prisma.UserWhereInput = {};
+    if (role) {
+      where.role = role;
+    }
+
     return this.prisma.user.findMany({
+      where,
       select: {
         id: true,
         name: true,

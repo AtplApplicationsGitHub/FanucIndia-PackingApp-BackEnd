@@ -15,7 +15,7 @@ const swagger_1 = require("@nestjs/swagger");
 class UpdateAdminOrderDto {
     status;
     priority;
-    terminalId;
+    assignedUserId;
     customerId;
     saleOrderNumber;
     outboundDelivery;
@@ -28,6 +28,7 @@ class UpdateAdminOrderDto {
     paymentClearance;
     salesZoneId;
     packConfigId;
+    fgLocation;
 }
 exports.UpdateAdminOrderDto = UpdateAdminOrderDto;
 __decorate([
@@ -43,11 +44,11 @@ __decorate([
     __metadata("design:type", Number)
 ], UpdateAdminOrderDto.prototype, "priority", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 1, description: 'Terminal ID' }),
+    (0, swagger_1.ApiPropertyOptional)({ example: 1, description: 'Assigned User ID' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
-], UpdateAdminOrderDto.prototype, "terminalId", void 0);
+], UpdateAdminOrderDto.prototype, "assignedUserId", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 1, description: 'Customer ID (lookup)' }),
     (0, class_validator_1.IsInt)(),
@@ -120,4 +121,10 @@ __decorate([
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
 ], UpdateAdminOrderDto.prototype, "packConfigId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Warehouse A, Rack 5', description: 'Finished Goods Location' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "fgLocation", void 0);
 //# sourceMappingURL=update-admin-order.dto.js.map

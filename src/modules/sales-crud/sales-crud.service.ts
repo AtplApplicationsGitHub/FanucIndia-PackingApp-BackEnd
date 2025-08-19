@@ -28,7 +28,7 @@ export class SalesCrudService {
           deliveryDate,
           userId,
           status: 'R105',
-          terminalId: null,
+          assignedUserId: null,
           customerId: dto.customerId,
           printerId: null,
         },
@@ -54,7 +54,7 @@ export class SalesCrudService {
   async findAll(userId: number, query: { search?: string }) {
     try {
       const { search } = query;
-      const where: any = { userId };
+      const where: any = { userId }; // Always filter by the logged-in user's ID
 
       if (search) {
         const s = { contains: search };
@@ -109,6 +109,7 @@ export class SalesCrudService {
           packConfig: true,
         },
       });
+      // Security Check: Ensure the order belongs to the user trying to access it
       if (!order || order.userId !== userId) {
         throw new NotFoundException('Sales order not found or access denied.');
       }
@@ -127,15 +128,10 @@ export class SalesCrudService {
     dto: UpdateSalesCrudDto,
     userId: number,
   ) {
-    // Ensure existence & permission first
-    const existing = await this.prisma.salesOrder.findUnique({ where: { id } });
+    // Security Check: Ensure the user owns the order before updating
+    const existing = await this.prisma.salesOrder.findFirst({ where: { id, userId } });
     if (!existing) {
-      throw new NotFoundException('Sales order not found.');
-    }
-    if (existing.userId !== userId) {
-      throw new ForbiddenException(
-        'You do not have permission to update this order.',
-      );
+      throw new NotFoundException('Sales order not found or access denied.');
     }
 
     try {
@@ -157,7 +153,6 @@ export class SalesCrudService {
         },
       });
     } catch (err: any) {
-      // Record not found at update time
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2025') {
           throw new NotFoundException('Sales order not found.');
@@ -176,15 +171,10 @@ export class SalesCrudService {
   }
 
   async remove(id: number, userId: number) {
-    // Ensure existence & permission first
-    const existing = await this.prisma.salesOrder.findUnique({ where: { id } });
+    // Security Check: Ensure the user owns the order before deleting
+    const existing = await this.prisma.salesOrder.findFirst({ where: { id, userId } });
     if (!existing) {
-      throw new NotFoundException('Sales order not found.');
-    }
-    if (existing.userId !== userId) {
-      throw new ForbiddenException(
-        'You do not have permission to delete this order.',
-      );
+      throw new NotFoundException('Sales order not found or access denied.');
     }
 
     try {
@@ -208,7 +198,7 @@ export class SalesCrudService {
   ) {
     try {
       const skip = (page - 1) * limit;
-      const whereClause: any = { userId };
+      const whereClause: any = { userId }; // Always filter by the logged-in user's ID
 
       if (search) {
         const s = { contains: search };

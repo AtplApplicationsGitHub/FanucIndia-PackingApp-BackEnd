@@ -70,13 +70,6 @@ async function main() {
             { configName: '4 SO# 1 Box' },
         ],
     });
-    await prisma.terminal.createMany({
-        data: [
-            { name: 'Terminal A' },
-            { name: 'Terminal B' },
-            { name: 'Terminal C' },
-        ],
-    });
     await prisma.customer.createMany({
         data: [
             { name: 'AA', address: 'India' },

@@ -50,6 +50,7 @@ export class AdminOrderService {
         { plantCode: { is: { code: { contains: search } } } },
         { salesZone: { is: { name: { contains: search } } } },
         { packConfig: { is: { configName: { contains: search } } } },
+        { assignedUser: { is: { name: { contains: search } } } }, 
 
         { saleOrderNumber: { contains: search } },
         { outboundDelivery: { contains: search } },
@@ -98,7 +99,7 @@ export class AdminOrderService {
           plantCode: { select: { id: true, code: true, description: true } },
           salesZone: { select: { id: true, name: true } },
           packConfig: { select: { id: true, configName: true } },
-          terminal: { select: { id: true, name: true } },
+          assignedUser: { select: { id: true, name: true } }, 
         },
       });
 
@@ -121,6 +122,7 @@ export class AdminOrderService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
+    
     return this.prisma.salesOrder.update({ where: { id }, data: dto });
   }
 

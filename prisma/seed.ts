@@ -47,15 +47,6 @@ async function main() {
     ],
   });
 
-  // Insert Terminals
-  await prisma.terminal.createMany({
-    data: [
-      { name: 'Terminal A' },
-      { name: 'Terminal B' },
-      { name: 'Terminal C' },
-    ],
-  });
-
   // Insert Customers
   await prisma.customer.createMany({
     data: [

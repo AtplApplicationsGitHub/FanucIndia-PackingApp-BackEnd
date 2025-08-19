@@ -35,7 +35,7 @@ export declare class AdminOrderController {
                 id: number;
                 configName: string;
             };
-            terminal: {
+            assignedUser: {
                 id: number;
                 name: string;
             } | null;
@@ -56,8 +56,9 @@ export declare class AdminOrderController {
             salesZoneId: number;
             packConfigId: number;
             customerId: number | null;
-            terminalId: number | null;
+            assignedUserId: number | null;
             printerId: number | null;
+            fgLocation: string | null;
             status: string;
             priority: number | null;
         })[];
@@ -79,8 +80,9 @@ export declare class AdminOrderController {
         salesZoneId: number;
         packConfigId: number;
         customerId: number | null;
-        terminalId: number | null;
+        assignedUserId: number | null;
         printerId: number | null;
+        fgLocation: string | null;
         status: string;
         priority: number | null;
     }>;

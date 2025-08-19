@@ -21,12 +21,13 @@ const user_module_1 = require("./modules/user/user.module");
 const erp_material_data_module_1 = require("./modules/erp-material-data/erp-material-data.module");
 const erp_material_file_module_1 = require("./modules/erp-material-file/erp-material-file.module");
 const sftp_module_1 = require("./modules/sftp/sftp.module");
+const user_dashboard_module_1 = require("./modules/user-dashboard/user-dashboard.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [config_1.ConfigModule.forRoot({ isGlobal: true }), prisma_module_1.PrismaModule, sales_order_module_1.SalesOrderModule, auth_module_1.AuthModule, lookup_module_1.LookupModule, sales_crud_module_1.SalesCrudModule, admin_order_module_1.AdminOrderModule, user_module_1.UserModule, erp_material_data_module_1.ErpMaterialDataModule, erp_material_file_module_1.ErpMaterialFileModule, sftp_module_1.SftpModule,],
+        imports: [config_1.ConfigModule.forRoot({ isGlobal: true }), prisma_module_1.PrismaModule, sales_order_module_1.SalesOrderModule, auth_module_1.AuthModule, lookup_module_1.LookupModule, sales_crud_module_1.SalesCrudModule, admin_order_module_1.AdminOrderModule, user_module_1.UserModule, erp_material_data_module_1.ErpMaterialDataModule, erp_material_file_module_1.ErpMaterialFileModule, sftp_module_1.SftpModule, user_dashboard_module_1.UserDashboardModule,],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],
     })

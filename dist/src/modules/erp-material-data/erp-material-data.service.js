@@ -12,6 +12,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ErpMaterialDataService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma.service");
+async function verifyOrderAccess(prisma, orderId, userId, userRole) {
+    if (userRole === 'admin') {
+        const order = await prisma.salesOrder.findUnique({ where: { id: orderId } });
+        if (!order)
+            throw new common_1.NotFoundException('Sales Order not found');
+        return { id: orderId };
+    }
+    const order = await prisma.salesOrder.findFirst({
+        where: { id: orderId, assignedUserId: userId },
+    });
+    if (!order) {
+        throw new common_1.ForbiddenException('You do not have permission to access this order.');
+    }
+    return { id: orderId };
+}
 function convertBigIntToString(obj) {
     if (Array.isArray(obj)) {
         return obj.map(convertBigIntToString);
@@ -33,48 +48,32 @@ let ErpMaterialDataService = class ErpMaterialDataService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async getMaterialsByOrderId(orderId) {
+    async getMaterialsByOrderId(orderId, userId, userRole) {
+        await verifyOrderAccess(this.prisma, orderId, userId, userRole);
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: { id: orderId },
-            select: {
-                saleOrderNumber: true,
-                transferOrder: true,
-                outboundDelivery: true,
-            },
+            select: { saleOrderNumber: true },
         });
         if (!salesOrder)
             throw new common_1.NotFoundException('Sales Order not found');
         const materials = await this.prisma.eRP_Material_Data.findMany({
-            where: {
-                OR: [
-                    { saleOrderNumber: salesOrder.saleOrderNumber },
-                    { transferOrder: salesOrder.transferOrder },
-                    { FG_OBD: salesOrder.outboundDelivery },
-                ],
-            },
+            where: { saleOrderNumber: salesOrder.saleOrderNumber },
             orderBy: { ID: 'asc' },
         });
         return convertBigIntToString(materials);
     }
-    async incrementIssueStage(orderId, materialCode) {
+    async incrementIssueStage(orderId, materialCode, userId, userRole) {
+        await verifyOrderAccess(this.prisma, orderId, userId, userRole);
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: { id: orderId },
-            select: {
-                saleOrderNumber: true,
-                transferOrder: true,
-                outboundDelivery: true,
-            },
+            select: { saleOrderNumber: true },
         });
         if (!salesOrder)
             throw new common_1.NotFoundException('Sales Order not found');
         const material = await this.prisma.eRP_Material_Data.findFirst({
             where: {
                 Material_Code: materialCode,
-                OR: [
-                    { saleOrderNumber: salesOrder.saleOrderNumber },
-                    { transferOrder: salesOrder.transferOrder },
-                    { FG_OBD: salesOrder.outboundDelivery },
-                ],
+                saleOrderNumber: salesOrder.saleOrderNumber,
             },
         });
         if (!material)
@@ -87,13 +86,7 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             data: { Issue_stage: { increment: 1 } },
         });
         const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-            where: {
-                OR: [
-                    { saleOrderNumber: salesOrder.saleOrderNumber },
-                    { transferOrder: salesOrder.transferOrder },
-                    { FG_OBD: salesOrder.outboundDelivery },
-                ],
-            },
+            where: { saleOrderNumber: salesOrder.saleOrderNumber },
             select: { Issue_stage: true, Required_Qty: true },
         });
         const allCompleted = allMaterials.every((m) => m.Issue_stage >= m.Required_Qty);
@@ -105,29 +98,21 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         }
         return convertBigIntToString({
             message: 'Issue_stage incremented successfully',
-            allCompleted,
             updatedMaterial,
         });
     }
-    async updateIssueStage(orderId, materialCode, newIssueStage) {
+    async updateIssueStage(orderId, materialCode, newIssueStage, userId, userRole) {
+        await verifyOrderAccess(this.prisma, orderId, userId, userRole);
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: { id: orderId },
-            select: {
-                saleOrderNumber: true,
-                transferOrder: true,
-                outboundDelivery: true,
-            },
+            select: { saleOrderNumber: true },
         });
         if (!salesOrder)
             throw new common_1.NotFoundException('Sales Order not found');
         const material = await this.prisma.eRP_Material_Data.findFirst({
             where: {
                 Material_Code: materialCode,
-                OR: [
-                    { saleOrderNumber: salesOrder.saleOrderNumber },
-                    { transferOrder: salesOrder.transferOrder },
-                    { FG_OBD: salesOrder.outboundDelivery },
-                ],
+                saleOrderNumber: salesOrder.saleOrderNumber,
             },
         });
         if (!material)
@@ -143,13 +128,7 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             data: { Issue_stage: newIssueStage },
         });
         const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-            where: {
-                OR: [
-                    { saleOrderNumber: salesOrder.saleOrderNumber },
-                    { transferOrder: salesOrder.transferOrder },
-                    { FG_OBD: salesOrder.outboundDelivery },
-                ],
-            },
+            where: { saleOrderNumber: salesOrder.saleOrderNumber },
             select: { Issue_stage: true, Required_Qty: true },
         });
         const allCompleted = allMaterials.every((m) => m.Issue_stage >= m.Required_Qty);
@@ -161,29 +140,21 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         }
         return convertBigIntToString({
             message: 'Issue_stage updated successfully',
-            allCompleted,
             updatedMaterial,
         });
     }
-    async incrementPackingStage(orderId, materialCode) {
+    async incrementPackingStage(orderId, materialCode, userId, userRole) {
+        await verifyOrderAccess(this.prisma, orderId, userId, userRole);
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: { id: orderId },
-            select: {
-                saleOrderNumber: true,
-                transferOrder: true,
-                outboundDelivery: true,
-            },
+            select: { saleOrderNumber: true },
         });
         if (!salesOrder)
             throw new common_1.NotFoundException('Sales Order not found');
         const material = await this.prisma.eRP_Material_Data.findFirst({
             where: {
                 Material_Code: materialCode,
-                OR: [
-                    { saleOrderNumber: salesOrder.saleOrderNumber },
-                    { transferOrder: salesOrder.transferOrder },
-                    { FG_OBD: salesOrder.outboundDelivery },
-                ],
+                saleOrderNumber: salesOrder.saleOrderNumber,
             },
         });
         if (!material)
@@ -204,28 +175,21 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             updatedMaterial,
         });
     }
-    async updatePackingStage(orderId, materialCode, newPackingStage) {
+    async updatePackingStage(orderId, materialCode, newPackingStage, userId, userRole) {
+        await verifyOrderAccess(this.prisma, orderId, userId, userRole);
         if (newPackingStage < 0) {
             throw new common_1.BadRequestException('Packing_stage cannot be negative');
         }
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: { id: orderId },
-            select: {
-                saleOrderNumber: true,
-                transferOrder: true,
-                outboundDelivery: true,
-            },
+            select: { saleOrderNumber: true },
         });
         if (!salesOrder)
             throw new common_1.NotFoundException('Sales Order not found');
         const material = await this.prisma.eRP_Material_Data.findFirst({
             where: {
                 Material_Code: materialCode,
-                OR: [
-                    { saleOrderNumber: salesOrder.saleOrderNumber },
-                    { transferOrder: salesOrder.transferOrder },
-                    { FG_OBD: salesOrder.outboundDelivery },
-                ],
+                saleOrderNumber: salesOrder.saleOrderNumber,
             },
         });
         if (!material)

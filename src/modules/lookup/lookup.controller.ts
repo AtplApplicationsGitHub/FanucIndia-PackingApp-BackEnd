@@ -191,35 +191,6 @@ export class LookupController {
     return this.lookupService.deletePackConfig(id);
   }
 
-  // TERMINALS
-  @Get('terminals')
-  @ApiOperation({ summary: 'Get all terminals' })
-  getTerminals() {
-    return this.lookupService.getTerminals();
-  }
-
-  @Post('terminals')
-  @ApiOperation({ summary: 'Create a terminal' })
-  @ApiBody({ type: CreateTerminalDto })
-  createTerminal(@Body() dto: CreateTerminalDto) {
-    return this.lookupService.createTerminal(dto);
-  }
-
-  @Patch('terminals/:id')
-  @ApiOperation({ summary: 'Update a terminal' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiBody({ type: UpdateTerminalDto })
-  updateTerminal(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateTerminalDto) {
-    return this.lookupService.updateTerminal(id, dto);
-  }
-
-  @Delete('terminals/:id')
-  @ApiOperation({ summary: 'Delete a terminal' })
-  @ApiParam({ name: 'id', type: Number })
-  deleteTerminal(@Param('id', ParseIntPipe) id: number) {
-    return this.lookupService.deleteTerminal(id);
-  }
-
   // CUSTOMERS
   @Get('customers')
   @ApiOperation({ summary: 'Get all customers' })

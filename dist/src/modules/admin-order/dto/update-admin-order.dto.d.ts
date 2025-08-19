@@ -1,7 +1,7 @@
 export declare class UpdateAdminOrderDto {
     status?: string;
     priority?: number;
-    terminalId?: number;
+    assignedUserId?: number;
     customerId?: number;
     saleOrderNumber?: string;
     outboundDelivery?: string;
@@ -14,4 +14,5 @@ export declare class UpdateAdminOrderDto {
     paymentClearance?: boolean;
     salesZoneId?: number;
     packConfigId?: number;
+    fgLocation?: string;
 }

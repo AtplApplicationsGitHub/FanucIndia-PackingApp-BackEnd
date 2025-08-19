@@ -18,10 +18,10 @@ export class UpdateAdminOrderDto {
   @IsInt()
   priority?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'Terminal ID' })
+  @ApiPropertyOptional({ example: 1, description: 'Assigned User ID' })
   @IsOptional()
   @IsInt()
-  terminalId?: number;
+  assignedUserId?: number;
 
   @ApiPropertyOptional({ example: 1, description: 'Customer ID (lookup)' })
   @IsInt()
@@ -82,4 +82,9 @@ export class UpdateAdminOrderDto {
   @IsOptional()
   @IsInt()
   packConfigId?: number;
+
+  @ApiPropertyOptional({ example: 'Warehouse A, Rack 5', description: 'Finished Goods Location' })
+  @IsOptional()
+  @IsString()
+  fgLocation?: string;
 }

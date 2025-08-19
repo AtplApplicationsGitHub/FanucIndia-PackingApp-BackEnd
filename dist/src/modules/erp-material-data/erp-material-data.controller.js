@@ -20,25 +20,32 @@ const update_issue_stage_dto_1 = require("./dto/update-issue-stage.dto");
 const increment_issue_stage_dto_1 = require("./dto/increment-issue-stage.dto");
 const update_packing_stage_dto_1 = require("./dto/update-packing-stage.dto");
 const increment_packing_stage_dto_1 = require("./dto/increment-packing-stage.dto");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const roles_decorator_1 = require("../auth/roles.decorator");
 let ErpMaterialDataController = class ErpMaterialDataController {
     erpMaterialDataService;
     constructor(erpMaterialDataService) {
         this.erpMaterialDataService = erpMaterialDataService;
     }
-    getMaterialsByOrderId(orderId) {
-        return this.erpMaterialDataService.getMaterialsByOrderId(orderId);
+    getMaterialsByOrderId(orderId, req) {
+        const { userId, role } = req.user;
+        return this.erpMaterialDataService.getMaterialsByOrderId(orderId, userId, role);
     }
-    incrementIssueStage(orderId, body) {
-        return this.erpMaterialDataService.incrementIssueStage(orderId, body.materialCode);
+    incrementIssueStage(orderId, body, req) {
+        const { userId, role } = req.user;
+        return this.erpMaterialDataService.incrementIssueStage(orderId, body.materialCode, userId, role);
     }
-    updateIssueStage(orderId, body) {
-        return this.erpMaterialDataService.updateIssueStage(orderId, body.materialCode, body.issueStage);
+    updateIssueStage(orderId, body, req) {
+        const { userId, role } = req.user;
+        return this.erpMaterialDataService.updateIssueStage(orderId, body.materialCode, body.issueStage, userId, role);
     }
-    incrementPackingStage(orderId, body) {
-        return this.erpMaterialDataService.incrementPackingStage(orderId, body.materialCode);
+    incrementPackingStage(orderId, body, req) {
+        const { userId, role } = req.user;
+        return this.erpMaterialDataService.incrementPackingStage(orderId, body.materialCode, userId, role);
     }
-    updatePackingStage(orderId, body) {
-        return this.erpMaterialDataService.updatePackingStage(orderId, body.materialCode, body.packingStage);
+    updatePackingStage(orderId, body, req) {
+        const { userId, role } = req.user;
+        return this.erpMaterialDataService.updatePackingStage(orderId, body.materialCode, body.packingStage, userId, role);
     }
 };
 exports.ErpMaterialDataController = ErpMaterialDataController;
@@ -50,9 +57,11 @@ __decorate([
         description: 'List of ERP materials for the order.',
     }),
     (0, common_1.Get)(),
+    (0, roles_decorator_1.Roles)('admin', 'user'),
     __param(0, (0, common_1.Param)('orderId', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], ErpMaterialDataController.prototype, "getMaterialsByOrderId", null);
 __decorate([
@@ -63,68 +72,58 @@ __decorate([
         status: 200,
         description: 'Issue stage incremented successfully.',
     }),
-    (0, swagger_1.ApiResponse)({
-        status: 400,
-        description: 'Cannot exceed the Required_Qty value.',
-    }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: 'Order or Material not found.' }),
     (0, common_1.Post)('increment-issue-stage'),
+    (0, roles_decorator_1.Roles)('admin', 'user'),
     __param(0, (0, common_1.Param)('orderId', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, increment_issue_stage_dto_1.IncrementIssueStageDto]),
+    __metadata("design:paramtypes", [Number, increment_issue_stage_dto_1.IncrementIssueStageDto, Object]),
     __metadata("design:returntype", void 0)
 ], ErpMaterialDataController.prototype, "incrementIssueStage", null);
 __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Update issue stage for a material code (inline edit)' }),
     (0, swagger_1.ApiParam)({ name: 'orderId', type: Number, description: 'Sales Order ID' }),
     (0, swagger_1.ApiBody)({ type: update_issue_stage_dto_1.UpdateIssueStageDto }),
-    (0, swagger_1.ApiResponse)({
-        status: 200,
-        description: 'Issue stage updated successfully.',
-    }),
-    (0, swagger_1.ApiResponse)({
-        status: 400,
-        description: 'Cannot exceed the Required_Qty value.',
-    }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: 'Order or Material not found.' }),
     (0, common_1.Patch)('update-issue-stage'),
+    (0, roles_decorator_1.Roles)('admin', 'user'),
     __param(0, (0, common_1.Param)('orderId', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, update_issue_stage_dto_1.UpdateIssueStageDto]),
+    __metadata("design:paramtypes", [Number, update_issue_stage_dto_1.UpdateIssueStageDto, Object]),
     __metadata("design:returntype", void 0)
 ], ErpMaterialDataController.prototype, "updateIssueStage", null);
 __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Increment packing stage for a material code' }),
     (0, swagger_1.ApiParam)({ name: 'orderId', type: Number, description: 'Sales Order ID' }),
     (0, swagger_1.ApiBody)({ type: increment_packing_stage_dto_1.IncrementPackingStageDto }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Packing stage incremented successfully.' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Cannot exceed the min(Required_Qty, Issue_stage) cap.' }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: 'Order or Material not found.' }),
     (0, common_1.Post)('increment-packing-stage'),
+    (0, roles_decorator_1.Roles)('admin', 'user'),
     __param(0, (0, common_1.Param)('orderId', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, increment_packing_stage_dto_1.IncrementPackingStageDto]),
+    __metadata("design:paramtypes", [Number, increment_packing_stage_dto_1.IncrementPackingStageDto, Object]),
     __metadata("design:returntype", void 0)
 ], ErpMaterialDataController.prototype, "incrementPackingStage", null);
 __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Update packing stage for a material code (inline edit)' }),
     (0, swagger_1.ApiParam)({ name: 'orderId', type: Number, description: 'Sales Order ID' }),
     (0, swagger_1.ApiBody)({ type: update_packing_stage_dto_1.UpdatePackingStageDto }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Packing stage updated successfully.' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Cannot exceed the min(Required_Qty, Issue_stage) cap.' }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: 'Order or Material not found.' }),
     (0, common_1.Patch)('update-packing-stage'),
+    (0, roles_decorator_1.Roles)('admin', 'user'),
     __param(0, (0, common_1.Param)('orderId', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, update_packing_stage_dto_1.UpdatePackingStageDto]),
+    __metadata("design:paramtypes", [Number, update_packing_stage_dto_1.UpdatePackingStageDto, Object]),
     __metadata("design:returntype", void 0)
 ], ErpMaterialDataController.prototype, "updatePackingStage", null);
 exports.ErpMaterialDataController = ErpMaterialDataController = __decorate([
     (0, swagger_1.ApiTags)('ERP Material Data'),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)('admin/orders/:orderId/erp-materials'),
     __metadata("design:paramtypes", [erp_material_data_service_1.ErpMaterialDataService])
 ], ErpMaterialDataController);
