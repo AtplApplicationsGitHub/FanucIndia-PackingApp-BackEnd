@@ -38,7 +38,7 @@ let AdminOrderController = class AdminOrderController {
 exports.AdminOrderController = AdminOrderController;
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)('admin'),
+    (0, roles_decorator_1.Roles)('ADMIN'),
     (0, swagger_1.ApiOperation)({ summary: 'Get all sales orders (admin only)' }),
     (0, swagger_1.ApiQuery)({
         name: 'status',
@@ -81,7 +81,7 @@ __decorate([
 ], AdminOrderController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    (0, roles_decorator_1.Roles)('admin'),
+    (0, roles_decorator_1.Roles)('ADMIN'),
     (0, swagger_1.ApiOperation)({ summary: 'Update a specific sales order (admin only)' }),
     (0, swagger_1.ApiParam)({
         name: 'id',
@@ -99,7 +99,7 @@ __decorate([
 ], AdminOrderController.prototype, "update", null);
 __decorate([
     (0, common_2.Delete)(':id'),
-    (0, roles_decorator_1.Roles)('admin'),
+    (0, roles_decorator_1.Roles)('ADMIN'),
     (0, swagger_1.ApiOperation)({ summary: 'Delete a specific sales order (admin only)' }),
     (0, swagger_1.ApiParam)({
         name: 'id',

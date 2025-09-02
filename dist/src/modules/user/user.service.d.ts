@@ -11,7 +11,7 @@ export declare class UserService {
         createdAt: Date;
         updatedAt: Date;
     }>;
-    findAll(role?: 'admin' | 'sales' | 'user'): Promise<{
+    findAll(role?: 'ADMIN' | 'SALES' | 'USER'): Promise<{
         id: number;
         name: string;
         email: string;

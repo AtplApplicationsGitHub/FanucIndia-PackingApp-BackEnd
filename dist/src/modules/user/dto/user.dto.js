@@ -38,13 +38,13 @@ __decorate([
 ], CreateUserDto.prototype, "password", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({
-        example: 'sales',
-        description: 'User role (sales, admin, user)',
-        enum: ['sales', 'admin', 'user'],
-        default: 'sales',
+        example: 'SALES',
+        description: 'User role (SALES, ADMIN, USER)',
+        enum: ['SALES', 'ADMIN', 'USER'],
+        default: 'SALES',
     }),
     (0, class_validator_1.IsNotEmpty)(),
-    (0, class_validator_1.IsIn)(['admin', 'sales', 'user']),
+    (0, class_validator_1.IsIn)(['SALES', 'ADMIN', 'USER']),
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "role", void 0);
 class UpdateUserDto {
@@ -74,13 +74,13 @@ __decorate([
 ], UpdateUserDto.prototype, "password", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({
-        example: 'user',
-        description: 'User role (sales, admin, user)',
-        enum: ['sales', 'admin', 'user'],
-        default: 'user',
+        example: 'USER',
+        description: 'User role (SALES, ADMIN, USER)',
+        enum: ['SALES', 'ADMIN', 'USER'],
+        default: 'USER',
     }),
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsIn)(['admin', 'sales', 'user']),
+    (0, class_validator_1.IsIn)(['SALES', 'ADMIN', 'USER']),
     __metadata("design:type", String)
 ], UpdateUserDto.prototype, "role", void 0);
 //# sourceMappingURL=user.dto.js.map

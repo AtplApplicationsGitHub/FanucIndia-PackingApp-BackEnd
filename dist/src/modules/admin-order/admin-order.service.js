@@ -19,7 +19,7 @@ let AdminOrderService = class AdminOrderService {
         this.prisma = prisma;
     }
     async findAll(query) {
-        const { page = 1, limit = 20, search, date, sortBy = 'createdAt', sortOrder = 'desc', } = query;
+        const { page = 1, limit = 20, search, date, sortBy = 'createdAt', sortOrder = 'desc', startDate, endDate, } = query;
         const parsedPage = Number(page) > 0 ? Number(page) : 1;
         const parsedLimit = Number(limit) > 0 && Number(limit) <= 100 ? Number(limit) : 20;
         const allowedSortFields = [
@@ -34,6 +34,24 @@ let AdminOrderService = class AdminOrderService {
             ? sortOrder
             : 'desc';
         const where = {};
+        const parseYMDLocal = (s) => {
+            const [y, m, d] = s.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        };
+        if (startDate || endDate) {
+            const range = {};
+            if (startDate) {
+                const s = parseYMDLocal(startDate);
+                s.setHours(0, 0, 0, 0);
+                range.gte = s;
+            }
+            if (endDate) {
+                const e = parseYMDLocal(endDate);
+                const next = new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1, 0, 0, 0, 0);
+                range.lt = next;
+            }
+            where.deliveryDate = { ...where.deliveryDate, ...range };
+        }
         if (search) {
             const lower = search.toLowerCase();
             const num = Number(search);
@@ -67,7 +85,7 @@ let AdminOrderService = class AdminOrderService {
             if (total === 0) {
                 return { total: 0, page: 1, limit: 0, data: [] };
             }
-            const isFilterActive = !!search || !!date;
+            const isFilterActive = !!search || !!startDate || !!endDate;
             const skip = isFilterActive ? 0 : (parsedPage - 1) * parsedLimit;
             const take = isFilterActive ? total : parsedLimit;
             const data = await this.prisma.salesOrder.findMany({

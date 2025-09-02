@@ -43,9 +43,11 @@ async function main() {
             { name: 'Robo Y2', code: 'Y2' },
             { name: 'Robo Z3', code: 'Z3' },
         ],
+        skipDuplicates: true,
     });
     await prisma.transporter.createMany({
         data: [{ name: 'BlueDart' }, { name: 'DHL' }, { name: 'FedEx' }],
+        skipDuplicates: true,
     });
     await prisma.plantCode.createMany({
         data: [
@@ -53,6 +55,7 @@ async function main() {
             { code: 'PL002', description: 'Plant 2' },
             { code: 'PL003', description: 'Plant 3' },
         ],
+        skipDuplicates: true,
     });
     await prisma.salesZone.createMany({
         data: [
@@ -61,6 +64,7 @@ async function main() {
             { name: 'East' },
             { name: 'West' },
         ],
+        skipDuplicates: true,
     });
     await prisma.packConfig.createMany({
         data: [
@@ -69,6 +73,7 @@ async function main() {
             { configName: '3 SO# 1 Box' },
             { configName: '4 SO# 1 Box' },
         ],
+        skipDuplicates: true,
     });
     await prisma.customer.createMany({
         data: [
@@ -76,6 +81,7 @@ async function main() {
             { name: 'BB', address: 'USA' },
             { name: 'CC', address: 'UK' },
         ],
+        skipDuplicates: true,
     });
     await prisma.printer.createMany({
         data: [
@@ -83,6 +89,7 @@ async function main() {
             { name: 'Printer 2' },
             { name: 'Printer 3' },
         ],
+        skipDuplicates: true,
     });
     const adminEmail = 'admin@fanuc.com';
     const adminPassword = 'FanucAdmin123';
@@ -96,7 +103,7 @@ async function main() {
                 name: adminName,
                 email: adminEmail,
                 password: await bcrypt.hash(adminPassword, 10),
-                role: 'admin',
+                role: 'ADMIN',
             },
         });
     }
@@ -112,7 +119,7 @@ async function main() {
                 name: salesName,
                 email: salesEmail,
                 password: await bcrypt.hash(salesPassword, 10),
-                role: 'sales',
+                role: 'SALES',
             },
         });
     }

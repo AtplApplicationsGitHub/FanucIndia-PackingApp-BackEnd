@@ -40,7 +40,7 @@ let UserDashboardController = class UserDashboardController {
 exports.UserDashboardController = UserDashboardController;
 __decorate([
     (0, common_1.Get)('orders'),
-    (0, roles_decorator_1.Roles)('user'),
+    (0, roles_decorator_1.Roles)('USER'),
     (0, swagger_1.ApiOperation)({ summary: "Get all sales orders assigned to the logged-in user" }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Assigned orders returned successfully' }),
     __param(0, (0, common_1.Req)()),
@@ -50,7 +50,7 @@ __decorate([
 ], UserDashboardController.prototype, "getAssignedOrders", null);
 __decorate([
     (0, common_1.Get)('orders/:id'),
-    (0, roles_decorator_1.Roles)('user', 'admin'),
+    (0, roles_decorator_1.Roles)('USER', 'ADMIN'),
     (0, swagger_1.ApiOperation)({ summary: "Get details for a specific sales order" }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order details returned' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Order not found or access denied' }),

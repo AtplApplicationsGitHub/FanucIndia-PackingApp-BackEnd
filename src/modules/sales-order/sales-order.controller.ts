@@ -35,7 +35,7 @@ export class SalesOrderController {
   constructor(private readonly salesOrderService: SalesOrderService) {}
 
   @Get('template')
-  @Roles('sales')
+  @Roles('SALES')
   @ApiOperation({ summary: 'Download sales order Excel template' })
   @ApiResponse({ status: 200, description: 'Excel file downloaded' })
   @ApiResponse({ status: 500, description: 'Failed to generate or send template' })
@@ -53,7 +53,7 @@ export class SalesOrderController {
   }
 
   @Post('import')
-  @Roles('sales')
+  @Roles('SALES')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Import bulk sales orders via Excel file' })
   @ApiConsumes('multipart/form-data')

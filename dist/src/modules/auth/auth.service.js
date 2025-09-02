@@ -78,7 +78,7 @@ let AuthService = class AuthService {
                 name: dto.name,
                 email,
                 password: hash,
-                role: dto.role ?? 'sales',
+                role: dto.role ?? 'SALES',
             },
         });
         return {

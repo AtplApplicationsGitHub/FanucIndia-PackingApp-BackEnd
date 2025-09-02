@@ -9,7 +9,7 @@ export class AdminSalesOrdersController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get(':id')
-  @Roles('admin') // Only allow users with the 'admin' role to access this
+  @Roles('ADMIN')
   async getSalesOrderById(@Param('id', ParseIntPipe) id: number) {
     const order = await this.prisma.salesOrder.findUnique({
       where: { id },

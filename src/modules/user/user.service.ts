@@ -37,7 +37,7 @@ export class UserService {
     });
   }
 
-  async findAll(role?: 'admin' | 'sales' | 'user') {
+  async findAll(role?: 'ADMIN' | 'SALES' | 'USER') {
     const where: Prisma.UserWhereInput = {};
     if (role) {
       where.role = role;
@@ -87,9 +87,9 @@ export class UserService {
     if (!user) throw new NotFoundException('User not found');
 
     // Last admin check
-    if (user.role === 'admin') {
+    if (user.role === 'ADMIN') {
       const adminCount = await this.prisma.user.count({
-        where: { role: 'admin' },
+        where: { role: 'ADMIN' },
       });
       if (adminCount <= 1) {
         throw new BadRequestException(

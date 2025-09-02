@@ -13,9 +13,13 @@ import { ErpMaterialDataModule } from './modules/erp-material-data/erp-material-
 import { ErpMaterialFileModule } from './modules/erp-material-file/erp-material-file.module';
 import { SftpModule } from './modules/sftp/sftp.module';
 import { UserDashboardModule } from './modules/user-dashboard/user-dashboard.module';
+import { ErpMaterialImporterModule } from './modules/erp-material-importer/erp-material-importer.module';
+import { DispatchModule } from './modules/dispatch/dispatch.module';
+import { SoSearchModule } from './modules/so-search/so-search.module';
+import { FgDashboardModule } from './modules/fg-dashboard/fg-dashboard.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule,],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule, ErpMaterialImporterModule, DispatchModule, SoSearchModule, FgDashboardModule],
   controllers: [AppController],
   providers: [AppService],
 })

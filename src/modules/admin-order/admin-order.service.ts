@@ -19,6 +19,8 @@ export class AdminOrderService {
       date,
       sortBy = 'createdAt',
       sortOrder = 'desc',
+      startDate,
+      endDate,
     } = query;
 
     const parsedPage = Number(page) > 0 ? Number(page) : 1;
@@ -39,6 +41,40 @@ export class AdminOrderService {
 
     const where: Prisma.SalesOrderWhereInput = {};
 
+    // Parse "YYYY-MM-DD" as **local** date (not UTC)
+    const parseYMDLocal = (s: string) => {
+      const [y, m, d] = s.split('-').map(Number);
+      return new Date(y, m - 1, d); // local midnight
+    };
+
+    if (startDate || endDate) {
+      const range: { gte?: Date; lt?: Date } = {};
+
+      if (startDate) {
+        const s = parseYMDLocal(startDate);
+        s.setHours(0, 0, 0, 0); // local start of day
+        range.gte = s;
+      }
+
+      if (endDate) {
+        const e = parseYMDLocal(endDate);
+        // end is inclusive → use < (next local day 00:00)
+        const next = new Date(
+          e.getFullYear(),
+          e.getMonth(),
+          e.getDate() + 1,
+          0,
+          0,
+          0,
+          0,
+        );
+        range.lt = next;
+      }
+
+      // apply to deliveryDate; change to createdAt if that's what you intend
+      where.deliveryDate = { ...(where.deliveryDate as object), ...range };
+    }
+
     if (search) {
       const lower = search.toLowerCase();
       const num = Number(search);
@@ -50,7 +86,7 @@ export class AdminOrderService {
         { plantCode: { is: { code: { contains: search } } } },
         { salesZone: { is: { name: { contains: search } } } },
         { packConfig: { is: { configName: { contains: search } } } },
-        { assignedUser: { is: { name: { contains: search } } } }, 
+        { assignedUser: { is: { name: { contains: search } } } },
 
         { saleOrderNumber: { contains: search } },
         { outboundDelivery: { contains: search } },
@@ -83,7 +119,7 @@ export class AdminOrderService {
         return { total: 0, page: 1, limit: 0, data: [] };
       }
 
-      const isFilterActive = !!search || !!date;
+      const isFilterActive = !!search || !!startDate || !!endDate;
       const skip = isFilterActive ? 0 : (parsedPage - 1) * parsedLimit;
       const take = isFilterActive ? total : parsedLimit;
 
@@ -99,7 +135,7 @@ export class AdminOrderService {
           plantCode: { select: { id: true, code: true, description: true } },
           salesZone: { select: { id: true, name: true } },
           packConfig: { select: { id: true, configName: true } },
-          assignedUser: { select: { id: true, name: true } }, 
+          assignedUser: { select: { id: true, name: true } },
         },
       });
 
@@ -122,7 +158,7 @@ export class AdminOrderService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    
+
     return this.prisma.salesOrder.update({ where: { id }, data: dto });
   }
 

@@ -27,7 +27,7 @@ export class AuthService {
       logAuthFailure({
         code: 'USER_ALREADY_EXISTS',
         message: 'Email already in use',
-        ip: req.ip ?? 'unknown',              // ensure a string
+        ip: req.ip ?? 'unknown',
         requestId: String(req.headers['x-request-id'] ?? ''), 
       })
       throw new ConflictException({
@@ -42,7 +42,7 @@ export class AuthService {
         name: dto.name,
         email,
         password: hash,
-        role: dto.role ?? 'sales',
+        role: dto.role ?? 'SALES',
       },
     })
 
@@ -80,7 +80,7 @@ export class AuthService {
         code: 'INVALID_CREDENTIALS',
         message: 'Invalid credentials',
         ip: req.ip ?? 'unknown',
-        userId: String(user.id),            // convert number → string
+        userId: String(user.id),
         requestId: String(req.headers['x-request-id'] ?? ''),
       })
       throw new UnauthorizedException({

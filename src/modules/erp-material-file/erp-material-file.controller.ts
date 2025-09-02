@@ -63,7 +63,7 @@ export class ErpMaterialFileController {
   ) {}
 
   @Get()
-  @Roles('sales', 'admin', 'user')
+  @Roles('SALES', 'ADMIN', 'USER')
   @ApiOperation({
     summary: 'List ERP material files with pagination, search & filters',
   })
@@ -73,7 +73,7 @@ export class ErpMaterialFileController {
   }
 
   @Get('by-sale-order/:saleOrderNumber')
-  @Roles('sales', 'admin', 'user')
+  @Roles('SALES', 'ADMIN', 'USER')
   @ApiOperation({ summary: 'List files by exact sale order number' })
   @ApiParam({ name: 'saleOrderNumber', type: String })
   async listBySaleOrder(
@@ -85,7 +85,7 @@ export class ErpMaterialFileController {
   }
 
   @Get(':id')
-  @Roles('sales', 'admin', 'user')
+  @Roles('SALES', 'ADMIN', 'USER')
   @ApiOperation({ summary: 'Get a file record by ID' })
   @ApiParam({ name: 'id', type: Number })
   async get(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
@@ -94,14 +94,14 @@ export class ErpMaterialFileController {
   }
 
   @Post()
-  @Roles('sales', 'admin', 'user')
+  @Roles('SALES', 'ADMIN', 'USER')
   @ApiOperation({ summary: 'Create a file record (metadata only)' })
   async create(@Body() dto: CreateErpMaterialFileDto) {
     return this.service.create(dto);
   }
 
   @Put(':id')
-  @Roles('sales', 'admin', 'user')
+  @Roles('SALES', 'ADMIN', 'USER')
   @ApiOperation({ summary: 'Update a file record' })
   @ApiParam({ name: 'id', type: Number })
   async update(
@@ -114,7 +114,7 @@ export class ErpMaterialFileController {
   }
 
   @Delete(':id')
-  @Roles('sales', 'admin', 'user')
+  @Roles('SALES', 'ADMIN', 'USER')
   @ApiOperation({ summary: 'Delete a file record' })
   @ApiParam({ name: 'id', type: Number })
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
@@ -123,7 +123,7 @@ export class ErpMaterialFileController {
   }
 
   @Get(':id/download')
-  @Roles('sales', 'admin', 'user')
+  @Roles('SALES', 'ADMIN', 'USER')
   @ApiOperation({ summary: 'Stream file content (inline if supported)' })
   async download(@Param('id', ParseIntPipe) id: number, @Res() res: Response, @Req() req: AuthRequest) {
     const { userId, role } = req.user;
@@ -148,7 +148,7 @@ export class ErpMaterialFileController {
   }
 
   @Post('upload')
-  @Roles('sales', 'admin', 'user')
+  @Roles('SALES', 'ADMIN', 'USER')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Upload one or more files to SFTP and create DB rows',

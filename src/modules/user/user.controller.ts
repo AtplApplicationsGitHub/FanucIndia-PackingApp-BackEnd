@@ -21,7 +21,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { AuthRequest } from '../auth/types/auth-request.type'; 
+import { AuthRequest } from '../auth/types/auth-request.type';
 
 @ApiTags('Users')
 @Controller('users')
@@ -41,7 +41,7 @@ export class UserController {
   @ApiOperation({ summary: 'Get all users (Admin only)' })
   @ApiQuery({ name: 'role', required: false, type: String, description: 'Filter by user role' })
   @ApiResponse({ status: 200, description: 'List of all users' })
-  findAll(@Query('role') role?: 'admin' | 'sales' | 'user') {
+  findAll(@Query('role') role?: 'ADMIN' | 'SALES' | 'USER') {
     return this.userService.findAll(role);
   }
 
@@ -61,7 +61,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
   remove(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
-    const currentUserId = req.user.userId; 
+    const currentUserId = req.user.userId;
     if (id === currentUserId) {
       throw new ForbiddenException('You cannot delete your own admin account.');
     }

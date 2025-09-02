@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlserver"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -12,11 +12,12 @@ model User {
   name           String
   email          String       @unique
   password       String
-  role           String       @default("sales")
+  role           String       @default("SALES")
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   salesOrders    SalesOrder[] @relation("CreatedOrders")
-  assignedOrders SalesOrder[] @relation("AssignedOrders") 
+  assignedOrders SalesOrder[] @relation("AssignedOrders")
+  dispatches     Dispatch[]
 }
 
 model Product {
@@ -30,6 +31,7 @@ model Transporter {
   id          Int          @id @default(autoincrement())
   name        String
   salesOrders SalesOrder[]
+  dispatches  Dispatch[]
 }
 
 model PlantCode {
@@ -57,6 +59,7 @@ model Customer {
   address      String
   erpMaterials ERP_Material_Data[] @relation("Customer_ERP_Material_Data")
   salesOrders  SalesOrder[]
+  dispatches   Dispatch[]
 }
 
 model Printer {
@@ -66,61 +69,62 @@ model Printer {
 }
 
 model SalesOrder {
-  id                  Int                 @id @default(autoincrement())
-  userId              Int
-  productId           Int
-  saleOrderNumber     String              @unique @db.NVarChar(500)
-  outboundDelivery    String              @unique @db.NVarChar(500)
-  transferOrder       String              @unique @db.NVarChar(500)
-  deliveryDate        DateTime
-  transporterId       Int
-  plantCodeId         Int
-  paymentClearance    Boolean
-  salesZoneId         Int
-  packConfigId        Int
-  assignedUserId      Int? // New field for the assigned user's ID
-  customerId          Int?
-  printerId           Int?
-  specialRemarks      String?
-  fgLocation          String?
-  status              String              @default("R105")
-  priority            Int?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  materialData        ERP_Material_Data[]
+  id               Int                 @id @default(autoincrement())
+  userId           Int
+  productId        Int
+  saleOrderNumber  String              @unique @db.VarChar(500)
+  outboundDelivery String              @unique @db.VarChar(500)
+  transferOrder    String              @unique @db.VarChar(500)
+  deliveryDate     DateTime
+  transporterId    Int
+  plantCodeId      Int
+  paymentClearance Boolean
+  salesZoneId      Int
+  packConfigId     Int
+  assignedUserId   Int?
+  customerId       Int?
+  printerId        Int?
+  specialRemarks   String?
+  fgLocation       String?
+  status           String              @default("R105")
+  priority         Int?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  materialData     ERP_Material_Data[]
   materialFilesByNumber ERP_Material_File[] @relation("SO_File_By_Number")
-  customer            Customer?           @relation(fields: [customerId], references: [id])
-  packConfig          PackConfig          @relation(fields: [packConfigId], references: [id])
-  plantCode           PlantCode           @relation(fields: [plantCodeId], references: [id])
-  printer             Printer?            @relation(fields: [printerId], references: [id])
-  product             Product             @relation(fields: [productId], references: [id])
-  salesZone           SalesZone           @relation(fields: [salesZoneId], references: [id])
-  assignedUser        User?               @relation("AssignedOrders", fields: [assignedUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  transporter         Transporter         @relation(fields: [transporterId], references: [id])
-  user                User                @relation("CreatedOrders", fields: [userId], references: [id])
+  customer         Customer?           @relation(fields: [customerId], references: [id])
+  packConfig       PackConfig          @relation(fields: [packConfigId], references: [id])
+  plantCode        PlantCode           @relation(fields: [plantCodeId], references: [id])
+  printer          Printer?            @relation(fields: [printerId], references: [id])
+  product          Product             @relation(fields: [productId], references: [id])
+  salesZone        SalesZone           @relation(fields: [salesZoneId], references: [id])
+  assignedUser     User?               @relation("AssignedOrders", fields: [assignedUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transporter      Transporter         @relation(fields: [transporterId], references: [id])
+  user             User                @relation("CreatedOrders", fields: [userId], references: [id])
+  Dispatch_SO      Dispatch_SO[]
 }
 
 model ERP_Material_Data {
   ID                   BigInt      @id(map: "PK_ERP_Material_Data") @default(autoincrement())
-  saleOrderNumber      String?     @db.NVarChar(500)
+  saleOrderNumber      String?     @db.VarChar(500)
   customerId           Int?
-  transferOrder        String?     @db.NVarChar(500)
-  FG_OBD               String?     @db.NVarChar(500)
+  transferOrder        String?     @db.VarChar(500)
+  FG_OBD               String?     @db.VarChar(500)
   Machine_Model        String?
-  CNC_Serial_No        String?     @db.NVarChar(100)
+  CNC_Serial_No        String?     @db.VarChar(100)
   Material_Code        String
   Material_Description String
-  Batch_No             String      @db.NVarChar(100)
-  SO_Donor_Batch       String      @db.NVarChar(100)
-  Cert_No              String      @db.NVarChar(100)
-  Bin_No               String      @db.NVarChar(100)
-  A_D_F                String      @db.NVarChar(100)
+  Batch_No             String      @db.VarChar(100)
+  SO_Donor_Batch       String      @db.VarChar(100)
+  Cert_No              String      @db.VarChar(100)
+  Bin_No               String      @db.VarChar(100)
+  A_D_F                String      @db.VarChar(100)
   Required_Qty         Int
   Issue_stage          Int         @default(0)
   Packing_stage        Int         @default(0)
-  Status               String?     @db.NVarChar(100)
-  UpdatedDate          DateTime?   @db.DateTime
-  UpdatedBy            String?     @db.NVarChar(50)
+  Status               String?     @db.VarChar(100)
+  UpdatedDate          DateTime?   @db.Timestamp(3)
+  UpdatedBy            String?     @db.VarChar(50)
   customer             Customer?   @relation("Customer_ERP_Material_Data", fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   salesOrder           SalesOrder? @relation(fields: [saleOrderNumber], references: [saleOrderNumber], onDelete: NoAction, onUpdate: NoAction)
 }
@@ -128,27 +132,55 @@ model ERP_Material_Data {
 model ERPMaterialLog {
   id                Int      @id @default(autoincrement())
   dateTime          DateTime @map("date_time")
-  fileName          String   @map("file_name") @db.NVarChar(255)
-  exceptionStatus   String?  @map("exception/status") @db.NVarChar(255)
-  soNo              String   @map("SO_NO") @db.NVarChar(50)
+  fileName          String   @map("file_name") @db.VarChar(255)
+  exceptionStatus   String?  @map("exception/status") @db.VarChar(255)
+  soNo              String   @map("SO_NO") @db.VarChar(50)
   noOfFilesExecuted Int      @map("no_of_files_executed")
 
   @@map("ERP_Material_Log")
 }
 
 model ERP_Material_File {
-  ID              Int      @id(map: "PK_ERP_Material_File") @default(autoincrement())
-  saleOrderNumber String?  @db.NVarChar(500)
-  fileName        String   @db.NVarChar(500)
-  description     String?  @db.NVarChar(2000)
-  sftpPath         String    @db.NVarChar(1000)
-  sftpDir          String    @db.NVarChar(1000)
-  fileSizeBytes    BigInt
-  mimeType         String?   @db.NVarChar(255)
-  checksumSha256   String?   @db.NVarChar(64)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  ID                 Int         @id(map: "PK_ERP_Material_File") @default(autoincrement())
+  saleOrderNumber    String?     @db.VarChar(500)
+  fileName           String      @db.VarChar(500)
+  description        String?     @db.VarChar(2000)
+  sftpPath           String      @db.VarChar(1000)
+  sftpDir            String      @db.VarChar(1000)
+  fileSizeBytes      BigInt
+  mimeType           String?     @db.VarChar(255)
+  checksumSha256     String?     @db.VarChar(64)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  
   @@unique([sftpPath])
   @@index([saleOrderNumber, fileName])
   salesOrderByNumber SalesOrder? @relation("SO_File_By_Number", fields: [saleOrderNumber], references: [saleOrderNumber], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Dispatch {
+  id            Int           @id @default(autoincrement())
+  customerId    Int
+  address       String
+  transporterId Int?
+  vehicleNumber String
+  attachments   Json?
+  createdBy     Int
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  transporter   Transporter?  @relation(fields: [transporterId], references: [id])
+  user          User          @relation(fields: [createdBy], references: [id])
+  dispatchSOs   Dispatch_SO[]
+}
+
+model Dispatch_SO {
+id              Int        @id @default(autoincrement())
+dispatchId      Int
+saleOrderNumber String     @db.VarChar(500)
+createdAt       DateTime   @default(now())
+dispatch        Dispatch   @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+salesOrder      SalesOrder @relation(fields: [saleOrderNumber], references: [saleOrderNumber])
+
+@@unique([dispatchId, saleOrderNumber])
 }

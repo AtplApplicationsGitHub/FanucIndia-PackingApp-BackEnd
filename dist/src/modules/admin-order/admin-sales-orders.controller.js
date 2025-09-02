@@ -36,7 +36,7 @@ let AdminSalesOrdersController = class AdminSalesOrdersController {
 exports.AdminSalesOrdersController = AdminSalesOrdersController;
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, roles_decorator_1.Roles)('admin'),
+    (0, roles_decorator_1.Roles)('ADMIN'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),

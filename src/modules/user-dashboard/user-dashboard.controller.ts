@@ -13,7 +13,7 @@ export class UserDashboardController {
   constructor(private readonly userDashboardService: UserDashboardService) {}
 
   @Get('orders')
-  @Roles('user')
+  @Roles('USER')
   @ApiOperation({ summary: "Get all sales orders assigned to the logged-in user" })
   @ApiResponse({ status: 200, description: 'Assigned orders returned successfully' })
   getAssignedOrders(@Req() req: AuthRequest) {
@@ -22,7 +22,7 @@ export class UserDashboardController {
   }
 
   @Get('orders/:id')
-  @Roles('user', 'admin') // Allow both users and admins to access this
+  @Roles('USER', 'ADMIN')
   @ApiOperation({ summary: "Get details for a specific sales order" })
   @ApiResponse({ status: 200, description: 'Sales order details returned' })
   @ApiResponse({ status: 404, description: 'Order not found or access denied' })

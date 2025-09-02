@@ -11,11 +11,13 @@ async function main() {
       { name: 'Robo Y2', code: 'Y2' },
       { name: 'Robo Z3', code: 'Z3' },
     ],
+    skipDuplicates: true,
   });
 
   // Insert Transporters
   await prisma.transporter.createMany({
     data: [{ name: 'BlueDart' }, { name: 'DHL' }, { name: 'FedEx' }],
+    skipDuplicates: true,
   });
 
   // Insert Plant Codes
@@ -25,6 +27,7 @@ async function main() {
       { code: 'PL002', description: 'Plant 2' },
       { code: 'PL003', description: 'Plant 3' },
     ],
+    skipDuplicates: true,
   });
 
   // Insert Sales Zones
@@ -35,6 +38,7 @@ async function main() {
       { name: 'East' },
       { name: 'West' },
     ],
+    skipDuplicates: true,
   });
 
   // Insert Packing Configs
@@ -45,6 +49,7 @@ async function main() {
       { configName: '3 SO# 1 Box' },
       { configName: '4 SO# 1 Box' },
     ],
+    skipDuplicates: true,
   });
 
   // Insert Customers
@@ -54,6 +59,7 @@ async function main() {
       { name: 'BB', address: 'USA' },
       { name: 'CC', address: 'UK' },
     ],
+    skipDuplicates: true,
   });
 
   // Insert Printers
@@ -63,6 +69,7 @@ async function main() {
       { name: 'Printer 2' },
       { name: 'Printer 3' },
     ],
+    skipDuplicates: true,
   });
 
   const adminEmail = 'admin@fanuc.com';
@@ -79,7 +86,7 @@ async function main() {
         name: adminName,
         email: adminEmail,
         password: await bcrypt.hash(adminPassword, 10),
-        role: 'admin',
+        role: 'ADMIN',
       },
     });
   }
@@ -98,7 +105,7 @@ async function main() {
         name: salesName,
         email: salesEmail,
         password: await bcrypt.hash(salesPassword, 10),
-        role: 'sales',
+        role: 'SALES',
       },
     });
   }

@@ -58,7 +58,7 @@ let UserDashboardService = class UserDashboardService {
     }
     async findOrderById(orderId, userId, userRole) {
         const whereClause = { id: orderId };
-        if (userRole !== 'admin') {
+        if (userRole !== 'ADMIN') {
             whereClause.assignedUserId = userId;
         }
         return this.prisma.salesOrder.findFirst({

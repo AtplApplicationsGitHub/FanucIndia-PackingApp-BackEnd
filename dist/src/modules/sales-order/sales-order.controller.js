@@ -55,7 +55,7 @@ let SalesOrderController = class SalesOrderController {
 exports.SalesOrderController = SalesOrderController;
 __decorate([
     (0, common_1.Get)('template'),
-    (0, roles_decorator_1.Roles)('sales'),
+    (0, roles_decorator_1.Roles)('SALES'),
     (0, swagger_1.ApiOperation)({ summary: 'Download sales order Excel template' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Excel file downloaded' }),
     (0, swagger_1.ApiResponse)({ status: 500, description: 'Failed to generate or send template' }),
@@ -66,7 +66,7 @@ __decorate([
 ], SalesOrderController.prototype, "downloadTemplate", null);
 __decorate([
     (0, common_1.Post)('import'),
-    (0, roles_decorator_1.Roles)('sales'),
+    (0, roles_decorator_1.Roles)('SALES'),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
     (0, swagger_1.ApiOperation)({ summary: 'Import bulk sales orders via Excel file' }),
     (0, swagger_1.ApiConsumes)('multipart/form-data'),

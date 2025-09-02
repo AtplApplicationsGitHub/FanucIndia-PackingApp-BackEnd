@@ -11,6 +11,15 @@ export class PrismaService extends PrismaClient
   implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
+  constructor() {
+    super({
+      transactionOptions: {
+        maxWait: 10000, // default: 2000
+        timeout: 30000, // default: 5000
+      },
+    });
+  }
+
   async onModuleInit() {
     await this.$connect();
     this.logger.log('✅ Prisma connected');

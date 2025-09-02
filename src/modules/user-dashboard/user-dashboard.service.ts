@@ -62,7 +62,7 @@ export class UserDashboardService {
   async findOrderById(orderId: number, userId: number, userRole: string) {
     const whereClause: Prisma.SalesOrderWhereUniqueInput = { id: orderId };
 
-    if (userRole !== 'admin') {
+    if (userRole !== 'ADMIN') {
       whereClause.assignedUserId = userId;
     }
 

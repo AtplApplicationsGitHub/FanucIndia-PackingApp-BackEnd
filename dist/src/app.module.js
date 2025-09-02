@@ -22,12 +22,16 @@ const erp_material_data_module_1 = require("./modules/erp-material-data/erp-mate
 const erp_material_file_module_1 = require("./modules/erp-material-file/erp-material-file.module");
 const sftp_module_1 = require("./modules/sftp/sftp.module");
 const user_dashboard_module_1 = require("./modules/user-dashboard/user-dashboard.module");
+const erp_material_importer_module_1 = require("./modules/erp-material-importer/erp-material-importer.module");
+const dispatch_module_1 = require("./modules/dispatch/dispatch.module");
+const so_search_module_1 = require("./modules/so-search/so-search.module");
+const fg_dashboard_module_1 = require("./modules/fg-dashboard/fg-dashboard.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [config_1.ConfigModule.forRoot({ isGlobal: true }), prisma_module_1.PrismaModule, sales_order_module_1.SalesOrderModule, auth_module_1.AuthModule, lookup_module_1.LookupModule, sales_crud_module_1.SalesCrudModule, admin_order_module_1.AdminOrderModule, user_module_1.UserModule, erp_material_data_module_1.ErpMaterialDataModule, erp_material_file_module_1.ErpMaterialFileModule, sftp_module_1.SftpModule, user_dashboard_module_1.UserDashboardModule,],
+        imports: [config_1.ConfigModule.forRoot({ isGlobal: true }), prisma_module_1.PrismaModule, sales_order_module_1.SalesOrderModule, auth_module_1.AuthModule, lookup_module_1.LookupModule, sales_crud_module_1.SalesCrudModule, admin_order_module_1.AdminOrderModule, user_module_1.UserModule, erp_material_data_module_1.ErpMaterialDataModule, erp_material_file_module_1.ErpMaterialFileModule, sftp_module_1.SftpModule, user_dashboard_module_1.UserDashboardModule, erp_material_importer_module_1.ErpMaterialImporterModule, dispatch_module_1.DispatchModule, so_search_module_1.SoSearchModule, fg_dashboard_module_1.FgDashboardModule],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],
     })

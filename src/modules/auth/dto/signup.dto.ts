@@ -16,13 +16,13 @@ export class SignupDto {
   password: string;
 
   @ApiProperty({
-    example: 'sales',
-    description: 'User role (sales or admin only)',
-    enum: ['sales', 'admin'],
-    default: 'sales',
+    example: 'SALES',
+    description: 'User role (SALES or ADMIN only)',
+    enum: ['SALES', 'ADMIN'],
+    default: 'SALES',
   })
   @IsString()
-  @IsIn(['sales', 'admin'], { message: 'role must be either sales or admin' })
+  @IsIn(['SALES', 'ADMIN'], { message: 'role must be either SALES or ADMIN' })
   role: string;
 }
 

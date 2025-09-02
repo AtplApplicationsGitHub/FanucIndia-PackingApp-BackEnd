@@ -22,7 +22,7 @@ async function verifyFileAccess(
   userId: number,
   userRole: string,
 ) {
-  if (userRole === 'admin' || userRole === 'sales') {
+  if (userRole === 'ADMIN' || userRole === 'SALES') {
     const file = await prisma.eRP_Material_File.findUnique({ where: { ID: fileId } });
     if (!file) throw new NotFoundException('File not found.');
     return file;
@@ -52,7 +52,7 @@ async function verifySaleOrderAccess(
   userId: number,
   userRole: string,
 ) {
-  if (userRole === 'admin' || userRole === 'sales') {
+  if (userRole === 'ADMIN' || userRole === 'SALES') {
     const order = await prisma.salesOrder.findUnique({ where: { saleOrderNumber } });
     if (!order) throw new NotFoundException(`Sales Order ${saleOrderNumber} not found.`);
     return;
@@ -119,7 +119,7 @@ export class ErpMaterialFileService {
         : {}),
     };
 
-    if (userRole === 'user') {
+    if (userRole === 'USER') {
         where.salesOrderByNumber = {
             is: {
                 assignedUserId: userId,
@@ -223,7 +223,7 @@ export class ErpMaterialFileService {
   ) {
     if (opts.saleOrderNumber) {
         await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
-    } else if (userRole === 'user') {
+    } else if (userRole === 'USER') {
         throw new ForbiddenException("You must specify a Sale Order Number for an order assigned to you.");
     }
 

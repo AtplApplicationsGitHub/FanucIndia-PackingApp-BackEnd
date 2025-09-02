@@ -51,7 +51,7 @@ const path = __importStar(require("path"));
 const crypto_1 = require("crypto");
 const fs = __importStar(require("fs"));
 async function verifyFileAccess(prisma, fileId, userId, userRole) {
-    if (userRole === 'admin' || userRole === 'sales') {
+    if (userRole === 'ADMIN' || userRole === 'SALES') {
         const file = await prisma.eRP_Material_File.findUnique({ where: { ID: fileId } });
         if (!file)
             throw new common_1.NotFoundException('File not found.');
@@ -72,7 +72,7 @@ async function verifyFileAccess(prisma, fileId, userId, userRole) {
     return file;
 }
 async function verifySaleOrderAccess(prisma, saleOrderNumber, userId, userRole) {
-    if (userRole === 'admin' || userRole === 'sales') {
+    if (userRole === 'ADMIN' || userRole === 'SALES') {
         const order = await prisma.salesOrder.findUnique({ where: { saleOrderNumber } });
         if (!order)
             throw new common_1.NotFoundException(`Sales Order ${saleOrderNumber} not found.`);
@@ -128,7 +128,7 @@ let ErpMaterialFileService = class ErpMaterialFileService {
                 }
                 : {}),
         };
-        if (userRole === 'user') {
+        if (userRole === 'USER') {
             where.salesOrderByNumber = {
                 is: {
                     assignedUserId: userId,
@@ -209,7 +209,7 @@ let ErpMaterialFileService = class ErpMaterialFileService {
         if (opts.saleOrderNumber) {
             await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
         }
-        else if (userRole === 'user') {
+        else if (userRole === 'USER') {
             throw new common_1.ForbiddenException("You must specify a Sale Order Number for an order assigned to you.");
         }
         const baseDir = process.env.SFTP_BASE_DIR || '/fanuc/order-attachments';

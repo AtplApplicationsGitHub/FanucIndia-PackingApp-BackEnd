@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, IsIn, MinLength, IsOptional } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateUserDto {
@@ -17,13 +17,13 @@ export class CreateUserDto {
   password: string;
 
   @ApiProperty({
-    example: 'sales',
-    description: 'User role (sales, admin, user)',
-    enum: ['sales', 'admin', 'user'],
-    default: 'sales',
+    example: 'SALES',
+    description: 'User role (SALES, ADMIN, USER)',
+    enum: ['SALES', 'ADMIN', 'USER'],
+    default: 'SALES',
   })
   @IsNotEmpty()
-  @IsIn(['admin', 'sales', 'user'])
+  @IsIn(['SALES', 'ADMIN', 'USER'])
   role: string;
 }
 
@@ -44,12 +44,12 @@ export class UpdateUserDto {
   password?: string;
 
   @ApiPropertyOptional({
-    example: 'user',
-    description: 'User role (sales, admin, user)',
-    enum: ['sales', 'admin', 'user'],
-    default: 'user',
+    example: 'USER',
+    description: 'User role (SALES, ADMIN, USER)',
+    enum: ['SALES', 'ADMIN', 'USER'],
+    default: 'USER',
   })
   @IsOptional()
-  @IsIn(['admin', 'sales', 'user'])
+  @IsIn(['SALES', 'ADMIN', 'USER'])
   role?: string;
 }

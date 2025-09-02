@@ -31,7 +31,7 @@ export class AdminOrderController {
   constructor(private readonly service: AdminOrderService) {}
 
   @Get()
-  @Roles('admin')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get all sales orders (admin only)' })
   @ApiQuery({
     name: 'status',
@@ -72,7 +72,7 @@ export class AdminOrderController {
   }
 
   @Patch(':id')
-  @Roles('admin')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Update a specific sales order (admin only)' })
   @ApiParam({
     name: 'id',
@@ -90,7 +90,7 @@ export class AdminOrderController {
   }
 
   @Delete(':id')
-  @Roles('admin')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete a specific sales order (admin only)' })
   @ApiParam({
     name: 'id',

@@ -37,13 +37,13 @@ __decorate([
 ], SignupDto.prototype, "password", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({
-        example: 'sales',
-        description: 'User role (sales or admin only)',
-        enum: ['sales', 'admin'],
-        default: 'sales',
+        example: 'SALES',
+        description: 'User role (SALES or ADMIN only)',
+        enum: ['SALES', 'ADMIN'],
+        default: 'SALES',
     }),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsIn)(['sales', 'admin'], { message: 'role must be either sales or admin' }),
+    (0, class_validator_1.IsIn)(['SALES', 'ADMIN'], { message: 'role must be either SALES or ADMIN' }),
     __metadata("design:type", String)
 ], SignupDto.prototype, "role", void 0);
 //# sourceMappingURL=signup.dto.js.map

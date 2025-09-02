@@ -46,7 +46,7 @@ let SalesCrudController = class SalesCrudController {
 exports.SalesCrudController = SalesCrudController;
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)('sales'),
+    (0, roles_decorator_1.Roles)('SALES'),
     (0, swagger_1.ApiOperation)({ summary: 'Create a new sales order' }),
     (0, swagger_1.ApiBody)({ type: create_sales_crud_dto_1.CreateSalesCrudDto }),
     (0, swagger_1.ApiResponse)({ status: 201, description: 'Sales order created successfully' }),
@@ -62,7 +62,7 @@ __decorate([
 ], SalesCrudController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)('sales'),
+    (0, roles_decorator_1.Roles)('SALES'),
     (0, swagger_1.ApiOperation)({ summary: 'Get paginated sales orders for the user' }),
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, example: 1 }),
     (0, swagger_1.ApiQuery)({ name: 'limit', required: false, example: 10 }),
@@ -80,7 +80,7 @@ __decorate([
 ], SalesCrudController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, roles_decorator_1.Roles)('sales'),
+    (0, roles_decorator_1.Roles)('SALES'),
     (0, swagger_1.ApiOperation)({ summary: 'Get a specific sales order by ID' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order found' }),
@@ -95,7 +95,7 @@ __decorate([
 ], SalesCrudController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Put)(':id'),
-    (0, roles_decorator_1.Roles)('sales'),
+    (0, roles_decorator_1.Roles)('SALES'),
     (0, swagger_1.ApiOperation)({ summary: 'Update a specific sales order by ID' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     (0, swagger_1.ApiBody)({ type: update_sales_crud_dto_1.UpdateSalesCrudDto }),
@@ -114,7 +114,7 @@ __decorate([
 ], SalesCrudController.prototype, "update", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    (0, roles_decorator_1.Roles)('sales'),
+    (0, roles_decorator_1.Roles)('SALES'),
     (0, swagger_1.ApiOperation)({ summary: 'Delete a sales order by ID' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order deleted' }),

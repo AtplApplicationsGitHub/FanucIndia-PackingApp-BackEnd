@@ -137,7 +137,7 @@ let ErpMaterialFileController = class ErpMaterialFileController {
 exports.ErpMaterialFileController = ErpMaterialFileController;
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
+    (0, roles_decorator_1.Roles)('SALES', 'ADMIN', 'USER'),
     (0, swagger_1.ApiOperation)({
         summary: 'List ERP material files with pagination, search & filters',
     }),
@@ -149,7 +149,7 @@ __decorate([
 ], ErpMaterialFileController.prototype, "list", null);
 __decorate([
     (0, common_1.Get)('by-sale-order/:saleOrderNumber'),
-    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
+    (0, roles_decorator_1.Roles)('SALES', 'ADMIN', 'USER'),
     (0, swagger_1.ApiOperation)({ summary: 'List files by exact sale order number' }),
     (0, swagger_1.ApiParam)({ name: 'saleOrderNumber', type: String }),
     __param(0, (0, common_1.Param)('saleOrderNumber')),
@@ -160,7 +160,7 @@ __decorate([
 ], ErpMaterialFileController.prototype, "listBySaleOrder", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
+    (0, roles_decorator_1.Roles)('SALES', 'ADMIN', 'USER'),
     (0, swagger_1.ApiOperation)({ summary: 'Get a file record by ID' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
@@ -171,7 +171,7 @@ __decorate([
 ], ErpMaterialFileController.prototype, "get", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
+    (0, roles_decorator_1.Roles)('SALES', 'ADMIN', 'USER'),
     (0, swagger_1.ApiOperation)({ summary: 'Create a file record (metadata only)' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -180,7 +180,7 @@ __decorate([
 ], ErpMaterialFileController.prototype, "create", null);
 __decorate([
     (0, common_1.Put)(':id'),
-    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
+    (0, roles_decorator_1.Roles)('SALES', 'ADMIN', 'USER'),
     (0, swagger_1.ApiOperation)({ summary: 'Update a file record' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
@@ -192,7 +192,7 @@ __decorate([
 ], ErpMaterialFileController.prototype, "update", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
+    (0, roles_decorator_1.Roles)('SALES', 'ADMIN', 'USER'),
     (0, swagger_1.ApiOperation)({ summary: 'Delete a file record' }),
     (0, swagger_1.ApiParam)({ name: 'id', type: Number }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
@@ -203,7 +203,7 @@ __decorate([
 ], ErpMaterialFileController.prototype, "remove", null);
 __decorate([
     (0, common_1.Get)(':id/download'),
-    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
+    (0, roles_decorator_1.Roles)('SALES', 'ADMIN', 'USER'),
     (0, swagger_1.ApiOperation)({ summary: 'Stream file content (inline if supported)' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Res)()),
@@ -214,7 +214,7 @@ __decorate([
 ], ErpMaterialFileController.prototype, "download", null);
 __decorate([
     (0, common_1.Post)('upload'),
-    (0, roles_decorator_1.Roles)('sales', 'admin', 'user'),
+    (0, roles_decorator_1.Roles)('SALES', 'ADMIN', 'USER'),
     (0, swagger_1.ApiConsumes)('multipart/form-data'),
     (0, swagger_1.ApiOperation)({
         summary: 'Upload one or more files to SFTP and create DB rows',

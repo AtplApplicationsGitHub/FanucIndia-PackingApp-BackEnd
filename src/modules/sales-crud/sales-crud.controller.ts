@@ -34,7 +34,7 @@ export class SalesCrudController {
   constructor(private readonly service: SalesCrudService) {}
 
   @Post()
-  @Roles('sales')
+  @Roles('SALES')
   @ApiOperation({ summary: 'Create a new sales order' })
   @ApiBody({ type: CreateSalesCrudDto })
   @ApiResponse({ status: 201, description: 'Sales order created successfully' })
@@ -47,7 +47,7 @@ export class SalesCrudController {
   }
 
   @Get()
-  @Roles('sales')
+  @Roles('SALES')
   @ApiOperation({ summary: 'Get paginated sales orders for the user' })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 10 })
@@ -72,7 +72,7 @@ export class SalesCrudController {
   }
 
   @Get(':id')
-  @Roles('sales')
+  @Roles('SALES')
   @ApiOperation({ summary: 'Get a specific sales order by ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, description: 'Sales order found' })
@@ -87,7 +87,7 @@ export class SalesCrudController {
   }
 
   @Put(':id')
-  @Roles('sales')
+  @Roles('SALES')
   @ApiOperation({ summary: 'Update a specific sales order by ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdateSalesCrudDto })
@@ -106,7 +106,7 @@ export class SalesCrudController {
   }
 
   @Delete(':id')
-  @Roles('sales')
+  @Roles('SALES')
   @ApiOperation({ summary: 'Delete a sales order by ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, description: 'Sales order deleted' })

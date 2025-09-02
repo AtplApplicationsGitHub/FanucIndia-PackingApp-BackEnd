@@ -12,9 +12,30 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ErpMaterialDataService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma.service");
+function convertBigInts(obj) {
+    if (obj === null || obj === undefined) {
+        return obj;
+    }
+    if (typeof obj === 'bigint') {
+        return obj.toString();
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(convertBigInts);
+    }
+    if (typeof obj === 'object') {
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                obj[key] = convertBigInts(obj[key]);
+            }
+        }
+    }
+    return obj;
+}
 async function verifyOrderAccess(prisma, orderId, userId, userRole) {
-    if (userRole === 'admin') {
-        const order = await prisma.salesOrder.findUnique({ where: { id: orderId } });
+    if (userRole === 'ADMIN') {
+        const order = await prisma.salesOrder.findUnique({
+            where: { id: orderId },
+        });
         if (!order)
             throw new common_1.NotFoundException('Sales Order not found');
         return { id: orderId };
@@ -26,22 +47,6 @@ async function verifyOrderAccess(prisma, orderId, userId, userRole) {
         throw new common_1.ForbiddenException('You do not have permission to access this order.');
     }
     return { id: orderId };
-}
-function convertBigIntToString(obj) {
-    if (Array.isArray(obj)) {
-        return obj.map(convertBigIntToString);
-    }
-    else if (obj && typeof obj === 'object') {
-        const res = {};
-        for (const [key, value] of Object.entries(obj)) {
-            res[key] =
-                typeof value === 'bigint'
-                    ? value.toString()
-                    : convertBigIntToString(value);
-        }
-        return res;
-    }
-    return obj;
 }
 let ErpMaterialDataService = class ErpMaterialDataService {
     prisma;
@@ -60,7 +65,7 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             where: { saleOrderNumber: salesOrder.saleOrderNumber },
             orderBy: { ID: 'asc' },
         });
-        return convertBigIntToString(materials);
+        return convertBigInts(materials);
     }
     async incrementIssueStage(orderId, materialCode, userId, userRole) {
         await verifyOrderAccess(this.prisma, orderId, userId, userRole);
@@ -90,15 +95,18 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             select: { Issue_stage: true, Required_Qty: true },
         });
         const allCompleted = allMaterials.every((m) => m.Issue_stage >= m.Required_Qty);
+        let issueStageCompleted = false;
         if (allCompleted) {
             await this.prisma.salesOrder.update({
                 where: { id: orderId },
-                data: { status: 'F105' },
+                data: { status: 'F105', assignedUserId: null },
             });
+            issueStageCompleted = true;
         }
-        return convertBigIntToString({
+        return convertBigInts({
             message: 'Issue_stage incremented successfully',
             updatedMaterial,
+            issueStageCompleted,
         });
     }
     async updateIssueStage(orderId, materialCode, newIssueStage, userId, userRole) {
@@ -126,21 +134,30 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         const updatedMaterial = await this.prisma.eRP_Material_Data.update({
             where: { ID: material.ID },
             data: { Issue_stage: newIssueStage },
+            select: {
+                ID: true,
+                Material_Code: true,
+                Issue_stage: true,
+                Required_Qty: true,
+            },
         });
         const allMaterials = await this.prisma.eRP_Material_Data.findMany({
             where: { saleOrderNumber: salesOrder.saleOrderNumber },
             select: { Issue_stage: true, Required_Qty: true },
         });
         const allCompleted = allMaterials.every((m) => m.Issue_stage >= m.Required_Qty);
+        let issueStageCompleted = false;
         if (allCompleted) {
             await this.prisma.salesOrder.update({
                 where: { id: orderId },
-                data: { status: 'F105' },
+                data: { status: 'F105', assignedUserId: null },
             });
+            issueStageCompleted = true;
         }
-        return convertBigIntToString({
+        return convertBigInts({
             message: 'Issue_stage updated successfully',
             updatedMaterial,
+            issueStageCompleted,
         });
     }
     async incrementPackingStage(orderId, materialCode, userId, userRole) {
@@ -170,7 +187,7 @@ let ErpMaterialDataService = class ErpMaterialDataService {
                 UpdatedDate: new Date(),
             },
         });
-        return convertBigIntToString({
+        return convertBigInts({
             message: 'Packing_stage incremented successfully',
             updatedMaterial,
         });
@@ -205,7 +222,7 @@ let ErpMaterialDataService = class ErpMaterialDataService {
                 UpdatedDate: new Date(),
             },
         });
-        return convertBigIntToString({
+        return convertBigInts({
             message: 'Packing_stage updated successfully',
             updatedMaterial,
         });

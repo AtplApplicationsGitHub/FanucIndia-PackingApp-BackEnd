@@ -121,9 +121,9 @@ let UserService = class UserService {
         const user = await this.prisma.user.findUnique({ where: { id } });
         if (!user)
             throw new common_1.NotFoundException('User not found');
-        if (user.role === 'admin') {
+        if (user.role === 'ADMIN') {
             const adminCount = await this.prisma.user.count({
-                where: { role: 'admin' },
+                where: { role: 'ADMIN' },
             });
             if (adminCount <= 1) {
                 throw new common_1.BadRequestException('At least one admin must remain in the system.');

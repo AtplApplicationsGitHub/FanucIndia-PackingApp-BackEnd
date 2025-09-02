@@ -42,7 +42,7 @@ export class ErpMaterialDataController {
     description: 'List of ERP materials for the order.',
   })
   @Get()
-  @Roles('admin', 'user') // Allow both admins and users
+  @Roles('ADMIN', 'USER')
   getMaterialsByOrderId(
     @Param('orderId', ParseIntPipe) orderId: number,
     @Req() req: AuthRequest,
@@ -59,7 +59,7 @@ export class ErpMaterialDataController {
     description: 'Issue stage incremented successfully.',
   })
   @Post('increment-issue-stage')
-  @Roles('admin', 'user') // Allow both admins and users
+  @Roles('ADMIN', 'USER')
   incrementIssueStage(
     @Param('orderId', ParseIntPipe) orderId: number,
     @Body() body: IncrementIssueStageDto,
@@ -78,7 +78,7 @@ export class ErpMaterialDataController {
   @ApiParam({ name: 'orderId', type: Number, description: 'Sales Order ID' })
   @ApiBody({ type: UpdateIssueStageDto })
   @Patch('update-issue-stage')
-  @Roles('admin', 'user') // Allow both admins and users
+  @Roles('ADMIN', 'USER')
   updateIssueStage(
     @Param('orderId', ParseIntPipe) orderId: number,
     @Body() body: UpdateIssueStageDto,
@@ -94,11 +94,11 @@ export class ErpMaterialDataController {
     );
   }
 
-    @ApiOperation({ summary: 'Increment packing stage for a material code' })
+  @ApiOperation({ summary: 'Increment packing stage for a material code' })
   @ApiParam({ name: 'orderId', type: Number, description: 'Sales Order ID' })
   @ApiBody({ type: IncrementPackingStageDto })
   @Post('increment-packing-stage')
-  @Roles('admin', 'user') // Allow both admins and users
+  @Roles('ADMIN', 'USER')
   incrementPackingStage(
     @Param('orderId', ParseIntPipe) orderId: number,
     @Body() body: IncrementPackingStageDto,
@@ -117,7 +117,7 @@ export class ErpMaterialDataController {
   @ApiParam({ name: 'orderId', type: Number, description: 'Sales Order ID' })
   @ApiBody({ type: UpdatePackingStageDto })
   @Patch('update-packing-stage')
-  @Roles('admin', 'user') // Allow both admins and users
+  @Roles('ADMIN', 'USER')
   updatePackingStage(
     @Param('orderId', ParseIntPipe) orderId: number,
     @Body() body: UpdatePackingStageDto,
