@@ -188,26 +188,78 @@ let SalesOrderService = class SalesOrderService {
                 });
             }
         });
-        if (ordersToInsert.length === 0) {
+        if (errors.length > 0) {
             throw new common_1.BadRequestException({
-                message: 'No valid orders to insert',
+                message: 'Import failed due to errors in the file. No orders were imported.',
                 errors,
             });
         }
+        if (ordersToInsert.length === 0) {
+            throw new common_1.BadRequestException({
+                message: 'No valid orders found to insert.',
+                errors,
+            });
+        }
+        const saleOrderNumbers = ordersToInsert.map(o => o.saleOrderNumber);
+        const outboundDeliveries = ordersToInsert.map(o => o.outboundDelivery);
+        const transferOrders = ordersToInsert.map(o => o.transferOrder);
+        const hasDuplicates = (arr) => new Set(arr).size !== arr.length;
+        if (hasDuplicates(saleOrderNumbers)) {
+            throw new common_1.BadRequestException('The import file contains duplicate Sale Order Numbers.');
+        }
+        if (hasDuplicates(outboundDeliveries)) {
+            throw new common_1.BadRequestException('The import file contains duplicate Outbound Delivery numbers.');
+        }
+        if (hasDuplicates(transferOrders)) {
+            throw new common_1.BadRequestException('The import file contains duplicate Transfer Order numbers.');
+        }
+        const existingOrders = await this.prisma.salesOrder.findMany({
+            where: {
+                OR: [
+                    { saleOrderNumber: { in: saleOrderNumbers } },
+                    { outboundDelivery: { in: outboundDeliveries } },
+                    { transferOrder: { in: transferOrders } },
+                ],
+            },
+        });
+        if (existingOrders.length > 0) {
+            const existingSO = existingOrders.find(e => saleOrderNumbers.includes(e.saleOrderNumber));
+            if (existingSO) {
+                throw new common_1.ConflictException(`An order with Sale Order Number '${existingSO.saleOrderNumber}' already exists.`);
+            }
+            const existingOBD = existingOrders.find(e => outboundDeliveries.includes(e.outboundDelivery));
+            if (existingOBD) {
+                throw new common_1.ConflictException(`An order with Outbound Delivery '${existingOBD.outboundDelivery}' already exists.`);
+            }
+            const existingTO = existingOrders.find(e => transferOrders.includes(e.transferOrder));
+            if (existingTO) {
+                throw new common_1.ConflictException(`An order with Transfer Order '${existingTO.transferOrder}' already exists.`);
+            }
+        }
         try {
-            const result = await this.prisma.salesOrder.createMany({
-                data: ordersToInsert,
+            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            const insertedCount = await this.prisma.$transaction(async (tx) => {
+                let count = 0;
+                for (const orderData of ordersToInsert) {
+                    await tx.salesOrder.create({
+                        data: orderData,
+                    });
+                    count++;
+                    await delay(10);
+                }
+                return count;
             });
             return {
-                message: `Inserted ${result.count} orders.`,
+                message: `Inserted ${insertedCount} orders.`,
                 errors,
-                insertedCount: result.count,
+                insertedCount,
             };
         }
         catch (err) {
             if (err instanceof client_1.Prisma.PrismaClientKnownRequestError &&
                 err.code === 'P2002') {
-                throw new common_1.ConflictException('Duplicate order detected in import; ensure each saleOrderNumber is unique.');
+                const target = err.meta?.target?.join(', ');
+                throw new common_1.ConflictException(`Database error: A duplicate order was detected. The value for '${target}' must be unique.`);
             }
             throw new common_1.InternalServerErrorException('Database insertion failed', err.message);
         }

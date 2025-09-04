@@ -80,19 +80,19 @@ export class AdminOrderService {
       const num = Number(search);
 
       where.OR = [
-        { user: { is: { name: { contains: search } } } },
-        { product: { is: { name: { contains: search } } } },
-        { transporter: { is: { name: { contains: search } } } },
-        { plantCode: { is: { code: { contains: search } } } },
-        { salesZone: { is: { name: { contains: search } } } },
-        { packConfig: { is: { configName: { contains: search } } } },
-        { assignedUser: { is: { name: { contains: search } } } },
+        { user: { is: { name: { contains: search, mode: 'insensitive' } } } },
+        { product: { is: { name: { contains: search, mode: 'insensitive' } } } },
+        { transporter: { is: { name: { contains: search, mode: 'insensitive' } } } },
+        { plantCode: { is: { code: { contains: search, mode: 'insensitive' } } } },
+        { salesZone: { is: { name: { contains: search, mode: 'insensitive' } } } },
+        { packConfig: { is: { configName: { contains: search, mode: 'insensitive' } } } },
+        { assignedUser: { is: { name: { contains: search, mode: 'insensitive' } } } },
 
-        { saleOrderNumber: { contains: search } },
-        { outboundDelivery: { contains: search } },
-        { transferOrder: { contains: search } },
-        { status: { contains: search } },
-        { specialRemarks: { contains: search } },
+        { saleOrderNumber: { contains: search, mode: 'insensitive' } },
+        { outboundDelivery: { contains: search, mode: 'insensitive' } },
+        { transferOrder: { contains: search, mode: 'insensitive' } },
+        { status: { contains: search, mode: 'insensitive' } },
+        { specialRemarks: { contains: search, mode: 'insensitive' } },
 
         ...(lower === 'yes' || lower === 'no'
           ? [{ paymentClearance: { equals: lower === 'yes' } }]

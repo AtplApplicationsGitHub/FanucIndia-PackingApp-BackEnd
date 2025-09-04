@@ -19,6 +19,26 @@ let SalesCrudService = class SalesCrudService {
         this.prisma = prisma;
     }
     async create(dto, userId) {
+        const existingOrder = await this.prisma.salesOrder.findFirst({
+            where: {
+                OR: [
+                    { saleOrderNumber: dto.saleOrderNumber },
+                    { outboundDelivery: dto.outboundDelivery },
+                    { transferOrder: dto.transferOrder },
+                ],
+            },
+        });
+        if (existingOrder) {
+            if (existingOrder.saleOrderNumber === dto.saleOrderNumber) {
+                throw new common_1.ConflictException('An order with this Sale Order Number already exists.');
+            }
+            if (existingOrder.outboundDelivery === dto.outboundDelivery) {
+                throw new common_1.ConflictException('An order with this Outbound Delivery number already exists.');
+            }
+            if (existingOrder.transferOrder === dto.transferOrder) {
+                throw new common_1.ConflictException('An order with this Transfer Order number already exists.');
+            }
+        }
         try {
             const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10
                 ? new Date(dto.deliveryDate).toISOString()
@@ -37,11 +57,6 @@ let SalesCrudService = class SalesCrudService {
             });
         }
         catch (err) {
-            if (err instanceof client_1.Prisma.PrismaClientKnownRequestError) {
-                if (err.code === 'P2002') {
-                    throw new common_1.ConflictException('A sales order with that reference already exists.');
-                }
-            }
             throw new common_1.InternalServerErrorException('Failed to create sales order.', err.message);
         }
     }
@@ -50,7 +65,7 @@ let SalesCrudService = class SalesCrudService {
             const { search } = query;
             const where = { userId };
             if (search) {
-                const s = { contains: search };
+                const s = { contains: search, mode: 'insensitive' };
                 where.OR = [
                     { saleOrderNumber: s },
                     { outboundDelivery: s },
@@ -163,7 +178,7 @@ let SalesCrudService = class SalesCrudService {
             const skip = (page - 1) * limit;
             const whereClause = { userId };
             if (search) {
-                const s = { contains: search };
+                const s = { contains: search, mode: 'insensitive' };
                 whereClause.OR = [
                     { saleOrderNumber: s },
                     { outboundDelivery: s },

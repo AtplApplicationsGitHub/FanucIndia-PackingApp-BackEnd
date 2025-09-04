@@ -17,19 +17,19 @@ export declare class UserDashboardService {
         specialRemarks: string | null;
         id: number;
         userId: number;
-        createdAt: Date;
-        updatedAt: Date;
         productId: number;
         transporterId: number;
         plantCodeId: number;
         salesZoneId: number;
         packConfigId: number;
-        customerId: number | null;
         assignedUserId: number | null;
+        customerId: number | null;
         printerId: number | null;
         fgLocation: string | null;
         status: string;
         priority: number | null;
+        createdAt: Date;
+        updatedAt: Date;
     }[]>;
     findOrderById(orderId: number, userId: number, userRole: string): Promise<({
         customer: {
@@ -46,18 +46,18 @@ export declare class UserDashboardService {
         specialRemarks: string | null;
         id: number;
         userId: number;
-        createdAt: Date;
-        updatedAt: Date;
         productId: number;
         transporterId: number;
         plantCodeId: number;
         salesZoneId: number;
         packConfigId: number;
-        customerId: number | null;
         assignedUserId: number | null;
+        customerId: number | null;
         printerId: number | null;
         fgLocation: string | null;
         status: string;
         priority: number | null;
+        createdAt: Date;
+        updatedAt: Date;
     }) | null>;
 }

@@ -15,6 +15,35 @@ export class SalesCrudService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateSalesCrudDto, userId: number) {
+    // Check for uniqueness of outboundDelivery and transferOrder before creation
+    const existingOrder = await this.prisma.salesOrder.findFirst({
+      where: {
+        OR: [
+          { saleOrderNumber: dto.saleOrderNumber },
+          { outboundDelivery: dto.outboundDelivery },
+          { transferOrder: dto.transferOrder },
+        ],
+      },
+    });
+
+    if (existingOrder) {
+      if (existingOrder.saleOrderNumber === dto.saleOrderNumber) {
+        throw new ConflictException(
+          'An order with this Sale Order Number already exists.',
+        );
+      }
+      if (existingOrder.outboundDelivery === dto.outboundDelivery) {
+        throw new ConflictException(
+          'An order with this Outbound Delivery number already exists.',
+        );
+      }
+      if (existingOrder.transferOrder === dto.transferOrder) {
+        throw new ConflictException(
+          'An order with this Transfer Order number already exists.',
+        );
+      }
+    }
+
     try {
       // Normalize deliveryDate
       const deliveryDate =
@@ -35,15 +64,6 @@ export class SalesCrudService {
         include: { customer: true },
       });
     } catch (err: any) {
-      // Unique constraint violation (e.g. on saleOrderNumber)
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        if (err.code === 'P2002') {
-          throw new ConflictException(
-            'A sales order with that reference already exists.',
-          );
-        }
-      }
-      // Any other error
       throw new InternalServerErrorException(
         'Failed to create sales order.',
         err.message,
@@ -57,7 +77,7 @@ export class SalesCrudService {
       const where: any = { userId }; // Always filter by the logged-in user's ID
 
       if (search) {
-        const s = { contains: search };
+        const s = { contains: search, mode: 'insensitive' };
         where.OR = [
           { saleOrderNumber: s },
           { outboundDelivery: s },
@@ -201,7 +221,7 @@ export class SalesCrudService {
       const whereClause: any = { userId }; // Always filter by the logged-in user's ID
 
       if (search) {
-        const s = { contains: search };
+        const s = { contains: search, mode: 'insensitive' };
         whereClause.OR = [
           { saleOrderNumber: s },
           { outboundDelivery: s },

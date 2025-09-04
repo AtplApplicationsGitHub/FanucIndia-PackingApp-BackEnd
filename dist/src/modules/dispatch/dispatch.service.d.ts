@@ -10,10 +10,10 @@ export declare class DispatchService {
     create(dto: CreateDispatchDto, files: Express.Multer.File[], userId: number): Promise<{
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: Prisma.JsonValue | null;
         createdBy: number;
@@ -31,10 +31,10 @@ export declare class DispatchService {
         };
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: Prisma.JsonValue | null;
         createdBy: number;
@@ -42,10 +42,10 @@ export declare class DispatchService {
     update(id: number, dto: UpdateDispatchDto): Promise<{
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: Prisma.JsonValue | null;
         createdBy: number;
@@ -69,10 +69,10 @@ export declare class DispatchService {
     addAttachments(dispatchId: number, files: Express.Multer.File[]): Promise<{
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: Prisma.JsonValue | null;
         createdBy: number;
@@ -80,10 +80,10 @@ export declare class DispatchService {
     deleteAttachment(dispatchId: number, fileName: string): Promise<{
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: Prisma.JsonValue | null;
         createdBy: number;

@@ -9,10 +9,10 @@ export declare class DispatchController {
     create(createDispatchDto: CreateDispatchDto, files: Express.Multer.File[], req: AuthRequest): Promise<{
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
@@ -30,10 +30,10 @@ export declare class DispatchController {
         };
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
@@ -41,10 +41,10 @@ export declare class DispatchController {
     update(id: number, updateDispatchDto: UpdateDispatchDto): Promise<{
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
@@ -68,10 +68,10 @@ export declare class DispatchController {
     addAttachments(id: number, files: Express.Multer.File[]): Promise<{
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
@@ -79,10 +79,10 @@ export declare class DispatchController {
     deleteAttachment(id: number, fileName: string): Promise<{
         id: number;
         address: string;
-        createdAt: Date;
-        updatedAt: Date;
         transporterId: number | null;
         customerId: number;
+        createdAt: Date;
+        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
