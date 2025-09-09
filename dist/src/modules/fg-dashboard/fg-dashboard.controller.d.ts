@@ -3,7 +3,10 @@ import { AuthRequest } from '../auth/types/auth-request.type';
 export declare class FgDashboardController {
     private readonly fgDashboardService;
     constructor(fgDashboardService: FgDashboardService);
-    getFgDashboardData(req: AuthRequest): Promise<{
+    getFgDashboardData(req: AuthRequest, query: {
+        search?: string;
+        date?: string;
+    }): Promise<{
         id: number;
         deliveryDate: Date;
         saleOrderNumber: string;

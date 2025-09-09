@@ -1,6 +1,5 @@
 import {
   Injectable,
-  ForbiddenException,
   NotFoundException,
   ConflictException,
   InternalServerErrorException,
@@ -253,6 +252,7 @@ export class SalesCrudService {
             plantCode: true,
             salesZone: true,
             packConfig: true,
+            assignedUser: true,
           },
         }),
         this.prisma.salesOrder.count({ where: whereClause }),

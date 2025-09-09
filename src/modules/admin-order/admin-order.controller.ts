@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  Req,
 } from '@nestjs/common';
 import { AdminOrderService } from './admin-order.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -22,6 +23,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { Delete } from '@nestjs/common';
+import { AuthRequest } from '../auth/types/auth-request.type';
 
 @ApiTags('Admin Orders')
 @ApiBearerAuth()
@@ -72,8 +74,8 @@ export class AdminOrderController {
   }
 
   @Patch(':id')
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'Update a specific sales order (admin only)' })
+  @Roles('ADMIN','USER')
+  @ApiOperation({ summary: 'Update a specific sales order (admin and user roles)' })
   @ApiParam({
     name: 'id',
     type: Number,
@@ -85,8 +87,9 @@ export class AdminOrderController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAdminOrderDto,
+    @Req() req: AuthRequest,
   ) {
-    return this.service.update(id, dto);
+    return this.service.update(id, dto, req.user);
   }
 
   @Delete(':id')

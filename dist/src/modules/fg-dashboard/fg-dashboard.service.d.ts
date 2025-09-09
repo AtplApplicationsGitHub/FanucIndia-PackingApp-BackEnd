@@ -5,6 +5,9 @@ export declare class FgDashboardService {
     getFgDashboardData(user: {
         userId: number;
         role: string;
+    }, query: {
+        search?: string;
+        date?: string;
     }): Promise<{
         id: number;
         deliveryDate: Date;

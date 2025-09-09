@@ -31,7 +31,7 @@ export class DispatchService {
     files: Express.Multer.File[],
     userId: number,
   ) {
-    const { customerId, address, transporterId, vehicleNumber } = dto;
+    const { customerId, address, transporterId, vehicleNumber, saleOrderNumbers } = dto;
 
     return this.prisma.$transaction(async (tx) => {
       const uploadedAttachments: AttachmentData[] = [];
@@ -69,15 +69,32 @@ export class DispatchService {
         },
       });
 
-      await tx.salesOrder.updateMany({
-        where: {
-          customerId: Number(customerId),
-          status: 'F105',
-        },
-        data: {
-          status: 'Dispatched',
-        },
-      });
+      if (saleOrderNumbers && saleOrderNumbers.length > 0) {
+        // Validate SOs
+        for (const so of saleOrderNumbers) {
+          const salesOrder = await tx.salesOrder.findUnique({ where: { saleOrderNumber: so } });
+          if (!salesOrder) throw new BadRequestException(`Sale Order ${so} not found.`);
+          if (salesOrder.customerId !== Number(customerId)) throw new BadRequestException(`Sale Order ${so} belongs to a different customer.`);
+        }
+
+        // Link SOs to the new dispatch
+        await tx.dispatch_SO.createMany({
+          data: saleOrderNumbers.map(so => ({
+            dispatchId: newDispatch.id,
+            saleOrderNumber: so,
+          })),
+        });
+
+        // Update status of only the specified SOs
+        await tx.salesOrder.updateMany({
+          where: {
+            saleOrderNumber: { in: saleOrderNumbers },
+          },
+          data: {
+            status: 'Dispatched',
+          },
+        });
+      }
 
       return newDispatch;
     });
@@ -139,11 +156,11 @@ export class DispatchService {
       throw new NotFoundException('Invalid SO Number');
     }
 
-    if (salesOrder.customerId !== dispatch.customerId) {
-      throw new BadRequestException(
-        'This SO Number belongs to a different customer.',
-      );
-    }
+    // if (salesOrder.customerId !== dispatch.customerId) {
+    //   throw new BadRequestException(
+    //     'This SO Number belongs to a different customer.',
+    //   );
+    // }
 
     // Status update logic is now in the create method, so this becomes simpler.
     try {
@@ -301,14 +318,14 @@ export class DispatchService {
 
     const attachments = (dispatch.attachments as AttachmentData[] | null) || [];
     const attachment = attachments.find(att => att.fileName === fileName);
-    
+
     if (!attachment) {
       throw new NotFoundException('Attachment not found');
     }
 
     try {
       const streamOrBuffer = await this.sftpService.getStream(attachment.path);
-      
+
       let stream;
       if (Buffer.isBuffer(streamOrBuffer)) {
         const { Readable } = require('stream');

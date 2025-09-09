@@ -8,14 +8,14 @@ export declare class DispatchController {
     constructor(dispatchService: DispatchService);
     create(createDispatchDto: CreateDispatchDto, files: Express.Multer.File[], req: AuthRequest): Promise<{
         id: number;
+        customerId: number;
         address: string;
         transporterId: number | null;
-        customerId: number;
-        createdAt: Date;
-        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
+        createdAt: Date;
+        updatedAt: Date;
     }>;
     findAll(): Promise<{
         soCount: number;
@@ -29,37 +29,37 @@ export declare class DispatchController {
             dispatchSOs: number;
         };
         id: number;
+        customerId: number;
         address: string;
         transporterId: number | null;
-        customerId: number;
-        createdAt: Date;
-        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
+        createdAt: Date;
+        updatedAt: Date;
     }[]>;
     update(id: number, updateDispatchDto: UpdateDispatchDto): Promise<{
         id: number;
+        customerId: number;
         address: string;
         transporterId: number | null;
-        customerId: number;
-        createdAt: Date;
-        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
+        createdAt: Date;
+        updatedAt: Date;
     }>;
     findDispatchSOs(id: number): Promise<{
-        saleOrderNumber: string;
         id: number;
         createdAt: Date;
         dispatchId: number;
+        saleOrderNumber: string;
     }[]>;
     addDispatchSO(id: number, saleOrderNumber: string): Promise<{
-        saleOrderNumber: string;
         id: number;
         createdAt: Date;
         dispatchId: number;
+        saleOrderNumber: string;
     }>;
     removeDispatchSO(soId: number): Promise<{
         message: string;
@@ -67,25 +67,25 @@ export declare class DispatchController {
     generatePdf(id: number, res: Response): Promise<void>;
     addAttachments(id: number, files: Express.Multer.File[]): Promise<{
         id: number;
+        customerId: number;
         address: string;
         transporterId: number | null;
-        customerId: number;
-        createdAt: Date;
-        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
+        createdAt: Date;
+        updatedAt: Date;
     }>;
     deleteAttachment(id: number, fileName: string): Promise<{
         id: number;
+        customerId: number;
         address: string;
         transporterId: number | null;
-        customerId: number;
-        createdAt: Date;
-        updatedAt: Date;
         vehicleNumber: string;
         attachments: import("@prisma/client/runtime/library").JsonValue | null;
         createdBy: number;
+        createdAt: Date;
+        updatedAt: Date;
     }>;
     downloadDispatchAttachment(id: number, fileName: string, res: Response): Promise<void>;
 }

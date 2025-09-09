@@ -24,11 +24,11 @@ let ErpMaterialImporterController = class ErpMaterialImporterController {
     constructor(service) {
         this.service = service;
     }
-    async uploadFile(file) {
+    async uploadFile(file, saleOrderNumber) {
         if (!file) {
             throw new common_1.BadRequestException('No file uploaded.');
         }
-        return this.service.processFile(file);
+        return this.service.processFile(file, saleOrderNumber);
     }
 };
 exports.ErpMaterialImporterController = ErpMaterialImporterController;
@@ -46,12 +46,18 @@ __decorate([
                     type: 'string',
                     format: 'binary',
                 },
+                saleOrderNumber: {
+                    type: 'string',
+                    description: 'The expected Sale Order Number to validate against the file content.',
+                    nullable: true,
+                }
             },
         },
     }),
     __param(0, (0, common_1.UploadedFile)()),
+    __param(1, (0, common_1.Body)('saleOrderNumber')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], ErpMaterialImporterController.prototype, "uploadFile", null);
 exports.ErpMaterialImporterController = ErpMaterialImporterController = __decorate([

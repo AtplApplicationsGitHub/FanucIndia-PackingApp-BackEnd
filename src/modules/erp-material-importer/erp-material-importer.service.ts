@@ -29,10 +29,10 @@ export class ErpMaterialImporterService {
 
   constructor(private prisma: PrismaService) {}
 
-  async processFile(file: Express.Multer.File) {
+  async processFile(file: Express.Multer.File, expectedSaleOrderNumber?: string) {
     this.logger.log(`Starting to process file: ${file.originalname}`);
     const records = this.readFile(file);
-    const validationError = await this.validateRecords(records);
+    const validationError = await this.validateRecords(records, expectedSaleOrderNumber);
     if (validationError) {
       this.logger.error(`Validation failed for ${file.originalname}: ${validationError}`);
       throw new BadRequestException(validationError);
@@ -57,7 +57,7 @@ export class ErpMaterialImporterService {
     }
   }
 
-  private async validateRecords(records: any[]): Promise<string | null> {
+  private async validateRecords(records: any[], expectedSaleOrderNumber?: string): Promise<string | null> {
     if (records.length === 0) {
       return 'File is empty.';
     }
@@ -93,6 +93,10 @@ export class ErpMaterialImporterService {
       return 'Missing SO Number in one or more rows.';
     }
     const soNumber = String(soNumberValue);
+
+    if (expectedSaleOrderNumber && soNumber !== expectedSaleOrderNumber) {
+      return `The SO Number in the file ('${soNumber}') does not match the expected SO Number ('${expectedSaleOrderNumber}').`;
+    }
 
     const orderExists = await this.prisma.salesOrder.findUnique({
       where: { saleOrderNumber: soNumber },

@@ -23,17 +23,20 @@ let FgDashboardController = class FgDashboardController {
     constructor(fgDashboardService) {
         this.fgDashboardService = fgDashboardService;
     }
-    getFgDashboardData(req) {
-        return this.fgDashboardService.getFgDashboardData(req.user);
+    getFgDashboardData(req, query) {
+        return this.fgDashboardService.getFgDashboardData(req.user, query);
     }
 };
 exports.FgDashboardController = FgDashboardController;
 __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)('ADMIN', 'USER'),
+    (0, swagger_1.ApiQuery)({ name: 'search', required: false, type: String }),
+    (0, swagger_1.ApiQuery)({ name: 'date', required: false, type: String, description: 'YYYY-MM-DD' }),
     __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], FgDashboardController.prototype, "getFgDashboardData", null);
 exports.FgDashboardController = FgDashboardController = __decorate([

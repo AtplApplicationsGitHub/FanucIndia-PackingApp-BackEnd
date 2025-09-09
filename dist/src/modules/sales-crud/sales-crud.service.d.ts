@@ -11,22 +11,22 @@ export declare class SalesCrudService {
             address: string;
         } | null;
     } & {
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
+        paymentClearance: boolean;
+        specialRemarks: string | null;
+        id: number;
+        userId: number;
+        productId: number;
         transporterId: number;
         plantCodeId: number;
-        paymentClearance: boolean;
         salesZoneId: number;
         packConfigId: number;
         assignedUserId: number | null;
         customerId: number | null;
         printerId: number | null;
-        specialRemarks: string | null;
         fgLocation: string | null;
         status: string;
         priority: number | null;
@@ -36,50 +36,50 @@ export declare class SalesCrudService {
     findAll(userId: number, query: {
         search?: string;
     }): Promise<({
-        customer: {
+        product: {
             id: number;
             name: string;
-            address: string;
-        } | null;
-        packConfig: {
+            code: string | null;
+        };
+        transporter: {
             id: number;
-            configName: string;
+            name: string;
         };
         plantCode: {
             id: number;
             code: string;
             description: string | null;
         };
-        product: {
-            id: number;
-            name: string;
-            code: string | null;
-        };
         salesZone: {
             id: number;
             name: string;
         };
-        transporter: {
+        packConfig: {
+            id: number;
+            configName: string;
+        };
+        customer: {
             id: number;
             name: string;
-        };
+            address: string;
+        } | null;
     } & {
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
+        paymentClearance: boolean;
+        specialRemarks: string | null;
+        id: number;
+        userId: number;
+        productId: number;
         transporterId: number;
         plantCodeId: number;
-        paymentClearance: boolean;
         salesZoneId: number;
         packConfigId: number;
         assignedUserId: number | null;
         customerId: number | null;
         printerId: number | null;
-        specialRemarks: string | null;
         fgLocation: string | null;
         status: string;
         priority: number | null;
@@ -87,50 +87,50 @@ export declare class SalesCrudService {
         updatedAt: Date;
     })[]>;
     findOne(id: number, userId: number): Promise<{
-        customer: {
+        product: {
             id: number;
             name: string;
-            address: string;
-        } | null;
-        packConfig: {
+            code: string | null;
+        };
+        transporter: {
             id: number;
-            configName: string;
+            name: string;
         };
         plantCode: {
             id: number;
             code: string;
             description: string | null;
         };
-        product: {
-            id: number;
-            name: string;
-            code: string | null;
-        };
         salesZone: {
             id: number;
             name: string;
         };
-        transporter: {
+        packConfig: {
+            id: number;
+            configName: string;
+        };
+        customer: {
             id: number;
             name: string;
-        };
+            address: string;
+        } | null;
     } & {
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
+        paymentClearance: boolean;
+        specialRemarks: string | null;
+        id: number;
+        userId: number;
+        productId: number;
         transporterId: number;
         plantCodeId: number;
-        paymentClearance: boolean;
         salesZoneId: number;
         packConfigId: number;
         assignedUserId: number | null;
         customerId: number | null;
         printerId: number | null;
-        specialRemarks: string | null;
         fgLocation: string | null;
         status: string;
         priority: number | null;
@@ -138,50 +138,50 @@ export declare class SalesCrudService {
         updatedAt: Date;
     }>;
     update(id: number, dto: UpdateSalesCrudDto, userId: number): Promise<{
-        customer: {
+        product: {
             id: number;
             name: string;
-            address: string;
-        } | null;
-        packConfig: {
+            code: string | null;
+        };
+        transporter: {
             id: number;
-            configName: string;
+            name: string;
         };
         plantCode: {
             id: number;
             code: string;
             description: string | null;
         };
-        product: {
-            id: number;
-            name: string;
-            code: string | null;
-        };
         salesZone: {
             id: number;
             name: string;
         };
-        transporter: {
+        packConfig: {
+            id: number;
+            configName: string;
+        };
+        customer: {
             id: number;
             name: string;
-        };
+            address: string;
+        } | null;
     } & {
-        id: number;
-        userId: number;
-        productId: number;
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
+        paymentClearance: boolean;
+        specialRemarks: string | null;
+        id: number;
+        userId: number;
+        productId: number;
         transporterId: number;
         plantCodeId: number;
-        paymentClearance: boolean;
         salesZoneId: number;
         packConfigId: number;
         assignedUserId: number | null;
         customerId: number | null;
         printerId: number | null;
-        specialRemarks: string | null;
         fgLocation: string | null;
         status: string;
         priority: number | null;
@@ -191,50 +191,59 @@ export declare class SalesCrudService {
     remove(id: number, userId: number): Promise<void>;
     getPaginatedOrders(page: number, limit: number, userId: number, search?: string): Promise<{
         orders: ({
-            customer: {
+            product: {
                 id: number;
                 name: string;
-                address: string;
-            } | null;
-            packConfig: {
+                code: string | null;
+            };
+            transporter: {
                 id: number;
-                configName: string;
+                name: string;
             };
             plantCode: {
                 id: number;
                 code: string;
                 description: string | null;
             };
-            product: {
-                id: number;
-                name: string;
-                code: string | null;
-            };
             salesZone: {
                 id: number;
                 name: string;
             };
-            transporter: {
+            packConfig: {
+                id: number;
+                configName: string;
+            };
+            customer: {
                 id: number;
                 name: string;
-            };
+                address: string;
+            } | null;
+            assignedUser: {
+                id: number;
+                name: string;
+                createdAt: Date;
+                updatedAt: Date;
+                email: string;
+                password: string;
+                role: string;
+            } | null;
         } & {
-            id: number;
-            userId: number;
-            productId: number;
             saleOrderNumber: string;
             outboundDelivery: string;
             transferOrder: string;
             deliveryDate: Date;
+            paymentClearance: boolean;
+            specialRemarks: string | null;
+            id: number;
+            userId: number;
+            productId: number;
             transporterId: number;
             plantCodeId: number;
-            paymentClearance: boolean;
             salesZoneId: number;
             packConfigId: number;
             assignedUserId: number | null;
             customerId: number | null;
             printerId: number | null;
-            specialRemarks: string | null;
             fgLocation: string | null;
             status: string;
             priority: number | null;

@@ -28,8 +28,8 @@ let AdminOrderController = class AdminOrderController {
     findAll(query) {
         return this.service.findAll(query);
     }
-    update(id, dto) {
-        return this.service.update(id, dto);
+    update(id, dto, req) {
+        return this.service.update(id, dto, req.user);
     }
     async remove(id) {
         return this.service.remove(id);
@@ -81,8 +81,8 @@ __decorate([
 ], AdminOrderController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    (0, roles_decorator_1.Roles)('ADMIN'),
-    (0, swagger_1.ApiOperation)({ summary: 'Update a specific sales order (admin only)' }),
+    (0, roles_decorator_1.Roles)('ADMIN', 'USER'),
+    (0, swagger_1.ApiOperation)({ summary: 'Update a specific sales order (admin and user roles)' }),
     (0, swagger_1.ApiParam)({
         name: 'id',
         type: Number,
@@ -93,8 +93,9 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Sales order not found' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, update_admin_order_dto_1.UpdateAdminOrderDto]),
+    __metadata("design:paramtypes", [Number, update_admin_order_dto_1.UpdateAdminOrderDto, Object]),
     __metadata("design:returntype", void 0)
 ], AdminOrderController.prototype, "update", null);
 __decorate([

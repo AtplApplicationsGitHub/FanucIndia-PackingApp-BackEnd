@@ -61,7 +61,7 @@ let DispatchService = class DispatchService {
         this.sftpService = sftpService;
     }
     async create(dto, files, userId) {
-        const { customerId, address, transporterId, vehicleNumber } = dto;
+        const { customerId, address, transporterId, vehicleNumber, saleOrderNumbers } = dto;
         return this.prisma.$transaction(async (tx) => {
             const uploadedAttachments = [];
             if (files && files.length > 0) {
@@ -91,15 +91,29 @@ let DispatchService = class DispatchService {
                         : client_1.Prisma.JsonNull,
                 },
             });
-            await tx.salesOrder.updateMany({
-                where: {
-                    customerId: Number(customerId),
-                    status: 'F105',
-                },
-                data: {
-                    status: 'Dispatched',
-                },
-            });
+            if (saleOrderNumbers && saleOrderNumbers.length > 0) {
+                for (const so of saleOrderNumbers) {
+                    const salesOrder = await tx.salesOrder.findUnique({ where: { saleOrderNumber: so } });
+                    if (!salesOrder)
+                        throw new common_1.BadRequestException(`Sale Order ${so} not found.`);
+                    if (salesOrder.customerId !== Number(customerId))
+                        throw new common_1.BadRequestException(`Sale Order ${so} belongs to a different customer.`);
+                }
+                await tx.dispatch_SO.createMany({
+                    data: saleOrderNumbers.map(so => ({
+                        dispatchId: newDispatch.id,
+                        saleOrderNumber: so,
+                    })),
+                });
+                await tx.salesOrder.updateMany({
+                    where: {
+                        saleOrderNumber: { in: saleOrderNumbers },
+                    },
+                    data: {
+                        status: 'Dispatched',
+                    },
+                });
+            }
             return newDispatch;
         });
     }
@@ -150,9 +164,6 @@ let DispatchService = class DispatchService {
         });
         if (!salesOrder) {
             throw new common_1.NotFoundException('Invalid SO Number');
-        }
-        if (salesOrder.customerId !== dispatch.customerId) {
-            throw new common_1.BadRequestException('This SO Number belongs to a different customer.');
         }
         try {
             return await this.prisma.dispatch_SO.create({

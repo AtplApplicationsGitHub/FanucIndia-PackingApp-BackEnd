@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { UpdateAdminOrderDto } from './dto/update-admin-order.dto';
@@ -136,6 +137,9 @@ export class AdminOrderService {
           salesZone: { select: { id: true, name: true } },
           packConfig: { select: { id: true, configName: true } },
           assignedUser: { select: { id: true, name: true } },
+          _count: {
+            select: { materialData: true },
+          },
         },
       });
 
@@ -143,7 +147,10 @@ export class AdminOrderService {
         total,
         page: isFilterActive ? 1 : parsedPage,
         limit: isFilterActive ? total : parsedLimit,
-        data,
+        data: data.map(({ _count, ...order }) => ({
+          ...order,
+          hasMaterialData: _count.materialData > 0,
+        })),
       };
     } catch (err) {
       if (err instanceof Prisma.PrismaClientValidationError) {
@@ -153,20 +160,44 @@ export class AdminOrderService {
     }
   }
 
-  async update(id: number, dto: UpdateAdminOrderDto) {
+  async update(id: number, dto: UpdateAdminOrderDto, user: { userId: number; role: string }) {
     const order = await this.prisma.salesOrder.findUnique({ where: { id } });
     if (!order) {
       throw new NotFoundException('Order not found');
+    }
+
+    if (user.role === 'USER' && order.assignedUserId !== user.userId) {
+      throw new ForbiddenException('You can only update orders assigned to you.');
+    }
+
+    // A USER should only be able to update the fgLocation
+    if (user.role === 'USER') {
+        if (Object.keys(dto).length > 1 || !('fgLocation' in dto) ) {
+            throw new ForbiddenException('You are only allowed to update the FG Location.');
+        }
     }
 
     return this.prisma.salesOrder.update({ where: { id }, data: dto });
   }
 
   async remove(id: number) {
-    const order = await this.prisma.salesOrder.findUnique({ where: { id } });
+    const order = await this.prisma.salesOrder.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { materialData: true },
+        },
+      },
+    });
+
     if (!order) {
       throw new NotFoundException('Sales order not found');
     }
+
+    if (order._count.materialData > 0) {
+      throw new BadRequestException('Cannot delete an order that has material data imported.');
+    }
+
     await this.prisma.salesOrder.delete({ where: { id } });
     return { message: 'Sales order deleted successfully' };
   }

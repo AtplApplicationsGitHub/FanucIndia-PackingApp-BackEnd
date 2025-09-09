@@ -1,5 +1,5 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, UseGuards, Req, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { FgDashboardService } from './fg-dashboard.service';
@@ -14,7 +14,9 @@ export class FgDashboardController {
 
   @Get()
   @Roles('ADMIN', 'USER')
-  getFgDashboardData(@Req() req: AuthRequest) {
-    return this.fgDashboardService.getFgDashboardData(req.user);
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'date', required: false, type: String, description: 'YYYY-MM-DD' })
+  getFgDashboardData(@Req() req: AuthRequest, @Query() query: { search?: string, date?: string }) {
+    return this.fgDashboardService.getFgDashboardData(req.user, query);
   }
 }

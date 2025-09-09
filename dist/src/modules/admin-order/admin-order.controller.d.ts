@@ -1,5 +1,6 @@
 import { AdminOrderService } from './admin-order.service';
 import { UpdateAdminOrderDto } from './dto/update-admin-order.dto';
+import { AuthRequest } from '../auth/types/auth-request.type';
 export declare class AdminOrderController {
     private readonly service;
     constructor(service: AdminOrderService);
@@ -7,79 +8,79 @@ export declare class AdminOrderController {
         total: number;
         page: number;
         limit: number;
-        data: ({
-            packConfig: {
+        data: {
+            hasMaterialData: boolean;
+            user: {
                 id: number;
-                configName: string;
-            };
-            plantCode: {
-                id: number;
-                code: string;
-                description: string | null;
+                name: string;
+                email: string;
             };
             product: {
                 id: number;
                 name: string;
                 code: string | null;
             };
+            transporter: {
+                id: number;
+                name: string;
+            };
+            plantCode: {
+                id: number;
+                code: string;
+                description: string | null;
+            };
             salesZone: {
                 id: number;
                 name: string;
+            };
+            packConfig: {
+                id: number;
+                configName: string;
             };
             assignedUser: {
                 id: number;
                 name: string;
             } | null;
-            transporter: {
-                id: number;
-                name: string;
-            };
-            user: {
-                id: number;
-                name: string;
-                email: string;
-            };
-        } & {
-            id: number;
-            userId: number;
-            productId: number;
             saleOrderNumber: string;
             outboundDelivery: string;
             transferOrder: string;
             deliveryDate: Date;
+            paymentClearance: boolean;
+            specialRemarks: string | null;
+            id: number;
+            userId: number;
+            productId: number;
             transporterId: number;
             plantCodeId: number;
-            paymentClearance: boolean;
             salesZoneId: number;
             packConfigId: number;
             assignedUserId: number | null;
             customerId: number | null;
             printerId: number | null;
-            specialRemarks: string | null;
             fgLocation: string | null;
             status: string;
             priority: number | null;
             createdAt: Date;
             updatedAt: Date;
-        })[];
+        }[];
     }>;
-    update(id: number, dto: UpdateAdminOrderDto): Promise<{
-        id: number;
-        userId: number;
-        productId: number;
+    update(id: number, dto: UpdateAdminOrderDto, req: AuthRequest): Promise<{
         saleOrderNumber: string;
         outboundDelivery: string;
         transferOrder: string;
         deliveryDate: Date;
+        paymentClearance: boolean;
+        specialRemarks: string | null;
+        id: number;
+        userId: number;
+        productId: number;
         transporterId: number;
         plantCodeId: number;
-        paymentClearance: boolean;
         salesZoneId: number;
         packConfigId: number;
         assignedUserId: number | null;
         customerId: number | null;
         printerId: number | null;
-        specialRemarks: string | null;
         fgLocation: string | null;
         status: string;
         priority: number | null;

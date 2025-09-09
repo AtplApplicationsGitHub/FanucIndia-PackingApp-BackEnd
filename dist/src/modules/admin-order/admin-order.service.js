@@ -101,13 +101,19 @@ let AdminOrderService = class AdminOrderService {
                     salesZone: { select: { id: true, name: true } },
                     packConfig: { select: { id: true, configName: true } },
                     assignedUser: { select: { id: true, name: true } },
+                    _count: {
+                        select: { materialData: true },
+                    },
                 },
             });
             return {
                 total,
                 page: isFilterActive ? 1 : parsedPage,
                 limit: isFilterActive ? total : parsedLimit,
-                data,
+                data: data.map(({ _count, ...order }) => ({
+                    ...order,
+                    hasMaterialData: _count.materialData > 0,
+                })),
             };
         }
         catch (err) {
@@ -117,17 +123,35 @@ let AdminOrderService = class AdminOrderService {
             throw new common_1.BadRequestException('Failed to fetch sales orders.');
         }
     }
-    async update(id, dto) {
+    async update(id, dto, user) {
         const order = await this.prisma.salesOrder.findUnique({ where: { id } });
         if (!order) {
             throw new common_1.NotFoundException('Order not found');
         }
+        if (user.role === 'USER' && order.assignedUserId !== user.userId) {
+            throw new common_1.ForbiddenException('You can only update orders assigned to you.');
+        }
+        if (user.role === 'USER') {
+            if (Object.keys(dto).length > 1 || !('fgLocation' in dto)) {
+                throw new common_1.ForbiddenException('You are only allowed to update the FG Location.');
+            }
+        }
         return this.prisma.salesOrder.update({ where: { id }, data: dto });
     }
     async remove(id) {
-        const order = await this.prisma.salesOrder.findUnique({ where: { id } });
+        const order = await this.prisma.salesOrder.findUnique({
+            where: { id },
+            include: {
+                _count: {
+                    select: { materialData: true },
+                },
+            },
+        });
         if (!order) {
             throw new common_1.NotFoundException('Sales order not found');
+        }
+        if (order._count.materialData > 0) {
+            throw new common_1.BadRequestException('Cannot delete an order that has material data imported.');
         }
         await this.prisma.salesOrder.delete({ where: { id } });
         return { message: 'Sales order deleted successfully' };

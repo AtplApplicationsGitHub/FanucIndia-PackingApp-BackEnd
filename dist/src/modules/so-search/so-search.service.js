@@ -72,10 +72,22 @@ let SoSearchService = class SoSearchService {
         });
         const materialDetails = await this.prisma.eRP_Material_Data.findMany({
             where: { saleOrderNumber },
+            orderBy: { ID: 'asc' },
         });
+        const latestMaterialUpdate = materialDetails.reduce((latest, current) => {
+            if (!latest.UpdatedDate || (current.UpdatedDate && new Date(current.UpdatedDate) > new Date(latest.UpdatedDate))) {
+                return current;
+            }
+            return latest;
+        }, materialDetails[0] || {});
+        const dispatchInfoWithUpdate = dispatchInfo.map(dispatch => ({
+            ...dispatch,
+            UpdatedBy: latestMaterialUpdate?.UpdatedBy,
+            UpdatedDate: latestMaterialUpdate?.UpdatedDate,
+        }));
         const result = {
             salesOrder,
-            dispatchInfo,
+            dispatchInfo: dispatchInfoWithUpdate,
             materialDetails,
         };
         return convertBigInts(result);

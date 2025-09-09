@@ -17,6 +17,7 @@ class CreateDispatchDto {
     address;
     transporterId;
     vehicleNumber;
+    saleOrderNumbers;
 }
 exports.CreateDispatchDto = CreateDispatchDto;
 __decorate([
@@ -42,4 +43,11 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreateDispatchDto.prototype, "vehicleNumber", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ type: [String], description: 'List of Sale Order Numbers to be dispatched' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], CreateDispatchDto.prototype, "saleOrderNumbers", void 0);
 //# sourceMappingURL=create-dispatch.dto.js.map

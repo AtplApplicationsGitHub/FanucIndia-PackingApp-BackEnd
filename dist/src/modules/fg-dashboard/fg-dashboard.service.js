@@ -17,16 +17,40 @@ let FgDashboardService = class FgDashboardService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async getFgDashboardData(user) {
+    async getFgDashboardData(user, query) {
+        const { search, date } = query;
         const where = {};
         if (user.role === 'USER') {
             where.assignedUserId = user.userId;
+        }
+        if (date) {
+            const startOfDay = new Date(date);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+            where.deliveryDate = {
+                gte: startOfDay,
+                lte: endOfDay,
+            };
+        }
+        if (search) {
+            where.OR = [
+                { saleOrderNumber: { contains: search, mode: 'insensitive' } },
+                { product: { name: { contains: search, mode: 'insensitive' } } },
+                { customer: { name: { contains: search, mode: 'insensitive' } } },
+                { status: { contains: search, mode: 'insensitive' } },
+                { fgLocation: { contains: search, mode: 'insensitive' } },
+                { specialRemarks: { contains: search, mode: 'insensitive' } },
+            ];
         }
         const salesOrders = await this.prisma.salesOrder.findMany({
             where,
             include: {
                 product: true,
                 customer: true,
+            },
+            orderBy: {
+                deliveryDate: 'desc',
             },
         });
         const fgData = await Promise.all(salesOrders.map(async (order) => {

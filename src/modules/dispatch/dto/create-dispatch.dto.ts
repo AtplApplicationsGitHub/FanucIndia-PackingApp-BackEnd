@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsNumberString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumberString, IsArray } from 'class-validator';
 
 export class CreateDispatchDto {
   @ApiProperty()
@@ -20,4 +20,10 @@ export class CreateDispatchDto {
   @IsString()
   @IsNotEmpty()
   vehicleNumber: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'List of Sale Order Numbers to be dispatched' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  saleOrderNumbers?: string[];
 }

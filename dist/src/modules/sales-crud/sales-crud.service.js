@@ -209,6 +209,7 @@ let SalesCrudService = class SalesCrudService {
                         plantCode: true,
                         salesZone: true,
                         packConfig: true,
+                        assignedUser: true,
                     },
                 }),
                 this.prisma.salesOrder.count({ where: whereClause }),

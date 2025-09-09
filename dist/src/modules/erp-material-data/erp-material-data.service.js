@@ -86,9 +86,15 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         if (material.Issue_stage >= material.Required_Qty) {
             throw new common_1.BadRequestException('Cannot exceed the Required_Qty value');
         }
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        const userName = user ? user.name : 'System';
         const updatedMaterial = await this.prisma.eRP_Material_Data.update({
             where: { ID: material.ID },
-            data: { Issue_stage: { increment: 1 } },
+            data: {
+                Issue_stage: { increment: 1 },
+                UpdatedBy: userName,
+                UpdatedDate: new Date(),
+            },
         });
         const allMaterials = await this.prisma.eRP_Material_Data.findMany({
             where: { saleOrderNumber: salesOrder.saleOrderNumber },
@@ -131,14 +137,21 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         if (newIssueStage < 0) {
             throw new common_1.BadRequestException('Issue_stage cannot be negative');
         }
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        const userName = user ? user.name : 'System';
         const updatedMaterial = await this.prisma.eRP_Material_Data.update({
             where: { ID: material.ID },
-            data: { Issue_stage: newIssueStage },
+            data: {
+                Issue_stage: newIssueStage,
+                UpdatedBy: userName,
+                UpdatedDate: new Date(),
+            },
             select: {
                 ID: true,
                 Material_Code: true,
                 Issue_stage: true,
                 Required_Qty: true,
+                Packing_stage: true,
             },
         });
         const allMaterials = await this.prisma.eRP_Material_Data.findMany({
@@ -180,16 +193,33 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         if (material.Packing_stage >= cap) {
             throw new common_1.BadRequestException('Cannot exceed the min(Required_Qty, Issue_stage) cap');
         }
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        const userName = user ? user.name : 'System';
         const updatedMaterial = await this.prisma.eRP_Material_Data.update({
             where: { ID: material.ID },
             data: {
                 Packing_stage: { increment: 1 },
+                UpdatedBy: userName,
                 UpdatedDate: new Date(),
             },
         });
+        const allMaterials = await this.prisma.eRP_Material_Data.findMany({
+            where: { saleOrderNumber: salesOrder.saleOrderNumber },
+            select: { Packing_stage: true, Required_Qty: true },
+        });
+        const allPacked = allMaterials.every((m) => m.Packing_stage >= m.Required_Qty);
+        let packingStageCompleted = false;
+        if (allPacked) {
+            await this.prisma.salesOrder.update({
+                where: { id: orderId },
+                data: { assignedUserId: null },
+            });
+            packingStageCompleted = true;
+        }
         return convertBigInts({
             message: 'Packing_stage incremented successfully',
             updatedMaterial,
+            packingStageCompleted,
         });
     }
     async updatePackingStage(orderId, materialCode, newPackingStage, userId, userRole) {
@@ -215,16 +245,33 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         if (newPackingStage > cap) {
             throw new common_1.BadRequestException(`Packing_stage cannot exceed min(Required_Qty, Issue_stage) = ${cap}`);
         }
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        const userName = user ? user.name : 'System';
         const updatedMaterial = await this.prisma.eRP_Material_Data.update({
             where: { ID: material.ID },
             data: {
                 Packing_stage: newPackingStage,
+                UpdatedBy: userName,
                 UpdatedDate: new Date(),
             },
         });
+        const allMaterials = await this.prisma.eRP_Material_Data.findMany({
+            where: { saleOrderNumber: salesOrder.saleOrderNumber },
+            select: { Packing_stage: true, Required_Qty: true },
+        });
+        const allPacked = allMaterials.every((m) => m.Packing_stage >= m.Required_Qty);
+        let packingStageCompleted = false;
+        if (allPacked) {
+            await this.prisma.salesOrder.update({
+                where: { id: orderId },
+                data: { assignedUserId: null },
+            });
+            packingStageCompleted = true;
+        }
         return convertBigInts({
             message: 'Packing_stage updated successfully',
             updatedMaterial,
+            packingStageCompleted,
         });
     }
 };

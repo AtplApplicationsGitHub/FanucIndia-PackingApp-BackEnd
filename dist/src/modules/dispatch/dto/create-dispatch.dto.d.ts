@@ -3,4 +3,5 @@ export declare class CreateDispatchDto {
     address: string;
     transporterId?: number;
     vehicleNumber: string;
+    saleOrderNumbers?: string[];
 }

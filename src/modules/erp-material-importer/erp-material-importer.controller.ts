@@ -5,6 +5,7 @@ import {
   UseInterceptors,
   UseGuards,
   BadRequestException,
+  Body,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ErpMaterialImporterService } from './erp-material-importer.service';
@@ -38,13 +39,18 @@ export class ErpMaterialImporterController {
           type: 'string',
           format: 'binary',
         },
+        saleOrderNumber: {
+          type: 'string',
+          description: 'The expected Sale Order Number to validate against the file content.',
+          nullable: true,
+        }
       },
     },
   })
-  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+  async uploadFile(@UploadedFile() file: Express.Multer.File, @Body('saleOrderNumber') saleOrderNumber?: string) {
     if (!file) {
       throw new BadRequestException('No file uploaded.');
     }
-    return this.service.processFile(file);
+    return this.service.processFile(file, saleOrderNumber);
   }
 }

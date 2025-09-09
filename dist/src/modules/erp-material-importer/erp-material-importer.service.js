@@ -73,10 +73,10 @@ let ErpMaterialImporterService = ErpMaterialImporterService_1 = class ErpMateria
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async processFile(file) {
+    async processFile(file, expectedSaleOrderNumber) {
         this.logger.log(`Starting to process file: ${file.originalname}`);
         const records = this.readFile(file);
-        const validationError = await this.validateRecords(records);
+        const validationError = await this.validateRecords(records, expectedSaleOrderNumber);
         if (validationError) {
             this.logger.error(`Validation failed for ${file.originalname}: ${validationError}`);
             throw new common_1.BadRequestException(validationError);
@@ -98,7 +98,7 @@ let ErpMaterialImporterService = ErpMaterialImporterService_1 = class ErpMateria
             throw new common_1.BadRequestException('Invalid or corrupted file. Please upload a valid .xlsx or .csv file.');
         }
     }
-    async validateRecords(records) {
+    async validateRecords(records, expectedSaleOrderNumber) {
         if (records.length === 0) {
             return 'File is empty.';
         }
@@ -130,6 +130,9 @@ let ErpMaterialImporterService = ErpMaterialImporterService_1 = class ErpMateria
             return 'Missing SO Number in one or more rows.';
         }
         const soNumber = String(soNumberValue);
+        if (expectedSaleOrderNumber && soNumber !== expectedSaleOrderNumber) {
+            return `The SO Number in the file ('${soNumber}') does not match the expected SO Number ('${expectedSaleOrderNumber}').`;
+        }
         const orderExists = await this.prisma.salesOrder.findUnique({
             where: { saleOrderNumber: soNumber },
         });

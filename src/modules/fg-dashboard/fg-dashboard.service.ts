@@ -6,7 +6,8 @@ import { Prisma } from '@prisma/client';
 export class FgDashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getFgDashboardData(user: { userId: number; role: string }) {
+  async getFgDashboardData(user: { userId: number; role: string }, query: { search?: string, date?: string }) {
+    const { search, date } = query;
     const where: Prisma.SalesOrderWhereInput = {};
 
     // If the user is not an admin, only show orders assigned to them
@@ -14,11 +15,37 @@ export class FgDashboardService {
       where.assignedUserId = user.userId;
     }
 
+    if (date) {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      where.deliveryDate = {
+        gte: startOfDay,
+        lte: endOfDay,
+      };
+    }
+
+    if (search) {
+      where.OR = [
+        { saleOrderNumber: { contains: search, mode: 'insensitive' } },
+        { product: { name: { contains: search, mode: 'insensitive' } } },
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+        { status: { contains: search, mode: 'insensitive' } },
+        { fgLocation: { contains: search, mode: 'insensitive' } },
+        { specialRemarks: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+
     const salesOrders = await this.prisma.salesOrder.findMany({
       where,
       include: {
         product: true,
         customer: true,
+      },
+      orderBy: {
+        deliveryDate: 'desc',
       },
     });
 
