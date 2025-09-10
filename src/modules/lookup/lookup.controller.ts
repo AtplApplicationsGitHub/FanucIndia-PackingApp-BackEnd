@@ -19,7 +19,6 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
-
 import { CreateProductDto } from './dto/createProductDto';
 import { UpdateProductDto } from './dto/updateProductDto';
 import { CreateTransporterDto } from './dto/createTransporterDto';
@@ -30,8 +29,6 @@ import { CreateSalesZoneDto } from './dto/createSalesZoneDto';
 import { UpdateSalesZoneDto } from './dto/updateSalesZoneDto';
 import { CreatePackConfigDto } from './dto/createPackConfigDto';
 import { UpdatePackConfigDto } from './dto/updatePackConfigDto';
-import { CreateTerminalDto } from './dto/createTerminalDto';
-import { UpdateTerminalDto } from './dto/updateTerminalDto';
 import { CreateCustomerDto } from './dto/createCustomerDto';
 import { UpdateCustomerDto } from './dto/updateCustomerDto';
 import { CreatePrinterDto } from './dto/createPrinterDto';
@@ -44,7 +41,6 @@ import { UpdatePrinterDto } from './dto/updatePrinterDto';
 export class LookupController {
   constructor(private readonly lookupService: LookupService) {}
 
-  // PRODUCTS
   @Get('products')
   @ApiOperation({ summary: 'Get all products' })
   @ApiResponse({ status: 200 })
@@ -75,7 +71,6 @@ export class LookupController {
     return this.lookupService.deleteProduct(id);
   }
 
-  // TRANSPORTERS
   @Get('transporters')
   @ApiOperation({ summary: 'Get all transporters' })
   getTransporters() {
@@ -104,7 +99,6 @@ export class LookupController {
     return this.lookupService.deleteTransporter(id);
   }
 
-  // PLANT CODES
   @Get('plant-codes')
   @ApiOperation({ summary: 'Get all plant codes' })
   getPlantCodes() {
@@ -133,7 +127,6 @@ export class LookupController {
     return this.lookupService.deletePlantCode(id);
   }
 
-  // SALES ZONES
   @Get('sales-zones')
   @ApiOperation({ summary: 'Get all sales zones' })
   getSalesZones() {
@@ -162,7 +155,6 @@ export class LookupController {
     return this.lookupService.deleteSalesZone(id);
   }
 
-  // PACK CONFIGS
   @Get('pack-configs')
   @ApiOperation({ summary: 'Get all pack configs' })
   getPackConfigs() {
@@ -191,7 +183,6 @@ export class LookupController {
     return this.lookupService.deletePackConfig(id);
   }
 
-  // CUSTOMERS
   @Get('customers')
   @ApiOperation({ summary: 'Get all customers' })
   getCustomers() {
@@ -220,7 +211,6 @@ export class LookupController {
     return this.lookupService.deleteCustomer(id);
   }
 
-  // PRINTERS
   @Get('printers')
   @ApiOperation({ summary: 'Get all printers' })
   getPrinters() {

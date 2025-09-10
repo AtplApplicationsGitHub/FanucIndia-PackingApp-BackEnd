@@ -1,4 +1,3 @@
-// src/common/pino-logger.service.ts
 import { LoggerService as NestLoggerService } from '@nestjs/common';
 import { logger } from './logger';
 

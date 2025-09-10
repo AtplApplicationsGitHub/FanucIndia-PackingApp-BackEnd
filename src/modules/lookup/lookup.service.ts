@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { BadRequestException } from '@nestjs/common';
-
 import { CreateProductDto } from './dto/createProductDto';
 import { UpdateProductDto } from './dto/updateProductDto';
 import { CreateTransporterDto } from './dto/createTransporterDto';
@@ -21,7 +20,6 @@ import { UpdatePrinterDto } from './dto/updatePrinterDto';
 export class LookupService {
   constructor(private prisma: PrismaService) {}
 
-  // PRODUCTS
   getProducts() {
     return this.prisma.product.findMany({ orderBy: { name: 'asc' } });
   }
@@ -48,7 +46,6 @@ export class LookupService {
     }
   }
 
-  // TRANSPORTERS
   getTransporters() {
     return this.prisma.transporter.findMany({ orderBy: { name: 'asc' } });
   }
@@ -74,7 +71,6 @@ export class LookupService {
     }
   }
 
-  // PLANT CODES
   getPlantCodes() {
     return this.prisma.plantCode.findMany({ orderBy: { code: 'asc' } });
   }
@@ -100,7 +96,6 @@ export class LookupService {
     }
   }
 
-  // SALES ZONES
   getSalesZones() {
     return this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } });
   }
@@ -126,7 +121,6 @@ export class LookupService {
     }
   }
 
-  // PACK CONFIGS
   getPackConfigs() {
     return this.prisma.packConfig.findMany({ orderBy: { configName: 'asc' } });
   }
@@ -152,7 +146,6 @@ export class LookupService {
     }
   }
 
-  // CUSTOMERS
   getCustomers() {
     return this.prisma.customer.findMany({ orderBy: { name: 'asc' } });
   }
@@ -178,7 +171,6 @@ export class LookupService {
     }
   }
 
-  // PRINTERS
   getPrinters() {
     return this.prisma.printer.findMany({ orderBy: { name: 'asc' } });
   }

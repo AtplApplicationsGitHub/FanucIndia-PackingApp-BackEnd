@@ -42,10 +42,9 @@ export class AdminOrderService {
 
     const where: Prisma.SalesOrderWhereInput = {};
 
-    // Parse "YYYY-MM-DD" as **local** date (not UTC)
     const parseYMDLocal = (s: string) => {
       const [y, m, d] = s.split('-').map(Number);
-      return new Date(y, m - 1, d); // local midnight
+      return new Date(y, m - 1, d); 
     };
 
     if (startDate || endDate) {
@@ -53,13 +52,12 @@ export class AdminOrderService {
 
       if (startDate) {
         const s = parseYMDLocal(startDate);
-        s.setHours(0, 0, 0, 0); // local start of day
+        s.setHours(0, 0, 0, 0); 
         range.gte = s;
       }
 
       if (endDate) {
         const e = parseYMDLocal(endDate);
-        // end is inclusive → use < (next local day 00:00)
         const next = new Date(
           e.getFullYear(),
           e.getMonth(),
@@ -72,7 +70,6 @@ export class AdminOrderService {
         range.lt = next;
       }
 
-      // apply to deliveryDate; change to createdAt if that's what you intend
       where.deliveryDate = { ...(where.deliveryDate as object), ...range };
     }
 
@@ -170,7 +167,6 @@ export class AdminOrderService {
       throw new ForbiddenException('You can only update orders assigned to you.');
     }
 
-    // A USER should only be able to update the fgLocation
     if (user.role === 'USER') {
         if (Object.keys(dto).length > 1 || !('fgLocation' in dto) ) {
             throw new ForbiddenException('You are only allowed to update the FG Location.');

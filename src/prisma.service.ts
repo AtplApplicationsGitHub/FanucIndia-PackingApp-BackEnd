@@ -14,8 +14,8 @@ export class PrismaService extends PrismaClient
   constructor() {
     super({
       transactionOptions: {
-        maxWait: 10000, // default: 2000
-        timeout: 30000, // default: 5000
+        maxWait: 10000, 
+        timeout: 30000,
       },
     });
   }
@@ -24,8 +24,6 @@ export class PrismaService extends PrismaClient
     await this.$connect();
     this.logger.log('✅ Prisma connected');
   }
-
-  // Prisma v5+: "beforeExit" hook is no longer supported/needed
 
   async onModuleDestroy() {
     await this.$disconnect();

@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma.service");
 const roles_decorator_1 = require("../auth/roles.decorator");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const swagger_1 = require("@nestjs/swagger");
 let AdminSalesOrdersController = class AdminSalesOrdersController {
     prisma;
     constructor(prisma) {
@@ -37,12 +38,19 @@ exports.AdminSalesOrdersController = AdminSalesOrdersController;
 __decorate([
     (0, common_1.Get)(':id'),
     (0, roles_decorator_1.Roles)('ADMIN'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get a specific sales order by its ID' }),
+    (0, swagger_1.ApiParam)({ name: 'id', description: 'The ID of the sales order', type: Number }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Sales order details returned successfully.' }),
+    (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden. User does not have the required role.' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Sales order not found.' }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], AdminSalesOrdersController.prototype, "getSalesOrderById", null);
 exports.AdminSalesOrdersController = AdminSalesOrdersController = __decorate([
+    (0, swagger_1.ApiTags)('Admin Orders'),
+    (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Controller)('admin/sales-orders'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])

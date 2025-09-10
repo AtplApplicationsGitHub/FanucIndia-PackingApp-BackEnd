@@ -8,7 +8,6 @@ import * as fs from 'fs';
 import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
-  // Disable Nest’s built-in logger
   const app = await NestFactory.create(AppModule, { logger: false });
   const configService = app.get(ConfigService);
 
@@ -24,15 +23,12 @@ async function bootstrap() {
       cert: fs.readFileSync(httpsCertPath!),
     };
     await app.close();
-    // Also disable built-in logger on HTTPS instance
     listenApp = await NestFactory.create(AppModule, { httpsOptions, logger: false });
   }
 
-  // Route all Nest logs & framework internals through our Pino adapter
   const pinoAdapter = new PinoLogger();
   listenApp.useLogger(pinoAdapter);
 
-  // Global validation
   listenApp.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -41,7 +37,6 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger setup
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Fanuc Packing App API')
     .setDescription('API documentation for Fanuc Packing Web & Mobile App')
@@ -51,17 +46,14 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(listenApp, swaggerConfig);
   SwaggerModule.setup('api', listenApp, document);
 
-  // Global exception filter
   listenApp.useGlobalFilters(new AllExceptionsFilter());
 
-  // CORS
   listenApp.enableCors({
     origin: ['http://localhost:3000', 'https://fanuc.goval.app:444'],
     credentials: true,
   });
 
   await listenApp.listen(process.env.PORT ?? 3010);
-  // Use our adapter directly to log bootstrap success
   pinoAdapter.log('Application started', 'bootstrap');
 }
 

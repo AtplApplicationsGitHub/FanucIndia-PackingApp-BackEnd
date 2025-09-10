@@ -12,8 +12,6 @@ function convertBigInts(obj: any): any {
     return obj;
   }
   if (typeof obj === 'bigint') {
-    // Convert BigInt to string, as JavaScript's Number can lose precision with large numbers.
-    // The frontend can parse this back to a number if needed.
     return obj.toString();
   }
   if (Array.isArray(obj)) {
@@ -29,7 +27,6 @@ function convertBigInts(obj: any): any {
   return obj;
 }
 
-// Helper function to verify ownership
 async function verifyOrderAccess(
   prisma: PrismaService,
   orderId: number,
@@ -121,7 +118,6 @@ export class ErpMaterialDataService {
       },
     });
 
-    // Check if all materials for this sales order are fully issued and update status to F105
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
       where: { saleOrderNumber: salesOrder.saleOrderNumber },
       select: { Issue_stage: true, Required_Qty: true },

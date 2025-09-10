@@ -7,7 +7,6 @@ export class UserDashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAssignedOrders(userId: number) {
-    // 1. Fetch all orders assigned to the user, including their materials
     const assignedOrders = await this.prisma.salesOrder.findMany({
       where: {
         assignedUserId: userId,
@@ -36,14 +35,11 @@ export class UserDashboardService {
       },
     });
 
-    // 2. Filter out the completed orders in the application code
     const incompleteOrders = assignedOrders.filter(order => {
-      // If an order has no materials, it's considered incomplete and should be shown.
       if (order.materialData.length === 0) {
         return true;
       }
 
-      // Check if every material is fully issued and packed
       const isComplete = order.materialData.every(
         material =>
           material.Required_Qty > 0 &&
@@ -51,11 +47,9 @@ export class UserDashboardService {
           material.Issue_stage === material.Packing_stage
       );
 
-      // Return true for orders that are NOT complete
       return !isComplete;
     });
     
-    // 3. Map the result to the required format, removing the materialData
     return incompleteOrders.map(({ materialData, ...order }) => order);
   }
 

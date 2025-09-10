@@ -145,7 +145,7 @@ export class SalesOrderService {
     const errors: { row: number; errors: string[] }[] = [];
 
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber === 1) return; // skip header
+      if (rowNumber === 1) return; 
       const [
         product,
         saleOrderNumber,
@@ -227,7 +227,6 @@ export class SalesOrderService {
       });
     }
 
-    // Pre-flight checks for uniqueness before attempting transaction
     const saleOrderNumbers = ordersToInsert.map(o => o.saleOrderNumber);
     const outboundDeliveries = ordersToInsert.map(o => o.outboundDelivery);
     const transferOrders = ordersToInsert.map(o => o.transferOrder);

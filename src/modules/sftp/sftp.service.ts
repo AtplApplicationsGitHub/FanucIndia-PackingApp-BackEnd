@@ -50,7 +50,7 @@ export class SftpService {
     };
 
     if (SFTP_PRIVATE_KEY) {
-      cfg.privateKey = Buffer.from(SFTP_PRIVATE_KEY, 'base64'); // base64-encoded private key
+      cfg.privateKey = Buffer.from(SFTP_PRIVATE_KEY, 'base64');
       if (SFTP_PASSPHRASE) cfg.passphrase = SFTP_PASSPHRASE;
     } else {
       cfg.password = SFTP_PASSWORD!;
@@ -71,7 +71,6 @@ export class SftpService {
       try {
         await client.end();
       } catch {
-        /* noop */
       }
     }
   }
@@ -83,7 +82,7 @@ export class SftpService {
       for (const seg of segments) {
         if (!seg) continue;
         cur += `/${seg}`;
-        const exists = await c.exists(cur); // 'd' | '-' | false
+        const exists = await c.exists(cur); 
         if (!exists) {
           await c.mkdir(cur);
         }
@@ -99,7 +98,7 @@ export class SftpService {
   }
 
   async getStream(remotePath: string) {
-    return this.withClient((c) => c.get(remotePath)); // Buffer or Readable
+    return this.withClient((c) => c.get(remotePath)); 
   }
 
   async delete(remotePath: string) {

@@ -86,7 +86,6 @@ export class UserService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
 
-    // Last admin check
     if (user.role === 'ADMIN') {
       const adminCount = await this.prisma.user.count({
         where: { role: 'ADMIN' },
@@ -98,7 +97,6 @@ export class UserService {
       }
     }
 
-    // Check for related sales orders BEFORE delete
     const salesOrderCount = await this.prisma.salesOrder.count({
       where: { userId: id },
     });

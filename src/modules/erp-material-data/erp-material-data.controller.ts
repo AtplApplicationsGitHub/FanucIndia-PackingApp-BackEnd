@@ -29,7 +29,7 @@ import { AuthRequest } from '../auth/types/auth-request.type';
 @ApiTags('ERP Material Data')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('admin/orders/:orderId/erp-materials') // Keep the URL for simplicity, but secure the methods
+@Controller('admin/orders/:orderId/erp-materials')
 export class ErpMaterialDataController {
   constructor(
     private readonly erpMaterialDataService: ErpMaterialDataService,

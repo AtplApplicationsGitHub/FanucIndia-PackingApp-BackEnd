@@ -14,7 +14,6 @@ export class SalesCrudService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateSalesCrudDto, userId: number) {
-    // Check for uniqueness of outboundDelivery and transferOrder before creation
     const existingOrder = await this.prisma.salesOrder.findFirst({
       where: {
         OR: [
@@ -44,7 +43,6 @@ export class SalesCrudService {
     }
 
     try {
-      // Normalize deliveryDate
       const deliveryDate =
         dto.deliveryDate && dto.deliveryDate.length === 10
           ? new Date(dto.deliveryDate).toISOString()
@@ -73,7 +71,7 @@ export class SalesCrudService {
   async findAll(userId: number, query: { search?: string }) {
     try {
       const { search } = query;
-      const where: any = { userId }; // Always filter by the logged-in user's ID
+      const where: any = { userId }; 
 
       if (search) {
         const s = { contains: search, mode: 'insensitive' };
@@ -128,7 +126,6 @@ export class SalesCrudService {
           packConfig: true,
         },
       });
-      // Security Check: Ensure the order belongs to the user trying to access it
       if (!order || order.userId !== userId) {
         throw new NotFoundException('Sales order not found or access denied.');
       }
@@ -147,7 +144,6 @@ export class SalesCrudService {
     dto: UpdateSalesCrudDto,
     userId: number,
   ) {
-    // Security Check: Ensure the user owns the order before updating
     const existing = await this.prisma.salesOrder.findFirst({ where: { id, userId } });
     if (!existing) {
       throw new NotFoundException('Sales order not found or access denied.');
@@ -190,7 +186,6 @@ export class SalesCrudService {
   }
 
   async remove(id: number, userId: number) {
-    // Security Check: Ensure the user owns the order before deleting
     const existing = await this.prisma.salesOrder.findFirst({ where: { id, userId } });
     if (!existing) {
       throw new NotFoundException('Sales order not found or access denied.');
@@ -217,7 +212,7 @@ export class SalesCrudService {
   ) {
     try {
       const skip = (page - 1) * limit;
-      const whereClause: any = { userId }; // Always filter by the logged-in user's ID
+      const whereClause: any = { userId }; 
 
       if (search) {
         const s = { contains: search, mode: 'insensitive' };

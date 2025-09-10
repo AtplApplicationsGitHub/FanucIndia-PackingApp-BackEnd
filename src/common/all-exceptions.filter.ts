@@ -1,4 +1,3 @@
-// src/common/all-exceptions.filter.ts
 import {
   ExceptionFilter,
   Catch,
@@ -16,13 +15,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const req = ctx.getRequest<Request>()
     const res = ctx.getResponse<Response>()
 
-    // Determine HTTP status
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR
 
-    // Extract our standardized payload or build a generic one
     const responsePayload = exception instanceof HttpException
       ? (exception.getResponse() as any)
       : {
@@ -30,7 +27,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
           message: 'Something went wrong. Please try again later.',
         }
 
-    // Log full error (stack trace if available)
     logger.error(
       {
         component: 'exception-filter',
@@ -42,7 +38,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof Error ? exception.stack! : String(exception)
     )
 
-    // Send uniform JSON error response
     res.status(status).json({
       code: responsePayload.code,
       message: responsePayload.message,

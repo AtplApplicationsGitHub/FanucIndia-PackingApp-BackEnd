@@ -10,7 +10,6 @@ export class FgDashboardService {
     const { search, date } = query;
     const where: Prisma.SalesOrderWhereInput = {};
 
-    // If the user is not an admin, only show orders assigned to them
     if (user.role === 'USER') {
       where.assignedUserId = user.userId;
     }
