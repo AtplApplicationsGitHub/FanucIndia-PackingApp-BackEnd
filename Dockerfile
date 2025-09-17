@@ -1,31 +1,23 @@
 # Stage 1: Build the NestJS application
 FROM node:22-slim AS builder
+RUN apt-get update && apt-get install -y openssl --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
-# Install dependencies
 COPY package*.json ./
 RUN npm install
-# Copy all the source files
 COPY . .
-# Run prisma generate to create Prisma client
 RUN npx prisma generate
-# Build the NestJS app (this will generate the dist/ folder)
 RUN npm run build
-# Stage 2: Production image
+
 FROM node:22-slim
+RUN apt-get update && apt-get install -y openssl --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
-# Install only the production dependencies
 COPY --from=builder /app/package*.json ./
 RUN npm ci --omit=dev
-# Copy the built app (including dist/ folder) from the builder stage
 COPY --from=builder /app/dist /app/dist
-# Copy the prisma folder (including schema.prisma) from the builder stage
 COPY --from=builder /app/prisma /app/prisma
-# Run prisma generate to create Prisma client in the production environment
 RUN npx prisma generate
-# Debugging step: Verify the contents of the dist folder and prisma folder
-RUN ls -l /app/dist
-RUN ls -l /app/prisma
-# Expose the port the app will run on
+
 EXPOSE 3010
-# Start the application using the compiled main.js file
 CMD ["node", "dist/src/main.js"]
