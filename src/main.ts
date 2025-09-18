@@ -12,21 +12,42 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const httpsKeyPath = configService.get<string>('SSL_KEY_PATH');
-  // console.log(httpsKeyPath);
+  console.log(httpsKeyPath);
   const httpsCertPath = configService.get<string>('SSL_CERT_PATH');
-  // console.log(httpsCertPath);
+  console.log(httpsCertPath);
   const isSSL = !!(httpsKeyPath && httpsCertPath);
 
   let listenApp = app;
 
+  // if (isSSL) {
+  //   const httpsOptions = {
+  //     key: fs.readFileSync(httpsKeyPath!),
+  //     cert: fs.readFileSync(httpsCertPath!),
+  //   };
+  //   await app.close();
+  //   listenApp = await NestFactory.create(AppModule, { httpsOptions, logger: false });
+  // }
   if (isSSL) {
+    // Read the key and certificate files into variables
+    const privateKey = fs.readFileSync(httpsKeyPath!);
+    const certificate = fs.readFileSync(httpsCertPath!);
+
+    // Log the contents to the console
+    // Using .toString() to see the text content instead of a buffer
+    console.log("--- HTTPS Key ---");
+    console.log(privateKey.toString()); 
+
+    console.log("--- HTTPS Certificate ---");
+    console.log(certificate.toString());
+
     const httpsOptions = {
-      key: fs.readFileSync(httpsKeyPath!),
-      cert: fs.readFileSync(httpsCertPath!),
+        key: privateKey,
+        cert: certificate,
     };
+
     await app.close();
     listenApp = await NestFactory.create(AppModule, { httpsOptions, logger: false });
-  }
+}
 
   const pinoAdapter = new PinoLogger();
   listenApp.useLogger(pinoAdapter);
