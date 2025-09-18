@@ -45,13 +45,21 @@ async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule, { logger: false });
     const configService = app.get(config_1.ConfigService);
     const httpsKeyPath = configService.get('SSL_KEY_PATH');
+    console.log(httpsKeyPath);
     const httpsCertPath = configService.get('SSL_CERT_PATH');
+    console.log(httpsCertPath);
     const isSSL = !!(httpsKeyPath && httpsCertPath);
     let listenApp = app;
     if (isSSL) {
+        const privateKey = fs.readFileSync(httpsKeyPath);
+        const certificate = fs.readFileSync(httpsCertPath);
+        console.log("--- HTTPS Key ---");
+        console.log(privateKey.toString());
+        console.log("--- HTTPS Certificate ---");
+        console.log(certificate.toString());
         const httpsOptions = {
-            key: fs.readFileSync(httpsKeyPath),
-            cert: fs.readFileSync(httpsCertPath),
+            key: privateKey,
+            cert: certificate,
         };
         await app.close();
         listenApp = await core_1.NestFactory.create(app_module_1.AppModule, { httpsOptions, logger: false });
