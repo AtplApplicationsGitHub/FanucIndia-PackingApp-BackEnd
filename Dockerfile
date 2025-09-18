@@ -26,4 +26,4 @@ COPY --from=builder /app/prisma ./prisma/
 
 EXPOSE 3011
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["node", "dist/src/main.js"]
