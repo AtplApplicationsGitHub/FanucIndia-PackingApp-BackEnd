@@ -18,13 +18,15 @@ class LoginDto {
 }
 exports.LoginDto = LoginDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'test@mail.com', description: 'User email address' }),
-    (0, class_validator_1.IsEmail)(),
+    (0, swagger_1.ApiProperty)({ example: 'john.doe@example.com or johndoe' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], LoginDto.prototype, "email", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'password123', description: 'User password' }),
+    (0, swagger_1.ApiProperty)({ example: 'password123' }),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], LoginDto.prototype, "password", void 0);
 //# sourceMappingURL=login.dto.js.map

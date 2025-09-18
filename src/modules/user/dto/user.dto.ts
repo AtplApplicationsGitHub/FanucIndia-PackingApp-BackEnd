@@ -1,5 +1,4 @@
 import {
-  IsEmail,
   IsString,
   MinLength,
   IsIn,
@@ -14,8 +13,8 @@ export class CreateUserDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ example: 'john.doe@example.com' })
-  @IsEmail()
+  @ApiProperty({ example: 'john.doe@example.com or johndoe' })
+  @IsString()
   email: string;
 
   @ApiProperty({

@@ -25,8 +25,8 @@ __decorate([
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "name", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'john.doe@example.com' }),
-    (0, class_validator_1.IsEmail)(),
+    (0, swagger_1.ApiProperty)({ example: 'john.doe@example.com or johndoe' }),
+    (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "email", void 0);
 __decorate([
