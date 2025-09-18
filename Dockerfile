@@ -19,5 +19,6 @@ COPY --from=builder /app/dist /app/dist
 COPY --from=builder /app/prisma /app/prisma
 RUN npx prisma generate
 
-EXPOSE 3010
+EXPOSE 3011
+
 CMD ["node", "dist/src/main.js"]
