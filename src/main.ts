@@ -76,7 +76,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = process.env.PORT || 3010;
+  const port = process.env.PORT || 3011;
   await listenApp.listen(port, '0.0.0.0');
   pinoAdapter.log(`Application is listening on port ${port}`, 'bootstrap');
   pinoAdapter.log('Application started', 'bootstrap');
