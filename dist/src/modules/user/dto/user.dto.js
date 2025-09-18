@@ -20,67 +20,54 @@ class CreateUserDto {
 }
 exports.CreateUserDto = CreateUserDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'John Doe', description: 'Full name of the user' }),
-    (0, class_validator_1.IsNotEmpty)(),
+    (0, swagger_1.ApiProperty)({ example: 'John Doe' }),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "name", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'user@mail.com', description: 'User email address' }),
+    (0, swagger_1.ApiProperty)({ example: 'john.doe@example.com' }),
     (0, class_validator_1.IsEmail)(),
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "email", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'password123', minLength: 8, description: 'Password (min 8 chars)' }),
-    (0, class_validator_1.IsNotEmpty)(),
-    (0, class_validator_1.MinLength)(8),
+    (0, swagger_1.ApiProperty)({
+        description: 'Password (min 8 chars for Admin/Sales, 4-digit PIN for User)',
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.ValidateIf)((o) => o.role !== 'USER'),
+    (0, class_validator_1.MinLength)(8, { message: 'Password must be at least 8 characters long' }),
+    (0, class_validator_1.ValidateIf)((o) => o.role === 'USER'),
+    (0, class_validator_1.Matches)(/^\d{4}$/, {
+        message: 'Password must be a 4-digit PIN for the USER role',
+    }),
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "password", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({
-        example: 'SALES',
-        description: 'User role (SALES, ADMIN, USER)',
-        enum: ['SALES', 'ADMIN', 'USER'],
-        default: 'SALES',
+        example: 'USER',
+        enum: ['ADMIN', 'SALES', 'USER'],
     }),
-    (0, class_validator_1.IsNotEmpty)(),
-    (0, class_validator_1.IsIn)(['SALES', 'ADMIN', 'USER']),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsIn)(['ADMIN', 'SALES', 'USER']),
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "role", void 0);
-class UpdateUserDto {
-    name;
-    email;
+class UpdateUserDto extends (0, swagger_1.PartialType)(CreateUserDto) {
     password;
-    role;
 }
 exports.UpdateUserDto = UpdateUserDto;
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'Jane Smith', description: 'Full name of the user' }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateUserDto.prototype, "name", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'jane@mail.com', description: 'User email address' }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEmail)(),
-    __metadata("design:type", String)
-], UpdateUserDto.prototype, "email", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'newpassword123', minLength: 8, description: 'Password (min 8 chars)' }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.MinLength)(8),
-    __metadata("design:type", String)
-], UpdateUserDto.prototype, "password", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({
-        example: 'USER',
-        description: 'User role (SALES, ADMIN, USER)',
-        enum: ['SALES', 'ADMIN', 'USER'],
-        default: 'USER',
+    (0, swagger_1.ApiProperty)({
+        description: 'Optional new password',
+        required: false,
     }),
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsIn)(['SALES', 'ADMIN', 'USER']),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.ValidateIf)((o) => o.role !== 'USER' && o.password),
+    (0, class_validator_1.MinLength)(8, { message: 'Password must be at least 8 characters long' }),
+    (0, class_validator_1.ValidateIf)((o) => o.role === 'USER' && o.password),
+    (0, class_validator_1.Matches)(/^\d{4}$/, {
+        message: 'Password must be a 4-digit PIN for the USER role',
+    }),
     __metadata("design:type", String)
-], UpdateUserDto.prototype, "role", void 0);
+], UpdateUserDto.prototype, "password", void 0);
 //# sourceMappingURL=user.dto.js.map

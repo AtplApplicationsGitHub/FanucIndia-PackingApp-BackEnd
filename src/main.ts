@@ -12,7 +12,9 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const httpsKeyPath = configService.get<string>('SSL_KEY_PATH');
+  // console.log(httpsKeyPath);
   const httpsCertPath = configService.get<string>('SSL_CERT_PATH');
+  // console.log(httpsCertPath);
   const isSSL = !!(httpsKeyPath && httpsCertPath);
 
   let listenApp = app;
@@ -53,7 +55,9 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await listenApp.listen(process.env.PORT ?? 3010);
+  const port = process.env.PORT || 3010;
+  await listenApp.listen(port, '0.0.0.0');
+  pinoAdapter.log(`Application is listening on port ${port}`, 'bootstrap');
   pinoAdapter.log('Application started', 'bootstrap');
 }
 

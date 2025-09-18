@@ -1,4 +1,11 @@
-import { IsEmail, IsString, MinLength, IsIn } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsIn,
+  ValidateIf,
+  Matches,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SignupDto {
@@ -10,19 +17,29 @@ export class SignupDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'password123', minLength: 8, description: 'Password (min 8 chars)' })
+  @ApiProperty({
+    example: 'password123',
+    description: 'Password (min 8 chars for Admin/Sales, 4-digit PIN for User)',
+  })
   @IsString()
-  @MinLength(8)
+  // Only apply the MinLength validator if the role is NOT 'USER'
+  @ValidateIf((o) => o.role !== 'USER')
+  @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  // Only apply the Matches validator if the role IS 'USER'
+  @ValidateIf((o) => o.role === 'USER')
+  @Matches(/^\d{4}$/, {
+    message: 'Password must be a 4-digit PIN for the USER role',
+  })
   password: string;
 
   @ApiProperty({
     example: 'SALES',
-    description: 'User role (SALES or ADMIN only)',
-    enum: ['SALES', 'ADMIN'],
-    default: 'SALES',
+    description: 'User role (SALES, ADMIN or USER)',
+    enum: ['SALES', 'ADMIN', 'USER'],
   })
   @IsString()
-  @IsIn(['SALES', 'ADMIN'], { message: 'role must be either SALES or ADMIN' })
+  @IsIn(['SALES', 'ADMIN', 'USER'], {
+    message: 'Role must be either SALES, ADMIN, or USER',
+  })
   role: string;
 }
-

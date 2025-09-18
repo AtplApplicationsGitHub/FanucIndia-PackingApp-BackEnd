@@ -76,7 +76,9 @@ async function bootstrap() {
         origin: ['http://localhost:3000', 'https://fanuc.goval.app:444'],
         credentials: true,
     });
-    await listenApp.listen(process.env.PORT ?? 3010);
+    const port = process.env.PORT || 3010;
+    await listenApp.listen(port, '0.0.0.0');
+    pinoAdapter.log(`Application is listening on port ${port}`, 'bootstrap');
     pinoAdapter.log('Application started', 'bootstrap');
 }
 bootstrap();

@@ -30,20 +30,29 @@ __decorate([
     __metadata("design:type", String)
 ], SignupDto.prototype, "email", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'password123', minLength: 8, description: 'Password (min 8 chars)' }),
+    (0, swagger_1.ApiProperty)({
+        example: 'password123',
+        description: 'Password (min 8 chars for Admin/Sales, 4-digit PIN for User)',
+    }),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MinLength)(8),
+    (0, class_validator_1.ValidateIf)((o) => o.role !== 'USER'),
+    (0, class_validator_1.MinLength)(8, { message: 'Password must be at least 8 characters long' }),
+    (0, class_validator_1.ValidateIf)((o) => o.role === 'USER'),
+    (0, class_validator_1.Matches)(/^\d{4}$/, {
+        message: 'Password must be a 4-digit PIN for the USER role',
+    }),
     __metadata("design:type", String)
 ], SignupDto.prototype, "password", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({
         example: 'SALES',
-        description: 'User role (SALES or ADMIN only)',
-        enum: ['SALES', 'ADMIN'],
-        default: 'SALES',
+        description: 'User role (SALES, ADMIN or USER)',
+        enum: ['SALES', 'ADMIN', 'USER'],
     }),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsIn)(['SALES', 'ADMIN'], { message: 'role must be either SALES or ADMIN' }),
+    (0, class_validator_1.IsIn)(['SALES', 'ADMIN', 'USER'], {
+        message: 'Role must be either SALES, ADMIN, or USER',
+    }),
     __metadata("design:type", String)
 ], SignupDto.prototype, "role", void 0);
 //# sourceMappingURL=signup.dto.js.map
