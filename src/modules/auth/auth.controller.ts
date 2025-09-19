@@ -72,4 +72,20 @@ export class AuthController {
       exists,
     }))
   }
+
+  @Public()
+  @Post('mobile-login')
+  @ApiOperation({ summary: 'Login for mobile users and receive JWT' })
+  @ApiBody({ type: LoginDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful, returns JWT token',
+  })
+  @ApiResponse({ status: 401, description: 'Invalid email or password' })
+  mobileLogin(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.mobileLogin(dto, req);
+  }
 }

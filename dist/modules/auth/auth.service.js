@@ -161,6 +161,69 @@ let AuthService = class AuthService {
         });
         return !!user;
     }
+    async mobileLogin(dto, req) {
+        const email = dto.email.toLowerCase();
+        const user = await this.prisma.user.findUnique({
+            where: {
+                email
+            }
+        });
+        if (!user) {
+            (0, _logger.logAuthFailure)({
+                code: 'INVALID_CREDENTIALS',
+                message: 'Invalid credentials for mobile login',
+                ip: req.ip ?? 'unknown',
+                requestId: String(req.headers['x-request-id'] ?? '')
+            });
+            throw new _common.UnauthorizedException({
+                code: 'INVALID_CREDENTIALS',
+                message: 'Invalid credentials'
+            });
+        }
+        // This is the key change: check the user's role
+        if (user.role !== 'USER') {
+            (0, _logger.logAuthFailure)({
+                code: 'INVALID_ROLE_FOR_MOBILE',
+                message: `User with role ${user.role} attempted mobile login`,
+                ip: req.ip ?? 'unknown',
+                userId: String(user.id),
+                requestId: String(req.headers['x-request-id'] ?? '')
+            });
+            throw new _common.UnauthorizedException({
+                code: 'INVALID_CREDENTIALS',
+                message: 'Invalid credentials'
+            });
+        }
+        const valid = await _bcryptjs.compare(dto.password, user.password);
+        if (!valid) {
+            (0, _logger.logAuthFailure)({
+                code: 'INVALID_CREDENTIALS',
+                message: 'Invalid credentials for mobile login',
+                ip: req.ip ?? 'unknown',
+                userId: String(user.id),
+                requestId: String(req.headers['x-request-id'] ?? '')
+            });
+            throw new _common.UnauthorizedException({
+                code: 'INVALID_CREDENTIALS',
+                message: 'Invalid credentials'
+            });
+        }
+        const token = await this.jwtService.signAsync({
+            sub: user.id,
+            email: user.email,
+            role: user.role,
+            name: user.name
+        });
+        return {
+            accessToken: token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
+        };
+    }
     constructor(prisma, jwtService){
         this.prisma = prisma;
         this.jwtService = jwtService;

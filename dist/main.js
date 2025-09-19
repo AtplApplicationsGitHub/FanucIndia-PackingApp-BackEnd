@@ -8,12 +8,10 @@ const _allexceptionsfilter = require("./common/all-exceptions.filter");
 const _pinologgerservice = require("./common/pino-logger.service");
 const _swagger = require("@nestjs/swagger");
 const _common = require("@nestjs/common");
-const _config = require("@nestjs/config");
 async function bootstrap() {
     const app = await _core.NestFactory.create(_appmodule.AppModule, {
         logger: false
     });
-    const configService = app.get(_config.ConfigService);
     const pinoAdapter = new _pinologgerservice.PinoLogger();
     app.useLogger(pinoAdapter);
     app.useGlobalPipes(new _common.ValidationPipe({

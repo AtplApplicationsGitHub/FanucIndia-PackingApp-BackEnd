@@ -4,12 +4,9 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { PinoLogger } from './common/pino-logger.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
-import * as fs from 'fs';
-import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { logger: false });
-  const configService = app.get(ConfigService);
 
   const pinoAdapter = new PinoLogger();
   app.useLogger(pinoAdapter);

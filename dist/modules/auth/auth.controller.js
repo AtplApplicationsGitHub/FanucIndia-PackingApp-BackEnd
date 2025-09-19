@@ -44,6 +44,9 @@ let AuthController = class AuthController {
                 exists
             }));
     }
+    mobileLogin(dto, req) {
+        return this.authService.mobileLogin(dto, req);
+    }
     constructor(authService){
         this.authService = authService;
     }
@@ -123,6 +126,32 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], AuthController.prototype, "checkEmail", null);
+_ts_decorate([
+    (0, _publicdecorator.Public)(),
+    (0, _common.Post)('mobile-login'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Login for mobile users and receive JWT'
+    }),
+    (0, _swagger.ApiBody)({
+        type: _logindto.LoginDto
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Login successful, returns JWT token'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 401,
+        description: 'Invalid email or password'
+    }),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _logindto.LoginDto === "undefined" ? Object : _logindto.LoginDto,
+        typeof _express.Request === "undefined" ? Object : _express.Request
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], AuthController.prototype, "mobileLogin", null);
 AuthController = _ts_decorate([
     (0, _swagger.ApiTags)('Auth'),
     (0, _common.Controller)('auth'),
