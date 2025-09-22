@@ -37,4 +37,13 @@ export class UserDashboardController {
     }
     return order;
   }
+
+  @Get('orders-summary')
+  @Roles('USER')
+  @ApiOperation({ summary: "Get a summary of sales orders assigned to the logged-in user" })
+  @ApiResponse({ status: 200, description: 'Assigned orders summary returned successfully' })
+  getAssignedOrdersSummary(@Req() req: AuthRequest) {
+    const userId = req.user.userId;
+    return this.userDashboardService.getAssignedOrdersSummary(userId);
+  }
 }

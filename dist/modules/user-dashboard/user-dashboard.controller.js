@@ -42,6 +42,10 @@ let UserDashboardController = class UserDashboardController {
         }
         return order;
     }
+    getAssignedOrdersSummary(req) {
+        const userId = req.user.userId;
+        return this.userDashboardService.getAssignedOrdersSummary(userId);
+    }
     constructor(userDashboardService){
         this.userDashboardService = userDashboardService;
     }
@@ -86,6 +90,23 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], UserDashboardController.prototype, "getOrderDetails", null);
+_ts_decorate([
+    (0, _common.Get)('orders-summary'),
+    (0, _rolesdecorator.Roles)('USER'),
+    (0, _swagger.ApiOperation)({
+        summary: "Get a summary of sales orders assigned to the logged-in user"
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Assigned orders summary returned successfully'
+    }),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UserDashboardController.prototype, "getAssignedOrdersSummary", null);
 UserDashboardController = _ts_decorate([
     (0, _swagger.ApiTags)('User Dashboard'),
     (0, _swagger.ApiBearerAuth)(),

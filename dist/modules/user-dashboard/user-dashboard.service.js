@@ -71,6 +71,37 @@ let UserDashboardService = class UserDashboardService {
             }
         });
     }
+    async getAssignedOrdersSummary(userId) {
+        const assignedOrders = await this.prisma.salesOrder.findMany({
+            where: {
+                assignedUserId: userId
+            },
+            select: {
+                saleOrderNumber: true,
+                priority: true,
+                status: true,
+                materialData: {
+                    select: {
+                        Required_Qty: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+        return assignedOrders.map((order)=>{
+            const totalMaterials = order.materialData.length;
+            const totalItems = order.materialData.reduce((sum, material)=>sum + material.Required_Qty, 0);
+            return {
+                saleOrderNumber: order.saleOrderNumber,
+                priority: order.priority,
+                status: order.status,
+                totalMaterials,
+                totalItems
+            };
+        });
+    }
     constructor(prisma){
         this.prisma = prisma;
     }
