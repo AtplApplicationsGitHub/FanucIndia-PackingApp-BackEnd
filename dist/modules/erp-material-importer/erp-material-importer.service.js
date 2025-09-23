@@ -64,7 +64,6 @@ function _ts_metadata(k, v) {
 }
 const columnMapping = {
     "SO Number": "saleOrderNumber",
-    "Customer ID": "customerId",
     "Transfer Order": "transferOrder",
     "FG OBD": "FG_OBD",
     "Machine Model": "Machine_Model",
@@ -214,7 +213,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             this.logger.error(`Database transaction failed for SO: ${soNumber}`, e);
             if (e instanceof _client.Prisma.PrismaClientKnownRequestError) {
                 if (e.code === 'P2003') {
-                    throw new _common.BadRequestException('Invalid data in file. A record refers to a Customer ID that does not exist.');
+                    this.logger.warn('Prisma FK constraint error encountered during ERP material import; proceeding to surface generic error without customer-id hint.');
                 }
             }
             throw new _common.InternalServerErrorException('Database transaction failed.');

@@ -50,13 +50,13 @@ export class SalesOrderService {
       ]);
 
       const dropdowns: Record<string, string[]> = {
-        product: products.map(p => p.name),
-        transporter: transporters.map(t => t.name),
-        plantCode: plantCodes.map(p => p.code),
-        salesZone: salesZones.map(s => s.name),
-        packConfig: packConfigs.map(p => p.configName),
+        product: products.map((p) => p.name),
+        transporter: transporters.map((t) => t.name),
+        plantCode: plantCodes.map((p) => p.code),
+        salesZone: salesZones.map((s) => s.name),
+        packConfig: packConfigs.map((p) => p.configName),
         paymentClearance: ['Yes', 'No'],
-        customer: customers.map(c => c.name),
+        customer: customers.map((c) => c.name),
       };
 
       const ROW_COUNT = 100;
@@ -73,16 +73,15 @@ export class SalesOrderService {
         }
       }
 
-      res
-        .status(200)
-        .set({
-          'Content-Type':
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition':
-            'attachment; filename="sales_bulk_template.xlsx"',
-        });
-      await workbook.xlsx.write(res);
-      res.end();
+      res.status(200).set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition':
+          'attachment; filename="sales_bulk_template.xlsx"',
+      });
+      return workbook.xlsx.write(res).then(() => {
+        res.end();
+      });
     } catch (err: any) {
       throw new InternalServerErrorException(
         'Failed to generate Excel template',
@@ -97,10 +96,7 @@ export class SalesOrderService {
       workbook = new Workbook();
       await workbook.xlsx.load(fileBuffer);
     } catch (err: any) {
-      throw new BadRequestException(
-        'Invalid Excel file format',
-        err.message,
-      );
+      throw new BadRequestException('Invalid Excel file format', err.message);
     }
 
     const worksheet = workbook.getWorksheet('Bulk Import');
@@ -110,21 +106,15 @@ export class SalesOrderService {
 
     let products, transporters, plantCodes, salesZones, packConfigs, customers;
     try {
-      [
-        products,
-        transporters,
-        plantCodes,
-        salesZones,
-        packConfigs,
-        customers,
-      ] = await Promise.all([
-        this.prisma.product.findMany(),
-        this.prisma.transporter.findMany(),
-        this.prisma.plantCode.findMany(),
-        this.prisma.salesZone.findMany(),
-        this.prisma.packConfig.findMany(),
-        this.prisma.customer.findMany(),
-      ]);
+      [products, transporters, plantCodes, salesZones, packConfigs, customers] =
+        await Promise.all([
+          this.prisma.product.findMany(),
+          this.prisma.transporter.findMany(),
+          this.prisma.plantCode.findMany(),
+          this.prisma.salesZone.findMany(),
+          this.prisma.packConfig.findMany(),
+          this.prisma.customer.findMany(),
+        ]);
     } catch (err: any) {
       throw new InternalServerErrorException(
         'Failed to retrieve reference data',
@@ -133,19 +123,21 @@ export class SalesOrderService {
     }
 
     const maps = {
-      product: new Map(products.map(p => [p.name.trim(), p.id])),
-      transporter: new Map(transporters.map(t => [t.name.trim(), t.id])),
-      plantCode: new Map(plantCodes.map(pc => [pc.code.trim(), pc.id])),
-      salesZone: new Map(salesZones.map(sz => [sz.name.trim(), sz.id])),
-      packConfig: new Map(packConfigs.map(pc => [pc.configName.trim(), pc.id])),
-      customer: new Map(customers.map(c => [c.name.trim(), c.id])),
+      product: new Map(products.map((p) => [p.name.trim(), p.id])),
+      transporter: new Map(transporters.map((t) => [t.name.trim(), t.id])),
+      plantCode: new Map(plantCodes.map((pc) => [pc.code.trim(), pc.id])),
+      salesZone: new Map(salesZones.map((sz) => [sz.name.trim(), sz.id])),
+      packConfig: new Map(
+        packConfigs.map((pc) => [pc.configName.trim(), pc.id]),
+      ),
+      customer: new Map(customers.map((c) => [c.name.trim(), c.id])),
     };
 
     const ordersToInsert: any[] = [];
     const errors: { row: number; errors: string[] }[] = [];
 
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber === 1) return; 
+      if (rowNumber === 1) return;
       const [
         product,
         saleOrderNumber,
@@ -163,10 +155,18 @@ export class SalesOrderService {
 
       const rowErrors: string[] = [];
       const productId = maps.product.get((product || '').toString().trim());
-      const transporterId = maps.transporter.get((transporter || '').toString().trim());
-      const plantCodeId = maps.plantCode.get((plantCode || '').toString().trim());
-      const salesZoneId = maps.salesZone.get((salesZone || '').toString().trim());
-      const packConfigId = maps.packConfig.get((packConfig || '').toString().trim());
+      const transporterId = maps.transporter.get(
+        (transporter || '').toString().trim(),
+      );
+      const plantCodeId = maps.plantCode.get(
+        (plantCode || '').toString().trim(),
+      );
+      const salesZoneId = maps.salesZone.get(
+        (salesZone || '').toString().trim(),
+      );
+      const packConfigId = maps.packConfig.get(
+        (packConfig || '').toString().trim(),
+      );
       const customerId = maps.customer.get((customer || '').toString().trim());
 
       if (!productId) rowErrors.push('Invalid product');
@@ -203,7 +203,8 @@ export class SalesOrderService {
           deliveryDate: deliveryDateObj,
           transporterId,
           plantCodeId,
-          paymentClearance: paymentClearance === 'Yes' || paymentClearance === true,
+          paymentClearance:
+            paymentClearance === 'Yes' || paymentClearance === true,
           salesZoneId,
           packConfigId,
           customerId,
@@ -215,7 +216,8 @@ export class SalesOrderService {
 
     if (errors.length > 0) {
       throw new BadRequestException({
-        message: 'Import failed due to errors in the file. No orders were imported.',
+        message:
+          'Import failed due to errors in the file. No orders were imported.',
         errors,
       });
     }
@@ -227,21 +229,27 @@ export class SalesOrderService {
       });
     }
 
-    const saleOrderNumbers = ordersToInsert.map(o => o.saleOrderNumber);
-    const outboundDeliveries = ordersToInsert.map(o => o.outboundDelivery);
-    const transferOrders = ordersToInsert.map(o => o.transferOrder);
+    const saleOrderNumbers = ordersToInsert.map((o) => o.saleOrderNumber);
+    const outboundDeliveries = ordersToInsert.map((o) => o.outboundDelivery);
+    const transferOrders = ordersToInsert.map((o) => o.transferOrder);
 
     const hasDuplicates = (arr: string[]) => new Set(arr).size !== arr.length;
     if (hasDuplicates(saleOrderNumbers)) {
-      throw new BadRequestException('The import file contains duplicate Sale Order Numbers.');
+      throw new BadRequestException(
+        'The import file contains duplicate Sale Order Numbers.',
+      );
     }
     if (hasDuplicates(outboundDeliveries)) {
-      throw new BadRequestException('The import file contains duplicate Outbound Delivery numbers.');
+      throw new BadRequestException(
+        'The import file contains duplicate Outbound Delivery numbers.',
+      );
     }
     if (hasDuplicates(transferOrders)) {
-      throw new BadRequestException('The import file contains duplicate Transfer Order numbers.');
+      throw new BadRequestException(
+        'The import file contains duplicate Transfer Order numbers.',
+      );
     }
-    
+
     const existingOrders = await this.prisma.salesOrder.findMany({
       where: {
         OR: [
@@ -253,22 +261,35 @@ export class SalesOrderService {
     });
 
     if (existingOrders.length > 0) {
-      const existingSO = existingOrders.find(e => saleOrderNumbers.includes(e.saleOrderNumber));
+      const existingSO = existingOrders.find((e) =>
+        saleOrderNumbers.includes(e.saleOrderNumber),
+      );
       if (existingSO) {
-        throw new ConflictException(`An order with Sale Order Number '${existingSO.saleOrderNumber}' already exists.`);
+        throw new ConflictException(
+          `An order with Sale Order Number '${existingSO.saleOrderNumber}' already exists.`,
+        );
       }
-      const existingOBD = existingOrders.find(e => outboundDeliveries.includes(e.outboundDelivery));
+      const existingOBD = existingOrders.find((e) =>
+        outboundDeliveries.includes(e.outboundDelivery),
+      );
       if (existingOBD) {
-        throw new ConflictException(`An order with Outbound Delivery '${existingOBD.outboundDelivery}' already exists.`);
+        throw new ConflictException(
+          `An order with Outbound Delivery '${existingOBD.outboundDelivery}' already exists.`,
+        );
       }
-      const existingTO = existingOrders.find(e => transferOrders.includes(e.transferOrder));
+      const existingTO = existingOrders.find((e) =>
+        transferOrders.includes(e.transferOrder),
+      );
       if (existingTO) {
-        throw new ConflictException(`An order with Transfer Order '${existingTO.transferOrder}' already exists.`);
+        throw new ConflictException(
+          `An order with Transfer Order '${existingTO.transferOrder}' already exists.`,
+        );
       }
     }
 
     try {
-      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      const delay = (ms: number) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
       const insertedCount = await this.prisma.$transaction(async (tx) => {
         let count = 0;
         for (const orderData of ordersToInsert) {
@@ -276,7 +297,7 @@ export class SalesOrderService {
             data: orderData,
           });
           count++;
-          await delay(10); 
+          await delay(10);
         }
         return count;
       });

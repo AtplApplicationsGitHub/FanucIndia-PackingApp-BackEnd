@@ -138,8 +138,9 @@ let SalesOrderService = class SalesOrderService {
                 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 'Content-Disposition': 'attachment; filename="sales_bulk_template.xlsx"'
             });
-            await workbook.xlsx.write(res);
-            res.end();
+            return workbook.xlsx.write(res).then(()=>{
+                res.end();
+            });
         } catch (err) {
             throw new _common.InternalServerErrorException('Failed to generate Excel template', err.message);
         }
