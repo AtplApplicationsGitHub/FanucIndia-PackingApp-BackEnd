@@ -46,4 +46,15 @@ export class UserDashboardController {
     const userId = req.user.userId;
     return this.userDashboardService.getAssignedOrdersSummary(userId);
   }
+
+  @Get('orders/:id/download-details')
+  @Roles('USER')
+  @ApiOperation({ summary: "Download material details for a specific sales order" })
+  @ApiResponse({ status: 200, description: 'Material details returned successfully' })
+  @ApiResponse({ status: 404, description: 'Order not found or access denied' })
+  async downloadOrderDetails(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    const userId = req.user.userId;
+    const userRole = req.user.role;
+    return this.userDashboardService.downloadOrderDetails(id, userId, userRole);
+  }
 }

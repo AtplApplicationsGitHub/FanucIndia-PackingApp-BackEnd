@@ -102,6 +102,60 @@ let UserDashboardService = class UserDashboardService {
             };
         });
     }
+    async downloadOrderDetails(orderId, userId, userRole) {
+        const order = await this.findOrderById(orderId, userId, userRole);
+        if (!order) {
+            throw new _common.NotFoundException('Sales order not found or access denied.');
+        }
+        const materialDetails = await this.prisma.eRP_Material_Data.findMany({
+            where: {
+                saleOrderNumber: order.saleOrderNumber
+            },
+            select: {
+                Material_Code: true,
+                Material_Description: true,
+                Bin_No: true,
+                A_D_F: true,
+                Required_Qty: true,
+                Issue_stage: true,
+                Packing_stage: true
+            }
+        });
+        return materialDetails;
+    }
+    async uploadOrderDetails(orderId, userId, userRole, data) {
+        const order = await this.findOrderById(orderId, userId, userRole);
+        if (!order) {
+            throw new _common.NotFoundException('Sales order not found or access denied.');
+        }
+        const { materials } = data;
+        if (!materials || materials.length === 0) {
+            throw new _common.BadRequestException('No materials data provided.');
+        }
+        try {
+            await this.prisma.$transaction(async (tx)=>{
+                for (const material of materials){
+                    await tx.eRP_Material_Data.updateMany({
+                        where: {
+                            saleOrderNumber: order.saleOrderNumber,
+                            Material_Code: material.Material_Code
+                        },
+                        data: {
+                            Issue_stage: material.Issue_stage,
+                            Packing_stage: material.Packing_stage,
+                            UpdatedBy: 'MOBILE_SYNC',
+                            UpdatedDate: new Date()
+                        }
+                    });
+                }
+            });
+            return {
+                message: 'Data uploaded and synchronized successfully.'
+            };
+        } catch (error) {
+            throw new _common.BadRequestException('Failed to update material data.');
+        }
+    }
     constructor(prisma){
         this.prisma = prisma;
     }
