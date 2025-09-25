@@ -47,9 +47,12 @@ let UserDashboardController = class UserDashboardController {
         return this.userDashboardService.getAssignedOrdersSummary(userId);
     }
     async downloadOrderDetails(id, req) {
-        const userId = req.user.userId;
-        const userRole = req.user.role;
-        return this.userDashboardService.downloadOrderDetails(id, userId, userRole);
+        const { userId, role } = req.user;
+        return this.userDashboardService.downloadOrderDetails(id, userId, role);
+    }
+    async downloadOrderDetailsBySoNumber(soNumber, req) {
+        const { userId, role } = req.user;
+        return this.userDashboardService.downloadOrderDetailsBySoNumber(soNumber, userId, role);
     }
     constructor(userDashboardService){
         this.userDashboardService = userDashboardService;
@@ -76,7 +79,7 @@ _ts_decorate([
     (0, _common.Get)('orders/:id'),
     (0, _rolesdecorator.Roles)('USER', 'ADMIN'),
     (0, _swagger.ApiOperation)({
-        summary: "Get details for a specific sales order"
+        summary: "Get details for a specific sales order by ID"
     }),
     (0, _swagger.ApiResponse)({
         status: 200,
@@ -116,7 +119,7 @@ _ts_decorate([
     (0, _common.Get)('orders/:id/download-details'),
     (0, _rolesdecorator.Roles)('USER'),
     (0, _swagger.ApiOperation)({
-        summary: "Download material details for a specific sales order"
+        summary: "Download material details using the Order ID"
     }),
     (0, _swagger.ApiResponse)({
         status: 200,
@@ -135,6 +138,29 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], UserDashboardController.prototype, "downloadOrderDetails", null);
+_ts_decorate([
+    (0, _common.Get)('orders/son/:soNumber/download-details'),
+    (0, _rolesdecorator.Roles)('USER'),
+    (0, _swagger.ApiOperation)({
+        summary: "Download material details using the SO Number"
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Material details returned successfully'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 404,
+        description: 'Order not found or access denied'
+    }),
+    _ts_param(0, (0, _common.Param)('soNumber')),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], UserDashboardController.prototype, "downloadOrderDetailsBySoNumber", null);
 UserDashboardController = _ts_decorate([
     (0, _swagger.ApiTags)('User Dashboard'),
     (0, _swagger.ApiBearerAuth)(),

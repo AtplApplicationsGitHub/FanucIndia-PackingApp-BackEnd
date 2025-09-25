@@ -23,7 +23,7 @@ export class UserDashboardController {
 
   @Get('orders/:id')
   @Roles('USER', 'ADMIN')
-  @ApiOperation({ summary: "Get details for a specific sales order" })
+  @ApiOperation({ summary: "Get details for a specific sales order by ID" })
   @ApiResponse({ status: 200, description: 'Sales order details returned' })
   @ApiResponse({ status: 404, description: 'Order not found or access denied' })
   async getOrderDetails(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
@@ -49,12 +49,24 @@ export class UserDashboardController {
 
   @Get('orders/:id/download-details')
   @Roles('USER')
-  @ApiOperation({ summary: "Download material details for a specific sales order" })
+  @ApiOperation({ summary: "Download material details using the Order ID" })
   @ApiResponse({ status: 200, description: 'Material details returned successfully' })
   @ApiResponse({ status: 404, description: 'Order not found or access denied' })
   async downloadOrderDetails(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
-    const userId = req.user.userId;
-    const userRole = req.user.role;
-    return this.userDashboardService.downloadOrderDetails(id, userId, userRole);
+    const { userId, role } = req.user;
+    return this.userDashboardService.downloadOrderDetails(id, userId, role);
+  }
+  
+  @Get('orders/son/:soNumber/download-details')
+  @Roles('USER')
+  @ApiOperation({ summary: "Download material details using the SO Number" })
+  @ApiResponse({ status: 200, description: 'Material details returned successfully' })
+  @ApiResponse({ status: 404, description: 'Order not found or access denied' })
+  async downloadOrderDetailsBySoNumber(
+    @Param('soNumber') soNumber: string,
+    @Req() req: AuthRequest,
+  ) {
+    const { userId, role } = req.user;
+    return this.userDashboardService.downloadOrderDetailsBySoNumber(soNumber, userId, role);
   }
 }
