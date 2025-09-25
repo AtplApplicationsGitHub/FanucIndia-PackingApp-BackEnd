@@ -1,3 +1,118 @@
+// import { Controller, Get, Post, Param, ParseIntPipe, Req, UseGuards, NotFoundException, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+// import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiConsumes } from '@nestjs/swagger';
+// import { FileInterceptor } from '@nestjs/platform-express';
+// import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+// import { Roles } from '../auth/roles.decorator';
+// import { AuthRequest } from '../auth/types/auth-request.type';
+// import { UserDashboardService } from './user-dashboard.service';
+// import { UpdateMaterialDataDto } from './dto/update-material-data.dto';
+// @ApiTags('User Dashboard')
+// @ApiBearerAuth()
+// @UseGuards(JwtAuthGuard)
+// @Controller('user-dashboard')
+// export class UserDashboardController {
+//   constructor(private readonly userDashboardService: UserDashboardService) {}
+//   @Get('orders')
+//   @Roles('USER')
+//   @ApiOperation({ summary: "Get all sales orders assigned to the logged-in user" })
+//   @ApiResponse({ status: 200, description: 'Assigned orders returned successfully' })
+//   getAssignedOrders(@Req() req: AuthRequest) {
+//     const userId = req.user.userId;
+//     return this.userDashboardService.findAssignedOrders(userId);
+//   }
+//   @Get('orders-summary')
+//   @Roles('USER')
+//   @ApiOperation({ summary: "Get a summary of sales orders assigned to the logged-in user" })
+//   @ApiResponse({ status: 200, description: 'Assigned orders summary returned successfully' })
+//   getAssignedOrdersSummary(@Req() req: AuthRequest) {
+//     const userId = req.user.userId;
+//     return this.userDashboardService.getAssignedOrdersSummary(userId);
+//   }
+//   @Get('orders/:id')
+//   @Roles('USER', 'ADMIN')
+//   @ApiOperation({ summary: "Get details for a specific sales order by ID" })
+//   @ApiResponse({ status: 200, description: 'Sales order details returned' })
+//   @ApiResponse({ status: 404, description: 'Order not found or access denied' })
+//   async getOrderDetails(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+//     const userId = req.user.userId;
+//     const userRole = req.user.role;
+//     const order = await this.userDashboardService.findOrderById(id, userId, userRole);
+//     if (!order) {
+//       throw new NotFoundException('Sales order not found or you do not have permission to view it.');
+//     }
+//     return order;
+//   }
+//   @Get('orders/:id/download-details')
+//   @Roles('USER')
+//   @ApiOperation({ summary: "Download material details using the Order ID" })
+//   @ApiResponse({ status: 200, description: 'Material details returned successfully' })
+//   @ApiResponse({ status: 404, description: 'Order not found or access denied' })
+//   async downloadOrderDetails(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+//     const { userId, role } = req.user;
+//     return this.userDashboardService.downloadOrderDetails(id, userId, role);
+//   }
+//   @Get('orders/son/:soNumber/download-details')
+//   @Roles('USER', 'ADMIN')
+//   @ApiOperation({ summary: "Download material details using the SO Number" })
+//   @ApiResponse({ status: 200, description: 'Material details returned successfully' })
+//   @ApiResponse({ status: 404, description: 'Order not found or access denied' })
+//   async downloadOrderDetailsBySoNumber(
+//     @Param('soNumber') soNumber: string,
+//     @Req() req: AuthRequest,
+//   ) {
+//     const { userId, role } = req.user;
+//     return this.userDashboardService.downloadOrderDetailsBySoNumber(soNumber, userId, role);
+//   }
+//   @Post('orders/:id/upload-details')
+//   @Roles('USER')
+//   @UseInterceptors(FileInterceptor('file'))
+//   @ApiOperation({ summary: 'Upload and synchronize material details from a JSON file using Order ID' })
+//   @ApiConsumes('multipart/form-data')
+//   @ApiResponse({ status: 200, description: 'Data synchronized successfully' })
+//   @ApiResponse({ status: 400, description: 'Invalid file or data format' })
+//   async uploadOrderDetails(
+//     @Param('id', ParseIntPipe) id: number,
+//     @Req() req: AuthRequest,
+//     @UploadedFile() file: Express.Multer.File,
+//   ) {
+//     if (!file) {
+//       throw new BadRequestException('No file uploaded.');
+//     }
+//     const { userId, role } = req.user;
+//     try {
+//       const parsedArray = JSON.parse(file.buffer.toString());
+//       const jsonData: UpdateMaterialDataDto = { materials: parsedArray };
+//       return this.userDashboardService.uploadOrderDetails(id, userId, role, jsonData);
+//     } catch (error) {
+//       throw new BadRequestException('Invalid JSON file.');
+//     }
+//   }
+//   @Post('orders/son/:soNumber/upload-details')
+//   @Roles('USER')
+//   @UseInterceptors(FileInterceptor('file'))
+//   @ApiOperation({ summary: 'Upload and synchronize material details from a JSON file using SO Number' })
+//   @ApiConsumes('multipart/form-data')
+//   @ApiResponse({ status: 200, description: 'Data synchronized successfully' })
+//   @ApiResponse({ status: 400, description: 'Invalid file or data format' })
+//   async uploadOrderDetailsBySoNumber(
+//     @Param('soNumber') soNumber: string,
+//     @Req() req: AuthRequest,
+//     @UploadedFile() file: Express.Multer.File,
+//   ) {
+//     if (!file) {
+//       throw new BadRequestException('No file uploaded.');
+//     }
+//     const { userId, role } = req.user;
+//     try {
+//       const parsedArray = JSON.parse(file.buffer.toString());
+//       const jsonData: UpdateMaterialDataDto = { materials: parsedArray };
+//       return this.userDashboardService.uploadOrderDetailsBySoNumber(soNumber, userId, role, jsonData);
+//     } catch (error) {
+//       throw new BadRequestException('Invalid JSON file.');
+//     }
+//   }
+// }
+// backend/src/modules/user-dashboard/user-dashboard.controller.ts
 "use strict";
 Object.defineProperty(exports, "__esModule", {
     value: true
@@ -10,6 +125,7 @@ Object.defineProperty(exports, "UserDashboardController", {
 });
 const _common = require("@nestjs/common");
 const _swagger = require("@nestjs/swagger");
+const _platformexpress = require("@nestjs/platform-express");
 const _jwtauthguard = require("../auth/jwt-auth.guard");
 const _rolesdecorator = require("../auth/roles.decorator");
 const _authrequesttype = require("../auth/types/auth-request.type");
@@ -29,9 +145,14 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let UserDashboardController = class UserDashboardController {
+    // ... (all other GET endpoints remain unchanged) ...
     getAssignedOrders(req) {
         const userId = req.user.userId;
         return this.userDashboardService.findAssignedOrders(userId);
+    }
+    getAssignedOrdersSummary(req) {
+        const userId = req.user.userId;
+        return this.userDashboardService.getAssignedOrdersSummary(userId);
     }
     async getOrderDetails(id, req) {
         const userId = req.user.userId;
@@ -42,10 +163,6 @@ let UserDashboardController = class UserDashboardController {
         }
         return order;
     }
-    getAssignedOrdersSummary(req) {
-        const userId = req.user.userId;
-        return this.userDashboardService.getAssignedOrdersSummary(userId);
-    }
     async downloadOrderDetails(id, req) {
         const { userId, role } = req.user;
         return this.userDashboardService.downloadOrderDetails(id, userId, role);
@@ -53,6 +170,40 @@ let UserDashboardController = class UserDashboardController {
     async downloadOrderDetailsBySoNumber(soNumber, req) {
         const { userId, role } = req.user;
         return this.userDashboardService.downloadOrderDetailsBySoNumber(soNumber, userId, role);
+    }
+    async uploadOrderDetails(id, req, files) {
+        if (!files.data || !files.data[0]) {
+            throw new _common.BadRequestException('No data file uploaded.');
+        }
+        const { userId, role } = req.user;
+        const dataFile = files.data[0];
+        const attachments = files.attachments || [];
+        try {
+            const parsedArray = JSON.parse(dataFile.buffer.toString());
+            const jsonData = {
+                materials: parsedArray
+            };
+            return this.userDashboardService.uploadOrderDetails(id, userId, role, jsonData, attachments);
+        } catch (error) {
+            throw new _common.BadRequestException('Invalid JSON data file.');
+        }
+    }
+    async uploadOrderDetailsBySoNumber(soNumber, req, files) {
+        if (!files.data || !files.data[0]) {
+            throw new _common.BadRequestException('No data file uploaded.');
+        }
+        const { userId, role } = req.user;
+        const dataFile = files.data[0];
+        const attachments = files.attachments || [];
+        try {
+            const parsedArray = JSON.parse(dataFile.buffer.toString());
+            const jsonData = {
+                materials: parsedArray
+            };
+            return this.userDashboardService.uploadOrderDetailsBySoNumber(soNumber, userId, role, jsonData, attachments);
+        } catch (error) {
+            throw new _common.BadRequestException('Invalid JSON data file.');
+        }
     }
     constructor(userDashboardService){
         this.userDashboardService = userDashboardService;
@@ -76,6 +227,23 @@ _ts_decorate([
     _ts_metadata("design:returntype", void 0)
 ], UserDashboardController.prototype, "getAssignedOrders", null);
 _ts_decorate([
+    (0, _common.Get)('orders-summary'),
+    (0, _rolesdecorator.Roles)('USER'),
+    (0, _swagger.ApiOperation)({
+        summary: "Get a summary of sales orders assigned to the logged-in user"
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Assigned orders summary returned successfully'
+    }),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UserDashboardController.prototype, "getAssignedOrdersSummary", null);
+_ts_decorate([
     (0, _common.Get)('orders/:id'),
     (0, _rolesdecorator.Roles)('USER', 'ADMIN'),
     (0, _swagger.ApiOperation)({
@@ -98,23 +266,6 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], UserDashboardController.prototype, "getOrderDetails", null);
-_ts_decorate([
-    (0, _common.Get)('orders-summary'),
-    (0, _rolesdecorator.Roles)('USER'),
-    (0, _swagger.ApiOperation)({
-        summary: "Get a summary of sales orders assigned to the logged-in user"
-    }),
-    (0, _swagger.ApiResponse)({
-        status: 200,
-        description: 'Assigned orders summary returned successfully'
-    }),
-    _ts_param(0, (0, _common.Req)()),
-    _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", [
-        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
-    ]),
-    _ts_metadata("design:returntype", void 0)
-], UserDashboardController.prototype, "getAssignedOrdersSummary", null);
 _ts_decorate([
     (0, _common.Get)('orders/:id/download-details'),
     (0, _rolesdecorator.Roles)('USER'),
@@ -140,7 +291,7 @@ _ts_decorate([
 ], UserDashboardController.prototype, "downloadOrderDetails", null);
 _ts_decorate([
     (0, _common.Get)('orders/son/:soNumber/download-details'),
-    (0, _rolesdecorator.Roles)('USER'),
+    (0, _rolesdecorator.Roles)('USER', 'ADMIN'),
     (0, _swagger.ApiOperation)({
         summary: "Download material details using the SO Number"
     }),
@@ -161,6 +312,62 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], UserDashboardController.prototype, "downloadOrderDetailsBySoNumber", null);
+_ts_decorate([
+    (0, _common.Post)('orders/:id/upload-details'),
+    (0, _rolesdecorator.Roles)('USER'),
+    (0, _common.UseInterceptors)((0, _platformexpress.FileFieldsInterceptor)([
+        {
+            name: 'data',
+            maxCount: 1
+        },
+        {
+            name: 'attachments',
+            maxCount: 10
+        }
+    ])),
+    (0, _swagger.ApiOperation)({
+        summary: 'Upload and synchronize material data and attachments using Order ID'
+    }),
+    (0, _swagger.ApiConsumes)('multipart/form-data'),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_param(2, (0, _common.UploadedFiles)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], UserDashboardController.prototype, "uploadOrderDetails", null);
+_ts_decorate([
+    (0, _common.Post)('orders/son/:soNumber/upload-details'),
+    (0, _rolesdecorator.Roles)('USER'),
+    (0, _common.UseInterceptors)((0, _platformexpress.FileFieldsInterceptor)([
+        {
+            name: 'data',
+            maxCount: 1
+        },
+        {
+            name: 'attachments',
+            maxCount: 10
+        }
+    ])),
+    (0, _swagger.ApiOperation)({
+        summary: 'Upload and synchronize material data and attachments using SO Number'
+    }),
+    (0, _swagger.ApiConsumes)('multipart/form-data'),
+    _ts_param(0, (0, _common.Param)('soNumber')),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_param(2, (0, _common.UploadedFiles)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], UserDashboardController.prototype, "uploadOrderDetailsBySoNumber", null);
 UserDashboardController = _ts_decorate([
     (0, _swagger.ApiTags)('User Dashboard'),
     (0, _swagger.ApiBearerAuth)(),
