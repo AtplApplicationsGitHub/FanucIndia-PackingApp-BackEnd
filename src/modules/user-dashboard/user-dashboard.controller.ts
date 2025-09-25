@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, ParseIntPipe, Req, UseGuards, NotFoundException, UseInterceptors, UploadedFile, BadRequestException, UploadedFiles } from '@nestjs/common';
+import { Controller, Get, Post, Param, ParseIntPipe, Req, UseGuards, NotFoundException, UseInterceptors, BadRequestException, UploadedFiles } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiConsumes } from '@nestjs/swagger';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';

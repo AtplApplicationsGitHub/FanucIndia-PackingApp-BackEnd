@@ -27,6 +27,7 @@ const _erpmaterialimportermodule = require("./modules/erp-material-importer/erp-
 const _dispatchmodule = require("./modules/dispatch/dispatch.module");
 const _sosearchmodule = require("./modules/so-search/so-search.module");
 const _fgdashboardmodule = require("./modules/fg-dashboard/fg-dashboard.module");
+const _fgstoragemodule = require("./modules/fg-storage/fg-storage.module");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -55,7 +56,8 @@ AppModule = _ts_decorate([
             _erpmaterialimportermodule.ErpMaterialImporterModule,
             _dispatchmodule.DispatchModule,
             _sosearchmodule.SoSearchModule,
-            _fgdashboardmodule.FgDashboardModule
+            _fgdashboardmodule.FgDashboardModule,
+            _fgstoragemodule.FgStorageModule
         ],
         controllers: [
             _appcontroller.AppController

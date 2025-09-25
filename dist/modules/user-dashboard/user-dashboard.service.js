@@ -64,7 +64,6 @@ function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
 let UserDashboardService = class UserDashboardService {
-    // ... (all other existing methods like findAssignedOrders, downloadOrderDetails, etc., remain unchanged) ...
     async findAssignedOrders(userId) {
         const assignedOrders = await this.prisma.salesOrder.findMany({
             where: {
@@ -224,7 +223,6 @@ let UserDashboardService = class UserDashboardService {
         }
         try {
             await this.prisma.$transaction(async (tx)=>{
-                // ... (material update logic is the same) ...
                 for (const material of materials){
                     await tx.eRP_Material_Data.updateMany({
                         where: {
@@ -239,7 +237,6 @@ let UserDashboardService = class UserDashboardService {
                         }
                     });
                 }
-                // ... (attachment upload logic is the same) ...
                 if (attachments.length > 0) {
                     const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR || '/fanuc/order-attachments', saleOrderNumber);
                     await this.sftpService.ensureDir(remoteDir);
@@ -264,7 +261,7 @@ let UserDashboardService = class UserDashboardService {
                 message: 'Data and attachments uploaded and synchronized successfully.'
             };
         } catch (error) {
-            console.error('ERROR during upload process:', error); // <-- BETTER LOGGING
+            console.error('ERROR during upload process:', error);
             throw new _common.BadRequestException('Failed to update material data or upload attachments.');
         }
     }

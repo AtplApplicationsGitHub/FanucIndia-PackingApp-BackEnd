@@ -13,7 +13,6 @@ export class UserDashboardService {
     private readonly sftpService: SftpService,
   ) {}
   
-  // ... (all other existing methods like findAssignedOrders, downloadOrderDetails, etc., remain unchanged) ...
   async findAssignedOrders(userId: number) {
     const assignedOrders = await this.prisma.salesOrder.findMany({
       where: {
@@ -213,7 +212,6 @@ export class UserDashboardService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        // ... (material update logic is the same) ...
         for (const material of materials) {
           await tx.eRP_Material_Data.updateMany({
             where: {
@@ -229,7 +227,6 @@ export class UserDashboardService {
           });
         }
         
-        // ... (attachment upload logic is the same) ...
         if (attachments.length > 0) {
           const remoteDir = path.posix.join(
             process.env.SFTP_BASE_DIR || '/fanuc/order-attachments',
@@ -258,7 +255,7 @@ export class UserDashboardService {
 
       return { message: 'Data and attachments uploaded and synchronized successfully.' };
     } catch (error) {
-      console.error('ERROR during upload process:', error); // <-- BETTER LOGGING
+      console.error('ERROR during upload process:', error); 
       throw new BadRequestException('Failed to update material data or upload attachments.');
     }
   }

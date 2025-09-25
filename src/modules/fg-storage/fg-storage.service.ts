@@ -1,0 +1,37 @@
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { PrismaService } from '../../prisma.service';
+import { UpdateFgLocationDto } from './dto/update-fg-location.dto';
+
+@Injectable()
+export class FgStorageService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async assignFgLocation(dto: UpdateFgLocationDto, user: { userId: number; role: string }) {
+    const { saleOrderNumber, fgLocation } = dto;
+
+    const salesOrder = await this.prisma.salesOrder.findUnique({
+      where: { saleOrderNumber },
+    });
+
+    if (!salesOrder) {
+      throw new NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
+    }
+
+    if (user.role === 'USER' && salesOrder.assignedUserId !== user.userId) {
+      throw new ForbiddenException('You do not have permission to assign an FG Location to this order.');
+    }
+
+    const updatedOrder = await this.prisma.salesOrder.update({
+      where: { saleOrderNumber },
+      data: {
+        fgLocation: fgLocation,
+      },
+    });
+
+    return {
+      message: 'FG Location updated successfully.',
+      saleOrderNumber: updatedOrder.saleOrderNumber,
+      fgLocation: updatedOrder.fgLocation,
+    };
+  }
+}
