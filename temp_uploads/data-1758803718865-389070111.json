@@ -1,0 +1,47 @@
+[
+  {
+    "Material_Code": "A1-B1-C1",
+    "Material_Description": "Soldering type connector (Standard type,",
+    "Bin_No": "21-E-02",
+    "A_D_F": "Arrangement",
+    "Required_Qty": 8,
+    "Issue_stage": 8,
+    "Packing_stage": 8
+  },
+  {
+    "Material_Code": "A2-B2-C2",
+    "Material_Description": "Connector(AMP 3 pins Female Black Y type",
+    "Bin_No": "BIN-29455",
+    "A_D_F": "Arrangement",
+    "Required_Qty": 1,
+    "Issue_stage": 1,
+    "Packing_stage": 1
+  },
+  {
+    "Material_Code": "A3-B3-C3",
+    "Material_Description": "Connector(AMP 3 pins Female Black X type",
+    "Bin_No": "BIN-35742",
+    "A_D_F": "Arrangement",
+    "Required_Qty": 1,
+    "Issue_stage": 1,
+    "Packing_stage": 1
+  },
+  {
+    "Material_Code": "A4-B4-C4",
+    "Material_Description": "Connector(AMP 3 pins Female Black X type",
+    "Bin_No": "BIN-35742",
+    "A_D_F": "Arrangement",
+    "Required_Qty": 3,
+    "Issue_stage": 3,
+    "Packing_stage": 3
+  },
+  {
+    "Material_Code": "A5-B5-C5",
+    "Material_Description": "FUSE",
+    "Bin_No": "21-E-02",
+    "A_D_F": "Arrangement",
+    "Required_Qty": 1,
+    "Issue_stage": 1,
+    "Packing_stage": 1
+  }
+]
