@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import { UpdateMaterialDataDto } from './dto/update-material-data.dto';
@@ -12,7 +17,7 @@ export class UserDashboardService {
     private readonly prisma: PrismaService,
     private readonly sftpService: SftpService,
   ) {}
-  
+
   async findAssignedOrders(userId: number) {
     const assignedOrders = await this.prisma.salesOrder.findMany({
       where: {
@@ -42,21 +47,21 @@ export class UserDashboardService {
       },
     });
 
-    const incompleteOrders = assignedOrders.filter(order => {
+    const incompleteOrders = assignedOrders.filter((order) => {
       if (order.materialData.length === 0) {
         return true;
       }
 
       const isComplete = order.materialData.every(
-        material =>
+        (material) =>
           material.Required_Qty > 0 &&
           material.Required_Qty === material.Issue_stage &&
-          material.Issue_stage === material.Packing_stage
+          material.Issue_stage === material.Packing_stage,
       );
 
       return !isComplete;
     });
-    
+
     return incompleteOrders.map(({ materialData, ...order }) => order);
   }
 
@@ -95,9 +100,12 @@ export class UserDashboardService {
       },
     });
 
-    return assignedOrders.map(order => {
+    return assignedOrders.map((order) => {
       const totalMaterials = order.materialData.length;
-      const totalItems = order.materialData.reduce((sum, material) => sum + material.Required_Qty, 0);
+      const totalItems = order.materialData.reduce(
+        (sum, material) => sum + material.Required_Qty,
+        0,
+      );
 
       return {
         saleOrderNumber: order.saleOrderNumber,
@@ -109,7 +117,11 @@ export class UserDashboardService {
     });
   }
 
-  async downloadOrderDetails(orderId: number, userId: number, userRole: string) {
+  async downloadOrderDetails(
+    orderId: number,
+    userId: number,
+    userRole: string,
+  ) {
     const order = await this.findOrderById(orderId, userId, userRole);
     if (!order) {
       throw new NotFoundException('Sales order not found or access denied.');
@@ -122,6 +134,9 @@ export class UserDashboardService {
       select: {
         Material_Code: true,
         Material_Description: true,
+        Batch_No: true,
+        SO_Donor_Batch: true,
+        Cert_No: true,
         Bin_No: true,
         A_D_F: true,
         Required_Qty: true,
@@ -133,7 +148,11 @@ export class UserDashboardService {
     return materialDetails;
   }
 
-  async downloadOrderDetailsBySoNumber(saleOrderNumber: string, userId: number, userRole: string) {
+  async downloadOrderDetailsBySoNumber(
+    saleOrderNumber: string,
+    userId: number,
+    userRole: string,
+  ) {
     const order = await this.prisma.salesOrder.findUnique({
       where: { saleOrderNumber },
     });
@@ -143,7 +162,9 @@ export class UserDashboardService {
     }
 
     if (userRole === 'USER' && order.assignedUserId !== userId) {
-      throw new ForbiddenException('You are not authorized to view this order.');
+      throw new ForbiddenException(
+        'You are not authorized to view this order.',
+      );
     }
 
     const materialDetails = await this.prisma.eRP_Material_Data.findMany({
@@ -153,6 +174,9 @@ export class UserDashboardService {
       select: {
         Material_Code: true,
         Material_Description: true,
+        Batch_No: true,
+        SO_Donor_Batch: true,
+        Cert_No: true,
         Bin_No: true,
         A_D_F: true,
         Required_Qty: true,
@@ -163,7 +187,7 @@ export class UserDashboardService {
 
     return materialDetails;
   }
-  
+
   async uploadOrderDetails(
     orderId: number,
     userId: number,
@@ -175,7 +199,7 @@ export class UserDashboardService {
     if (!order) {
       throw new NotFoundException('Sales order not found or access denied.');
     }
-    
+
     return this.processUpload(order.saleOrderNumber, data, attachments);
   }
 
@@ -186,16 +210,20 @@ export class UserDashboardService {
     data: UpdateMaterialDataDto,
     attachments: Express.Multer.File[] = [],
   ) {
-    const order = await this.prisma.salesOrder.findUnique({ where: { saleOrderNumber } });
+    const order = await this.prisma.salesOrder.findUnique({
+      where: { saleOrderNumber },
+    });
 
     if (!order) {
       throw new NotFoundException('Sales Order not found.');
     }
 
     if (userRole === 'USER' && order.assignedUserId !== userId) {
-      throw new ForbiddenException('You are not authorized to modify this order.');
+      throw new ForbiddenException(
+        'You are not authorized to modify this order.',
+      );
     }
-    
+
     return this.processUpload(saleOrderNumber, data, attachments);
   }
 
@@ -226,7 +254,7 @@ export class UserDashboardService {
             },
           });
         }
-        
+
         if (attachments.length > 0) {
           const remoteDir = path.posix.join(
             process.env.SFTP_BASE_DIR || '/fanuc/order-attachments',
@@ -253,10 +281,14 @@ export class UserDashboardService {
         }
       });
 
-      return { message: 'Data and attachments uploaded and synchronized successfully.' };
+      return {
+        message: 'Data and attachments uploaded and synchronized successfully.',
+      };
     } catch (error) {
-      console.error('ERROR during upload process:', error); 
-      throw new BadRequestException('Failed to update material data or upload attachments.');
+      console.error('ERROR during upload process:', error);
+      throw new BadRequestException(
+        'Failed to update material data or upload attachments.',
+      );
     }
   }
 }

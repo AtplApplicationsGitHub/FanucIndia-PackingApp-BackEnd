@@ -158,6 +158,9 @@ let UserDashboardService = class UserDashboardService {
             select: {
                 Material_Code: true,
                 Material_Description: true,
+                Batch_No: true,
+                SO_Donor_Batch: true,
+                Cert_No: true,
                 Bin_No: true,
                 A_D_F: true,
                 Required_Qty: true,
@@ -186,6 +189,9 @@ let UserDashboardService = class UserDashboardService {
             select: {
                 Material_Code: true,
                 Material_Description: true,
+                Batch_No: true,
+                SO_Donor_Batch: true,
+                Cert_No: true,
                 Bin_No: true,
                 A_D_F: true,
                 Required_Qty: true,
