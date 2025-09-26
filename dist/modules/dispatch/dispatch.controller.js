@@ -18,6 +18,7 @@ const _authrequesttype = require("../auth/types/auth-request.type");
 const _dispatchservice = require("./dispatch.service");
 const _createdispatchdto = require("./dto/create-dispatch.dto");
 const _updatedispatchdto = require("./dto/update-dispatch.dto");
+const _createmobiledispatchdto = require("./dto/create-mobile-dispatch.dto");
 const _express = require("express");
 const _swagger = require("@nestjs/swagger");
 function _ts_decorate(decorators, target, key, desc) {
@@ -37,6 +38,34 @@ function _ts_param(paramIndex, decorator) {
 let DispatchController = class DispatchController {
     create(createDispatchDto, files, req) {
         return this.dispatchService.create(createDispatchDto, files, req.user.userId);
+    }
+    // @Post('mobile/header')
+    // @Roles('ADMIN', 'USER')
+    // @ApiOperation({ summary: 'Step 1 (Mobile): Create a dispatch header record.' })
+    // @ApiBody({
+    //   description: 'Data for the dispatch header. Exclude attachments and saleOrderNumbers.',
+    //   type: CreateDispatchDto,
+    // })
+    // createMobileDispatchHeader(
+    //   @Body() createDispatchDto: CreateDispatchDto,
+    //   @Req() req: AuthRequest,
+    // ) {
+    //   return this.dispatchService.createMobileDispatchHeader(createDispatchDto, req.user.userId);
+    // }
+    createMobileDispatchHeader(dto, req) {
+        return this.dispatchService.createMobileDispatchHeader(dto, req.user.userId);
+    }
+    addMobileAttachments(id, files) {
+        if (!files || files.length === 0) {
+            throw new _common.BadRequestException('No attachment files provided.');
+        }
+        return this.dispatchService.addMobileAttachments(id, files);
+    }
+    addMobileDispatchSO(id, saleOrderNumber) {
+        if (!saleOrderNumber) {
+            throw new _common.BadRequestException('saleOrderNumber is required.');
+        }
+        return this.dispatchService.addMobileDispatchSO(id, saleOrderNumber);
     }
     findAll() {
         return this.dispatchService.findAll();
@@ -104,6 +133,79 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], DispatchController.prototype, "create", null);
+_ts_decorate([
+    (0, _common.Post)('mobile/header'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Step 1 (Mobile): Create dispatch header with ID or Name for Customer/Transporter.'
+    }),
+    (0, _swagger.ApiBody)({
+        description: 'Provide either customerId OR customerName. Provide either transporterId OR transporterName (optional).',
+        type: _createmobiledispatchdto.CreateMobileDispatchDto
+    }),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _createmobiledispatchdto.CreateMobileDispatchDto === "undefined" ? Object : _createmobiledispatchdto.CreateMobileDispatchDto,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], DispatchController.prototype, "createMobileDispatchHeader", null);
+_ts_decorate([
+    (0, _common.Post)('mobile/:id/attachments'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10, {
+        storage: (0, _multer.diskStorage)({
+            destination: './temp_uploads',
+            filename: (req, file, cb)=>{
+                const randomName = Array(32).fill(null).map(()=>Math.round(Math.random() * 16).toString(16)).join('');
+                cb(null, `${randomName}${(0, _path.extname)(file.originalname)}`);
+            }
+        })
+    })),
+    (0, _swagger.ApiOperation)({
+        summary: 'Step 2 (Mobile): Upload attachments for a dispatch record.'
+    }),
+    (0, _swagger.ApiConsumes)('multipart/form-data'),
+    (0, _swagger.ApiBody)({
+        schema: {
+            type: 'object',
+            properties: {
+                attachments: {
+                    type: 'array',
+                    items: {
+                        type: 'string',
+                        format: 'binary'
+                    }
+                }
+            }
+        }
+    }),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.UploadedFiles)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        Array
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], DispatchController.prototype, "addMobileAttachments", null);
+_ts_decorate([
+    (0, _common.Post)('mobile/:id/so'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Step 3 (Mobile): Link a Sales Order and update its status to Dispatched.'
+    }),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Body)('saleOrderNumber')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        String
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], DispatchController.prototype, "addMobileDispatchSO", null);
 _ts_decorate([
     (0, _common.Get)(),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),

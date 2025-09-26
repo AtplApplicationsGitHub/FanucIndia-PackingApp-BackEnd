@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateDispatchDto } from './dto/create-dispatch.dto';
 import { UpdateDispatchDto } from './dto/update-dispatch.dto';
+import { CreateMobileDispatchDto } from './dto/create-mobile-dispatch.dto';
 import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -70,14 +72,12 @@ export class DispatchService {
       });
 
       if (saleOrderNumbers && saleOrderNumbers.length > 0) {
-        // Validate SOs
         for (const so of saleOrderNumbers) {
           const salesOrder = await tx.salesOrder.findUnique({ where: { saleOrderNumber: so } });
           if (!salesOrder) throw new BadRequestException(`Sale Order ${so} not found.`);
           if (salesOrder.customerId !== Number(customerId)) throw new BadRequestException(`Sale Order ${so} belongs to a different customer.`);
         }
 
-        // Link SOs to the new dispatch
         await tx.dispatch_SO.createMany({
           data: saleOrderNumbers.map(so => ({
             dispatchId: newDispatch.id,
@@ -85,7 +85,6 @@ export class DispatchService {
           })),
         });
 
-        // Update status of only the specified SOs
         await tx.salesOrder.updateMany({
           where: {
             saleOrderNumber: { in: saleOrderNumbers },
@@ -97,6 +96,130 @@ export class DispatchService {
       }
 
       return newDispatch;
+    });
+  }  
+
+  async createMobileDispatchHeader(dto: CreateMobileDispatchDto, userId: number) {
+    const { customerId, customerName, address, transporterId, transporterName, vehicleNumber } = dto;
+
+    return this.prisma.$transaction(async (tx) => {
+      let finalCustomerId: number;
+      let finalTransporterId: number;
+
+      if (customerId) {
+        finalCustomerId = Number(customerId);
+        const customerExists = await tx.customer.findUnique({ where: { id: finalCustomerId } });
+        if (!customerExists) {
+          throw new BadRequestException(`Customer with ID ${customerId} not found.`);
+        }
+      } else if (customerName) {
+        let customer = await tx.customer.findFirst({
+          where: { name: { equals: customerName, mode: 'insensitive' } },
+        });
+        if (!customer) {
+          customer = await tx.customer.create({
+            data: { name: customerName, address: address },
+          });
+        }
+        finalCustomerId = customer.id;
+      } else {
+        throw new BadRequestException('Either customerId or customerName must be provided.');
+      }
+
+      if (transporterId) {
+        finalTransporterId = Number(transporterId);
+        const transporterExists = await tx.transporter.findUnique({ where: { id: finalTransporterId } });
+        if (!transporterExists) {
+          throw new BadRequestException(`Transporter with ID ${transporterId} not found.`);
+        }
+      } else if (transporterName) { 
+        let transporter = await tx.transporter.findFirst({
+          where: { name: { equals: transporterName, mode: 'insensitive' } },
+        });
+        if (!transporter) {
+          transporter = await tx.transporter.create({ data: { name: transporterName } });
+        }
+        finalTransporterId = transporter.id;
+      } else {
+        throw new BadRequestException('Either transporterId or transporterName must be provided.');
+      }
+
+      const newDispatch = await tx.dispatch.create({
+        data: {
+          customerId: finalCustomerId,
+          address,
+          transporterId: finalTransporterId,
+          vehicleNumber,
+          createdBy: userId,
+          attachments: Prisma.JsonNull,
+        },
+      });
+
+      return newDispatch;
+    });
+  }
+
+  async addMobileAttachments(dispatchId: number, files: Express.Multer.File[]) {
+    const dispatch = await this.prisma.dispatch.findUnique({ where: { id: dispatchId } });
+    if (!dispatch) {
+      throw new NotFoundException('Dispatch not found');
+    }
+
+    const existingAttachments = (dispatch.attachments as AttachmentData[] | null) || [];
+    const newAttachments: AttachmentData[] = [];
+    const remoteDir = path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '/fanuc/dispatch-attachments', String(dispatchId));
+    
+    try {
+        await this.sftpService.ensureDir(remoteDir);
+        for (const file of files) {
+          const remotePath = path.posix.join(remoteDir, file.originalname);
+          await this.sftpService.put(file.path, remotePath);
+          newAttachments.push({
+            fileName: file.originalname,
+            path: remotePath,
+            mimeType: file.mimetype,
+            size: file.size,
+          });
+          fs.unlinkSync(file.path);
+        }
+    } catch (error) {
+        files.forEach(file => { try { fs.unlinkSync(file.path); } catch {} });
+        throw new InternalServerErrorException('Failed to upload attachments.');
+    }
+
+    const allAttachments = [...existingAttachments, ...newAttachments];
+    return this.prisma.dispatch.update({
+      where: { id: dispatchId },
+      data: { attachments: allAttachments as unknown as Prisma.JsonArray },
+    });
+  }
+
+  async addMobileDispatchSO(dispatchId: number, saleOrderNumber: string) {
+    return this.prisma.$transaction(async (tx) => {
+        const dispatch = await tx.dispatch.findUnique({ where: { id: dispatchId } });
+        if (!dispatch) {
+          throw new NotFoundException('Dispatch record not found.');
+        }
+    
+        const salesOrder = await tx.salesOrder.findUnique({ where: { saleOrderNumber } });
+        if (!salesOrder) {
+          throw new NotFoundException(`Sales Order '${saleOrderNumber}' not found.`);
+        }
+
+        // if (salesOrder.customerId !== dispatch.customerId) {
+        //   throw new BadRequestException('This SO Number belongs to a different customer than the one on the dispatch record.');
+        // }
+
+        const createdLink = await tx.dispatch_SO.create({
+          data: { dispatchId, saleOrderNumber },
+        });
+
+        await tx.salesOrder.update({
+            where: { saleOrderNumber },
+            data: { status: 'Dispatched' }
+        });
+
+        return createdLink;
     });
   }
 
@@ -161,8 +284,7 @@ export class DispatchService {
     //     'This SO Number belongs to a different customer.',
     //   );
     // }
-
-    // Status update logic is now in the create method, so this becomes simpler.
+    
     try {
       return await this.prisma.dispatch_SO.create({
         data: {

@@ -23,8 +23,9 @@ import { AuthRequest } from '../auth/types/auth-request.type';
 import { DispatchService } from './dispatch.service';
 import { CreateDispatchDto } from './dto/create-dispatch.dto';
 import { UpdateDispatchDto } from './dto/update-dispatch.dto';
+import { CreateMobileDispatchDto } from './dto/create-mobile-dispatch.dto';
 import { Response } from 'express';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 
 @ApiTags('Dispatch')
 @ApiBearerAuth()
@@ -61,6 +62,78 @@ export class DispatchController {
     );
   }
 
+
+  // @Post('mobile/header')
+  // @Roles('ADMIN', 'USER')
+  // @ApiOperation({ summary: 'Step 1 (Mobile): Create a dispatch header record.' })
+  // @ApiBody({
+  //   description: 'Data for the dispatch header. Exclude attachments and saleOrderNumbers.',
+  //   type: CreateDispatchDto,
+  // })
+  // createMobileDispatchHeader(
+  //   @Body() createDispatchDto: CreateDispatchDto,
+  //   @Req() req: AuthRequest,
+  // ) {
+  //   return this.dispatchService.createMobileDispatchHeader(createDispatchDto, req.user.userId);
+  // }
+  @Post('mobile/header')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({ summary: 'Step 1 (Mobile): Create dispatch header with ID or Name for Customer/Transporter.' })
+  @ApiBody({
+    description: 'Provide either customerId OR customerName. Provide either transporterId OR transporterName (optional).',
+    type: CreateMobileDispatchDto, // Use the new flexible DTO
+  })
+  createMobileDispatchHeader(
+    @Body() dto: CreateMobileDispatchDto, // Type hint to the new DTO
+    @Req() req: AuthRequest,
+  ) {
+    return this.dispatchService.createMobileDispatchHeader(dto, req.user.userId);
+  }
+
+  @Post('mobile/:id/attachments')
+  @Roles('ADMIN', 'USER')
+  @UseInterceptors(
+    FilesInterceptor('attachments', 10, {
+      storage: diskStorage({
+        destination: './temp_uploads',
+        filename: (req, file, cb) => {
+          const randomName = Array(32).fill(null).map(() => Math.round(Math.random() * 16).toString(16)).join('');
+          cb(null, `${randomName}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  @ApiOperation({ summary: 'Step 2 (Mobile): Upload attachments for a dispatch record.' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+      schema: {
+          type: 'object',
+          properties: { attachments: { type: 'array', items: { type: 'string', format: 'binary' } } },
+      },
+  })
+  addMobileAttachments(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    if (!files || files.length === 0) {
+        throw new BadRequestException('No attachment files provided.');
+    }
+    return this.dispatchService.addMobileAttachments(id, files);
+  }
+
+  @Post('mobile/:id/so')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({ summary: 'Step 3 (Mobile): Link a Sales Order and update its status to Dispatched.' })
+  addMobileDispatchSO(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('saleOrderNumber') saleOrderNumber: string,
+  ) {
+    if (!saleOrderNumber) {
+        throw new BadRequestException('saleOrderNumber is required.');
+    }
+    return this.dispatchService.addMobileDispatchSO(id, saleOrderNumber);
+  }
+
   @Get()
   @Roles('ADMIN', 'USER')
   findAll() {
@@ -90,7 +163,7 @@ export class DispatchController {
   ) {
     return this.dispatchService.addDispatchSO(id, saleOrderNumber);
   }
-
+  
   @Delete('so/:soId')
   @Roles('ADMIN', 'USER')
   removeDispatchSO(@Param('soId', ParseIntPipe) soId: number) {
