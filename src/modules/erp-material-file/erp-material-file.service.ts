@@ -227,7 +227,7 @@ export class ErpMaterialFileService {
         throw new ForbiddenException("You must specify a Sale Order Number for an order assigned to you.");
     }
 
-    const baseDir = process.env.SFTP_BASE_DIR || '/fanuc/order-attachments';
+    const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
     const soDir = opts.saleOrderNumber
       ? sanitize(opts.saleOrderNumber)
       : 'misc';

@@ -76,7 +76,7 @@ let DispatchService = class DispatchService {
         return this.prisma.$transaction(async (tx)=>{
             const uploadedAttachments = [];
             if (files && files.length > 0) {
-                const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR || '/fanuc/dispatch-attachments', `${Date.now()}`);
+                const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR || '', `${Date.now()}`);
                 await this.sftpService.ensureDir(remoteDir);
                 for (const file of files){
                     const remotePath = _path.posix.join(remoteDir, file.filename);
@@ -220,7 +220,7 @@ let DispatchService = class DispatchService {
         }
         const existingAttachments = dispatch.attachments || [];
         const newAttachments = [];
-        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '/fanuc/dispatch-attachments', String(dispatchId));
+        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', String(dispatchId));
         try {
             await this.sftpService.ensureDir(remoteDir);
             for (const file of files){
@@ -458,7 +458,7 @@ let DispatchService = class DispatchService {
         }
         const existingAttachments = dispatch.attachments || [];
         const newAttachments = [];
-        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR || '/fanuc/dispatch-attachments', `${dispatch.id}_${Date.now()}`);
+        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', `${dispatch.id}_${Date.now()}`);
         await this.sftpService.ensureDir(remoteDir);
         for (const file of files){
             const remotePath = _path.posix.join(remoteDir, file.filename);

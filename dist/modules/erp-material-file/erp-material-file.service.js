@@ -250,7 +250,7 @@ let ErpMaterialFileService = class ErpMaterialFileService {
         } else if (userRole === 'USER') {
             throw new _common.ForbiddenException("You must specify a Sale Order Number for an order assigned to you.");
         }
-        const baseDir = process.env.SFTP_BASE_DIR || '/fanuc/order-attachments';
+        const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
         const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
         const remoteDir = _path.posix.join(baseDir, soDir);
         const created = [];

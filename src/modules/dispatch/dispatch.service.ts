@@ -39,7 +39,7 @@ export class DispatchService {
       const uploadedAttachments: AttachmentData[] = [];
       if (files && files.length > 0) {
         const remoteDir = path.posix.join(
-          process.env.SFTP_BASE_DIR || '/fanuc/dispatch-attachments',
+          process.env.SFTP_BASE_DIR || '',
           `${Date.now()}`,
         );
         await this.sftpService.ensureDir(remoteDir);
@@ -167,7 +167,7 @@ export class DispatchService {
 
     const existingAttachments = (dispatch.attachments as AttachmentData[] | null) || [];
     const newAttachments: AttachmentData[] = [];
-    const remoteDir = path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '/fanuc/dispatch-attachments', String(dispatchId));
+    const remoteDir = path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', String(dispatchId));
     
     try {
         await this.sftpService.ensureDir(remoteDir);
@@ -372,7 +372,7 @@ export class DispatchService {
     const newAttachments: AttachmentData[] = [];
 
     const remoteDir = path.posix.join(
-      process.env.SFTP_BASE_DIR || '/fanuc/dispatch-attachments',
+      process.env.SFTP_BASE_DIR_DISPATCH || '',
       `${dispatch.id}_${Date.now()}`,
     );
     await this.sftpService.ensureDir(remoteDir);
