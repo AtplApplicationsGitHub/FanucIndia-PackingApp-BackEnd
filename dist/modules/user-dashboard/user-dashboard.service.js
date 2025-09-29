@@ -101,21 +101,8 @@ let UserDashboardService = class UserDashboardService {
         });
         return incompleteOrders.map(({ materialData, ...order })=>order);
     }
-    async findOrderById(orderId, userId, userRole) {
-        const whereClause = {
-            id: orderId
-        };
-        if (userRole !== 'ADMIN') {
-            whereClause.assignedUserId = userId;
-        }
-        return this.prisma.salesOrder.findFirst({
-            where: whereClause,
-            include: {
-                customer: true
-            }
-        });
-    }
     async getAssignedOrdersSummary(userId) {
+        // ... existing implementation ...
         const assignedOrders = await this.prisma.salesOrder.findMany({
             where: {
                 assignedUserId: userId
@@ -145,6 +132,25 @@ let UserDashboardService = class UserDashboardService {
                 totalItems
             };
         });
+    }
+    // --- NEW METHOD TO FIX 404 ---
+    async findOrderById(orderId, userId, userRole) {
+        const whereClause = {
+            id: orderId
+        };
+        if (userRole !== 'ADMIN') {
+            whereClause.assignedUserId = userId;
+        }
+        const order = await this.prisma.salesOrder.findFirst({
+            where: whereClause,
+            include: {
+                customer: true
+            }
+        });
+        if (!order) {
+            throw new _common.NotFoundException('Sales order not found or access denied.');
+        }
+        return order;
     }
     async downloadOrderDetails(orderId, userId, userRole) {
         const order = await this.findOrderById(orderId, userId, userRole);
@@ -176,6 +182,7 @@ let UserDashboardService = class UserDashboardService {
             }
         });
     }
+    // --- All 3 Upload Types Logic ---
     async syncOrderById(orderId, user, data, attachments) {
         const order = await this.findOrderById(orderId, user.userId, user.role);
         if (!order) {
@@ -252,7 +259,7 @@ let UserDashboardService = class UserDashboardService {
         if (!attachments || attachments.length === 0) {
             throw new _common.BadRequestException('No attachment files provided.');
         }
-        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_ORDER || '', saleOrderNumber);
+        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR || '/fanuc/order-attachments', saleOrderNumber);
         await this.sftpService.ensureDir(remoteDir);
         for (const file of attachments){
             const remotePath = _path.posix.join(remoteDir, file.filename);

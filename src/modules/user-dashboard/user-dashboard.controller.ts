@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   Req,
   UseGuards,
+  NotFoundException,
   UseInterceptors,
   BadRequestException,
   UploadedFile,
@@ -14,6 +15,7 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiResponse,
   ApiTags,
   ApiConsumes,
 } from '@nestjs/swagger';
@@ -62,6 +64,20 @@ export class UserDashboardController {
   getAssignedOrdersSummary(@Req() req: AuthRequest) {
     return this.userDashboardService.getAssignedOrdersSummary(req.user.userId);
   }
+  
+  // --- NEW ENDPOINT TO FIX 404 ---
+  @Get('orders/:id')
+  @Roles('USER', 'ADMIN')
+  @ApiOperation({ summary: 'Get details for a specific sales order by ID' })
+  @ApiResponse({ status: 200, description: 'Sales order details returned' })
+  @ApiResponse({ status: 404, description: 'Order not found or access denied' })
+  async getOrderDetails(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthRequest,
+  ) {
+    const { userId, role } = req.user;
+    return this.userDashboardService.findOrderById(id, userId, role);
+  }
 
   @Get('orders/:id/download-details')
   @Roles('USER', 'ADMIN')
@@ -88,7 +104,8 @@ export class UserDashboardController {
       req.user.role,
     );
   }
-  
+
+  // --- All 3 Upload Endpoints ---
   @Post('orders/son/:soNumber/sync')
   @Roles('USER')
   @UseInterceptors(FileFieldsInterceptor([

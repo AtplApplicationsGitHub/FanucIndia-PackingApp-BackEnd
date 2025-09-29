@@ -62,6 +62,44 @@ export class UserDashboardService {
     return incompleteOrders.map(({ materialData, ...order }) => order);
   }
 
+  async getAssignedOrdersSummary(userId: number) {
+    // ... existing implementation ...
+    const assignedOrders = await this.prisma.salesOrder.findMany({
+        where: {
+            assignedUserId: userId,
+        },
+        select: {
+            saleOrderNumber: true,
+            priority: true,
+            status: true,
+            materialData: {
+                select: {
+                    Required_Qty: true,
+                },
+            },
+        },
+        orderBy: {
+            createdAt: 'desc',
+        },
+    });
+
+    return assignedOrders.map((order) => {
+        const totalMaterials = order.materialData.length;
+        const totalItems = order.materialData.reduce(
+            (sum, material) => sum + material.Required_Qty,
+            0,
+        );
+        return {
+            saleOrderNumber: order.saleOrderNumber,
+            priority: order.priority,
+            status: order.status,
+            totalMaterials,
+            totalItems,
+        };
+    });
+  }
+  
+  // --- NEW METHOD TO FIX 404 ---
   async findOrderById(orderId: number, userId: number, userRole: string) {
     const whereClause: Prisma.SalesOrderWhereInput = { id: orderId };
 
@@ -69,48 +107,18 @@ export class UserDashboardService {
       whereClause.assignedUserId = userId;
     }
 
-    return this.prisma.salesOrder.findFirst({
+    const order = await this.prisma.salesOrder.findFirst({
       where: whereClause,
       include: {
         customer: true,
       },
     });
-  }
 
-  async getAssignedOrdersSummary(userId: number) {
-    const assignedOrders = await this.prisma.salesOrder.findMany({
-      where: {
-        assignedUserId: userId,
-      },
-      select: {
-        saleOrderNumber: true,
-        priority: true,
-        status: true,
-        materialData: {
-          select: {
-            Required_Qty: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    if (!order) {
+      throw new NotFoundException('Sales order not found or access denied.');
+    }
 
-    return assignedOrders.map((order) => {
-      const totalMaterials = order.materialData.length;
-      const totalItems = order.materialData.reduce(
-        (sum, material) => sum + material.Required_Qty,
-        0,
-      );
-      return {
-        saleOrderNumber: order.saleOrderNumber,
-        priority: order.priority,
-        status: order.status,
-        totalMaterials,
-        totalItems,
-      };
-    });
+    return order;
   }
 
   async downloadOrderDetails(orderId: number, userId: number, userRole: string) {
@@ -148,7 +156,7 @@ export class UserDashboardService {
     });
   }
 
-
+  // --- All 3 Upload Types Logic ---
   async syncOrderById(
     orderId: number,
     user: { userId: number; role: string },
@@ -213,7 +221,7 @@ export class UserDashboardService {
     await this.authorizeOrderAccess(saleOrderNumber, user.userId, user.role);
     return this.processAttachmentsUpload(saleOrderNumber, attachments);
   }
-
+  
   private async processCombinedUpload(
     saleOrderNumber: string,
     data: UpdateMaterialDataDto,
@@ -270,7 +278,7 @@ export class UserDashboardService {
     }
 
     const remoteDir = path.posix.join(
-      process.env.SFTP_BASE_DIR_ORDER || '',
+      process.env.SFTP_BASE_DIR || '/fanuc/order-attachments',
       saleOrderNumber,
     );
     await this.sftpService.ensureDir(remoteDir);

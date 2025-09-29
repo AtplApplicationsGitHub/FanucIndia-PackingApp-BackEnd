@@ -89,12 +89,18 @@ let UserDashboardController = class UserDashboardController {
     getAssignedOrdersSummary(req) {
         return this.userDashboardService.getAssignedOrdersSummary(req.user.userId);
     }
+    // --- NEW ENDPOINT TO FIX 404 ---
+    async getOrderDetails(id, req) {
+        const { userId, role } = req.user;
+        return this.userDashboardService.findOrderById(id, userId, role);
+    }
     async downloadOrderDetails(id, req) {
         return this.userDashboardService.downloadOrderDetails(id, req.user.userId, req.user.role);
     }
     async downloadOrderDetailsBySoNumber(soNumber, req) {
         return this.userDashboardService.downloadOrderDetailsBySoNumber(soNumber, req.user.userId, req.user.role);
     }
+    // --- All 3 Upload Endpoints ---
     async syncOrderBySoNumber(soNumber, req, files) {
         if (!files.data || !files.data[0]) {
             throw new _common.BadRequestException('Data file is required for sync.');
@@ -158,6 +164,29 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], UserDashboardController.prototype, "getAssignedOrdersSummary", null);
+_ts_decorate([
+    (0, _common.Get)('orders/:id'),
+    (0, _rolesdecorator.Roles)('USER', 'ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get details for a specific sales order by ID'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Sales order details returned'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 404,
+        description: 'Order not found or access denied'
+    }),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], UserDashboardController.prototype, "getOrderDetails", null);
 _ts_decorate([
     (0, _common.Get)('orders/:id/download-details'),
     (0, _rolesdecorator.Roles)('USER', 'ADMIN'),
