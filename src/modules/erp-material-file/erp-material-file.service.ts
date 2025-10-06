@@ -22,7 +22,7 @@ async function verifyFileAccess(
   userId: number,
   userRole: string,
 ) {
-  if (userRole === 'ADMIN' || userRole === 'SALES') {
+  if (userRole === 'ADMIN' || userRole === 'SALES' || userRole === 'USER') {
     const file = await prisma.eRP_Material_File.findUnique({ where: { ID: fileId } });
     if (!file) throw new NotFoundException('File not found.');
     return file;

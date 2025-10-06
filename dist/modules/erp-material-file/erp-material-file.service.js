@@ -66,7 +66,7 @@ function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
 async function verifyFileAccess(prisma, fileId, userId, userRole) {
-    if (userRole === 'ADMIN' || userRole === 'SALES') {
+    if (userRole === 'ADMIN' || userRole === 'SALES' || userRole === 'USER') {
         const file = await prisma.eRP_Material_File.findUnique({
             where: {
                 ID: fileId
