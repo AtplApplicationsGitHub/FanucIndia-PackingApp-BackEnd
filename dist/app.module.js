@@ -28,6 +28,7 @@ const _dispatchmodule = require("./modules/dispatch/dispatch.module");
 const _sosearchmodule = require("./modules/so-search/so-search.module");
 const _fgdashboardmodule = require("./modules/fg-dashboard/fg-dashboard.module");
 const _fgstoragemodule = require("./modules/fg-storage/fg-storage.module");
+const _soarchivemodule = require("./modules/so-archive/so-archive.module");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -57,7 +58,8 @@ AppModule = _ts_decorate([
             _dispatchmodule.DispatchModule,
             _sosearchmodule.SoSearchModule,
             _fgdashboardmodule.FgDashboardModule,
-            _fgstoragemodule.FgStorageModule
+            _fgstoragemodule.FgStorageModule,
+            _soarchivemodule.SoArchiveModule
         ],
         controllers: [
             _appcontroller.AppController

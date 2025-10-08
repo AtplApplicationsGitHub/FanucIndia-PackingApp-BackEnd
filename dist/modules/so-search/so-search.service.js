@@ -40,6 +40,7 @@ function convertBigInts(obj) {
 }
 let SoSearchService = class SoSearchService {
     async findDetailsBySoNumber(saleOrderNumber, user) {
+        // 1. Search in primary tables
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: {
                 saleOrderNumber
@@ -63,66 +64,88 @@ let SoSearchService = class SoSearchService {
                 }
             }
         });
-        if (!salesOrder) {
-            throw new _common.NotFoundException('Sales Order not found');
-        }
-        if (user.role === 'SALES' && salesOrder.userId !== user.userId) {
-            throw new _common.ForbiddenException('You are not authorized to view this order.');
-        }
-        const dispatchSOs = await this.prisma.dispatch_SO.findMany({
-            where: {
-                saleOrderNumber
-            },
-            select: {
-                dispatchId: true
+        if (salesOrder) {
+            // Apply permission check for primary orders
+            if (user.role === 'SALES' && salesOrder.userId !== user.userId) {
+                throw new _common.ForbiddenException('You are not authorized to view this order.');
             }
-        });
-        const dispatchIds = dispatchSOs.map((dso)=>dso.dispatchId);
-        const dispatchInfo = await this.prisma.dispatch.findMany({
-            where: {
-                id: {
-                    in: dispatchIds
+            const dispatchSOs = await this.prisma.dispatch_SO.findMany({
+                where: {
+                    saleOrderNumber
+                },
+                select: {
+                    dispatchId: true
                 }
-            },
-            include: {
-                customer: {
-                    select: {
-                        name: true,
-                        address: true
+            });
+            const dispatchIds = dispatchSOs.map((dso)=>dso.dispatchId);
+            const dispatchInfo = await this.prisma.dispatch.findMany({
+                where: {
+                    id: {
+                        in: dispatchIds
                     }
                 },
-                transporter: {
-                    select: {
-                        name: true
-                    }
+                include: {
+                    customer: true,
+                    transporter: true
                 }
-            }
-        });
-        const materialDetails = await this.prisma.eRP_Material_Data.findMany({
+            });
+            const materialDetails = await this.prisma.eRP_Material_Data.findMany({
+                where: {
+                    saleOrderNumber
+                },
+                orderBy: {
+                    ID: 'asc'
+                }
+            });
+            const result = {
+                salesOrder,
+                dispatchInfo,
+                materialDetails,
+                isArchived: false
+            };
+            return convertBigInts(result);
+        }
+        // 2. If not found, search in archive tables
+        const archivedSalesOrder = await this.prisma.salesOrderArchive.findFirst({
             where: {
                 saleOrderNumber
-            },
-            orderBy: {
-                ID: 'asc'
             }
         });
-        const latestMaterialUpdate = materialDetails.reduce((latest, current)=>{
-            if (!latest.UpdatedDate || current.UpdatedDate && new Date(current.UpdatedDate) > new Date(latest.UpdatedDate)) {
-                return current;
-            }
-            return latest;
-        }, materialDetails[0] || {});
-        const dispatchInfoWithUpdate = dispatchInfo.map((dispatch)=>({
-                ...dispatch,
-                UpdatedBy: latestMaterialUpdate?.UpdatedBy,
-                UpdatedDate: latestMaterialUpdate?.UpdatedDate
-            }));
-        const result = {
-            salesOrder,
-            dispatchInfo: dispatchInfoWithUpdate,
-            materialDetails
-        };
-        return convertBigInts(result);
+        if (archivedSalesOrder) {
+            const dispatchSOArchives = await this.prisma.dispatch_SOArchive.findMany({
+                where: {
+                    saleOrderNumber
+                },
+                select: {
+                    dispatchId: true
+                }
+            });
+            const dispatchIds = dispatchSOArchives.map((d)=>d.dispatchId);
+            const dispatchInfo = await this.prisma.dispatchArchive.findMany({
+                where: {
+                    id: {
+                        in: dispatchIds
+                    }
+                }
+            });
+            const materialDetails = await this.prisma.eRP_Material_DataArchive.findMany({
+                where: {
+                    saleOrderNumber
+                },
+                orderBy: {
+                    ID: 'asc'
+                }
+            });
+            const result = {
+                salesOrder: archivedSalesOrder,
+                dispatchInfo,
+                materialDetails,
+                isArchived: true
+            };
+            return convertBigInts(result);
+        }
+        // 3. If not found in either, throw an error
+        throw new _common.NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
     }
     constructor(prisma){
         this.prisma = prisma;

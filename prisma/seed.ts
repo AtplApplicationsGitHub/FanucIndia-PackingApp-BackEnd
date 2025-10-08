@@ -91,7 +91,7 @@ async function main() {
     });
   }
 
-  const salesEmail = 'user1@example.com';
+  const salesEmail = 'salesuser1';
   const salesPassword = 'Demo123!@#';
   const salesName = 'User 1';
 

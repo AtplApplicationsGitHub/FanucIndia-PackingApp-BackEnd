@@ -99,7 +99,6 @@ export class UserDashboardService {
     });
   }
   
-  // --- NEW METHOD TO FIX 404 ---
   async findOrderById(orderId: number, userId: number, userRole: string) {
     const whereClause: Prisma.SalesOrderWhereInput = { id: orderId };
 
@@ -156,7 +155,6 @@ export class UserDashboardService {
     });
   }
 
-  // --- All 3 Upload Types Logic ---
   async syncOrderById(
     orderId: number,
     user: { userId: number; role: string },
@@ -264,7 +262,10 @@ export class UserDashboardService {
         },
       });
     }
-     return { message: 'Data updated successfully.' };
+
+    await this._checkAndUpdateOrderStatus(saleOrderNumber, prismaClient);
+
+    return { message: 'Data updated successfully.' };
   }
 
   private async processAttachmentsUpload(
@@ -313,6 +314,46 @@ export class UserDashboardService {
     }
     if (userRole === 'USER' && order.assignedUserId !== userId) {
       throw new ForbiddenException('You are not authorized to modify this order.');
+    }
+  }
+
+  private async _checkAndUpdateOrderStatus(
+    saleOrderNumber: string,
+    prismaClient: Prisma.TransactionClient | PrismaService,
+  ) {
+    const order = await prismaClient.salesOrder.findUnique({
+      where: { saleOrderNumber },
+      select: { id: true, status: true },
+    });
+    if (!order) return;
+
+    const allMaterials = await prismaClient.eRP_Material_Data.findMany({
+      where: { saleOrderNumber: saleOrderNumber },
+      select: { Issue_stage: true, Packing_stage: true, Required_Qty: true },
+    });
+
+    if (allMaterials.length === 0) return;
+
+    const issueStageCompleted = allMaterials.every(
+      (m) => m.Required_Qty > 0 && m.Issue_stage >= m.Required_Qty,
+    );
+
+    if (issueStageCompleted && order.status !== 'F105') {
+      await prismaClient.salesOrder.update({
+        where: { id: order.id },
+        data: { status: 'F105', assignedUserId: null },
+      });
+    }
+
+    const packingStageCompleted = allMaterials.every(
+      (m) => m.Required_Qty > 0 && m.Packing_stage >= m.Required_Qty,
+    );
+
+    if (packingStageCompleted) {
+      await prismaClient.salesOrder.update({
+        where: { id: order.id },
+        data: { assignedUserId: null },
+      });
     }
   }
 }

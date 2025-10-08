@@ -372,19 +372,32 @@ let DispatchService = class DispatchService {
         //     'This SO Number belongs to a different customer.',
         //   );
         // }
-        try {
-            return await this.prisma.dispatch_SO.create({
-                data: {
-                    dispatchId,
-                    saleOrderNumber
+        // Wrap the operations in a transaction
+        return this.prisma.$transaction(async (tx)=>{
+            try {
+                const newDispatchSO = await tx.dispatch_SO.create({
+                    data: {
+                        dispatchId,
+                        saleOrderNumber
+                    }
+                });
+                // Add this block to update the SalesOrder status
+                await tx.salesOrder.update({
+                    where: {
+                        saleOrderNumber
+                    },
+                    data: {
+                        status: 'Dispatched'
+                    }
+                });
+                return newDispatchSO;
+            } catch (error) {
+                if (error instanceof _client.Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+                    throw new _common.BadRequestException('SO Number already added.');
                 }
-            });
-        } catch (error) {
-            if (error instanceof _client.Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                throw new _common.BadRequestException('SO Number already added.');
+                throw error;
             }
-            throw error;
-        }
+        });
     }
     async removeDispatchSO(soId) {
         await this.prisma.dispatch_SO.delete({
@@ -541,7 +554,7 @@ let DispatchService = class DispatchService {
                 mimeType: attachment.mimeType
             };
         } catch (error) {
-            console.error("SFTP stream error:", error);
+            console.error('SFTP stream error:', error);
             throw new _common.NotFoundException('File not found on storage server.');
         }
     }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 
 function convertBigInts(obj: any): any {
@@ -25,7 +29,11 @@ function convertBigInts(obj: any): any {
 export class SoSearchService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findDetailsBySoNumber(saleOrderNumber: string, user: { userId: number; role: string }) {
+  async findDetailsBySoNumber(
+    saleOrderNumber: string,
+    user: { userId: number; role: string },
+  ) {
+    // 1. Search in primary tables
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { saleOrderNumber },
       include: {
@@ -40,56 +48,69 @@ export class SoSearchService {
       },
     });
 
-    if (!salesOrder) {
-      throw new NotFoundException('Sales Order not found');
-    }
-
-    if (user.role === 'SALES' && salesOrder.userId !== user.userId) {
-      throw new ForbiddenException('You are not authorized to view this order.');
-    }
-
-    const dispatchSOs = await this.prisma.dispatch_SO.findMany({
-      where: { saleOrderNumber },
-      select: { dispatchId: true },
-    });
-
-    const dispatchIds = dispatchSOs.map((dso) => dso.dispatchId);
-
-    const dispatchInfo = await this.prisma.dispatch.findMany({
-      where: {
-        id: { in: dispatchIds },
-      },
-      include: {
-        customer: { select: { name: true, address: true } },
-        transporter: { select: { name: true } },
-      },
-    });
-
-    const materialDetails = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber },
-      orderBy: { ID: 'asc' },
-    });
-
-    const latestMaterialUpdate = materialDetails.reduce((latest, current) => {
-      if (!latest.UpdatedDate || (current.UpdatedDate && new Date(current.UpdatedDate) > new Date(latest.UpdatedDate))) {
-        return current;
+    if (salesOrder) {
+      // Apply permission check for primary orders
+      if (user.role === 'SALES' && salesOrder.userId !== user.userId) {
+        throw new ForbiddenException(
+          'You are not authorized to view this order.',
+        );
       }
-      return latest;
-    }, materialDetails[0] || {});
 
-    const dispatchInfoWithUpdate = dispatchInfo.map(dispatch => ({
-      ...dispatch,
-      UpdatedBy: latestMaterialUpdate?.UpdatedBy,
-      UpdatedDate: latestMaterialUpdate?.UpdatedDate,
-    }));
+      const dispatchSOs = await this.prisma.dispatch_SO.findMany({
+        where: { saleOrderNumber },
+        select: { dispatchId: true },
+      });
+      const dispatchIds = dispatchSOs.map((dso) => dso.dispatchId);
+      const dispatchInfo = await this.prisma.dispatch.findMany({
+        where: { id: { in: dispatchIds } },
+        include: { customer: true, transporter: true },
+      });
+      const materialDetails = await this.prisma.eRP_Material_Data.findMany({
+        where: { saleOrderNumber },
+        orderBy: { ID: 'asc' },
+      });
 
+      const result = {
+        salesOrder,
+        dispatchInfo,
+        materialDetails,
+        isArchived: false,
+      };
+      return convertBigInts(result);
+    }
 
-    const result = {
-      salesOrder,
-      dispatchInfo: dispatchInfoWithUpdate,
-      materialDetails,
-    };
+    // 2. If not found, search in archive tables
+    const archivedSalesOrder = await this.prisma.salesOrderArchive.findFirst({
+      where: { saleOrderNumber },
+    });
 
-    return convertBigInts(result);
+    if (archivedSalesOrder) {
+      const dispatchSOArchives = await this.prisma.dispatch_SOArchive.findMany({
+        where: { saleOrderNumber },
+        select: { dispatchId: true },
+      });
+      const dispatchIds = dispatchSOArchives.map((d) => d.dispatchId);
+      const dispatchInfo = await this.prisma.dispatchArchive.findMany({
+        where: { id: { in: dispatchIds } },
+      });
+      const materialDetails =
+        await this.prisma.eRP_Material_DataArchive.findMany({
+          where: { saleOrderNumber },
+          orderBy: { ID: 'asc' },
+        });
+
+      const result = {
+        salesOrder: archivedSalesOrder,
+        dispatchInfo,
+        materialDetails,
+        isArchived: true,
+      };
+      return convertBigInts(result);
+    }
+
+    // 3. If not found in either, throw an error
+    throw new NotFoundException(
+      `Sales Order with number '${saleOrderNumber}' not found.`,
+    );
   }
 }
