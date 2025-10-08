@@ -279,7 +279,7 @@ export class UserDashboardService {
     }
 
     const remoteDir = path.posix.join(
-      process.env.SFTP_BASE_DIR || '/fanuc/order-attachments',
+      process.env.SFTP_BASE_DIR_ORDER || '',
       saleOrderNumber,
     );
     await this.sftpService.ensureDir(remoteDir);

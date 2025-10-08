@@ -62,29 +62,15 @@ export class DispatchController {
     );
   }
 
-
-  // @Post('mobile/header')
-  // @Roles('ADMIN', 'USER')
-  // @ApiOperation({ summary: 'Step 1 (Mobile): Create a dispatch header record.' })
-  // @ApiBody({
-  //   description: 'Data for the dispatch header. Exclude attachments and saleOrderNumbers.',
-  //   type: CreateDispatchDto,
-  // })
-  // createMobileDispatchHeader(
-  //   @Body() createDispatchDto: CreateDispatchDto,
-  //   @Req() req: AuthRequest,
-  // ) {
-  //   return this.dispatchService.createMobileDispatchHeader(createDispatchDto, req.user.userId);
-  // }
   @Post('mobile/header')
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: 'Step 1 (Mobile): Create dispatch header with ID or Name for Customer/Transporter.' })
   @ApiBody({
     description: 'Provide either customerId OR customerName. Provide either transporterId OR transporterName (optional).',
-    type: CreateMobileDispatchDto, // Use the new flexible DTO
+    type: CreateMobileDispatchDto, 
   })
   createMobileDispatchHeader(
-    @Body() dto: CreateMobileDispatchDto, // Type hint to the new DTO
+    @Body() dto: CreateMobileDispatchDto, 
     @Req() req: AuthRequest,
   ) {
     return this.dispatchService.createMobileDispatchHeader(dto, req.user.userId);

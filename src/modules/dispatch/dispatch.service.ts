@@ -45,7 +45,7 @@ export class DispatchService {
       const uploadedAttachments: AttachmentData[] = [];
       if (files && files.length > 0) {
         const remoteDir = path.posix.join(
-          process.env.SFTP_BASE_DIR || '',
+          process.env.SFTP_BASE_DIR_DISPATCH || '',
           `${Date.now()}`,
         );
         await this.sftpService.ensureDir(remoteDir);
