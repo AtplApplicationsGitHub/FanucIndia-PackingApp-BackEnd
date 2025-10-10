@@ -32,7 +32,15 @@ let SoArchiveService = class SoArchiveService {
                 materialFilesByNumber: true,
                 Dispatch_SO: {
                     include: {
-                        dispatch: true
+                        dispatch: {
+                            include: {
+                                _count: {
+                                    select: {
+                                        dispatchSOs: true
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -48,42 +56,29 @@ let SoArchiveService = class SoArchiveService {
             await tx.salesOrderArchive.create({
                 data: soData
             });
-            if (so.materialData.length > 0) {
+            if (materialData.length > 0) {
                 await tx.eRP_Material_DataArchive.createMany({
-                    data: so.materialData.map(({ ID, ...d })=>d)
+                    data: materialData.map(({ ID, ...d })=>d)
                 });
             }
-            if (so.materialFilesByNumber.length > 0) {
+            if (materialFilesByNumber.length > 0) {
                 await tx.eRP_Material_FileArchive.createMany({
-                    data: so.materialFilesByNumber.map(({ ID, updatedAt, ...f })=>f)
+                    data: materialFilesByNumber.map(({ ID, updatedAt, ...f })=>f)
                 });
             }
-            const dispatches = so.Dispatch_SO.map((dso)=>dso.dispatch);
+            const dispatches = Dispatch_SO.map((dso)=>dso.dispatch);
             if (dispatches.length > 0) {
                 await tx.dispatchArchive.createMany({
-                    data: dispatches.map(({ id, updatedAt, ...d })=>({
+                    data: dispatches.map(({ updatedAt, _count, ...d })=>({
                             ...d,
                             attachments: d.attachments ?? _client.Prisma.DbNull
-                        }))
+                        })),
+                    skipDuplicates: true
                 });
                 await tx.dispatch_SOArchive.createMany({
-                    data: so.Dispatch_SO.map(({ id, dispatch, ...dso })=>dso)
+                    data: Dispatch_SO.map(({ id, dispatch, ...dso })=>dso)
                 });
             }
-            await tx.dispatch_SO.deleteMany({
-                where: {
-                    saleOrderNumber
-                }
-            });
-            await tx.dispatch.deleteMany({
-                where: {
-                    dispatchSOs: {
-                        some: {
-                            saleOrderNumber
-                        }
-                    }
-                }
-            });
             await tx.eRP_Material_File.deleteMany({
                 where: {
                     saleOrderNumber
@@ -94,6 +89,21 @@ let SoArchiveService = class SoArchiveService {
                     saleOrderNumber
                 }
             });
+            await tx.dispatch_SO.deleteMany({
+                where: {
+                    saleOrderNumber
+                }
+            });
+            for (const dispatch of dispatches){
+                const totalSOsLinked = dispatch._count.dispatchSOs;
+                if (totalSOsLinked <= 1) {
+                    await tx.dispatch.delete({
+                        where: {
+                            id: dispatch.id
+                        }
+                    });
+                }
+            }
             await tx.salesOrder.delete({
                 where: {
                     saleOrderNumber
@@ -140,14 +150,19 @@ let SoArchiveService = class SoArchiveService {
                     saleOrderNumber
                 }
             });
-            if (dispatchIds.length > 0) {
-                await tx.dispatchArchive.deleteMany({
+            for (const dispatchId of dispatchIds){
+                const remainingLinks = await tx.dispatch_SOArchive.count({
                     where: {
-                        id: {
-                            in: dispatchIds
-                        }
+                        dispatchId: dispatchId
                     }
                 });
+                if (remainingLinks === 0) {
+                    await tx.dispatchArchive.delete({
+                        where: {
+                            id: dispatchId
+                        }
+                    });
+                }
             }
             await tx.eRP_Material_FileArchive.deleteMany({
                 where: {
@@ -169,6 +184,31 @@ let SoArchiveService = class SoArchiveService {
                 message: `Archived Sales Order ${saleOrderNumber} has been permanently deleted.`
             };
         });
+    }
+    async downloadArchivedFile(fileId, res) {
+        const file = await this.prisma.eRP_Material_FileArchive.findUnique({
+            where: {
+                ID: fileId
+            }
+        });
+        if (!file) {
+            throw new _common.NotFoundException('Archived file not found.');
+        }
+        try {
+            const data = await this.sftp.getStream(file.sftpPath);
+            res.setHeader('Content-Type', file.mimeType ?? 'application/octet-stream');
+            res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.fileName)}"`);
+            if (file.fileSizeBytes) {
+                res.setHeader('Content-Length', String(file.fileSizeBytes));
+            }
+            if (Buffer.isBuffer(data)) {
+                return res.end(data);
+            }
+            data.pipe(res);
+        } catch (error) {
+            console.error("SFTP download error for archived file:", error);
+            res.status(404).send('File not found in storage.');
+        }
     }
     constructor(prisma, sftp){
         this.prisma = prisma;

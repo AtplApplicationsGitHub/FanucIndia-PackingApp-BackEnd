@@ -14,6 +14,7 @@ const _soarchiveservice = require("./so-archive.service");
 const _jwtauthguard = require("../auth/jwt-auth.guard");
 const _rolesguard = require("../auth/roles.guard");
 const _rolesdecorator = require("../auth/roles.decorator");
+const _express = require("express");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -34,6 +35,9 @@ let SoArchiveController = class SoArchiveController {
     }
     async delete(soNumber) {
         return this.soArchiveService.delete(soNumber);
+    }
+    async downloadArchivedAttachment(fileId, res) {
+        return this.soArchiveService.downloadArchivedFile(fileId, res);
     }
     constructor(soArchiveService){
         this.soArchiveService = soArchiveService;
@@ -75,6 +79,18 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], SoArchiveController.prototype, "delete", null);
+_ts_decorate([
+    (0, _common.Get)('attachments/:fileId/download'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER', 'SALES'),
+    _ts_param(0, (0, _common.Param)('fileId', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Res)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        typeof _express.Response === "undefined" ? Object : _express.Response
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], SoArchiveController.prototype, "downloadArchivedAttachment", null);
 SoArchiveController = _ts_decorate([
     (0, _swagger.ApiTags)('so-archive'),
     (0, _swagger.ApiBearerAuth)(),

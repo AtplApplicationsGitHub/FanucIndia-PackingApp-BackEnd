@@ -1,14 +1,15 @@
-import { Controller, Post, Delete, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Delete, Param, UseGuards, HttpCode, HttpStatus, Get, ParseIntPipe, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam } from '@nestjs/swagger';
 import { SoArchiveService } from './so-archive.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { Response } from 'express';
 
 @ApiTags('so-archive')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN') // Restrict these actions to ADMIN role
+@Roles('ADMIN') 
 @Controller('so-archive')
 export class SoArchiveController {
   constructor(private readonly soArchiveService: SoArchiveService) {}
@@ -27,5 +28,14 @@ export class SoArchiveController {
   @ApiParam({ name: 'soNumber', type: String, description: 'The Sales Order Number to delete from archives' })
   async delete(@Param('soNumber') soNumber: string) {
     return this.soArchiveService.delete(soNumber);
+  }
+
+  @Get('attachments/:fileId/download')
+  @Roles('ADMIN', 'USER', 'SALES')
+  async downloadArchivedAttachment(
+    @Param('fileId', ParseIntPipe) fileId: number,
+    @Res() res: Response,
+  ) {
+    return this.soArchiveService.downloadArchivedFile(fileId, res);
   }
 }

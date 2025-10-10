@@ -39,19 +39,6 @@ let DispatchController = class DispatchController {
     create(createDispatchDto, files, req) {
         return this.dispatchService.create(createDispatchDto, files, req.user.userId);
     }
-    // @Post('mobile/header')
-    // @Roles('ADMIN', 'USER')
-    // @ApiOperation({ summary: 'Step 1 (Mobile): Create a dispatch header record.' })
-    // @ApiBody({
-    //   description: 'Data for the dispatch header. Exclude attachments and saleOrderNumbers.',
-    //   type: CreateDispatchDto,
-    // })
-    // createMobileDispatchHeader(
-    //   @Body() createDispatchDto: CreateDispatchDto,
-    //   @Req() req: AuthRequest,
-    // ) {
-    //   return this.dispatchService.createMobileDispatchHeader(createDispatchDto, req.user.userId);
-    // }
     createMobileDispatchHeader(dto, req) {
         return this.dispatchService.createMobileDispatchHeader(dto, req.user.userId);
     }

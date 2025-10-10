@@ -76,7 +76,7 @@ let DispatchService = class DispatchService {
         return this.prisma.$transaction(async (tx)=>{
             const uploadedAttachments = [];
             if (files && files.length > 0) {
-                const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR || '', `${Date.now()}`);
+                const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', `${Date.now()}`);
                 await this.sftpService.ensureDir(remoteDir);
                 for (const file of files){
                     const remotePath = _path.posix.join(remoteDir, file.filename);

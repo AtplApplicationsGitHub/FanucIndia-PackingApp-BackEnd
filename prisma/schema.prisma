@@ -249,7 +249,7 @@ model ERP_Material_FileArchive {
 }
 
 model DispatchArchive {
-  id            Int           @id @default(autoincrement())
+  id            Int           @id 
   customerId    Int
   address       String
   transporterId Int?

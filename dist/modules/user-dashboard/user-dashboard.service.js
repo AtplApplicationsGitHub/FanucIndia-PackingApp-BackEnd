@@ -258,7 +258,7 @@ let UserDashboardService = class UserDashboardService {
         if (!attachments || attachments.length === 0) {
             throw new _common.BadRequestException('No attachment files provided.');
         }
-        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR || '/fanuc/order-attachments', saleOrderNumber);
+        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_ORDER || '', saleOrderNumber);
         await this.sftpService.ensureDir(remoteDir);
         for (const file of attachments){
             const remotePath = _path.posix.join(remoteDir, file.filename);
