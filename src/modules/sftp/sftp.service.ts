@@ -109,4 +109,19 @@ export class SftpService {
       return true;
     });
   }
+
+  async rmdir(remotePath: string) {
+    return this.withClient(async (c) => {
+      try {
+        await c.rmdir(remotePath, true); 
+        return true;
+      } catch (err: any) {
+        if (err.code === 2) { 
+          return false;
+        }
+        this.logger.error(`SFTP rmdir failed for ${remotePath}: ${err?.message || err}`);
+        throw err;
+      }
+    });
+  }
 }

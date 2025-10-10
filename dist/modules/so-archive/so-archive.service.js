@@ -124,36 +124,73 @@ let SoArchiveService = class SoArchiveService {
         if (!archivedSo) {
             throw new _common.NotFoundException(`Archived Sales Order ${saleOrderNumber} not found.`);
         }
-        const archivedFiles = await this.prisma.eRP_Material_FileArchive.findMany({
+        // 1. Get lists of files AND directories to delete BEFORE the transaction
+        // Get material files and directories
+        const materialFiles = await this.prisma.eRP_Material_FileArchive.findMany({
             where: {
                 saleOrderNumber
+            },
+            select: {
+                sftpPath: true,
+                sftpDir: true
             }
         });
-        for (const file of archivedFiles){
-            try {
-                if (file.sftpPath) {
-                    await this.sftp.delete(file.sftpPath);
+        // Get dispatch file and directory paths for dispatches that will be deleted
+        const dispatchSOArchives = await this.prisma.dispatch_SOArchive.findMany({
+            where: {
+                saleOrderNumber
+            },
+            select: {
+                dispatchId: true
+            }
+        });
+        const dispatchIds = [
+            ...new Set(dispatchSOArchives.map((d)=>d.dispatchId))
+        ];
+        const dispatchArchivesToDelete = [];
+        for (const dispatchId of dispatchIds){
+            const remainingLinks = await this.prisma.dispatch_SOArchive.count({
+                where: {
+                    dispatchId: dispatchId,
+                    NOT: {
+                        saleOrderNumber: saleOrderNumber
+                    }
                 }
-            } catch (error) {
-                console.warn(`Failed to delete SFTP file ${file.sftpPath}:`, error);
+            });
+            if (remainingLinks === 0) {
+                const dispatchArchive = await this.prisma.dispatchArchive.findUnique({
+                    where: {
+                        id: dispatchId
+                    },
+                    select: {
+                        attachments: true
+                    }
+                });
+                if (dispatchArchive) {
+                    dispatchArchivesToDelete.push(dispatchArchive);
+                }
             }
         }
-        return this.prisma.$transaction(async (tx)=>{
-            const dispatchSOArchives = await tx.dispatch_SOArchive.findMany({
-                where: {
-                    saleOrderNumber
-                }
-            });
-            const dispatchIds = dispatchSOArchives.map((d)=>d.dispatchId);
-            await tx.dispatch_SOArchive.deleteMany({
-                where: {
-                    saleOrderNumber
-                }
-            });
+        const dispatchFiles = dispatchArchivesToDelete.flatMap((d)=>d.attachments).filter((att)=>att && att.path).map((att)=>({
+                sftpPath: att.path,
+                sftpDir: att.path.substring(0, att.path.lastIndexOf('/'))
+            }));
+        const allFilesToDelete = [
+            ...materialFiles,
+            ...dispatchFiles
+        ];
+        const uniqueDirectoriesToDelete = [
+            ...new Set(allFilesToDelete.map((f)=>f.sftpDir).filter(Boolean))
+        ];
+        // 2. Run all database deletions within a single, atomic transaction
+        await this.prisma.$transaction(async (tx)=>{
             for (const dispatchId of dispatchIds){
                 const remainingLinks = await tx.dispatch_SOArchive.count({
                     where: {
-                        dispatchId: dispatchId
+                        dispatchId: dispatchId,
+                        NOT: {
+                            saleOrderNumber: saleOrderNumber
+                        }
                     }
                 });
                 if (remainingLinks === 0) {
@@ -164,6 +201,11 @@ let SoArchiveService = class SoArchiveService {
                     });
                 }
             }
+            await tx.dispatch_SOArchive.deleteMany({
+                where: {
+                    saleOrderNumber
+                }
+            });
             await tx.eRP_Material_FileArchive.deleteMany({
                 where: {
                     saleOrderNumber
@@ -179,11 +221,31 @@ let SoArchiveService = class SoArchiveService {
                     saleOrderNumber
                 }
             });
-            return {
-                success: true,
-                message: `Archived Sales Order ${saleOrderNumber} has been permanently deleted.`
-            };
         });
+        // 3. AFTER the transaction, delete all individual files
+        for (const file of allFilesToDelete){
+            try {
+                if (file.sftpPath) {
+                    await this.sftp.delete(file.sftpPath);
+                }
+            } catch (error) {
+                console.warn(`Failed to clean up SFTP file ${file.sftpPath}:`, error);
+            }
+        }
+        // 4. Finally, delete the now-empty directories
+        for (const dir of uniqueDirectoriesToDelete){
+            try {
+                if (dir) {
+                    await this.sftp.rmdir(dir);
+                }
+            } catch (error) {
+                console.warn(`Failed to clean up SFTP directory ${dir}:`, error);
+            }
+        }
+        return {
+            success: true,
+            message: `Archived Sales Order ${saleOrderNumber} has been permanently deleted.`
+        };
     }
     async downloadArchivedFile(fileId, res) {
         const file = await this.prisma.eRP_Material_FileArchive.findUnique({
