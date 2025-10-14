@@ -74,12 +74,24 @@ let DispatchService = class DispatchService {
     async create(dto, files, userId) {
         const { customerId, address, transporterId, vehicleNumber, saleOrderNumbers } = dto;
         return this.prisma.$transaction(async (tx)=>{
+            // 1. Create dispatch record first to get the ID
+            const newDispatch = await tx.dispatch.create({
+                data: {
+                    customerId: Number(customerId),
+                    address,
+                    transporterId: transporterId ? Number(transporterId) : null,
+                    vehicleNumber,
+                    createdBy: userId,
+                    attachments: _client.Prisma.JsonNull
+                }
+            });
             const uploadedAttachments = [];
             if (files && files.length > 0) {
-                const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', `${Date.now()}`);
+                // 2. Use the newDispatch.id for the folder name
+                const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', String(newDispatch.id));
                 await this.sftpService.ensureDir(remoteDir);
                 for (const file of files){
-                    const remotePath = _path.posix.join(remoteDir, file.filename);
+                    const remotePath = _path.posix.join(remoteDir, file.originalname); // using originalname as per previous request
                     await this.sftpService.put(file.path, remotePath);
                     uploadedAttachments.push({
                         fileName: file.originalname,
@@ -89,17 +101,16 @@ let DispatchService = class DispatchService {
                     });
                     _fs.unlinkSync(file.path);
                 }
+                // 3. Update the dispatch record with attachment info
+                await tx.dispatch.update({
+                    where: {
+                        id: newDispatch.id
+                    },
+                    data: {
+                        attachments: uploadedAttachments
+                    }
+                });
             }
-            const newDispatch = await tx.dispatch.create({
-                data: {
-                    customerId: Number(customerId),
-                    address,
-                    transporterId: transporterId ? Number(transporterId) : null,
-                    vehicleNumber,
-                    createdBy: userId,
-                    attachments: uploadedAttachments.length > 0 ? uploadedAttachments : _client.Prisma.JsonNull
-                }
-            });
             if (saleOrderNumbers && saleOrderNumbers.length > 0) {
                 for (const so of saleOrderNumbers){
                     const salesOrder = await tx.salesOrder.findUnique({
@@ -123,11 +134,15 @@ let DispatchService = class DispatchService {
                         }
                     },
                     data: {
-                        status: 'Dispatched'
+                        status: 'Dispatched',
+                        fgLocation: null
                     }
                 });
             }
-            return newDispatch;
+            return {
+                ...newDispatch,
+                attachments: uploadedAttachments
+            };
         });
     }
     async createMobileDispatchHeader(dto, userId) {
@@ -287,7 +302,8 @@ let DispatchService = class DispatchService {
                     saleOrderNumber
                 },
                 data: {
-                    status: 'Dispatched'
+                    status: 'Dispatched',
+                    fgLocation: null
                 }
             });
             return createdLink;
@@ -372,7 +388,6 @@ let DispatchService = class DispatchService {
         //     'This SO Number belongs to a different customer.',
         //   );
         // }
-        // Wrap the operations in a transaction
         return this.prisma.$transaction(async (tx)=>{
             try {
                 const newDispatchSO = await tx.dispatch_SO.create({
@@ -381,13 +396,13 @@ let DispatchService = class DispatchService {
                         saleOrderNumber
                     }
                 });
-                // Add this block to update the SalesOrder status
                 await tx.salesOrder.update({
                     where: {
                         saleOrderNumber
                     },
                     data: {
-                        status: 'Dispatched'
+                        status: 'Dispatched',
+                        fgLocation: null
                     }
                 });
                 return newDispatchSO;
@@ -471,7 +486,7 @@ let DispatchService = class DispatchService {
         }
         const existingAttachments = dispatch.attachments || [];
         const newAttachments = [];
-        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', `${dispatch.id}_${Date.now()}`);
+        const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', String(dispatchId));
         await this.sftpService.ensureDir(remoteDir);
         for (const file of files){
             const remotePath = _path.posix.join(remoteDir, file.filename);

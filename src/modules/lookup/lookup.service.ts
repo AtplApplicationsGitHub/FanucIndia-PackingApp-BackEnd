@@ -21,7 +21,7 @@ export class LookupService {
   constructor(private prisma: PrismaService) {}
 
   getProducts() {
-    return this.prisma.product.findMany({ orderBy: { name: 'asc' } });
+    return this.prisma.product.findMany({ orderBy: { id: 'desc' } });
   }
 
   createProduct(dto: CreateProductDto) {
@@ -47,7 +47,7 @@ export class LookupService {
   }
 
   getTransporters() {
-    return this.prisma.transporter.findMany({ orderBy: { name: 'asc' } });
+    return this.prisma.transporter.findMany({ orderBy: { id: 'desc' } });
   }
 
   createTransporter(dto: CreateTransporterDto) {
@@ -72,7 +72,7 @@ export class LookupService {
   }
 
   getPlantCodes() {
-    return this.prisma.plantCode.findMany({ orderBy: { code: 'asc' } });
+    return this.prisma.plantCode.findMany({ orderBy: { id: 'desc' } });
   }
 
   createPlantCode(dto: CreatePlantCodeDto) {
@@ -97,7 +97,7 @@ export class LookupService {
   }
 
   getSalesZones() {
-    return this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } });
+    return this.prisma.salesZone.findMany({ orderBy: { id: 'desc' } });
   }
 
   createSalesZone(dto: CreateSalesZoneDto) {
@@ -122,7 +122,7 @@ export class LookupService {
   }
 
   getPackConfigs() {
-    return this.prisma.packConfig.findMany({ orderBy: { configName: 'asc' } });
+    return this.prisma.packConfig.findMany({ orderBy: { id: 'desc' } });
   }
 
   createPackConfig(dto: CreatePackConfigDto) {
@@ -147,7 +147,7 @@ export class LookupService {
   }
 
   getCustomers() {
-    return this.prisma.customer.findMany({ orderBy: { name: 'asc' } });
+    return this.prisma.customer.findMany({ orderBy: { id: 'desc' } });
   }
 
   createCustomer(dto: CreateCustomerDto) {
@@ -172,7 +172,7 @@ export class LookupService {
   }
 
   getPrinters() {
-    return this.prisma.printer.findMany({ orderBy: { name: 'asc' } });
+    return this.prisma.printer.findMany({ orderBy: { id: 'desc' } });
   }
 
   createPrinter(dto: CreatePrinterDto) {

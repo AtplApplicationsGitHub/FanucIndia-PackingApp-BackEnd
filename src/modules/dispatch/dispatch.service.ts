@@ -42,16 +42,29 @@ export class DispatchService {
     } = dto;
 
     return this.prisma.$transaction(async (tx) => {
+      // 1. Create dispatch record first to get the ID
+      const newDispatch = await tx.dispatch.create({
+        data: {
+          customerId: Number(customerId),
+          address,
+          transporterId: transporterId ? Number(transporterId) : null,
+          vehicleNumber,
+          createdBy: userId,
+          attachments: Prisma.JsonNull, // Initially no attachments
+        },
+      });
+
       const uploadedAttachments: AttachmentData[] = [];
       if (files && files.length > 0) {
+        // 2. Use the newDispatch.id for the folder name
         const remoteDir = path.posix.join(
           process.env.SFTP_BASE_DIR_DISPATCH || '',
-          `${Date.now()}`,
+          String(newDispatch.id), // Use dispatch ID as folder name
         );
         await this.sftpService.ensureDir(remoteDir);
 
         for (const file of files) {
-          const remotePath = path.posix.join(remoteDir, file.filename);
+          const remotePath = path.posix.join(remoteDir, file.originalname); // using originalname as per previous request
           await this.sftpService.put(file.path, remotePath);
           uploadedAttachments.push({
             fileName: file.originalname,
@@ -61,21 +74,15 @@ export class DispatchService {
           });
           fs.unlinkSync(file.path);
         }
-      }
 
-      const newDispatch = await tx.dispatch.create({
-        data: {
-          customerId: Number(customerId),
-          address,
-          transporterId: transporterId ? Number(transporterId) : null,
-          vehicleNumber,
-          createdBy: userId,
-          attachments:
-            uploadedAttachments.length > 0
-              ? (uploadedAttachments as unknown as Prisma.JsonArray)
-              : Prisma.JsonNull,
-        },
-      });
+        // 3. Update the dispatch record with attachment info
+        await tx.dispatch.update({
+          where: { id: newDispatch.id },
+          data: {
+            attachments: uploadedAttachments as unknown as Prisma.JsonArray,
+          },
+        });
+      }
 
       if (saleOrderNumbers && saleOrderNumbers.length > 0) {
         for (const so of saleOrderNumbers) {
@@ -103,11 +110,15 @@ export class DispatchService {
           },
           data: {
             status: 'Dispatched',
+            fgLocation: null,
           },
         });
       }
 
-      return newDispatch;
+      return {
+        ...newDispatch,
+        attachments: uploadedAttachments as unknown as Prisma.JsonArray,
+      };
     });
   }
 
@@ -268,7 +279,10 @@ export class DispatchService {
 
       await tx.salesOrder.update({
         where: { saleOrderNumber },
-        data: { status: 'Dispatched' },
+        data: {
+          status: 'Dispatched',
+          fgLocation: null,
+        },
       });
 
       return createdLink;
@@ -337,7 +351,6 @@ export class DispatchService {
     //   );
     // }
 
-    // Wrap the operations in a transaction
     return this.prisma.$transaction(async (tx) => {
       try {
         const newDispatchSO = await tx.dispatch_SO.create({
@@ -347,10 +360,12 @@ export class DispatchService {
           },
         });
 
-        // Add this block to update the SalesOrder status
         await tx.salesOrder.update({
           where: { saleOrderNumber },
-          data: { status: 'Dispatched' },
+          data: {
+            status: 'Dispatched',
+            fgLocation: null,
+          },
         });
 
         return newDispatchSO;
@@ -436,7 +451,7 @@ export class DispatchService {
 
     const remoteDir = path.posix.join(
       process.env.SFTP_BASE_DIR_DISPATCH || '',
-      `${dispatch.id}_${Date.now()}`,
+      String(dispatchId),
     );
     await this.sftpService.ensureDir(remoteDir);
 

@@ -67,7 +67,10 @@ let UserDashboardService = class UserDashboardService {
     async findAssignedOrders(userId) {
         const assignedOrders = await this.prisma.salesOrder.findMany({
             where: {
-                assignedUserId: userId
+                assignedUserId: userId,
+                materialData: {
+                    some: {}
+                }
             },
             include: {
                 product: {
@@ -94,7 +97,7 @@ let UserDashboardService = class UserDashboardService {
         });
         const incompleteOrders = assignedOrders.filter((order)=>{
             if (order.materialData.length === 0) {
-                return true;
+                return false;
             }
             const isComplete = order.materialData.every((material)=>material.Required_Qty > 0 && material.Required_Qty === material.Issue_stage && material.Issue_stage === material.Packing_stage);
             return !isComplete;
@@ -102,7 +105,6 @@ let UserDashboardService = class UserDashboardService {
         return incompleteOrders.map(({ materialData, ...order })=>order);
     }
     async getAssignedOrdersSummary(userId) {
-        // ... existing implementation ...
         const assignedOrders = await this.prisma.salesOrder.findMany({
             where: {
                 assignedUserId: userId
@@ -261,7 +263,7 @@ let UserDashboardService = class UserDashboardService {
         const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_ORDER || '', saleOrderNumber);
         await this.sftpService.ensureDir(remoteDir);
         for (const file of attachments){
-            const remotePath = _path.posix.join(remoteDir, file.filename);
+            const remotePath = _path.posix.join(remoteDir, file.originalname);
             await this.sftpService.put(file.path, remotePath);
             await prismaClient.eRP_Material_File.create({
                 data: {

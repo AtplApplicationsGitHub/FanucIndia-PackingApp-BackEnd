@@ -237,7 +237,7 @@ export class ErpMaterialFileService {
     try {
       for (const f of files) {
         const checksum = await sha256File(f.path);
-        const remoteName = f.filename;
+        const remoteName = f.originalname;
         const remotePath = path.posix.join(remoteDir, remoteName);
 
         await this.sftp.put(f.path, remotePath);

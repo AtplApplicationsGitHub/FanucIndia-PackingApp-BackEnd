@@ -22,6 +22,9 @@ export class UserDashboardService {
     const assignedOrders = await this.prisma.salesOrder.findMany({
       where: {
         assignedUserId: userId,
+        materialData: {
+          some: {}, 
+        },
       },
       include: {
         product: {
@@ -49,7 +52,7 @@ export class UserDashboardService {
 
     const incompleteOrders = assignedOrders.filter((order) => {
       if (order.materialData.length === 0) {
-        return true;
+        return false;
       }
       const isComplete = order.materialData.every(
         (material) =>
@@ -63,7 +66,6 @@ export class UserDashboardService {
   }
 
   async getAssignedOrdersSummary(userId: number) {
-    // ... existing implementation ...
     const assignedOrders = await this.prisma.salesOrder.findMany({
         where: {
             assignedUserId: userId,
@@ -285,7 +287,7 @@ export class UserDashboardService {
     await this.sftpService.ensureDir(remoteDir);
 
     for (const file of attachments) {
-      const remotePath = path.posix.join(remoteDir, file.filename);
+      const remotePath = path.posix.join(remoteDir, file.originalname);
       await this.sftpService.put(file.path, remotePath);
 
       await prismaClient.eRP_Material_File.create({

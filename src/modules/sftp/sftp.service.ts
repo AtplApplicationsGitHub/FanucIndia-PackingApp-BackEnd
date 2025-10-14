@@ -11,8 +11,8 @@ type ConnectOptions = {
   passphrase?: string;
   retries?: number;
   retry_factor?: number;
-  retry_minTimeout?: number; 
-  readyTimeout?: number;     
+  retry_minTimeout?: number;
+  readyTimeout?: number;
 };
 
 @Injectable()
@@ -45,7 +45,9 @@ export class SftpService {
       username: SFTP_USERNAME,
       retries: SFTP_RETRIES ? Number(SFTP_RETRIES) : 2,
       retry_factor: SFTP_RETRY_FACTOR ? Number(SFTP_RETRY_FACTOR) : 2,
-      retry_minTimeout: SFTP_RETRY_MIN_TIMEOUT ? Number(SFTP_RETRY_MIN_TIMEOUT) : 500,
+      retry_minTimeout: SFTP_RETRY_MIN_TIMEOUT
+        ? Number(SFTP_RETRY_MIN_TIMEOUT)
+        : 500,
       readyTimeout: SFTP_READY_TIMEOUT ? Number(SFTP_READY_TIMEOUT) : 20000,
     };
 
@@ -70,24 +72,26 @@ export class SftpService {
     } finally {
       try {
         await client.end();
-      } catch {
-      }
+      } catch {}
     }
   }
 
+  // async ensureDir(remoteDir: string) {
+  //   return this.withClient(async (c) => {
+  //     const segments = path.posix.normalize(remoteDir).split('/');
+  //     let cur = '';
+  //     for (const seg of segments) {
+  //       if (!seg) continue;
+  //       cur += `/${seg}`;
+  //       const exists = await c.exists(cur);
+  //       if (!exists) {
+  //         await c.mkdir(cur);
+  //       }
+  //     }
+  //   });
+  // }
   async ensureDir(remoteDir: string) {
-    return this.withClient(async (c) => {
-      const segments = path.posix.normalize(remoteDir).split('/');
-      let cur = '';
-      for (const seg of segments) {
-        if (!seg) continue;
-        cur += `/${seg}`;
-        const exists = await c.exists(cur); 
-        if (!exists) {
-          await c.mkdir(cur);
-        }
-      }
-    });
+    return this.withClient((c) => c.mkdir(remoteDir, true));
   }
 
   async put(localPath: string, remotePath: string) {
@@ -98,7 +102,7 @@ export class SftpService {
   }
 
   async getStream(remotePath: string) {
-    return this.withClient((c) => c.get(remotePath)); 
+    return this.withClient((c) => c.get(remotePath));
   }
 
   async delete(remotePath: string) {
@@ -113,13 +117,15 @@ export class SftpService {
   async rmdir(remotePath: string) {
     return this.withClient(async (c) => {
       try {
-        await c.rmdir(remotePath, true); 
+        await c.rmdir(remotePath, true);
         return true;
       } catch (err: any) {
-        if (err.code === 2) { 
+        if (err.code === 2) {
           return false;
         }
-        this.logger.error(`SFTP rmdir failed for ${remotePath}: ${err?.message || err}`);
+        this.logger.error(
+          `SFTP rmdir failed for ${remotePath}: ${err?.message || err}`,
+        );
         throw err;
       }
     });

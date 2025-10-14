@@ -102,19 +102,22 @@ let SftpService = class SftpService {
             } catch  {}
         }
     }
+    // async ensureDir(remoteDir: string) {
+    //   return this.withClient(async (c) => {
+    //     const segments = path.posix.normalize(remoteDir).split('/');
+    //     let cur = '';
+    //     for (const seg of segments) {
+    //       if (!seg) continue;
+    //       cur += `/${seg}`;
+    //       const exists = await c.exists(cur);
+    //       if (!exists) {
+    //         await c.mkdir(cur);
+    //       }
+    //     }
+    //   });
+    // }
     async ensureDir(remoteDir) {
-        return this.withClient(async (c)=>{
-            const segments = _path.posix.normalize(remoteDir).split('/');
-            let cur = '';
-            for (const seg of segments){
-                if (!seg) continue;
-                cur += `/${seg}`;
-                const exists = await c.exists(cur);
-                if (!exists) {
-                    await c.mkdir(cur);
-                }
-            }
-        });
+        return this.withClient((c)=>c.mkdir(remoteDir, true));
     }
     async put(localPath, remotePath) {
         const remoteDir = _path.posix.dirname(remotePath);

@@ -30,9 +30,6 @@ let FgStorageService = class FgStorageService {
         if (!salesOrder) {
             throw new _common.NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
         }
-        if (user.role === 'USER' && salesOrder.assignedUserId !== user.userId) {
-            throw new _common.ForbiddenException('You do not have permission to assign an FG Location to this order.');
-        }
         const updatedOrder = await this.prisma.salesOrder.update({
             where: {
                 saleOrderNumber

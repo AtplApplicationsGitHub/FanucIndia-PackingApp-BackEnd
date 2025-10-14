@@ -23,7 +23,7 @@ let LookupService = class LookupService {
     getProducts() {
         return this.prisma.product.findMany({
             orderBy: {
-                name: 'asc'
+                id: 'desc'
             }
         });
     }
@@ -58,7 +58,7 @@ let LookupService = class LookupService {
     getTransporters() {
         return this.prisma.transporter.findMany({
             orderBy: {
-                name: 'asc'
+                id: 'desc'
             }
         });
     }
@@ -92,7 +92,7 @@ let LookupService = class LookupService {
     getPlantCodes() {
         return this.prisma.plantCode.findMany({
             orderBy: {
-                code: 'asc'
+                id: 'desc'
             }
         });
     }
@@ -126,7 +126,7 @@ let LookupService = class LookupService {
     getSalesZones() {
         return this.prisma.salesZone.findMany({
             orderBy: {
-                name: 'asc'
+                id: 'desc'
             }
         });
     }
@@ -160,7 +160,7 @@ let LookupService = class LookupService {
     getPackConfigs() {
         return this.prisma.packConfig.findMany({
             orderBy: {
-                configName: 'asc'
+                id: 'desc'
             }
         });
     }
@@ -194,7 +194,7 @@ let LookupService = class LookupService {
     getCustomers() {
         return this.prisma.customer.findMany({
             orderBy: {
-                name: 'asc'
+                id: 'desc'
             }
         });
     }
@@ -228,7 +228,7 @@ let LookupService = class LookupService {
     getPrinters() {
         return this.prisma.printer.findMany({
             orderBy: {
-                name: 'asc'
+                id: 'desc'
             }
         });
     }

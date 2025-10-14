@@ -134,10 +134,8 @@ let SalesOrderService = class SalesOrderService {
                     };
                 }
             }
-            res.status(200).set({
-                'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition': 'attachment; filename="sales_bulk_template.xlsx"'
-            });
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', 'attachment; filename="bulk_import_excel.xlsx"');
             return workbook.xlsx.write(res).then(()=>{
                 res.end();
             });
