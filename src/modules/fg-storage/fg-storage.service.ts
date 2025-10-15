@@ -22,12 +22,6 @@ export class FgStorageService {
       throw new NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
     }
 
-    // const updatedOrder = await this.prisma.salesOrder.update({
-    //   where: { saleOrderNumber },
-    //   data: {
-    //     fgLocation: fgLocation,
-    //   },
-    // });
     const updatedOrder = await this.prisma.salesOrder.update({
       where: { id: salesOrder.id },
       data: {

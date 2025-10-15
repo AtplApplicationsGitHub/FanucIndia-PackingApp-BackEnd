@@ -356,27 +356,26 @@ export class DispatchService {
       throw new NotFoundException('Dispatch record not found.');
     }
 
-    const salesOrder = await this.prisma.salesOrder.findUnique({
-      where: { saleOrderNumber },
-      select: { customerId: true },
+    const salesOrder = await this.prisma.salesOrder.findFirst({
+      where: {
+        saleOrderNumber: {
+          equals: saleOrderNumber,
+          mode: 'insensitive',
+        },
+      },
+      select: { customerId: true, saleOrderNumber: true }, 
     });
 
     if (!salesOrder) {
       throw new NotFoundException('Invalid SO Number');
     }
 
-    // if (salesOrder.customerId !== dispatch.customerId) {
-    //   throw new BadRequestException(
-    //     'This SO Number belongs to a different customer.',
-    //   );
-    // }
-
     return this.prisma.$transaction(async (tx) => {
       try {
         const newDispatchSO = await tx.dispatch_SO.create({
           data: {
             dispatchId,
-            saleOrderNumber,
+            saleOrderNumber: salesOrder.saleOrderNumber,
           },
         });
 
@@ -388,7 +387,7 @@ export class DispatchService {
         });
 
         await tx.salesOrder.update({
-          where: { saleOrderNumber },
+          where: { saleOrderNumber: salesOrder.saleOrderNumber },
           data: {
             status: 'Dispatched',
             fgLocation: null,
