@@ -42,7 +42,9 @@ export class DispatchService {
     } = dto;
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Create dispatch record first to get the ID
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      const userName = user?.name || 'System';
+
       const newDispatch = await tx.dispatch.create({
         data: {
           customerId: Number(customerId),
@@ -50,21 +52,22 @@ export class DispatchService {
           transporterId: transporterId ? Number(transporterId) : null,
           vehicleNumber,
           createdBy: userId,
-          attachments: Prisma.JsonNull, // Initially no attachments
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
+          attachments: Prisma.JsonNull,
         },
       });
 
       const uploadedAttachments: AttachmentData[] = [];
       if (files && files.length > 0) {
-        // 2. Use the newDispatch.id for the folder name
         const remoteDir = path.posix.join(
           process.env.SFTP_BASE_DIR_DISPATCH || '',
-          String(newDispatch.id), // Use dispatch ID as folder name
+          String(newDispatch.id),
         );
         await this.sftpService.ensureDir(remoteDir);
 
         for (const file of files) {
-          const remotePath = path.posix.join(remoteDir, file.originalname); // using originalname as per previous request
+          const remotePath = path.posix.join(remoteDir, file.originalname);
           await this.sftpService.put(file.path, remotePath);
           uploadedAttachments.push({
             fileName: file.originalname,
@@ -75,7 +78,6 @@ export class DispatchService {
           fs.unlinkSync(file.path);
         }
 
-        // 3. Update the dispatch record with attachment info
         await tx.dispatch.update({
           where: { id: newDispatch.id },
           data: {
@@ -191,6 +193,9 @@ export class DispatchService {
         );
       }
 
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      const userName = user?.name || 'System';
+
       const newDispatch = await tx.dispatch.create({
         data: {
           customerId: finalCustomerId,
@@ -198,6 +203,8 @@ export class DispatchService {
           transporterId: finalTransporterId,
           vehicleNumber,
           createdBy: userId,
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
           attachments: Prisma.JsonNull,
         },
       });
@@ -277,6 +284,13 @@ export class DispatchService {
         data: { dispatchId, saleOrderNumber },
       });
 
+      await tx.dispatch.update({
+        where: { id: dispatchId },
+        data: {
+          UpdatedDate: new Date(),
+        },
+      });
+
       await tx.salesOrder.update({
         where: { saleOrderNumber },
         data: {
@@ -307,14 +321,18 @@ export class DispatchService {
     }));
   }
 
-  async update(id: number, dto: UpdateDispatchDto) {
+  async update(id: number, dto: UpdateDispatchDto, userId: number) {
     const { customerId, transporterId, vehicleNumber } = dto;
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
     return this.prisma.dispatch.update({
       where: { id },
       data: {
         customerId: customerId ? Number(customerId) : undefined,
         transporterId: transporterId ? Number(transporterId) : undefined,
         vehicleNumber,
+        UpdatedBy: user?.name || 'System',
+        UpdatedDate: new Date(),
       },
     });
   }
@@ -360,6 +378,13 @@ export class DispatchService {
           },
         });
 
+        await tx.dispatch.update({
+          where: { id: dispatchId },
+          data: {
+            UpdatedDate: new Date(),
+          },
+        });
+
         await tx.salesOrder.update({
           where: { saleOrderNumber },
           data: {
@@ -382,7 +407,23 @@ export class DispatchService {
   }
 
   async removeDispatchSO(soId: number) {
+    const dispatchSoLink = await this.prisma.dispatch_SO.findUnique({
+      where: { id: soId },
+    });
+
+    if (!dispatchSoLink) {
+      throw new NotFoundException('Dispatch link not found.');
+    }
+
     await this.prisma.dispatch_SO.delete({ where: { id: soId } });
+
+    await this.prisma.dispatch.update({
+      where: { id: dispatchSoLink.dispatchId },
+      data: {
+        UpdatedDate: new Date(),
+      },
+    });
+
     return { message: 'SO Number removed' };
   }
 

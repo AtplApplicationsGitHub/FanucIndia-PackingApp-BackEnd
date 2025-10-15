@@ -159,7 +159,7 @@ export class UserDashboardService {
 
   async syncOrderById(
     orderId: number,
-    user: { userId: number; role: string },
+    user: { userId: number; role: string; name: string },
     data: UpdateMaterialDataDto,
     attachments: Express.Multer.File[],
   ) {
@@ -167,38 +167,38 @@ export class UserDashboardService {
     if (!order) {
       throw new NotFoundException('Sales order not found or access denied.');
     }
-    return this.processCombinedUpload(order.saleOrderNumber, data, attachments);
+    return this.processCombinedUpload(order.saleOrderNumber, data, attachments, user.name);
   }
 
   async syncOrderBySoNumber(
     saleOrderNumber: string,
-    user: { userId: number; role: string },
+    user: { userId: number; role: string; name: string },
     data: UpdateMaterialDataDto,
     attachments: Express.Multer.File[],
   ) {
     await this.authorizeOrderAccess(saleOrderNumber, user.userId, user.role);
-    return this.processCombinedUpload(saleOrderNumber, data, attachments);
+    return this.processCombinedUpload(saleOrderNumber, data, attachments, user.name);
   }
 
   async updateDataById(
     orderId: number,
-    user: { userId: number; role: string },
+    user: { userId: number; role: string; name: string },
     data: UpdateMaterialDataDto,
   ) {
     const order = await this.findOrderById(orderId, user.userId, user.role);
     if (!order) {
       throw new NotFoundException('Sales order not found or access denied.');
     }
-    return this.processDataUpdate(order.saleOrderNumber, data);
+    return this.processDataUpdate(order.saleOrderNumber, data, user.name);
   }
 
   async updateDataBySoNumber(
     saleOrderNumber: string,
-    user: { userId: number; role: string },
+    user: { userId: number; role: string; name: string },
     data: UpdateMaterialDataDto,
   ) {
     await this.authorizeOrderAccess(saleOrderNumber, user.userId, user.role);
-    return this.processDataUpdate(saleOrderNumber, data);
+    return this.processDataUpdate(saleOrderNumber, data, user.name);
   }
 
   async uploadAttachmentsById(
@@ -226,10 +226,11 @@ export class UserDashboardService {
     saleOrderNumber: string,
     data: UpdateMaterialDataDto,
     attachments: Express.Multer.File[],
+    userName: string,
   ) {
     try {
       await this.prisma.$transaction(async (tx) => {
-        await this.processDataUpdate(saleOrderNumber, data, tx);
+        await this.processDataUpdate(saleOrderNumber, data, userName, tx);
         await this.processAttachmentsUpload(saleOrderNumber, attachments, tx);
       });
       return { message: 'Data and attachments synchronized successfully.' };
@@ -242,6 +243,7 @@ export class UserDashboardService {
   private async processDataUpdate(
     saleOrderNumber: string,
     data: UpdateMaterialDataDto,
+    userName: string,
     tx?: Prisma.TransactionClient,
   ) {
     const prismaClient = tx || this.prisma;
@@ -259,7 +261,7 @@ export class UserDashboardService {
         data: {
           Issue_stage: material.Issue_stage,
           Packing_stage: material.Packing_stage,
-          UpdatedBy: 'MOBILE_SYNC',
+          UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
       });

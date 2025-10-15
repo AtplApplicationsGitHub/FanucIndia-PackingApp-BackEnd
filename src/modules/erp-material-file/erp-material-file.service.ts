@@ -23,7 +23,9 @@ async function verifyFileAccess(
   userRole: string,
 ) {
   if (userRole === 'ADMIN' || userRole === 'SALES' || userRole === 'USER') {
-    const file = await prisma.eRP_Material_File.findUnique({ where: { ID: fileId } });
+    const file = await prisma.eRP_Material_File.findUnique({
+      where: { ID: fileId },
+    });
     if (!file) throw new NotFoundException('File not found.');
     return file;
   }
@@ -39,8 +41,13 @@ async function verifyFileAccess(
     throw new NotFoundException('File not found.');
   }
 
-  if (!file.salesOrderByNumber || file.salesOrderByNumber.assignedUserId !== userId) {
-    throw new ForbiddenException('You do not have permission to access this file.');
+  if (
+    !file.salesOrderByNumber ||
+    file.salesOrderByNumber.assignedUserId !== userId
+  ) {
+    throw new ForbiddenException(
+      'You do not have permission to access this file.',
+    );
   }
 
   return file;
@@ -53,8 +60,11 @@ async function verifySaleOrderAccess(
   userRole: string,
 ) {
   if (userRole === 'ADMIN' || userRole === 'SALES') {
-    const order = await prisma.salesOrder.findUnique({ where: { saleOrderNumber } });
-    if (!order) throw new NotFoundException(`Sales Order ${saleOrderNumber} not found.`);
+    const order = await prisma.salesOrder.findUnique({
+      where: { saleOrderNumber },
+    });
+    if (!order)
+      throw new NotFoundException(`Sales Order ${saleOrderNumber} not found.`);
     return;
   }
 
@@ -66,7 +76,9 @@ async function verifySaleOrderAccess(
   });
 
   if (!order) {
-    throw new ForbiddenException(`You do not have permission to access files for Sales Order ${saleOrderNumber}.`);
+    throw new ForbiddenException(
+      `You do not have permission to access files for Sales Order ${saleOrderNumber}.`,
+    );
   }
 }
 
@@ -120,11 +132,11 @@ export class ErpMaterialFileService {
     };
 
     if (userRole === 'USER') {
-        where.salesOrderByNumber = {
-            is: {
-                assignedUserId: userId,
-            }
-        }
+      where.salesOrderByNumber = {
+        is: {
+          assignedUserId: userId,
+        },
+      };
     }
 
     const [items, total] = await this.prisma.$transaction([
@@ -151,7 +163,11 @@ export class ErpMaterialFileService {
     return normalizeBigInt(row);
   }
 
-  async listBySaleOrderNumber(soNumber: string, userId: number, userRole: string) {
+  async listBySaleOrderNumber(
+    soNumber: string,
+    userId: number,
+    userRole: string,
+  ) {
     await verifySaleOrderAccess(this.prisma, soNumber, userId, userRole);
     const items = await this.prisma.eRP_Material_File.findMany({
       where: { saleOrderNumber: soNumber },
@@ -166,10 +182,17 @@ export class ErpMaterialFileService {
     );
   }
 
-  async update(id: number, dto: UpdateErpMaterialFileDto, userId: number, userRole: string) {
+  async update(
+    id: number,
+    dto: UpdateErpMaterialFileDto,
+    userId: number,
+    userRole: string,
+  ) {
     const existing = await verifyFileAccess(this.prisma, id, userId, userRole);
 
     try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
       const updated = await this.prisma.eRP_Material_File.update({
         where: { ID: id },
         data: {
@@ -182,6 +205,8 @@ export class ErpMaterialFileService {
             dto.description !== undefined
               ? dto.description
               : existing.description,
+          UpdatedBy: user?.name || 'System',
+          UpdatedDate: new Date(),
         },
       });
       return normalizeBigInt(updated);
@@ -222,9 +247,16 @@ export class ErpMaterialFileService {
     userRole: string,
   ) {
     if (opts.saleOrderNumber) {
-        await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
+      await verifySaleOrderAccess(
+        this.prisma,
+        opts.saleOrderNumber,
+        userId,
+        userRole,
+      );
     } else if (userRole === 'USER') {
-        throw new ForbiddenException("You must specify a Sale Order Number for an order assigned to you.");
+      throw new ForbiddenException(
+        'You must specify a Sale Order Number for an order assigned to you.',
+      );
     }
 
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';

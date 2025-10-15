@@ -71,7 +71,7 @@ export class SalesCrudService {
   async findAll(userId: number, query: { search?: string }) {
     try {
       const { search } = query;
-      const where: any = { userId }; 
+      const where: any = { userId };
 
       if (search) {
         const s = { contains: search, mode: 'insensitive' };
@@ -139,12 +139,10 @@ export class SalesCrudService {
     }
   }
 
-  async update(
-    id: number,
-    dto: UpdateSalesCrudDto,
-    userId: number,
-  ) {
-    const existing = await this.prisma.salesOrder.findFirst({ where: { id, userId } });
+  async update(id: number, dto: UpdateSalesCrudDto, userId: number) {
+    const existing = await this.prisma.salesOrder.findFirst({
+      where: { id, userId },
+    });
     if (!existing) {
       throw new NotFoundException('Sales order not found or access denied.');
     }
@@ -155,9 +153,16 @@ export class SalesCrudService {
           ? new Date(dto.deliveryDate).toISOString()
           : dto.deliveryDate;
 
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
       return await this.prisma.salesOrder.update({
         where: { id },
-        data: { ...dto, deliveryDate },
+        data: {
+          ...dto,
+          deliveryDate,
+          UpdatedBy: user?.name || 'System',
+          UpdatedDate: new Date(),
+        },
         include: {
           customer: true,
           product: true,
@@ -186,7 +191,9 @@ export class SalesCrudService {
   }
 
   async remove(id: number, userId: number) {
-    const existing = await this.prisma.salesOrder.findFirst({ where: { id, userId } });
+    const existing = await this.prisma.salesOrder.findFirst({
+      where: { id, userId },
+    });
     if (!existing) {
       throw new NotFoundException('Sales order not found or access denied.');
     }
@@ -194,7 +201,10 @@ export class SalesCrudService {
     try {
       await this.prisma.salesOrder.delete({ where: { id } });
     } catch (err: any) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
         throw new NotFoundException('Sales order not found.');
       }
       throw new InternalServerErrorException(
@@ -212,7 +222,7 @@ export class SalesCrudService {
   ) {
     try {
       const skip = (page - 1) * limit;
-      const whereClause: any = { userId }; 
+      const whereClause: any = { userId };
 
       if (search) {
         const s = { contains: search, mode: 'insensitive' };

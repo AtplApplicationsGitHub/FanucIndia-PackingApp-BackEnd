@@ -131,8 +131,9 @@ export class DispatchController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDispatchDto: UpdateDispatchDto,
+    @Req() req: AuthRequest, // Add this
   ) {
-    return this.dispatchService.update(id, updateDispatchDto);
+    return this.dispatchService.update(id, updateDispatchDto, req.user.userId); 
   }
 
   @Get(':id/so')

@@ -44,7 +44,7 @@ export class AdminOrderService {
 
     const parseYMDLocal = (s: string) => {
       const [y, m, d] = s.split('-').map(Number);
-      return new Date(y, m - 1, d); 
+      return new Date(y, m - 1, d);
     };
 
     if (startDate || endDate) {
@@ -52,7 +52,7 @@ export class AdminOrderService {
 
       if (startDate) {
         const s = parseYMDLocal(startDate);
-        s.setHours(0, 0, 0, 0); 
+        s.setHours(0, 0, 0, 0);
         range.gte = s;
       }
 
@@ -79,12 +79,34 @@ export class AdminOrderService {
 
       where.OR = [
         { user: { is: { name: { contains: search, mode: 'insensitive' } } } },
-        { product: { is: { name: { contains: search, mode: 'insensitive' } } } },
-        { transporter: { is: { name: { contains: search, mode: 'insensitive' } } } },
-        { plantCode: { is: { code: { contains: search, mode: 'insensitive' } } } },
-        { salesZone: { is: { name: { contains: search, mode: 'insensitive' } } } },
-        { packConfig: { is: { configName: { contains: search, mode: 'insensitive' } } } },
-        { assignedUser: { is: { name: { contains: search, mode: 'insensitive' } } } },
+        {
+          product: { is: { name: { contains: search, mode: 'insensitive' } } },
+        },
+        {
+          transporter: {
+            is: { name: { contains: search, mode: 'insensitive' } },
+          },
+        },
+        {
+          plantCode: {
+            is: { code: { contains: search, mode: 'insensitive' } },
+          },
+        },
+        {
+          salesZone: {
+            is: { name: { contains: search, mode: 'insensitive' } },
+          },
+        },
+        {
+          packConfig: {
+            is: { configName: { contains: search, mode: 'insensitive' } },
+          },
+        },
+        {
+          assignedUser: {
+            is: { name: { contains: search, mode: 'insensitive' } },
+          },
+        },
 
         { saleOrderNumber: { contains: search, mode: 'insensitive' } },
         { outboundDelivery: { contains: search, mode: 'insensitive' } },
@@ -157,23 +179,38 @@ export class AdminOrderService {
     }
   }
 
-  async update(id: number, dto: UpdateAdminOrderDto, user: { userId: number; role: string }) {
+  async update(
+    id: number,
+    dto: UpdateAdminOrderDto,
+    user: { userId: number; role: string; name: string; },
+  ) {
     const order = await this.prisma.salesOrder.findUnique({ where: { id } });
     if (!order) {
       throw new NotFoundException('Order not found');
     }
 
     if (user.role === 'USER' && order.assignedUserId !== user.userId) {
-      throw new ForbiddenException('You can only update orders assigned to you.');
+      throw new ForbiddenException(
+        'You can only update orders assigned to you.',
+      );
     }
 
     if (user.role === 'USER') {
-        if (Object.keys(dto).length > 1 || !('fgLocation' in dto) ) {
-            throw new ForbiddenException('You are only allowed to update the FG Location.');
-        }
+      if (Object.keys(dto).length > 1 || !('fgLocation' in dto)) {
+        throw new ForbiddenException(
+          'You are only allowed to update the FG Location.',
+        );
+      }
     }
 
-    return this.prisma.salesOrder.update({ where: { id }, data: dto });
+    return this.prisma.salesOrder.update({
+      where: { id },
+      data: {
+        ...dto,
+        UpdatedBy: user.name,
+        UpdatedDate: new Date(),
+      },
+    });
   }
 
   async remove(id: number) {
@@ -191,7 +228,9 @@ export class AdminOrderService {
     }
 
     if (order._count.materialData > 0) {
-      throw new BadRequestException('Cannot delete an order that has material data imported.');
+      throw new BadRequestException(
+        'Cannot delete an order that has material data imported.',
+      );
     }
 
     await this.prisma.salesOrder.delete({ where: { id } });
