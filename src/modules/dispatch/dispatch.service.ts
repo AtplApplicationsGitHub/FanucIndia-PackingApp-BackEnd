@@ -267,21 +267,23 @@ export class DispatchService {
         throw new NotFoundException('Dispatch record not found.');
       }
 
-      const salesOrder = await tx.salesOrder.findUnique({
-        where: { saleOrderNumber },
+      const salesOrder = await tx.salesOrder.findFirst({
+        where: {
+          saleOrderNumber: {
+            equals: saleOrderNumber,
+            mode: 'insensitive',
+          },
+        },
       });
+
       if (!salesOrder) {
         throw new NotFoundException(
           `Sales Order '${saleOrderNumber}' not found.`,
         );
       }
 
-      // if (salesOrder.customerId !== dispatch.customerId) {
-      //   throw new BadRequestException('This SO Number belongs to a different customer than the one on the dispatch record.');
-      // }
-
       const createdLink = await tx.dispatch_SO.create({
-        data: { dispatchId, saleOrderNumber },
+        data: { dispatchId, saleOrderNumber: salesOrder.saleOrderNumber },
       });
 
       await tx.dispatch.update({
@@ -292,10 +294,10 @@ export class DispatchService {
       });
 
       await tx.salesOrder.update({
-        where: { saleOrderNumber },
-        data: {
-          status: 'Dispatched',
-          fgLocation: null,
+        where: { saleOrderNumber: salesOrder.saleOrderNumber },
+        data: { 
+            status: 'Dispatched',
+            fgLocation: null,
         },
       });
 

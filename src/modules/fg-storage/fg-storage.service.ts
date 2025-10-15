@@ -9,16 +9,27 @@ export class FgStorageService {
   async assignFgLocation(dto: UpdateFgLocationDto, user: { userId: number; role: string }) {
     const { saleOrderNumber, fgLocation } = dto;
 
-    const salesOrder = await this.prisma.salesOrder.findUnique({
-      where: { saleOrderNumber },
+    const salesOrder = await this.prisma.salesOrder.findFirst({
+      where: {
+        saleOrderNumber: {
+          equals: saleOrderNumber,
+          mode: 'insensitive',
+        },
+      },
     });
 
     if (!salesOrder) {
       throw new NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
     }
 
+    // const updatedOrder = await this.prisma.salesOrder.update({
+    //   where: { saleOrderNumber },
+    //   data: {
+    //     fgLocation: fgLocation,
+    //   },
+    // });
     const updatedOrder = await this.prisma.salesOrder.update({
-      where: { saleOrderNumber },
+      where: { id: salesOrder.id },
       data: {
         fgLocation: fgLocation,
       },
