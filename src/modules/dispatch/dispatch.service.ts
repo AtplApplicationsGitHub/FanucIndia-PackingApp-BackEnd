@@ -295,9 +295,9 @@ export class DispatchService {
 
       await tx.salesOrder.update({
         where: { saleOrderNumber: salesOrder.saleOrderNumber },
-        data: { 
-            status: 'Dispatched',
-            fgLocation: null,
+        data: {
+          status: 'Dispatched',
+          fgLocation: null,
         },
       });
 
@@ -363,7 +363,7 @@ export class DispatchService {
           mode: 'insensitive',
         },
       },
-      select: { customerId: true, saleOrderNumber: true }, 
+      select: { customerId: true, saleOrderNumber: true },
     });
 
     if (!salesOrder) {
@@ -416,16 +416,28 @@ export class DispatchService {
       throw new NotFoundException('Dispatch link not found.');
     }
 
-    await this.prisma.dispatch_SO.delete({ where: { id: soId } });
+    await this.prisma.$transaction(async (tx) => {
+      // Delete the link
+      await tx.dispatch_SO.delete({ where: { id: soId } });
 
-    await this.prisma.dispatch.update({
-      where: { id: dispatchSoLink.dispatchId },
-      data: {
-        UpdatedDate: new Date(),
-      },
+      // Revert the Sales Order status
+      await tx.salesOrder.update({
+        where: { saleOrderNumber: dispatchSoLink.saleOrderNumber },
+        data: {
+          status: 'F105',
+        },
+      });
+
+      // Update the dispatch record's timestamp
+      await tx.dispatch.update({
+        where: { id: dispatchSoLink.dispatchId },
+        data: {
+          UpdatedDate: new Date(),
+        },
+      });
     });
 
-    return { message: 'SO Number removed' };
+    return { message: 'SO Number removed and status reverted to F105' };
   }
 
   async generatePdf(dispatchId: number): Promise<Buffer> {
