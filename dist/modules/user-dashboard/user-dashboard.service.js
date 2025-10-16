@@ -188,22 +188,22 @@ let UserDashboardService = class UserDashboardService {
         if (!order) {
             throw new _common.NotFoundException('Sales order not found or access denied.');
         }
-        return this.processCombinedUpload(order.saleOrderNumber, data, attachments);
+        return this.processCombinedUpload(order.saleOrderNumber, data, attachments, user.name);
     }
     async syncOrderBySoNumber(saleOrderNumber, user, data, attachments) {
         await this.authorizeOrderAccess(saleOrderNumber, user.userId, user.role);
-        return this.processCombinedUpload(saleOrderNumber, data, attachments);
+        return this.processCombinedUpload(saleOrderNumber, data, attachments, user.name);
     }
     async updateDataById(orderId, user, data) {
         const order = await this.findOrderById(orderId, user.userId, user.role);
         if (!order) {
             throw new _common.NotFoundException('Sales order not found or access denied.');
         }
-        return this.processDataUpdate(order.saleOrderNumber, data);
+        return this.processDataUpdate(order.saleOrderNumber, data, user.name);
     }
     async updateDataBySoNumber(saleOrderNumber, user, data) {
         await this.authorizeOrderAccess(saleOrderNumber, user.userId, user.role);
-        return this.processDataUpdate(saleOrderNumber, data);
+        return this.processDataUpdate(saleOrderNumber, data, user.name);
     }
     async uploadAttachmentsById(orderId, user, attachments) {
         const order = await this.findOrderById(orderId, user.userId, user.role);
@@ -216,10 +216,10 @@ let UserDashboardService = class UserDashboardService {
         await this.authorizeOrderAccess(saleOrderNumber, user.userId, user.role);
         return this.processAttachmentsUpload(saleOrderNumber, attachments);
     }
-    async processCombinedUpload(saleOrderNumber, data, attachments) {
+    async processCombinedUpload(saleOrderNumber, data, attachments, userName) {
         try {
             await this.prisma.$transaction(async (tx)=>{
-                await this.processDataUpdate(saleOrderNumber, data, tx);
+                await this.processDataUpdate(saleOrderNumber, data, userName, tx);
                 await this.processAttachmentsUpload(saleOrderNumber, attachments, tx);
             });
             return {
@@ -230,7 +230,7 @@ let UserDashboardService = class UserDashboardService {
             throw new _common.BadRequestException('Failed to synchronize data and attachments.');
         }
     }
-    async processDataUpdate(saleOrderNumber, data, tx) {
+    async processDataUpdate(saleOrderNumber, data, userName, tx) {
         const prismaClient = tx || this.prisma;
         const { materials } = data;
         if (!materials || materials.length === 0) {
@@ -245,7 +245,7 @@ let UserDashboardService = class UserDashboardService {
                 data: {
                     Issue_stage: material.Issue_stage,
                     Packing_stage: material.Packing_stage,
-                    UpdatedBy: 'MOBILE_SYNC',
+                    UpdatedBy: userName,
                     UpdatedDate: new Date()
                 }
             });

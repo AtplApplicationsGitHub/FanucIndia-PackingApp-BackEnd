@@ -57,8 +57,8 @@ let DispatchController = class DispatchController {
     findAll() {
         return this.dispatchService.findAll();
     }
-    update(id, updateDispatchDto) {
-        return this.dispatchService.update(id, updateDispatchDto);
+    update(id, updateDispatchDto, req) {
+        return this.dispatchService.update(id, updateDispatchDto, req.user.userId);
     }
     findDispatchSOs(id) {
         return this.dispatchService.findDispatchSOs(id);
@@ -205,10 +205,12 @@ _ts_decorate([
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
     _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
     _ts_param(1, (0, _common.Body)()),
+    _ts_param(2, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         Number,
-        typeof _updatedispatchdto.UpdateDispatchDto === "undefined" ? Object : _updatedispatchdto.UpdateDispatchDto
+        typeof _updatedispatchdto.UpdateDispatchDto === "undefined" ? Object : _updatedispatchdto.UpdateDispatchDto,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
     ]),
     _ts_metadata("design:returntype", void 0)
 ], DispatchController.prototype, "update", null);

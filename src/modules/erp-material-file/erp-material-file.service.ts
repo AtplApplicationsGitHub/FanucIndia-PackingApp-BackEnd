@@ -308,6 +308,82 @@ export class ErpMaterialFileService {
       }
     }
   }
+  async uploadAndCreateWithDescriptions(
+    files: Express.Multer.File[],
+    opts: { saleOrderNumber: string | null; descriptions: string },
+    userId: number,
+    userRole: string,
+  ) {
+    if (opts.saleOrderNumber) {
+      await verifySaleOrderAccess(
+        this.prisma,
+        opts.saleOrderNumber,
+        userId,
+        userRole,
+      );
+    } else if (userRole === 'USER') {
+      throw new ForbiddenException(
+        'You must specify a Sale Order Number for an order assigned to you.',
+      );
+    }
+
+    let descriptionMap: { [key: string]: string };
+    try {
+      descriptionMap = JSON.parse(opts.descriptions);
+    } catch (error) {
+      throw new BadRequestException('Invalid descriptions JSON.');
+    }
+
+    const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
+    const soDir = opts.saleOrderNumber
+      ? sanitize(opts.saleOrderNumber)
+      : 'misc';
+    const remoteDir = path.posix.join(baseDir, soDir);
+
+    const created: any[] = [];
+    try {
+      for (const f of files) {
+        const checksum = await sha256File(f.path);
+        const remoteName = f.originalname;
+        const remotePath = path.posix.join(remoteDir, remoteName);
+        const description = descriptionMap[f.originalname] || null;
+
+        await this.sftp.put(f.path, remotePath);
+
+        const row = await this.prisma.eRP_Material_File.create({
+          data: {
+            saleOrderNumber: opts.saleOrderNumber,
+            fileName: f.originalname,
+            description: description,
+            sftpPath: remotePath,
+            sftpDir: remoteDir,
+            fileSizeBytes: BigInt(f.size),
+            mimeType: f.mimetype,
+            checksumSha256: checksum,
+          },
+        });
+
+        created.push(row);
+      }
+      return {
+        success: true,
+        items: created.map((r) => ({
+          ...r,
+          fileSizeBytes: Number(r.fileSizeBytes),
+        })),
+      };
+    } catch (e: any) {
+      throw new InternalServerErrorException(
+        'Upload failed. ' + (e?.message || ''),
+      );
+    } finally {
+      for (const f of files) {
+        try {
+          fs.unlinkSync(f.path);
+        } catch {}
+      }
+    }
+  }
 }
 
 async function sha256File(localPath: string): Promise<string> {

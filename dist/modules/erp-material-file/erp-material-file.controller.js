@@ -23,6 +23,7 @@ const _express = require("express");
 const _sftpservice = require("../sftp/sftp.service");
 const _authrequesttype = require("../auth/types/auth-request.type");
 const _jwtauthguard = require("../auth/jwt-auth.guard");
+const _uploaderpmaterialfiledto = require("./dto/upload-erp-material-file.dto");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -144,6 +145,19 @@ let ErpMaterialFileController = class ErpMaterialFileController {
         return this.service.uploadAndCreate(files, {
             saleOrderNumber: saleOrderNumber?.trim() || null,
             description: description?.trim() || null
+        }, userId, role);
+    }
+    async uploadWithDescriptions(files, body, req) {
+        if (!files || files.length === 0) {
+            throw new _common.BadRequestException('No files received');
+        }
+        if (!req?.user) {
+            throw new _common.BadRequestException('User information not available');
+        }
+        const { userId, role } = req.user;
+        return this.service.uploadAndCreateWithDescriptions(files, {
+            saleOrderNumber: body.saleOrderNumber?.trim() || null,
+            descriptions: body.descriptions
         }, userId, role);
     }
     constructor(service, sftp){
@@ -309,6 +323,60 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], ErpMaterialFileController.prototype, "upload", null);
+_ts_decorate([
+    (0, _common.Post)('upload-with-descriptions'),
+    (0, _rolesdecorator.Roles)('SALES', 'ADMIN', 'USER'),
+    (0, _swagger.ApiConsumes)('multipart/form-data'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Upload one or more files with individual descriptions to SFTP and create DB rows'
+    }),
+    (0, _swagger.ApiBody)({
+        type: _uploaderpmaterialfiledto.UploadErpMaterialFileDto,
+        schema: {
+            type: 'object',
+            properties: {
+                files: {
+                    type: 'array',
+                    items: {
+                        type: 'string',
+                        format: 'binary'
+                    }
+                },
+                saleOrderNumber: {
+                    type: 'string'
+                },
+                descriptions: {
+                    type: 'string'
+                }
+            }
+        }
+    }),
+    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('files', 20, {
+        storage: (0, _multer.diskStorage)({
+            destination: _os.tmpdir(),
+            filename: (_req, file, cb)=>{
+                const { base, ext } = splitExt(file.originalname);
+                const safeBase = sanitizeBase(base);
+                const ts = Date.now();
+                const id = (0, _crypto.randomUUID)();
+                cb(null, `${safeBase}__${ts}_${id}${ext}`);
+            }
+        }),
+        limits: {
+            fileSize: MAX_UPLOAD_BYTES
+        }
+    })),
+    _ts_param(0, (0, _common.UploadedFiles)()),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_param(2, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Array,
+        typeof _uploaderpmaterialfiledto.UploadErpMaterialFileDto === "undefined" ? Object : _uploaderpmaterialfiledto.UploadErpMaterialFileDto,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], ErpMaterialFileController.prototype, "uploadWithDescriptions", null);
 ErpMaterialFileController = _ts_decorate([
     (0, _swagger.ApiTags)('erp-material-files'),
     (0, _swagger.ApiBearerAuth)(),

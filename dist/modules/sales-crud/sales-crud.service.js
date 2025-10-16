@@ -201,13 +201,20 @@ let SalesCrudService = class SalesCrudService {
         }
         try {
             const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10 ? new Date(dto.deliveryDate).toISOString() : dto.deliveryDate;
+            const user = await this.prisma.user.findUnique({
+                where: {
+                    id: userId
+                }
+            });
             return await this.prisma.salesOrder.update({
                 where: {
                     id
                 },
                 data: {
                     ...dto,
-                    deliveryDate
+                    deliveryDate,
+                    UpdatedBy: user?.name || 'System',
+                    UpdatedDate: new Date()
                 },
                 include: {
                     customer: true,

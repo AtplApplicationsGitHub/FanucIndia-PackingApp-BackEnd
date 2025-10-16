@@ -208,6 +208,11 @@ let ErpMaterialFileService = class ErpMaterialFileService {
     async update(id, dto, userId, userRole) {
         const existing = await verifyFileAccess(this.prisma, id, userId, userRole);
         try {
+            const user = await this.prisma.user.findUnique({
+                where: {
+                    id: userId
+                }
+            });
             const updated = await this.prisma.eRP_Material_File.update({
                 where: {
                     ID: id
@@ -215,7 +220,9 @@ let ErpMaterialFileService = class ErpMaterialFileService {
                 data: {
                     saleOrderNumber: dto.saleOrderNumber !== undefined ? dto.saleOrderNumber : existing.saleOrderNumber,
                     fileName: dto.fileName ?? existing.fileName,
-                    description: dto.description !== undefined ? dto.description : existing.description
+                    description: dto.description !== undefined ? dto.description : existing.description,
+                    UpdatedBy: user?.name || 'System',
+                    UpdatedDate: new Date()
                 }
             });
             return normalizeBigInt(updated);
@@ -248,7 +255,7 @@ let ErpMaterialFileService = class ErpMaterialFileService {
         if (opts.saleOrderNumber) {
             await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
         } else if (userRole === 'USER') {
-            throw new _common.ForbiddenException("You must specify a Sale Order Number for an order assigned to you.");
+            throw new _common.ForbiddenException('You must specify a Sale Order Number for an order assigned to you.');
         }
         const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
         const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
@@ -265,6 +272,60 @@ let ErpMaterialFileService = class ErpMaterialFileService {
                         saleOrderNumber: opts.saleOrderNumber,
                         fileName: f.originalname,
                         description: opts.description,
+                        sftpPath: remotePath,
+                        sftpDir: remoteDir,
+                        fileSizeBytes: BigInt(f.size),
+                        mimeType: f.mimetype,
+                        checksumSha256: checksum
+                    }
+                });
+                created.push(row);
+            }
+            return {
+                success: true,
+                items: created.map((r)=>({
+                        ...r,
+                        fileSizeBytes: Number(r.fileSizeBytes)
+                    }))
+            };
+        } catch (e) {
+            throw new _common.InternalServerErrorException('Upload failed. ' + (e?.message || ''));
+        } finally{
+            for (const f of files){
+                try {
+                    _fs.unlinkSync(f.path);
+                } catch  {}
+            }
+        }
+    }
+    async uploadAndCreateWithDescriptions(files, opts, userId, userRole) {
+        if (opts.saleOrderNumber) {
+            await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
+        } else if (userRole === 'USER') {
+            throw new _common.ForbiddenException('You must specify a Sale Order Number for an order assigned to you.');
+        }
+        let descriptionMap;
+        try {
+            descriptionMap = JSON.parse(opts.descriptions);
+        } catch (error) {
+            throw new _common.BadRequestException('Invalid descriptions JSON.');
+        }
+        const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
+        const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
+        const remoteDir = _path.posix.join(baseDir, soDir);
+        const created = [];
+        try {
+            for (const f of files){
+                const checksum = await sha256File(f.path);
+                const remoteName = f.originalname;
+                const remotePath = _path.posix.join(remoteDir, remoteName);
+                const description = descriptionMap[f.originalname] || null;
+                await this.sftp.put(f.path, remotePath);
+                const row = await this.prisma.eRP_Material_File.create({
+                    data: {
+                        saleOrderNumber: opts.saleOrderNumber,
+                        fileName: f.originalname,
+                        description: description,
                         sftpPath: remotePath,
                         sftpDir: remoteDir,
                         fileSizeBytes: BigInt(f.size),

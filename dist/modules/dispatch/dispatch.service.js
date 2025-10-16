@@ -74,7 +74,12 @@ let DispatchService = class DispatchService {
     async create(dto, files, userId) {
         const { customerId, address, transporterId, vehicleNumber, saleOrderNumbers } = dto;
         return this.prisma.$transaction(async (tx)=>{
-            // 1. Create dispatch record first to get the ID
+            const user = await tx.user.findUnique({
+                where: {
+                    id: userId
+                }
+            });
+            const userName = user?.name || 'System';
             const newDispatch = await tx.dispatch.create({
                 data: {
                     customerId: Number(customerId),
@@ -82,16 +87,17 @@ let DispatchService = class DispatchService {
                     transporterId: transporterId ? Number(transporterId) : null,
                     vehicleNumber,
                     createdBy: userId,
+                    UpdatedBy: userName,
+                    UpdatedDate: new Date(),
                     attachments: _client.Prisma.JsonNull
                 }
             });
             const uploadedAttachments = [];
             if (files && files.length > 0) {
-                // 2. Use the newDispatch.id for the folder name
                 const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', String(newDispatch.id));
                 await this.sftpService.ensureDir(remoteDir);
                 for (const file of files){
-                    const remotePath = _path.posix.join(remoteDir, file.originalname); // using originalname as per previous request
+                    const remotePath = _path.posix.join(remoteDir, file.originalname);
                     await this.sftpService.put(file.path, remotePath);
                     uploadedAttachments.push({
                         fileName: file.originalname,
@@ -101,7 +107,6 @@ let DispatchService = class DispatchService {
                     });
                     _fs.unlinkSync(file.path);
                 }
-                // 3. Update the dispatch record with attachment info
                 await tx.dispatch.update({
                     where: {
                         id: newDispatch.id
@@ -211,6 +216,12 @@ let DispatchService = class DispatchService {
             } else {
                 throw new _common.BadRequestException('Either transporterId or transporterName must be provided.');
             }
+            const user = await tx.user.findUnique({
+                where: {
+                    id: userId
+                }
+            });
+            const userName = user?.name || 'System';
             const newDispatch = await tx.dispatch.create({
                 data: {
                     customerId: finalCustomerId,
@@ -218,6 +229,8 @@ let DispatchService = class DispatchService {
                     transporterId: finalTransporterId,
                     vehicleNumber,
                     createdBy: userId,
+                    UpdatedBy: userName,
+                    UpdatedDate: new Date(),
                     attachments: _client.Prisma.JsonNull
                 }
             });
@@ -280,26 +293,34 @@ let DispatchService = class DispatchService {
             if (!dispatch) {
                 throw new _common.NotFoundException('Dispatch record not found.');
             }
-            const salesOrder = await tx.salesOrder.findUnique({
+            const salesOrder = await tx.salesOrder.findFirst({
                 where: {
-                    saleOrderNumber
+                    saleOrderNumber: {
+                        equals: saleOrderNumber,
+                        mode: 'insensitive'
+                    }
                 }
             });
             if (!salesOrder) {
                 throw new _common.NotFoundException(`Sales Order '${saleOrderNumber}' not found.`);
             }
-            // if (salesOrder.customerId !== dispatch.customerId) {
-            //   throw new BadRequestException('This SO Number belongs to a different customer than the one on the dispatch record.');
-            // }
             const createdLink = await tx.dispatch_SO.create({
                 data: {
                     dispatchId,
-                    saleOrderNumber
+                    saleOrderNumber: salesOrder.saleOrderNumber
+                }
+            });
+            await tx.dispatch.update({
+                where: {
+                    id: dispatchId
+                },
+                data: {
+                    UpdatedDate: new Date()
                 }
             });
             await tx.salesOrder.update({
                 where: {
-                    saleOrderNumber
+                    saleOrderNumber: salesOrder.saleOrderNumber
                 },
                 data: {
                     status: 'Dispatched',
@@ -337,8 +358,13 @@ let DispatchService = class DispatchService {
                 soCount: d._count.dispatchSOs
             }));
     }
-    async update(id, dto) {
+    async update(id, dto, userId) {
         const { customerId, transporterId, vehicleNumber } = dto;
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            }
+        });
         return this.prisma.dispatch.update({
             where: {
                 id
@@ -346,7 +372,9 @@ let DispatchService = class DispatchService {
             data: {
                 customerId: customerId ? Number(customerId) : undefined,
                 transporterId: transporterId ? Number(transporterId) : undefined,
-                vehicleNumber
+                vehicleNumber,
+                UpdatedBy: user?.name || 'System',
+                UpdatedDate: new Date()
             }
         });
     }
@@ -372,33 +400,40 @@ let DispatchService = class DispatchService {
         if (!dispatch) {
             throw new _common.NotFoundException('Dispatch record not found.');
         }
-        const salesOrder = await this.prisma.salesOrder.findUnique({
+        const salesOrder = await this.prisma.salesOrder.findFirst({
             where: {
-                saleOrderNumber
+                saleOrderNumber: {
+                    equals: saleOrderNumber,
+                    mode: 'insensitive'
+                }
             },
             select: {
-                customerId: true
+                customerId: true,
+                saleOrderNumber: true
             }
         });
         if (!salesOrder) {
             throw new _common.NotFoundException('Invalid SO Number');
         }
-        // if (salesOrder.customerId !== dispatch.customerId) {
-        //   throw new BadRequestException(
-        //     'This SO Number belongs to a different customer.',
-        //   );
-        // }
         return this.prisma.$transaction(async (tx)=>{
             try {
                 const newDispatchSO = await tx.dispatch_SO.create({
                     data: {
                         dispatchId,
-                        saleOrderNumber
+                        saleOrderNumber: salesOrder.saleOrderNumber
+                    }
+                });
+                await tx.dispatch.update({
+                    where: {
+                        id: dispatchId
+                    },
+                    data: {
+                        UpdatedDate: new Date()
                     }
                 });
                 await tx.salesOrder.update({
                     where: {
-                        saleOrderNumber
+                        saleOrderNumber: salesOrder.saleOrderNumber
                     },
                     data: {
                         status: 'Dispatched',
@@ -415,9 +450,25 @@ let DispatchService = class DispatchService {
         });
     }
     async removeDispatchSO(soId) {
+        const dispatchSoLink = await this.prisma.dispatch_SO.findUnique({
+            where: {
+                id: soId
+            }
+        });
+        if (!dispatchSoLink) {
+            throw new _common.NotFoundException('Dispatch link not found.');
+        }
         await this.prisma.dispatch_SO.delete({
             where: {
                 id: soId
+            }
+        });
+        await this.prisma.dispatch.update({
+            where: {
+                id: dispatchSoLink.dispatchId
+            },
+            data: {
+                UpdatedDate: new Date()
             }
         });
         return {

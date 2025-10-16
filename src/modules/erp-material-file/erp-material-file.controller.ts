@@ -21,6 +21,7 @@ import {
   ApiParam,
   ApiTags,
   ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -35,6 +36,7 @@ import { Response } from 'express';
 import { SftpService } from '../sftp/sftp.service';
 import { AuthRequest } from '../auth/types/auth-request.type';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UploadErpMaterialFileDto } from './dto/upload-erp-material-file.dto';
 
 const MAX_UPLOAD_BYTES = Number(
   process.env.MAX_UPLOAD_BYTES || 50 * 1024 * 1024,
@@ -42,7 +44,7 @@ const MAX_UPLOAD_BYTES = Number(
 
 function splitExt(name: string) {
   const i = name.lastIndexOf('.');
-  if (i <= 0) return { base: name, ext: '' }; 
+  if (i <= 0) return { base: name, ext: '' };
   return { base: name.slice(0, i), ext: name.slice(i) };
 }
 function sanitizeBase(name: string) {
@@ -77,9 +79,9 @@ export class ErpMaterialFileController {
   @ApiOperation({ summary: 'List files by exact sale order number' })
   @ApiParam({ name: 'saleOrderNumber', type: String })
   async listBySaleOrder(
-      @Param('saleOrderNumber') saleOrderNumber: string,
-      @Req() req: AuthRequest
-    ) {
+    @Param('saleOrderNumber') saleOrderNumber: string,
+    @Req() req: AuthRequest,
+  ) {
     const { userId, role } = req.user;
     return this.service.listBySaleOrderNumber(saleOrderNumber, userId, role);
   }
@@ -107,7 +109,7 @@ export class ErpMaterialFileController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateErpMaterialFileDto,
-    @Req() req: AuthRequest
+    @Req() req: AuthRequest,
   ) {
     const { userId, role } = req.user;
     return this.service.update(id, dto, userId, role);
@@ -125,7 +127,11 @@ export class ErpMaterialFileController {
   @Get(':id/download')
   @Roles('SALES', 'ADMIN', 'USER')
   @ApiOperation({ summary: 'Stream file content (inline if supported)' })
-  async download(@Param('id', ParseIntPipe) id: number, @Res() res: Response, @Req() req: AuthRequest) {
+  async download(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+    @Req() req: AuthRequest,
+  ) {
     const { userId, role } = req.user;
     const row = await this.service.get(id, userId, role);
     try {
@@ -177,16 +183,90 @@ export class ErpMaterialFileController {
     if (!files || files.length === 0) {
       throw new BadRequestException('No files received');
     }
-    
+
     if (!req?.user) {
-        throw new BadRequestException('User information not available');
+      throw new BadRequestException('User information not available');
     }
 
     const { userId, role } = req.user;
 
-    return this.service.uploadAndCreate(files, {
-      saleOrderNumber: saleOrderNumber?.trim() || null,
-      description: description?.trim() || null,
-    }, userId, role);
+    return this.service.uploadAndCreate(
+      files,
+      {
+        saleOrderNumber: saleOrderNumber?.trim() || null,
+        description: description?.trim() || null,
+      },
+      userId,
+      role,
+    );
+  }
+
+  @Post('upload-with-descriptions')
+  @Roles('SALES', 'ADMIN', 'USER')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      'Upload one or more files with individual descriptions to SFTP and create DB rows',
+  })
+  @ApiBody({
+    type: UploadErpMaterialFileDto,
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+        saleOrderNumber: {
+          type: 'string',
+        },
+        descriptions: {
+          type: 'string',
+        },
+      },
+    },
+  })
+  @UseInterceptors(
+    FilesInterceptor('files', 20, {
+      storage: diskStorage({
+        destination: os.tmpdir(),
+        filename: (_req, file, cb) => {
+          const { base, ext } = splitExt(file.originalname);
+          const safeBase = sanitizeBase(base);
+          const ts = Date.now();
+          const id = randomUUID();
+          cb(null, `${safeBase}__${ts}_${id}${ext}`);
+        },
+      }),
+      limits: { fileSize: MAX_UPLOAD_BYTES },
+    }),
+  )
+  async uploadWithDescriptions(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: UploadErpMaterialFileDto,
+    @Req() req?: AuthRequest,
+  ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files received');
+    }
+
+    if (!req?.user) {
+      throw new BadRequestException('User information not available');
+    }
+
+    const { userId, role } = req.user;
+
+    return this.service.uploadAndCreateWithDescriptions(
+      files,
+      {
+        saleOrderNumber: body.saleOrderNumber?.trim() || null,
+        descriptions: body.descriptions,
+      },
+      userId,
+      role,
+    );
   }
 }

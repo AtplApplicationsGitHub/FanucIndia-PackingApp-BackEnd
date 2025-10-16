@@ -22,9 +22,12 @@ function _ts_metadata(k, v) {
 let FgStorageService = class FgStorageService {
     async assignFgLocation(dto, user) {
         const { saleOrderNumber, fgLocation } = dto;
-        const salesOrder = await this.prisma.salesOrder.findUnique({
+        const salesOrder = await this.prisma.salesOrder.findFirst({
             where: {
-                saleOrderNumber
+                saleOrderNumber: {
+                    equals: saleOrderNumber,
+                    mode: 'insensitive'
+                }
             }
         });
         if (!salesOrder) {
@@ -32,7 +35,7 @@ let FgStorageService = class FgStorageService {
         }
         const updatedOrder = await this.prisma.salesOrder.update({
             where: {
-                saleOrderNumber
+                id: salesOrder.id
             },
             data: {
                 fgLocation: fgLocation

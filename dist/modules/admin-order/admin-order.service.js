@@ -300,7 +300,11 @@ let AdminOrderService = class AdminOrderService {
             where: {
                 id
             },
-            data: dto
+            data: {
+                ...dto,
+                UpdatedBy: user.name,
+                UpdatedDate: new Date()
+            }
         });
     }
     async remove(id) {
