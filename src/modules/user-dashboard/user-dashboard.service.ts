@@ -69,6 +69,9 @@ export class UserDashboardService {
     const assignedOrders = await this.prisma.salesOrder.findMany({
         where: {
             assignedUserId: userId,
+            materialData: {
+                some: {},
+            },
         },
         select: {
             saleOrderNumber: true,
