@@ -344,7 +344,7 @@ export class ErpMaterialFileService {
     try {
       for (const f of files) {
         const checksum = await sha256File(f.path);
-        const remoteName = f.originalname;
+        const remoteName = f.filename; 
         const remotePath = path.posix.join(remoteDir, remoteName);
         const description = descriptionMap[f.originalname] || null;
 
@@ -353,9 +353,9 @@ export class ErpMaterialFileService {
         const row = await this.prisma.eRP_Material_File.create({
           data: {
             saleOrderNumber: opts.saleOrderNumber,
-            fileName: f.originalname,
+            fileName: f.originalname, 
             description: description,
-            sftpPath: remotePath,
+            sftpPath: remotePath, 
             sftpDir: remoteDir,
             fileSizeBytes: BigInt(f.size),
             mimeType: f.mimetype,
@@ -373,6 +373,11 @@ export class ErpMaterialFileService {
         })),
       };
     } catch (e: any) {
+      for (const f of files) {
+        try {
+          fs.unlinkSync(f.path);
+        } catch {}
+      }
       throw new InternalServerErrorException(
         'Upload failed. ' + (e?.message || ''),
       );

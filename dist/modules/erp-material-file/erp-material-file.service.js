@@ -317,7 +317,7 @@ let ErpMaterialFileService = class ErpMaterialFileService {
         try {
             for (const f of files){
                 const checksum = await sha256File(f.path);
-                const remoteName = f.originalname;
+                const remoteName = f.filename;
                 const remotePath = _path.posix.join(remoteDir, remoteName);
                 const description = descriptionMap[f.originalname] || null;
                 await this.sftp.put(f.path, remotePath);
@@ -343,6 +343,11 @@ let ErpMaterialFileService = class ErpMaterialFileService {
                     }))
             };
         } catch (e) {
+            for (const f of files){
+                try {
+                    _fs.unlinkSync(f.path);
+                } catch  {}
+            }
             throw new _common.InternalServerErrorException('Upload failed. ' + (e?.message || ''));
         } finally{
             for (const f of files){
