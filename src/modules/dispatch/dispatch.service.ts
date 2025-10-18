@@ -26,6 +26,11 @@ interface AttachmentData {
 export class DispatchService {
   private readonly logger = new Logger(DispatchService.name);
 
+  private async getUserName(userId: number): Promise<string> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    return user?.name || 'System';
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sftpService: SftpService,
@@ -46,53 +51,71 @@ export class DispatchService {
     } = dto;
 
     return this.prisma.$transaction(async (tx) => {
-
       let finalCustomerId: number;
 
       if (customerName) {
         let customer = await tx.customer.findFirst({
-            where: { name: { equals: customerName, mode: 'insensitive' } },
+          where: { name: { equals: customerName, mode: 'insensitive' } },
         });
         if (!customer) {
-            this.logger.log(`Customer "${customerName}" not found, creating new one.`);
-            customer = await tx.customer.create({
-                data: { name: customerName, address: address },
-            });
+          this.logger.log(
+            `Customer "${customerName}" not found, creating new one.`,
+          );
+          customer = await tx.customer.create({
+            data: { name: customerName, address: address },
+          });
         }
         finalCustomerId = customer.id;
       } else if (customerIdString) {
-          const parsedCustomerId = parseInt(customerIdString, 10);
-          if (isNaN(parsedCustomerId)) {
-              throw new BadRequestException('Invalid customerId provided.');
-          }
-          const customerExists = await tx.customer.findUnique({ where: { id: parsedCustomerId } });
-          if (!customerExists) {
-              throw new BadRequestException(`Customer with ID ${parsedCustomerId} not found.`);
-          }
-          finalCustomerId = parsedCustomerId; 
+        const parsedCustomerId = parseInt(customerIdString, 10);
+        if (isNaN(parsedCustomerId)) {
+          throw new BadRequestException('Invalid customerId provided.');
+        }
+        const customerExists = await tx.customer.findUnique({
+          where: { id: parsedCustomerId },
+        });
+        if (!customerExists) {
+          throw new BadRequestException(
+            `Customer with ID ${parsedCustomerId} not found.`,
+          );
+        }
+        finalCustomerId = parsedCustomerId;
       } else {
-          throw new BadRequestException('Either customerId or customerName must be provided.');
+        throw new BadRequestException(
+          'Either customerId or customerName must be provided.',
+        );
       }
 
       const user = await tx.user.findUnique({ where: { id: userId } });
       const userName = user?.name || 'System';
 
-      const finalTransporterId = transporterIdString ? parseInt(transporterIdString, 10) : null;
-      if (transporterIdString && finalTransporterId !== null && isNaN(finalTransporterId)) {
-          throw new BadRequestException('Invalid transporterId provided.');
+      const finalTransporterId = transporterIdString
+        ? parseInt(transporterIdString, 10)
+        : null;
+      if (
+        transporterIdString &&
+        finalTransporterId !== null &&
+        isNaN(finalTransporterId)
+      ) {
+        throw new BadRequestException('Invalid transporterId provided.');
       }
       if (finalTransporterId !== null) {
-          const transporterExists = await tx.transporter.findUnique({ where: { id: finalTransporterId } });
-          if (!transporterExists) {
-               throw new BadRequestException(`Transporter with ID ${finalTransporterId} not found.`);
-          }
+        const transporterExists = await tx.transporter.findUnique({
+          where: { id: finalTransporterId },
+        });
+        if (!transporterExists) {
+          throw new BadRequestException(
+            `Transporter with ID ${finalTransporterId} not found.`,
+          );
+        }
       }
 
       const newDispatch = await tx.dispatch.create({
         data: {
           customerId: finalCustomerId,
           address: address,
-          transporterId: finalTransporterId === null ? undefined : finalTransporterId,
+          transporterId:
+            finalTransporterId === null ? undefined : finalTransporterId,
           vehicleNumber,
           createdBy: userId,
           UpdatedBy: userName,
@@ -301,7 +324,8 @@ export class DispatchService {
     });
   }
 
-  async addMobileDispatchSO(dispatchId: number, saleOrderNumber: string) {
+  async addMobileDispatchSO(dispatchId: number, saleOrderNumber: string, userId: number) {
+    const userName = await this.getUserName(userId);
     return this.prisma.$transaction(async (tx) => {
       const dispatch = await tx.dispatch.findUnique({
         where: { id: dispatchId },
@@ -341,9 +365,10 @@ export class DispatchService {
         data: {
           status: 'Dispatched',
           fgLocation: null,
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
         },
       });
-
       return createdLink;
     });
   }
@@ -351,7 +376,18 @@ export class DispatchService {
   async findAll() {
     const dispatches = await this.prisma.dispatch.findMany({
       orderBy: { createdAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        customerId: true,
+        address: true,
+        transporterId: true,
+        vehicleNumber: true,
+        attachments: true,
+        createdBy: true,
+        createdAt: true,
+        updatedAt: true,
+        UpdatedBy: true,
+        UpdatedDate: true,
         customer: { select: { name: true } },
         transporter: { select: { name: true } },
         _count: {
@@ -389,7 +425,7 @@ export class DispatchService {
     });
   }
 
-  async addDispatchSO(dispatchId: number, saleOrderNumber: string) {
+  async addDispatchSO(dispatchId: number, saleOrderNumber: string, userId: number) {
     const dispatch = await this.prisma.dispatch.findUnique({
       where: { id: dispatchId },
       select: { customerId: true },
@@ -413,6 +449,8 @@ export class DispatchService {
       throw new NotFoundException('Invalid SO Number');
     }
 
+    const userName = await this.getUserName(userId);
+
     return this.prisma.$transaction(async (tx) => {
       try {
         const newDispatchSO = await tx.dispatch_SO.create({
@@ -434,6 +472,8 @@ export class DispatchService {
           data: {
             status: 'Dispatched',
             fgLocation: null,
+            UpdatedBy: userName,
+            UpdatedDate: new Date(),
           },
         });
 
@@ -450,7 +490,7 @@ export class DispatchService {
     });
   }
 
-  async removeDispatchSO(soId: number) {
+  async removeDispatchSO(soId: number, userId: number) {
     const dispatchSoLink = await this.prisma.dispatch_SO.findUnique({
       where: { id: soId },
     });
@@ -459,6 +499,8 @@ export class DispatchService {
       throw new NotFoundException('Dispatch link not found.');
     }
 
+    const userName = await this.getUserName(userId);
+
     await this.prisma.$transaction(async (tx) => {
       await tx.dispatch_SO.delete({ where: { id: soId } });
 
@@ -466,6 +508,8 @@ export class DispatchService {
         where: { saleOrderNumber: dispatchSoLink.saleOrderNumber },
         data: {
           status: 'F105',
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
         },
       });
 

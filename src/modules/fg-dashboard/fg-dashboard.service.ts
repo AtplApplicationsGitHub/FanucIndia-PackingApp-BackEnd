@@ -16,9 +16,9 @@ export class FgDashboardService {
 
     if (date) {
       const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
+      startOfDay.setUTCHours(0, 0, 0, 0); 
       const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+      endOfDay.setUTCHours(23, 59, 59, 999);
       where.deliveryDate = {
         gte: startOfDay,
         lte: endOfDay,
@@ -33,43 +33,44 @@ export class FgDashboardService {
         { status: { contains: search, mode: 'insensitive' } },
         { fgLocation: { contains: search, mode: 'insensitive' } },
         { specialRemarks: { contains: search, mode: 'insensitive' } },
+        { UpdatedBy: { contains: search, mode: 'insensitive' } },
       ];
     }
 
-
     const salesOrders = await this.prisma.salesOrder.findMany({
       where,
-      include: {
-        product: true,
-        customer: true,
+      select: {
+          id: true,
+          deliveryDate: true,
+          saleOrderNumber: true,
+          paymentClearance: true,
+          status: true,
+          fgLocation: true,
+          specialRemarks: true,
+          UpdatedBy: true,  
+          UpdatedDate: true, 
+          product: { select: { name: true } }, 
+          customer: { select: { name: true } }, 
       },
       orderBy: {
-        deliveryDate: 'desc',
+        UpdatedDate: 'desc', 
       },
     });
 
-    const fgData = await Promise.all(
-      salesOrders.map(async (order) => {
-        const materialData = await this.prisma.eRP_Material_Data.findFirst({
-          where: { saleOrderNumber: order.saleOrderNumber },
-          orderBy: { UpdatedDate: 'desc' },
-        });
+    const fgData = salesOrders.map(order => ({
+      id: order.id,
+      deliveryDate: order.deliveryDate,
+      saleOrderNumber: order.saleOrderNumber,
+      product: order.product?.name,
+      customerName: order.customer?.name,
+      payment: order.paymentClearance,
+      status: order.status,
+      fgLocation: order.fgLocation,
+      specialRemarks: order.specialRemarks,
+      updatedBy: order.UpdatedBy, 
+      updatedDate: order.UpdatedDate,
+    }));
 
-        return {
-          id: order.id,
-          deliveryDate: order.deliveryDate,
-          saleOrderNumber: order.saleOrderNumber,
-          product: order.product?.name,
-          customerName: order.customer?.name,
-          payment: order.paymentClearance,
-          status: order.status,
-          fgLocation: order.fgLocation,
-          specialRemarks: order.specialRemarks,
-          updatedBy: materialData?.UpdatedBy,
-          updatedDate: materialData?.UpdatedDate,
-        };
-      }),
-    );
     return fgData;
   }
 }

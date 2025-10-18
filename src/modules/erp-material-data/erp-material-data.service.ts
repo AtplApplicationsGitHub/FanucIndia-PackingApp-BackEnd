@@ -56,6 +56,11 @@ async function verifyOrderAccess(
 export class ErpMaterialDataService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async getUserName(userId: number): Promise<string> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    return user?.name || 'System'; 
+  }
+
   async getMaterialsByOrderId(
     orderId: number,
     userId: number,
@@ -108,10 +113,10 @@ export class ErpMaterialDataService {
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user ? user.name : 'System';
-    
+
     const updatedMaterial = await this.prisma.eRP_Material_Data.update({
       where: { ID: material.ID },
-      data: { 
+      data: {
         Issue_stage: { increment: 1 },
         UpdatedBy: userName,
         UpdatedDate: new Date(),
@@ -127,10 +132,11 @@ export class ErpMaterialDataService {
       (m) => m.Issue_stage >= m.Required_Qty,
     );
     let issueStageCompleted = false;
+
     if (allCompleted) {
       await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { status: 'F105', assignedUserId: null },
+        data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
       });
       issueStageCompleted = true;
     }
@@ -176,19 +182,19 @@ export class ErpMaterialDataService {
     if (newIssueStage < 0) {
       throw new BadRequestException('Issue_stage cannot be negative');
     }
-    
+
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user ? user.name : 'System';
 
     const updatedMaterial = await this.prisma.eRP_Material_Data.update({
       where: { ID: material.ID },
-      data: { 
+      data: {
         Issue_stage: newIssueStage,
         UpdatedBy: userName,
         UpdatedDate: new Date(),
-       },
+      },
       select: {
-        ID: true, 
+        ID: true,
         Material_Code: true,
         Issue_stage: true,
         Required_Qty: true,
@@ -204,13 +210,13 @@ export class ErpMaterialDataService {
     const allCompleted = allMaterials.every(
       (m) => m.Issue_stage >= m.Required_Qty,
     );
-    let issueStageCompleted = false; 
+    let issueStageCompleted = false;
     if (allCompleted) {
       await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { status: 'F105', assignedUserId: null },
+        data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
       });
-      issueStageCompleted = true; 
+      issueStageCompleted = true;
     }
 
     return convertBigInts({
@@ -276,7 +282,7 @@ export class ErpMaterialDataService {
     if (allPacked) {
       await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { assignedUserId: null },
+        data: { assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
       });
       packingStageCompleted = true;
     }
@@ -349,7 +355,7 @@ export class ErpMaterialDataService {
     if (allPacked) {
       await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { assignedUserId: null },
+        data: { assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
       });
       packingStageCompleted = true;
     }

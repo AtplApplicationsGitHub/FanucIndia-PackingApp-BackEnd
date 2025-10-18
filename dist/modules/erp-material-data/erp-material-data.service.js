@@ -64,6 +64,14 @@ async function verifyOrderAccess(prisma, orderId, userId, userRole) {
     };
 }
 let ErpMaterialDataService = class ErpMaterialDataService {
+    async getUserName(userId) {
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            }
+        });
+        return user?.name || 'System';
+    }
     async getMaterialsByOrderId(orderId, userId, userRole) {
         await verifyOrderAccess(this.prisma, orderId, userId, userRole);
         const salesOrder = await this.prisma.salesOrder.findUnique({
@@ -142,7 +150,9 @@ let ErpMaterialDataService = class ErpMaterialDataService {
                 },
                 data: {
                     status: 'F105',
-                    assignedUserId: null
+                    assignedUserId: null,
+                    UpdatedBy: userName,
+                    UpdatedDate: new Date()
                 }
             });
             issueStageCompleted = true;
@@ -218,7 +228,9 @@ let ErpMaterialDataService = class ErpMaterialDataService {
                 },
                 data: {
                     status: 'F105',
-                    assignedUserId: null
+                    assignedUserId: null,
+                    UpdatedBy: userName,
+                    UpdatedDate: new Date()
                 }
             });
             issueStageCompleted = true;
@@ -286,7 +298,9 @@ let ErpMaterialDataService = class ErpMaterialDataService {
                     id: orderId
                 },
                 data: {
-                    assignedUserId: null
+                    assignedUserId: null,
+                    UpdatedBy: userName,
+                    UpdatedDate: new Date()
                 }
             });
             packingStageCompleted = true;
@@ -355,7 +369,9 @@ let ErpMaterialDataService = class ErpMaterialDataService {
                     id: orderId
                 },
                 data: {
-                    assignedUserId: null
+                    assignedUserId: null,
+                    UpdatedBy: userName,
+                    UpdatedDate: new Date()
                 }
             });
             packingStageCompleted = true;

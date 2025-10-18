@@ -48,11 +48,11 @@ let DispatchController = class DispatchController {
         }
         return this.dispatchService.addMobileAttachments(id, files);
     }
-    addMobileDispatchSO(id, saleOrderNumber) {
+    addMobileDispatchSO(id, saleOrderNumber, req) {
         if (!saleOrderNumber) {
             throw new _common.BadRequestException('saleOrderNumber is required.');
         }
-        return this.dispatchService.addMobileDispatchSO(id, saleOrderNumber);
+        return this.dispatchService.addMobileDispatchSO(id, saleOrderNumber, req.user.userId);
     }
     findAll() {
         return this.dispatchService.findAll();
@@ -63,11 +63,11 @@ let DispatchController = class DispatchController {
     findDispatchSOs(id) {
         return this.dispatchService.findDispatchSOs(id);
     }
-    addDispatchSO(id, saleOrderNumber) {
-        return this.dispatchService.addDispatchSO(id, saleOrderNumber);
+    addDispatchSO(id, saleOrderNumber, req) {
+        return this.dispatchService.addDispatchSO(id, saleOrderNumber, req.user.userId);
     }
-    removeDispatchSO(soId) {
-        return this.dispatchService.removeDispatchSO(soId);
+    removeDispatchSO(soId, req) {
+        return this.dispatchService.removeDispatchSO(soId, req.user.userId);
     }
     async generatePdf(id, res) {
         const pdfBuffer = await this.dispatchService.generatePdf(id);
@@ -186,10 +186,12 @@ _ts_decorate([
     }),
     _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
     _ts_param(1, (0, _common.Body)('saleOrderNumber')),
+    _ts_param(2, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         Number,
-        String
+        String,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
     ]),
     _ts_metadata("design:returntype", void 0)
 ], DispatchController.prototype, "addMobileDispatchSO", null);
@@ -229,10 +231,12 @@ _ts_decorate([
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
     _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
     _ts_param(1, (0, _common.Body)('saleOrderNumber')),
+    _ts_param(2, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         Number,
-        String
+        String,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
     ]),
     _ts_metadata("design:returntype", void 0)
 ], DispatchController.prototype, "addDispatchSO", null);
@@ -240,9 +244,11 @@ _ts_decorate([
     (0, _common.Delete)('so/:soId'),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
     _ts_param(0, (0, _common.Param)('soId', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        Number
+        Number,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
     ]),
     _ts_metadata("design:returntype", void 0)
 ], DispatchController.prototype, "removeDispatchSO", null);

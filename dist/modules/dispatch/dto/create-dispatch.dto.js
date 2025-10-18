@@ -22,24 +22,53 @@ function _ts_metadata(k, v) {
 let CreateDispatchDto = class CreateDispatchDto {
 };
 _ts_decorate([
-    (0, _swagger.ApiProperty)(),
+    (0, _swagger.ApiPropertyOptional)({
+        description: 'The ID of the existing customer.',
+        example: '1'
+    }),
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsNumberString)(),
-    _ts_metadata("design:type", Number)
+    (0, _classvalidator.ValidateIf)((o)=>!o.customerName),
+    (0, _classvalidator.IsDefined)({
+        message: 'Either customerId or customerName must be provided.'
+    }),
+    _ts_metadata("design:type", String)
 ], CreateDispatchDto.prototype, "customerId", void 0);
 _ts_decorate([
-    (0, _swagger.ApiProperty)(),
+    (0, _swagger.ApiPropertyOptional)({
+        description: 'The name of the new or existing customer.',
+        example: 'New Customer Inc.'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.IsNotEmpty)(),
+    (0, _classvalidator.ValidateIf)((o)=>!o.customerId),
+    (0, _classvalidator.IsDefined)({
+        message: 'Either customerId or customerName must be provided.'
+    }),
+    _ts_metadata("design:type", String)
+], CreateDispatchDto.prototype, "customerName", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'The dispatch address.',
+        example: '123 Main St'
+    }),
     (0, _classvalidator.IsString)(),
     (0, _classvalidator.IsNotEmpty)(),
     _ts_metadata("design:type", String)
 ], CreateDispatchDto.prototype, "address", void 0);
 _ts_decorate([
-    (0, _swagger.ApiPropertyOptional)(),
+    (0, _swagger.ApiPropertyOptional)({
+        description: 'Transporter ID (optional)'
+    }),
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsNumberString)(),
-    _ts_metadata("design:type", Number)
+    _ts_metadata("design:type", String)
 ], CreateDispatchDto.prototype, "transporterId", void 0);
 _ts_decorate([
-    (0, _swagger.ApiProperty)(),
+    (0, _swagger.ApiProperty)({
+        description: 'Vehicle registration number.'
+    }),
     (0, _classvalidator.IsString)(),
     (0, _classvalidator.IsNotEmpty)(),
     _ts_metadata("design:type", String)
@@ -49,7 +78,7 @@ _ts_decorate([
         type: [
             String
         ],
-        description: 'List of Sale Order Numbers to be dispatched'
+        description: 'List of Sale Order Numbers to be dispatched (optional)'
     }),
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsArray)(),

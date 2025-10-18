@@ -38,7 +38,9 @@ let FgStorageService = class FgStorageService {
                 id: salesOrder.id
             },
             data: {
-                fgLocation: fgLocation
+                fgLocation: fgLocation,
+                UpdatedBy: user.name,
+                UpdatedDate: new Date()
             }
         });
         return {

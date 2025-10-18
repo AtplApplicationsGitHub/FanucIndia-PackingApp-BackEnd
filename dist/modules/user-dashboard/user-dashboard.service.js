@@ -107,7 +107,10 @@ let UserDashboardService = class UserDashboardService {
     async getAssignedOrdersSummary(userId) {
         const assignedOrders = await this.prisma.salesOrder.findMany({
             where: {
-                assignedUserId: userId
+                assignedUserId: userId,
+                materialData: {
+                    some: {}
+                }
             },
             select: {
                 saleOrderNumber: true,

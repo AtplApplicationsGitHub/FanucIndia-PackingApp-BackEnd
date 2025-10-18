@@ -113,11 +113,12 @@ export class DispatchController {
   addMobileDispatchSO(
     @Param('id', ParseIntPipe) id: number,
     @Body('saleOrderNumber') saleOrderNumber: string,
+    @Req() req: AuthRequest,
   ) {
     if (!saleOrderNumber) {
         throw new BadRequestException('saleOrderNumber is required.');
     }
-    return this.dispatchService.addMobileDispatchSO(id, saleOrderNumber);
+    return this.dispatchService.addMobileDispatchSO(id, saleOrderNumber, req.user.userId);
   }
 
   @Get()
@@ -147,14 +148,15 @@ export class DispatchController {
   addDispatchSO(
     @Param('id', ParseIntPipe) id: number,
     @Body('saleOrderNumber') saleOrderNumber: string,
+    @Req() req: AuthRequest,
   ) {
-    return this.dispatchService.addDispatchSO(id, saleOrderNumber);
+    return this.dispatchService.addDispatchSO(id, saleOrderNumber, req.user.userId);
   }
   
   @Delete('so/:soId')
   @Roles('ADMIN', 'USER')
-  removeDispatchSO(@Param('soId', ParseIntPipe) soId: number) {
-    return this.dispatchService.removeDispatchSO(soId);
+  removeDispatchSO(@Param('soId', ParseIntPipe) soId: number, @Req() req: AuthRequest) {
+    return this.dispatchService.removeDispatchSO(soId, req.user.userId);
   }
 
   @Get(':id/pdf')

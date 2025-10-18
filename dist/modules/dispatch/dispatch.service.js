@@ -71,20 +71,79 @@ function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
 let DispatchService = class DispatchService {
+    async getUserName(userId) {
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            }
+        });
+        return user?.name || 'System';
+    }
     async create(dto, files, userId) {
-        const { customerId, address, transporterId, vehicleNumber, saleOrderNumbers } = dto;
+        const { customerId: customerIdString, customerName, address, transporterId: transporterIdString, vehicleNumber, saleOrderNumbers } = dto;
         return this.prisma.$transaction(async (tx)=>{
+            let finalCustomerId;
+            if (customerName) {
+                let customer = await tx.customer.findFirst({
+                    where: {
+                        name: {
+                            equals: customerName,
+                            mode: 'insensitive'
+                        }
+                    }
+                });
+                if (!customer) {
+                    this.logger.log(`Customer "${customerName}" not found, creating new one.`);
+                    customer = await tx.customer.create({
+                        data: {
+                            name: customerName,
+                            address: address
+                        }
+                    });
+                }
+                finalCustomerId = customer.id;
+            } else if (customerIdString) {
+                const parsedCustomerId = parseInt(customerIdString, 10);
+                if (isNaN(parsedCustomerId)) {
+                    throw new _common.BadRequestException('Invalid customerId provided.');
+                }
+                const customerExists = await tx.customer.findUnique({
+                    where: {
+                        id: parsedCustomerId
+                    }
+                });
+                if (!customerExists) {
+                    throw new _common.BadRequestException(`Customer with ID ${parsedCustomerId} not found.`);
+                }
+                finalCustomerId = parsedCustomerId;
+            } else {
+                throw new _common.BadRequestException('Either customerId or customerName must be provided.');
+            }
             const user = await tx.user.findUnique({
                 where: {
                     id: userId
                 }
             });
             const userName = user?.name || 'System';
+            const finalTransporterId = transporterIdString ? parseInt(transporterIdString, 10) : null;
+            if (transporterIdString && finalTransporterId !== null && isNaN(finalTransporterId)) {
+                throw new _common.BadRequestException('Invalid transporterId provided.');
+            }
+            if (finalTransporterId !== null) {
+                const transporterExists = await tx.transporter.findUnique({
+                    where: {
+                        id: finalTransporterId
+                    }
+                });
+                if (!transporterExists) {
+                    throw new _common.BadRequestException(`Transporter with ID ${finalTransporterId} not found.`);
+                }
+            }
             const newDispatch = await tx.dispatch.create({
                 data: {
-                    customerId: Number(customerId),
-                    address,
-                    transporterId: transporterId ? Number(transporterId) : null,
+                    customerId: finalCustomerId,
+                    address: address,
+                    transporterId: finalTransporterId === null ? undefined : finalTransporterId,
                     vehicleNumber,
                     createdBy: userId,
                     UpdatedBy: userName,
@@ -124,7 +183,10 @@ let DispatchService = class DispatchService {
                         }
                     });
                     if (!salesOrder) throw new _common.BadRequestException(`Sale Order ${so} not found.`);
-                    if (salesOrder.customerId !== Number(customerId)) throw new _common.BadRequestException(`Sale Order ${so} belongs to a different customer.`);
+                // if (salesOrder.customerId !== Number(customerId))
+                //   throw new BadRequestException(
+                //     `Sale Order ${so} belongs to a different customer.`,
+                //   );
                 }
                 await tx.dispatch_SO.createMany({
                     data: saleOrderNumbers.map((so)=>({
@@ -283,7 +345,8 @@ let DispatchService = class DispatchService {
             }
         });
     }
-    async addMobileDispatchSO(dispatchId, saleOrderNumber) {
+    async addMobileDispatchSO(dispatchId, saleOrderNumber, userId) {
+        const userName = await this.getUserName(userId);
         return this.prisma.$transaction(async (tx)=>{
             const dispatch = await tx.dispatch.findUnique({
                 where: {
@@ -324,7 +387,9 @@ let DispatchService = class DispatchService {
                 },
                 data: {
                     status: 'Dispatched',
-                    fgLocation: null
+                    fgLocation: null,
+                    UpdatedBy: userName,
+                    UpdatedDate: new Date()
                 }
             });
             return createdLink;
@@ -335,7 +400,18 @@ let DispatchService = class DispatchService {
             orderBy: {
                 createdAt: 'desc'
             },
-            include: {
+            select: {
+                id: true,
+                customerId: true,
+                address: true,
+                transporterId: true,
+                vehicleNumber: true,
+                attachments: true,
+                createdBy: true,
+                createdAt: true,
+                updatedAt: true,
+                UpdatedBy: true,
+                UpdatedDate: true,
                 customer: {
                     select: {
                         name: true
@@ -388,7 +464,7 @@ let DispatchService = class DispatchService {
             }
         });
     }
-    async addDispatchSO(dispatchId, saleOrderNumber) {
+    async addDispatchSO(dispatchId, saleOrderNumber, userId) {
         const dispatch = await this.prisma.dispatch.findUnique({
             where: {
                 id: dispatchId
@@ -415,6 +491,7 @@ let DispatchService = class DispatchService {
         if (!salesOrder) {
             throw new _common.NotFoundException('Invalid SO Number');
         }
+        const userName = await this.getUserName(userId);
         return this.prisma.$transaction(async (tx)=>{
             try {
                 const newDispatchSO = await tx.dispatch_SO.create({
@@ -437,7 +514,9 @@ let DispatchService = class DispatchService {
                     },
                     data: {
                         status: 'Dispatched',
-                        fgLocation: null
+                        fgLocation: null,
+                        UpdatedBy: userName,
+                        UpdatedDate: new Date()
                     }
                 });
                 return newDispatchSO;
@@ -449,7 +528,7 @@ let DispatchService = class DispatchService {
             }
         });
     }
-    async removeDispatchSO(soId) {
+    async removeDispatchSO(soId, userId) {
         const dispatchSoLink = await this.prisma.dispatch_SO.findUnique({
             where: {
                 id: soId
@@ -458,23 +537,23 @@ let DispatchService = class DispatchService {
         if (!dispatchSoLink) {
             throw new _common.NotFoundException('Dispatch link not found.');
         }
+        const userName = await this.getUserName(userId);
         await this.prisma.$transaction(async (tx)=>{
-            // Delete the link
             await tx.dispatch_SO.delete({
                 where: {
                     id: soId
                 }
             });
-            // Revert the Sales Order status
             await tx.salesOrder.update({
                 where: {
                     saleOrderNumber: dispatchSoLink.saleOrderNumber
                 },
                 data: {
-                    status: 'F105'
+                    status: 'F105',
+                    UpdatedBy: userName,
+                    UpdatedDate: new Date()
                 }
             });
-            // Update the dispatch record's timestamp
             await tx.dispatch.update({
                 where: {
                     id: dispatchSoLink.dispatchId
@@ -640,6 +719,7 @@ let DispatchService = class DispatchService {
     constructor(prisma, sftpService){
         this.prisma = prisma;
         this.sftpService = sftpService;
+        this.logger = new _common.Logger(DispatchService.name);
     }
 };
 DispatchService = _ts_decorate([

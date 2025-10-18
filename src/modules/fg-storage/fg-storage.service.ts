@@ -6,7 +6,7 @@ import { UpdateFgLocationDto } from './dto/update-fg-location.dto';
 export class FgStorageService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async assignFgLocation(dto: UpdateFgLocationDto, user: { userId: number; role: string }) {
+  async assignFgLocation(dto: UpdateFgLocationDto, user: { userId: number; role: string; name: string }) {
     const { saleOrderNumber, fgLocation } = dto;
 
     const salesOrder = await this.prisma.salesOrder.findFirst({
@@ -26,6 +26,8 @@ export class FgStorageService {
       where: { id: salesOrder.id },
       data: {
         fgLocation: fgLocation,
+        UpdatedBy: user.name, 
+        UpdatedDate: new Date(),
       },
     });
 
