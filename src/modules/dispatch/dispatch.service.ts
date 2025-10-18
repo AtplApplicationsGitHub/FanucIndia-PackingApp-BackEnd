@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateDispatchDto } from './dto/create-dispatch.dto';
@@ -23,6 +24,8 @@ interface AttachmentData {
 
 @Injectable()
 export class DispatchService {
+  private readonly logger = new Logger(DispatchService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sftpService: SftpService,
@@ -34,22 +37,62 @@ export class DispatchService {
     userId: number,
   ) {
     const {
-      customerId,
+      customerId: customerIdString,
+      customerName,
       address,
-      transporterId,
+      transporterId: transporterIdString,
       vehicleNumber,
       saleOrderNumbers,
     } = dto;
 
     return this.prisma.$transaction(async (tx) => {
+
+      let finalCustomerId: number;
+
+      if (customerName) {
+        let customer = await tx.customer.findFirst({
+            where: { name: { equals: customerName, mode: 'insensitive' } },
+        });
+        if (!customer) {
+            this.logger.log(`Customer "${customerName}" not found, creating new one.`);
+            customer = await tx.customer.create({
+                data: { name: customerName, address: address },
+            });
+        }
+        finalCustomerId = customer.id;
+      } else if (customerIdString) {
+          const parsedCustomerId = parseInt(customerIdString, 10);
+          if (isNaN(parsedCustomerId)) {
+              throw new BadRequestException('Invalid customerId provided.');
+          }
+          const customerExists = await tx.customer.findUnique({ where: { id: parsedCustomerId } });
+          if (!customerExists) {
+              throw new BadRequestException(`Customer with ID ${parsedCustomerId} not found.`);
+          }
+          finalCustomerId = parsedCustomerId; 
+      } else {
+          throw new BadRequestException('Either customerId or customerName must be provided.');
+      }
+
       const user = await tx.user.findUnique({ where: { id: userId } });
       const userName = user?.name || 'System';
 
+      const finalTransporterId = transporterIdString ? parseInt(transporterIdString, 10) : null;
+      if (transporterIdString && finalTransporterId !== null && isNaN(finalTransporterId)) {
+          throw new BadRequestException('Invalid transporterId provided.');
+      }
+      if (finalTransporterId !== null) {
+          const transporterExists = await tx.transporter.findUnique({ where: { id: finalTransporterId } });
+          if (!transporterExists) {
+               throw new BadRequestException(`Transporter with ID ${finalTransporterId} not found.`);
+          }
+      }
+
       const newDispatch = await tx.dispatch.create({
         data: {
-          customerId: Number(customerId),
-          address,
-          transporterId: transporterId ? Number(transporterId) : null,
+          customerId: finalCustomerId,
+          address: address,
+          transporterId: finalTransporterId === null ? undefined : finalTransporterId,
           vehicleNumber,
           createdBy: userId,
           UpdatedBy: userName,
@@ -93,10 +136,10 @@ export class DispatchService {
           });
           if (!salesOrder)
             throw new BadRequestException(`Sale Order ${so} not found.`);
-          if (salesOrder.customerId !== Number(customerId))
-            throw new BadRequestException(
-              `Sale Order ${so} belongs to a different customer.`,
-            );
+          // if (salesOrder.customerId !== Number(customerId))
+          //   throw new BadRequestException(
+          //     `Sale Order ${so} belongs to a different customer.`,
+          //   );
         }
 
         await tx.dispatch_SO.createMany({
@@ -417,10 +460,8 @@ export class DispatchService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Delete the link
       await tx.dispatch_SO.delete({ where: { id: soId } });
 
-      // Revert the Sales Order status
       await tx.salesOrder.update({
         where: { saleOrderNumber: dispatchSoLink.saleOrderNumber },
         data: {
@@ -428,7 +469,6 @@ export class DispatchService {
         },
       });
 
-      // Update the dispatch record's timestamp
       await tx.dispatch.update({
         where: { id: dispatchSoLink.dispatchId },
         data: {

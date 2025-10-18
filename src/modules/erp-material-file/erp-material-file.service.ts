@@ -342,18 +342,38 @@ export class ErpMaterialFileService {
 
     const created: any[] = [];
     try {
+      const existingDbFiles = opts.saleOrderNumber
+        ? await this.prisma.eRP_Material_File.findMany({
+            where: { saleOrderNumber: opts.saleOrderNumber },
+            select: { fileName: true },
+          })
+        : [];
+      const existingFileNames = new Set(existingDbFiles.map(f => f.fileName));
+
       for (const f of files) {
         const checksum = await sha256File(f.path);
         const remoteName = f.filename; 
         const remotePath = path.posix.join(remoteDir, remoteName);
         const description = descriptionMap[f.originalname] || null;
 
+        let finalDbFileName = f.originalname;
+        if (opts.saleOrderNumber && existingFileNames.has(finalDbFileName)) {
+          let counter = 1;
+          const { name, ext } = this.splitFileName(f.originalname);
+          do {
+            finalDbFileName = `${name}-${counter}${ext}`;
+            counter++;
+          } while (existingFileNames.has(finalDbFileName));
+        }
+        // Add the new name to the set for subsequent files in *this* batch
+        existingFileNames.add(finalDbFileName);
+
         await this.sftp.put(f.path, remotePath);
 
         const row = await this.prisma.eRP_Material_File.create({
           data: {
             saleOrderNumber: opts.saleOrderNumber,
-            fileName: f.originalname, 
+            fileName: finalDbFileName, 
             description: description,
             sftpPath: remotePath, 
             sftpDir: remoteDir,
@@ -388,6 +408,17 @@ export class ErpMaterialFileService {
         } catch {}
       }
     }
+  }
+
+  private splitFileName(filename: string): { name: string; ext: string } {
+      const lastDotIndex = filename.lastIndexOf('.');
+      if (lastDotIndex === -1 || lastDotIndex === 0) {
+          return { name: filename, ext: '' };
+      }
+      return {
+          name: filename.substring(0, lastDotIndex),
+          ext: filename.substring(lastDotIndex), 
+      };
   }
 }
 
