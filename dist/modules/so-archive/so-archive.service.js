@@ -12,6 +12,48 @@ const _common = require("@nestjs/common");
 const _prismaservice = require("../../prisma.service");
 const _sftpservice = require("../sftp/sftp.service");
 const _client = require("@prisma/client");
+const _path = /*#__PURE__*/ _interop_require_wildcard(require("path"));
+function _getRequireWildcardCache(nodeInterop) {
+    if (typeof WeakMap !== "function") return null;
+    var cacheBabelInterop = new WeakMap();
+    var cacheNodeInterop = new WeakMap();
+    return (_getRequireWildcardCache = function(nodeInterop) {
+        return nodeInterop ? cacheNodeInterop : cacheBabelInterop;
+    })(nodeInterop);
+}
+function _interop_require_wildcard(obj, nodeInterop) {
+    if (!nodeInterop && obj && obj.__esModule) {
+        return obj;
+    }
+    if (obj === null || typeof obj !== "object" && typeof obj !== "function") {
+        return {
+            default: obj
+        };
+    }
+    var cache = _getRequireWildcardCache(nodeInterop);
+    if (cache && cache.has(obj)) {
+        return cache.get(obj);
+    }
+    var newObj = {
+        __proto__: null
+    };
+    var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor;
+    for(var key in obj){
+        if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) {
+            var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null;
+            if (desc && (desc.get || desc.set)) {
+                Object.defineProperty(newObj, key, desc);
+            } else {
+                newObj[key] = obj[key];
+            }
+        }
+    }
+    newObj.default = obj;
+    if (cache) {
+        cache.set(obj, newObj);
+    }
+    return newObj;
+}
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -222,20 +264,32 @@ let SoArchiveService = class SoArchiveService {
                 }
             });
         });
-        // 3. AFTER the transaction, delete all individual files
+        const orderBaseDir = process.env.SFTP_BASE_DIR_ORDER || '';
+        const dispatchBaseDir = process.env.SFTP_BASE_DIR_DISPATCH || '';
+        const resolvedOrderBase = _path.posix.resolve(orderBaseDir);
+        const resolvedDispatchBase = _path.posix.resolve(dispatchBaseDir);
         for (const file of allFilesToDelete){
             try {
                 if (file.sftpPath) {
+                    const resolvedPath = _path.posix.resolve(file.sftpPath);
+                    if (!resolvedPath.startsWith(resolvedOrderBase) && !resolvedPath.startsWith(resolvedDispatchBase)) {
+                        console.warn(`Skipping delete: Path ${file.sftpPath} is outside of configured base directories.`);
+                        continue;
+                    }
                     await this.sftp.delete(file.sftpPath);
                 }
             } catch (error) {
                 console.warn(`Failed to clean up SFTP file ${file.sftpPath}:`, error);
             }
         }
-        // 4. Finally, delete the now-empty directories
         for (const dir of uniqueDirectoriesToDelete){
             try {
                 if (dir) {
+                    const resolvedDir = _path.posix.resolve(dir);
+                    if (!resolvedDir.startsWith(resolvedOrderBase) && !resolvedDir.startsWith(resolvedDispatchBase)) {
+                        console.warn(`Skipping rmdir: Path ${dir} is outside of configured base directories.`);
+                        continue;
+                    }
                     await this.sftp.rmdir(dir);
                 }
             } catch (error) {

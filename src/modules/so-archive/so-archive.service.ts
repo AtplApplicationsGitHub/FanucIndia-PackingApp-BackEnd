@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { SftpService } from '../sftp/sftp.service';
 import { Prisma } from '@prisma/client';
 import { Response } from 'express';
+import * as path from 'path';
 
 @Injectable()
 export class SoArchiveService {
@@ -155,10 +156,26 @@ export class SoArchiveService {
         await tx.salesOrderArchive.deleteMany({ where: { saleOrderNumber } });
     });
 
-    // 3. AFTER the transaction, delete all individual files
+    const orderBaseDir = process.env.SFTP_BASE_DIR_ORDER || '';
+    const dispatchBaseDir = process.env.SFTP_BASE_DIR_DISPATCH || '';
+    const resolvedOrderBase = path.posix.resolve(orderBaseDir);
+    const resolvedDispatchBase = path.posix.resolve(dispatchBaseDir);
+
     for (const file of allFilesToDelete) {
       try {
         if (file.sftpPath) {
+          const resolvedPath = path.posix.resolve(file.sftpPath);
+
+          if (
+            !resolvedPath.startsWith(resolvedOrderBase) &&
+            !resolvedPath.startsWith(resolvedDispatchBase)
+          ) {
+            console.warn(
+              `Skipping delete: Path ${file.sftpPath} is outside of configured base directories.`,
+            );
+            continue; 
+          }
+
           await this.sftp.delete(file.sftpPath);
         }
       } catch (error) {
@@ -166,15 +183,26 @@ export class SoArchiveService {
       }
     }
 
-    // 4. Finally, delete the now-empty directories
     for (const dir of uniqueDirectoriesToDelete) {
-        try {
-            if (dir) {
-                await this.sftp.rmdir(dir);
-            }
-        } catch (error) {
-            console.warn(`Failed to clean up SFTP directory ${dir}:`, error);
+      try {
+        if (dir) {
+          const resolvedDir = path.posix.resolve(dir);
+
+          if (
+            !resolvedDir.startsWith(resolvedOrderBase) &&
+            !resolvedDir.startsWith(resolvedDispatchBase)
+          ) {
+            console.warn(
+              `Skipping rmdir: Path ${dir} is outside of configured base directories.`,
+            );
+            continue; 
+          }
+
+          await this.sftp.rmdir(dir);
         }
+      } catch (error) {
+        console.warn(`Failed to clean up SFTP directory ${dir}:`, error);
+      }
     }
 
     return { success: true, message: `Archived Sales Order ${saleOrderNumber} has been permanently deleted.` };

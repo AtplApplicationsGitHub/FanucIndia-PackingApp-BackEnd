@@ -299,11 +299,9 @@ _ts_decorate([
         storage: (0, _multer.diskStorage)({
             destination: _os.tmpdir(),
             filename: (_req, file, cb)=>{
-                const { base, ext } = splitExt(file.originalname);
-                const safeBase = sanitizeBase(base);
-                const ts = Date.now();
+                const { ext } = splitExt(file.originalname);
                 const id = (0, _crypto.randomUUID)();
-                cb(null, `${safeBase}__${ts}_${id}${ext}`);
+                cb(null, `${id}${ext}`);
             }
         }),
         limits: {
@@ -355,11 +353,9 @@ _ts_decorate([
         storage: (0, _multer.diskStorage)({
             destination: _os.tmpdir(),
             filename: (_req, file, cb)=>{
-                const { base, ext } = splitExt(file.originalname);
-                const safeBase = sanitizeBase(base);
-                const ts = Date.now();
+                const { ext } = splitExt(file.originalname);
                 const id = (0, _crypto.randomUUID)();
-                cb(null, `${safeBase}__${ts}_${id}${ext}`);
+                cb(null, `${id}${ext}`);
             }
         }),
         limits: {

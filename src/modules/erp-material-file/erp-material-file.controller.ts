@@ -164,11 +164,9 @@ export class ErpMaterialFileController {
       storage: diskStorage({
         destination: os.tmpdir(),
         filename: (_req, file, cb) => {
-          const { base, ext } = splitExt(file.originalname);
-          const safeBase = sanitizeBase(base);
-          const ts = Date.now();
+          const { ext } = splitExt(file.originalname);
           const id = randomUUID();
-          cb(null, `${safeBase}__${ts}_${id}${ext}`);
+          cb(null, `${id}${ext}`);
         },
       }),
       limits: { fileSize: MAX_UPLOAD_BYTES },
@@ -234,11 +232,9 @@ export class ErpMaterialFileController {
       storage: diskStorage({
         destination: os.tmpdir(),
         filename: (_req, file, cb) => {
-          const { base, ext } = splitExt(file.originalname);
-          const safeBase = sanitizeBase(base);
-          const ts = Date.now();
+          const { ext } = splitExt(file.originalname); 
           const id = randomUUID();
-          cb(null, `${safeBase}__${ts}_${id}${ext}`);
+          cb(null, `${id}${ext}`); 
         },
       }),
       limits: { fileSize: MAX_UPLOAD_BYTES },

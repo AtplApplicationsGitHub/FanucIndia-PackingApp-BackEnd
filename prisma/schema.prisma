@@ -215,6 +215,8 @@ model SalesOrderArchive {
   status              String
   priority            Int?
   createdAt           DateTime
+  UpdatedBy           String?             
+  UpdatedDate         DateTime?           
   archivedAt          DateTime            @default(now())
 }
 
@@ -253,6 +255,8 @@ model ERP_Material_FileArchive {
   mimeType           String?     @db.VarChar(255)
   checksumSha256     String?     @db.VarChar(64)
   createdAt          DateTime
+  UpdatedBy          String?          
+  UpdatedDate        DateTime?           
   archivedAt         DateTime    @default(now())
 }
 
@@ -265,6 +269,8 @@ model DispatchArchive {
   attachments   Json?
   createdBy     Int
   createdAt     DateTime
+  UpdatedBy     String?             
+  UpdatedDate   DateTime?          
   archivedAt    DateTime      @default(now())
 }
 
