@@ -55,7 +55,6 @@ let SalesCrudService = class SalesCrudService {
                     ...dto,
                     deliveryDate,
                     userId,
-                    status: 'R105',
                     assignedUserId: null,
                     customerId: dto.customerId,
                     printerId: null

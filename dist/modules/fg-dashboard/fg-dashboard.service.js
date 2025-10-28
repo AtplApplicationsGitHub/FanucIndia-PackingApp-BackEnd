@@ -21,7 +21,8 @@ function _ts_metadata(k, v) {
 }
 let FgDashboardService = class FgDashboardService {
     async getFgDashboardData(user, query) {
-        const { search, date } = query;
+        const { search, date, page = 1, limit = 10 } = query;
+        const skip = (page - 1) * limit;
         const where = {};
         if (user.role === 'USER') {
             where.assignedUserId = user.userId;
@@ -86,33 +87,40 @@ let FgDashboardService = class FgDashboardService {
                 }
             ];
         }
-        const salesOrders = await this.prisma.salesOrder.findMany({
-            where,
-            select: {
-                id: true,
-                deliveryDate: true,
-                saleOrderNumber: true,
-                paymentClearance: true,
-                status: true,
-                fgLocation: true,
-                specialRemarks: true,
-                UpdatedBy: true,
-                UpdatedDate: true,
-                product: {
-                    select: {
-                        name: true
+        const [salesOrders, totalCount] = await this.prisma.$transaction([
+            this.prisma.salesOrder.findMany({
+                where,
+                select: {
+                    id: true,
+                    deliveryDate: true,
+                    saleOrderNumber: true,
+                    paymentClearance: true,
+                    status: true,
+                    fgLocation: true,
+                    specialRemarks: true,
+                    UpdatedBy: true,
+                    UpdatedDate: true,
+                    product: {
+                        select: {
+                            name: true
+                        }
+                    },
+                    customer: {
+                        select: {
+                            name: true
+                        }
                     }
                 },
-                customer: {
-                    select: {
-                        name: true
-                    }
-                }
-            },
-            orderBy: {
-                UpdatedDate: 'desc'
-            }
-        });
+                orderBy: {
+                    UpdatedDate: 'desc'
+                },
+                skip,
+                take: limit
+            }),
+            this.prisma.salesOrder.count({
+                where
+            })
+        ]);
         const fgData = salesOrders.map((order)=>({
                 id: order.id,
                 deliveryDate: order.deliveryDate,
@@ -126,7 +134,10 @@ let FgDashboardService = class FgDashboardService {
                 updatedBy: order.UpdatedBy,
                 updatedDate: order.UpdatedDate
             }));
-        return fgData;
+        return {
+            data: fgData,
+            totalCount
+        };
     }
     constructor(prisma){
         this.prisma = prisma;

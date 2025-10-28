@@ -86,7 +86,7 @@ model SalesOrder {
   printerId        Int?
   specialRemarks   String?
   fgLocation       String?
-  status           String              @default("R105")
+  status           String?
   priority         Int?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt

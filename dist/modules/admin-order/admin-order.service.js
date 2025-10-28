@@ -296,15 +296,19 @@ let AdminOrderService = class AdminOrderService {
                 throw new _common.ForbiddenException('You are only allowed to update the FG Location.');
             }
         }
+        const data = {
+            ...dto,
+            UpdatedBy: user.name,
+            UpdatedDate: new Date()
+        };
+        if (dto.priority !== undefined && dto.priority !== null && order.status === null) {
+            data.status = 'R105';
+        }
         return this.prisma.salesOrder.update({
             where: {
                 id
             },
-            data: {
-                ...dto,
-                UpdatedBy: user.name,
-                UpdatedDate: new Date()
-            }
+            data
         });
     }
     async remove(id) {

@@ -30,7 +30,13 @@ function _ts_param(paramIndex, decorator) {
 }
 let FgDashboardController = class FgDashboardController {
     getFgDashboardData(req, query) {
-        return this.fgDashboardService.getFgDashboardData(req.user, query);
+        const page = query.page ? parseInt(query.page, 10) : 1;
+        const limit = query.limit ? parseInt(query.limit, 10) : 10;
+        return this.fgDashboardService.getFgDashboardData(req.user, {
+            ...query,
+            page,
+            limit
+        });
     }
     constructor(fgDashboardService){
         this.fgDashboardService = fgDashboardService;
@@ -49,6 +55,18 @@ _ts_decorate([
         required: false,
         type: String,
         description: 'YYYY-MM-DD'
+    }),
+    (0, _swagger.ApiQuery)({
+        name: 'page',
+        required: false,
+        type: Number,
+        description: 'Page number for pagination'
+    }),
+    (0, _swagger.ApiQuery)({
+        name: 'limit',
+        required: false,
+        type: Number,
+        description: 'Number of items per page'
     }),
     _ts_param(0, (0, _common.Req)()),
     _ts_param(1, (0, _common.Query)()),
