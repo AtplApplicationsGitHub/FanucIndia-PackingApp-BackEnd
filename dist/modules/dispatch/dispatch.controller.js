@@ -19,6 +19,7 @@ const _dispatchservice = require("./dispatch.service");
 const _createdispatchdto = require("./dto/create-dispatch.dto");
 const _updatedispatchdto = require("./dto/update-dispatch.dto");
 const _createmobiledispatchdto = require("./dto/create-mobile-dispatch.dto");
+const _updatemobiledispatchdto = require("./dto/update-mobile-dispatch.dto");
 const _express = require("express");
 const _swagger = require("@nestjs/swagger");
 function _ts_decorate(decorators, target, key, desc) {
@@ -59,6 +60,15 @@ let DispatchController = class DispatchController {
     }
     update(id, updateDispatchDto, req) {
         return this.dispatchService.update(id, updateDispatchDto, req.user.userId);
+    }
+    updateMobileDispatch(id, dto, req) {
+        if (!dto.customerId && !dto.customerName) {
+            throw new _common.BadRequestException('Either customerId or customerName must be provided.');
+        }
+        if (!dto.transporterId && !dto.transporterName) {
+            throw new _common.BadRequestException('Either transporterId or transporterName must be provided.');
+        }
+        return this.dispatchService.updateMobileDispatch(id, dto, req.user.userId);
     }
     findDispatchSOs(id) {
         return this.dispatchService.findDispatchSOs(id);
@@ -216,6 +226,31 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], DispatchController.prototype, "update", null);
+_ts_decorate([
+    (0, _common.Patch)('mobile/:id'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Update dispatch details (Mobile). Handles Customer/Transporter by ID or Name.'
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'id',
+        description: 'The ID of the dispatch record to update',
+        type: Number
+    }),
+    (0, _swagger.ApiBody)({
+        type: _updatemobiledispatchdto.UpdateMobileDispatchDto
+    }),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_param(2, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        typeof _updatemobiledispatchdto.UpdateMobileDispatchDto === "undefined" ? Object : _updatemobiledispatchdto.UpdateMobileDispatchDto,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], DispatchController.prototype, "updateMobileDispatch", null);
 _ts_decorate([
     (0, _common.Get)(':id/so'),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),

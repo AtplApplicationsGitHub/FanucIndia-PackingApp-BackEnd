@@ -24,8 +24,9 @@ import { DispatchService } from './dispatch.service';
 import { CreateDispatchDto } from './dto/create-dispatch.dto';
 import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { CreateMobileDispatchDto } from './dto/create-mobile-dispatch.dto';
+import { UpdateMobileDispatchDto } from './dto/update-mobile-dispatch.dto';
 import { Response } from 'express';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody, ApiParam } from '@nestjs/swagger';
 
 @ApiTags('Dispatch')
 @ApiBearerAuth()
@@ -135,6 +136,26 @@ export class DispatchController {
     @Req() req: AuthRequest, // Add this
   ) {
     return this.dispatchService.update(id, updateDispatchDto, req.user.userId); 
+  }
+
+  @Patch('mobile/:id')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({ summary: 'Update dispatch details (Mobile). Handles Customer/Transporter by ID or Name.' })
+  @ApiParam({ name: 'id', description: 'The ID of the dispatch record to update', type: Number })
+  @ApiBody({ type: UpdateMobileDispatchDto })
+  updateMobileDispatch(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateMobileDispatchDto,
+    @Req() req: AuthRequest,
+  ) {
+    if (!dto.customerId && !dto.customerName) {
+      throw new BadRequestException('Either customerId or customerName must be provided.');
+    }
+     if (!dto.transporterId && !dto.transporterName) {
+      throw new BadRequestException('Either transporterId or transporterName must be provided.');
+    }
+
+    return this.dispatchService.updateMobileDispatch(id, dto, req.user.userId);
   }
 
   @Get(':id/so')

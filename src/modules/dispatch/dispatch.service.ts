@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma.service';
 import { CreateDispatchDto } from './dto/create-dispatch.dto';
 import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { CreateMobileDispatchDto } from './dto/create-mobile-dispatch.dto';
+import { UpdateMobileDispatchDto } from './dto/update-mobile-dispatch.dto';
 import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -324,7 +325,11 @@ export class DispatchService {
     });
   }
 
-  async addMobileDispatchSO(dispatchId: number, saleOrderNumber: string, userId: number) {
+  async addMobileDispatchSO(
+    dispatchId: number,
+    saleOrderNumber: string,
+    userId: number,
+  ) {
     const userName = await this.getUserName(userId);
     return this.prisma.$transaction(async (tx) => {
       const dispatch = await tx.dispatch.findUnique({
@@ -406,6 +411,11 @@ export class DispatchService {
     const { customerId, transporterId, vehicleNumber } = dto;
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
+    const existingDispatch = await this.prisma.dispatch.findUnique({ where: { id } });
+    if (!existingDispatch) {
+      throw new NotFoundException(`Dispatch with ID ${id} not found.`);
+    }
+
     return this.prisma.dispatch.update({
       where: { id },
       data: {
@@ -418,6 +428,95 @@ export class DispatchService {
     });
   }
 
+  async updateMobileDispatch(dispatchId: number, dto: UpdateMobileDispatchDto, userId: number) {
+    const {
+      customerId,
+      customerName,
+      address,
+      transporterId,
+      transporterName,
+      vehicleNumber,
+    } = dto;
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Verify Dispatch Exists
+      const dispatch = await tx.dispatch.findUnique({ where: { id: dispatchId } });
+      if (!dispatch) {
+        throw new NotFoundException(`Dispatch with ID ${dispatchId} not found.`);
+      }
+
+      // 2. Determine Customer ID (Find by ID, Find by Name, or Create)
+      let finalCustomerId: number;
+      if (customerId) {
+        finalCustomerId = Number(customerId);
+        const customerExists = await tx.customer.findUnique({ where: { id: finalCustomerId } });
+        if (!customerExists) {
+          throw new BadRequestException(`Customer with ID ${customerId} not found.`);
+        }
+      } else if (customerName) {
+        let customer = await tx.customer.findFirst({ where: { name: { equals: customerName, mode: 'insensitive' } } });
+        if (!customer) {
+          this.logger.log(`Customer "${customerName}" not found during update, creating new one.`);
+          customer = await tx.customer.create({ data: { name: customerName, address: address } }); // Use provided address for new customer
+        } else {
+            // If customer exists but address is different, update the customer's address
+             if (customer.address !== address) {
+               await tx.customer.update({
+                 where: { id: customer.id },
+                 data: { address: address }
+               });
+               this.logger.log(`Updated address for existing customer "${customerName}".`);
+             }
+        }
+        finalCustomerId = customer.id;
+      } else {
+        // This case should ideally be prevented by DTO validation, but handle defensively
+        throw new BadRequestException('Either customerId or customerName must be provided for update.');
+      }
+
+
+      // 3. Determine Transporter ID (Find by ID, Find by Name, or Create)
+      let finalTransporterId: number | null = null; // Allow transporter to be optional potentially
+      if (transporterId) {
+        finalTransporterId = Number(transporterId);
+        const transporterExists = await tx.transporter.findUnique({ where: { id: finalTransporterId } });
+        if (!transporterExists) {
+          throw new BadRequestException(`Transporter with ID ${transporterId} not found.`);
+        }
+      } else if (transporterName) {
+        let transporter = await tx.transporter.findFirst({ where: { name: { equals: transporterName, mode: 'insensitive' } } });
+        if (!transporter) {
+          this.logger.log(`Transporter "${transporterName}" not found during update, creating new one.`);
+          transporter = await tx.transporter.create({ data: { name: transporterName } });
+        }
+        finalTransporterId = transporter.id;
+      }
+      // If neither transporterId nor transporterName is provided, finalTransporterId remains null
+
+      // 4. Get User Name for Audit
+      const userName = await this.getUserName(userId);
+
+      // 5. Update Dispatch Record
+      const updatedDispatch = await tx.dispatch.update({
+        where: { id: dispatchId },
+        data: {
+          customerId: finalCustomerId,
+          address: address, // Always update address from the DTO
+          transporterId: finalTransporterId, // Can be null if neither ID nor name was provided
+          vehicleNumber: vehicleNumber,
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
+        },
+        include: { // Include related data in the response if needed
+          customer: true,
+          transporter: true,
+        }
+      });
+
+      return updatedDispatch;
+    });
+  }
+
   async findDispatchSOs(dispatchId: number) {
     return this.prisma.dispatch_SO.findMany({
       where: { dispatchId },
@@ -425,7 +524,11 @@ export class DispatchService {
     });
   }
 
-  async addDispatchSO(dispatchId: number, saleOrderNumber: string, userId: number) {
+  async addDispatchSO(
+    dispatchId: number,
+    saleOrderNumber: string,
+    userId: number,
+  ) {
     const dispatch = await this.prisma.dispatch.findUnique({
       where: { id: dispatchId },
       select: { customerId: true },
@@ -554,17 +657,20 @@ export class DispatchService {
 
     const tableTop = doc.y;
     const tableHeaders = ['S.No', 'Sale Order Number'];
+    const col1X = 50; // X position for S.No
+    const col2X = 150; // X position for Sale Order Number (matches data)
 
     doc.font('Helvetica-Bold');
-    tableHeaders.forEach((header, i) => {
-      doc.text(header, 50 + i * 250, tableTop);
-    });
+    // Draw Headers using specific X positions
+    doc.text(tableHeaders[0], col1X, tableTop); // "S.No" at 50
+    doc.text(tableHeaders[1], col2X, tableTop); // "Sale Order Number" at 150
     doc.font('Helvetica');
 
+    // Draw Rows (This part is already correct)
     dispatch.dispatchSOs.forEach((so, index) => {
       const y = tableTop + 25 + index * 25;
-      doc.text(String(index + 1), 50, y);
-      doc.text(so.saleOrderNumber, 300, y);
+      doc.text(String(index + 1), col1X, y); // S.No data at 50
+      doc.text(so.saleOrderNumber, col2X, y); // Sale Order Number data at 150
     });
 
     return new Promise((resolve) => {
