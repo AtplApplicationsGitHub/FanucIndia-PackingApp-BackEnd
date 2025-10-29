@@ -182,7 +182,8 @@ let UserDashboardService = class UserDashboardService {
                 A_D_F: true,
                 Required_Qty: true,
                 Issue_stage: true,
-                Packing_stage: true
+                Packing_stage: true,
+                UpdatedDate: true
             }
         });
     }

@@ -20,7 +20,7 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
   },
-  "include": ["src", "prisma"]          // <-- add this if missing
+  "include": ["src", "prisma", "../Archived/prisma/seed.ts"]          // <-- add this if missing
 }
 
  

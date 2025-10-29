@@ -156,6 +156,7 @@ export class UserDashboardService {
         Required_Qty: true,
         Issue_stage: true,
         Packing_stage: true,
+        UpdatedDate: true,
       },
     });
   }
