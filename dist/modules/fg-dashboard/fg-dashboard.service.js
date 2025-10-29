@@ -28,16 +28,31 @@ let FgDashboardService = class FgDashboardService {
             where.assignedUserId = user.userId;
         }
         if (date) {
-            const startOfDay = new Date(date);
-            startOfDay.setUTCHours(0, 0, 0, 0);
-            const endOfDay = new Date(date);
-            endOfDay.setUTCHours(23, 59, 59, 999);
+            const parseYMD = (s)=>{
+                const [y, m, d] = s.split('-').map(Number);
+                return {
+                    y,
+                    m,
+                    d
+                };
+            };
+            const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+            const { y, m, d } = parseYMD(date);
+            const startIST = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
+            const endISTExclusive = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
             where.deliveryDate = {
-                gte: startOfDay,
-                lte: endOfDay
+                gte: startIST,
+                lt: endISTExclusive
             };
         }
         if (search) {
+            const lowerSearch = search.toLowerCase();
+            let paymentBoolean = undefined;
+            if (lowerSearch === 'yes') {
+                paymentBoolean = true;
+            } else if (lowerSearch === 'no') {
+                paymentBoolean = false;
+            }
             where.OR = [
                 {
                     saleOrderNumber: {
@@ -84,7 +99,14 @@ let FgDashboardService = class FgDashboardService {
                         contains: search,
                         mode: 'insensitive'
                     }
-                }
+                },
+                ...paymentBoolean !== undefined ? [
+                    {
+                        paymentClearance: {
+                            equals: paymentBoolean
+                        }
+                    }
+                ] : []
             ];
         }
         const [salesOrders, totalCount] = await this.prisma.$transaction([
@@ -112,7 +134,7 @@ let FgDashboardService = class FgDashboardService {
                     }
                 },
                 orderBy: {
-                    UpdatedDate: 'desc'
+                    id: 'desc'
                 },
                 skip,
                 take: limit

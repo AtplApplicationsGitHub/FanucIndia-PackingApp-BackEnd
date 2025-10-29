@@ -38,21 +38,26 @@ let AdminOrderService = class AdminOrderService {
         const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
         const orderDirection = allowedSortOrders.includes(sortOrder) ? sortOrder : 'desc';
         const where = {};
-        const parseYMDLocal = (s)=>{
+        const parseYMD = (s)=>{
             const [y, m, d] = s.split('-').map(Number);
-            return new Date(y, m - 1, d);
+            return {
+                y,
+                m,
+                d
+            };
         };
+        const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
         if (startDate || endDate) {
             const range = {};
             if (startDate) {
-                const s = parseYMDLocal(startDate);
-                s.setHours(0, 0, 0, 0);
+                const { y, m, d } = parseYMD(startDate);
+                const s = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
                 range.gte = s;
             }
             if (endDate) {
-                const e = parseYMDLocal(endDate);
-                const next = new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1, 0, 0, 0, 0);
-                range.lt = next;
+                const { y, m, d } = parseYMD(endDate);
+                const e = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
+                range.lt = e;
             }
             where.deliveryDate = {
                 ...where.deliveryDate,

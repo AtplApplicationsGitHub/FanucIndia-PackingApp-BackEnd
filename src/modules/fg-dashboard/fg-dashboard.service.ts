@@ -19,17 +19,33 @@ export class FgDashboardService {
     }
 
     if (date) {
-      const startOfDay = new Date(date);
-      startOfDay.setUTCHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setUTCHours(23, 59, 59, 999);
+      const parseYMD = (s: string) => {
+        const [y, m, d] = s.split('-').map(Number);
+        return { y, m, d };
+      };
+
+      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+      const { y, m, d } = parseYMD(date);
+      const startIST = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
+      const endISTExclusive = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
+
       where.deliveryDate = {
-        gte: startOfDay,
-        lte: endOfDay,
+        gte: startIST,         
+        lt: endISTExclusive,   
       };
     }
 
     if (search) {
+      const lowerSearch = search.toLowerCase();
+      let paymentBoolean: boolean | undefined = undefined;
+
+      if (lowerSearch === 'yes') {
+        paymentBoolean = true;
+      } else if (lowerSearch === 'no') {
+        paymentBoolean = false;
+      }
+
       where.OR = [
         { saleOrderNumber: { contains: search, mode: 'insensitive' } },
         { product: { name: { contains: search, mode: 'insensitive' } } },
@@ -38,6 +54,7 @@ export class FgDashboardService {
         { fgLocation: { contains: search, mode: 'insensitive' } },
         { specialRemarks: { contains: search, mode: 'insensitive' } },
         { UpdatedBy: { contains: search, mode: 'insensitive' } },
+        ...(paymentBoolean !== undefined ? [{ paymentClearance: { equals: paymentBoolean } }] : []),
       ];
     }
 
@@ -58,7 +75,7 @@ export class FgDashboardService {
           customer: { select: { name: true } },
         },
         orderBy: {
-          UpdatedDate: 'desc',
+          id: 'desc',
         },
         skip,
         take: limit,
