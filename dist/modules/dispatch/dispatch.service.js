@@ -215,7 +215,6 @@ let DispatchService = class DispatchService {
         return this.prisma.$transaction(async (tx)=>{
             let finalCustomerId = null;
             let finalCustomerName = null;
-            let finalTransporterId = null;
             if (customerId) {
                 finalCustomerId = Number(customerId);
                 const customerExists = await tx.customer.findUnique({
@@ -231,6 +230,8 @@ let DispatchService = class DispatchService {
             } else {
                 throw new _common.BadRequestException('Either customerId or customerName must be provided.');
             }
+            let finalTransporterId = null;
+            let finalTransporterName = null;
             if (transporterId) {
                 finalTransporterId = Number(transporterId);
                 const transporterExists = await tx.transporter.findUnique({
@@ -242,24 +243,10 @@ let DispatchService = class DispatchService {
                     throw new _common.BadRequestException(`Transporter with ID ${transporterId} not found.`);
                 }
             } else if (transporterName) {
-                let transporter = await tx.transporter.findFirst({
-                    where: {
-                        name: {
-                            equals: transporterName,
-                            mode: 'insensitive'
-                        }
-                    }
-                });
-                if (!transporter) {
-                    transporter = await tx.transporter.create({
-                        data: {
-                            name: transporterName
-                        }
-                    });
-                }
-                finalTransporterId = transporter.id;
+                finalTransporterName = transporterName;
             } else {
                 finalTransporterId = null;
+                finalTransporterName = null;
             }
             const user = await tx.user.findUnique({
                 where: {
@@ -273,6 +260,7 @@ let DispatchService = class DispatchService {
                     customerName: finalCustomerName,
                     address,
                     transporterId: finalTransporterId,
+                    transporterName: finalTransporterName,
                     vehicleNumber,
                     createdBy: userId,
                     UpdatedBy: userName,
@@ -496,6 +484,7 @@ let DispatchService = class DispatchService {
                 throw new _common.BadRequestException('Either customerId or customerName must be provided for update.');
             }
             let finalTransporterId = null;
+            let finalTransporterName = null;
             if (transporterId) {
                 finalTransporterId = Number(transporterId);
                 const transporterExists = await tx.transporter.findUnique({
@@ -507,23 +496,10 @@ let DispatchService = class DispatchService {
                     throw new _common.BadRequestException(`Transporter with ID ${transporterId} not found.`);
                 }
             } else if (transporterName) {
-                let transporter = await tx.transporter.findFirst({
-                    where: {
-                        name: {
-                            equals: transporterName,
-                            mode: 'insensitive'
-                        }
-                    }
-                });
-                if (!transporter) {
-                    this.logger.log(`Transporter "${transporterName}" not found during update, creating new one.`);
-                    transporter = await tx.transporter.create({
-                        data: {
-                            name: transporterName
-                        }
-                    });
-                }
-                finalTransporterId = transporter.id;
+                finalTransporterName = transporterName;
+            } else {
+                finalTransporterId = null;
+                finalTransporterName = null;
             }
             const userName = await this.getUserName(userId);
             // 5. Update Dispatch Record
@@ -536,6 +512,7 @@ let DispatchService = class DispatchService {
                     customerName: finalCustomerName,
                     address: address,
                     transporterId: finalTransporterId,
+                    transporterName: finalTransporterName,
                     vehicleNumber: vehicleNumber,
                     UpdatedBy: userName,
                     UpdatedDate: new Date()

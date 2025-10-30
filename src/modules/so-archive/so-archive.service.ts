@@ -63,6 +63,7 @@ export class SoArchiveService {
             data: dispatches.map(({ updatedAt, _count, ...d }) => ({
               ...d,
               customerName: d.customerName,
+              transporterName: d.transporterName,
               attachments: d.attachments ?? Prisma.DbNull, 
             })),
             skipDuplicates: true, 

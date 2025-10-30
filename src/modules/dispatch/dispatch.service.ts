@@ -212,7 +212,6 @@ export class DispatchService {
     return this.prisma.$transaction(async (tx) => {
       let finalCustomerId: number | null = null;
       let finalCustomerName: string | null = null;
-      let finalTransporterId: number | null = null;
 
       if (customerId) {
         finalCustomerId = Number(customerId);
@@ -232,6 +231,9 @@ export class DispatchService {
         );
       }
 
+      let finalTransporterId: number | null = null;
+      let finalTransporterName: string | null = null;
+
       if (transporterId) {
         finalTransporterId = Number(transporterId);
         const transporterExists = await tx.transporter.findUnique({
@@ -243,17 +245,10 @@ export class DispatchService {
           );
         }
       } else if (transporterName) {
-        let transporter = await tx.transporter.findFirst({
-          where: { name: { equals: transporterName, mode: 'insensitive' } },
-        });
-        if (!transporter) {
-          transporter = await tx.transporter.create({
-            data: { name: transporterName },
-          });
-        }
-        finalTransporterId = transporter.id;
+        finalTransporterName = transporterName;
       } else {
         finalTransporterId = null;
+        finalTransporterName = null;
       }
 
       const user = await tx.user.findUnique({ where: { id: userId } });
@@ -265,6 +260,7 @@ export class DispatchService {
           customerName: finalCustomerName,
           address,
           transporterId: finalTransporterId,
+          transporterName: finalTransporterName,
           vehicleNumber,
           createdBy: userId,
           UpdatedBy: userName,
@@ -480,7 +476,9 @@ export class DispatchService {
       }
 
 
-      let finalTransporterId: number | null = null; 
+      let finalTransporterId: number | null = null;
+      let finalTransporterName: string | null = null;
+
       if (transporterId) {
         finalTransporterId = Number(transporterId);
         const transporterExists = await tx.transporter.findUnique({ where: { id: finalTransporterId } });
@@ -488,12 +486,10 @@ export class DispatchService {
           throw new BadRequestException(`Transporter with ID ${transporterId} not found.`);
         }
       } else if (transporterName) {
-        let transporter = await tx.transporter.findFirst({ where: { name: { equals: transporterName, mode: 'insensitive' } } });
-        if (!transporter) {
-          this.logger.log(`Transporter "${transporterName}" not found during update, creating new one.`);
-          transporter = await tx.transporter.create({ data: { name: transporterName } });
-        }
-        finalTransporterId = transporter.id;
+        finalTransporterName = transporterName;
+      } else {
+        finalTransporterId = null;
+        finalTransporterName = null;
       }
 
       const userName = await this.getUserName(userId);
@@ -504,13 +500,14 @@ export class DispatchService {
         data: {
           customerId: finalCustomerId,
           customerName: finalCustomerName,
-          address: address, // Always update address from the DTO
-          transporterId: finalTransporterId, // Can be null if neither ID nor name was provided
+          address: address, 
+          transporterId: finalTransporterId, 
+          transporterName: finalTransporterName,
           vehicleNumber: vehicleNumber,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
-        include: { // Include related data in the response if needed
+        include: { 
           customer: true,
           transporter: true,
         }

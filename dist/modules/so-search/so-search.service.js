@@ -87,15 +87,38 @@ let SoSearchService = class SoSearchService {
                 })
             ]);
             const dispatchIds = dispatchSOs.map((dso)=>dso.dispatchId);
+            // const dispatchInfo = await this.prisma.dispatch.findMany({
+            //   where: { id: { in: dispatchIds } },
+            //   include: { customer: true, transporter: true },
+            // });
             const dispatchInfo = await this.prisma.dispatch.findMany({
                 where: {
                     id: {
                         in: dispatchIds
                     }
                 },
-                include: {
-                    customer: true,
-                    transporter: true
+                select: {
+                    id: true,
+                    address: true,
+                    vehicleNumber: true,
+                    attachments: true,
+                    UpdatedBy: true,
+                    UpdatedDate: true,
+                    customerName: true,
+                    customerId: true,
+                    customer: {
+                        select: {
+                            name: true,
+                            address: true
+                        }
+                    },
+                    transporterName: true,
+                    transporterId: true,
+                    transporter: {
+                        select: {
+                            name: true
+                        }
+                    }
                 }
             });
             const result = {
@@ -185,6 +208,18 @@ let SoSearchService = class SoSearchService {
                     id: {
                         in: dispatchIds
                     }
+                },
+                select: {
+                    id: true,
+                    address: true,
+                    vehicleNumber: true,
+                    attachments: true,
+                    UpdatedBy: true,
+                    UpdatedDate: true,
+                    customerName: true,
+                    customerId: true,
+                    transporterName: true,
+                    transporterId: true
                 }
             });
             const dispatchCustomerIds = [

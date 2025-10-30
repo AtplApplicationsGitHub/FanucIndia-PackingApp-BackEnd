@@ -66,9 +66,28 @@ export class SoSearchService {
       ]);
 
       const dispatchIds = dispatchSOs.map((dso) => dso.dispatchId);
+
+      // const dispatchInfo = await this.prisma.dispatch.findMany({
+      //   where: { id: { in: dispatchIds } },
+      //   include: { customer: true, transporter: true },
+      // });
+
       const dispatchInfo = await this.prisma.dispatch.findMany({
         where: { id: { in: dispatchIds } },
-        include: { customer: true, transporter: true },
+        select: {
+          id: true,
+          address: true,
+          vehicleNumber: true,
+          attachments: true,
+          UpdatedBy: true,
+          UpdatedDate: true,
+          customerName: true, // For Customer fix
+          customerId: true,
+          customer: { select: { name: true, address: true } },
+          transporterName: true, // [ADD] For Transporter fix
+          transporterId: true,
+          transporter: { select: { name: true } },
+        },
       });
 
       const result = {
@@ -118,7 +137,22 @@ export class SoSearchService {
 
       // Fetch related names for archived Dispatch
       const dispatchIds = dispatchSOArchives.map((d) => d.dispatchId);
-      const archivedDispatchesRaw = await this.prisma.dispatchArchive.findMany({ where: { id: { in: dispatchIds } } });
+
+      const archivedDispatchesRaw = await this.prisma.dispatchArchive.findMany({ 
+        where: { id: { in: dispatchIds } },
+        select: {
+          id: true,
+          address: true,
+          vehicleNumber: true,
+          attachments: true,
+          UpdatedBy: true,
+          UpdatedDate: true,
+          customerName: true, // For Customer fix
+          customerId: true,
+          transporterName: true, // [ADD] For Transporter fix
+          transporterId: true,
+        }
+      });
       
       const dispatchCustomerIds = [...new Set(archivedDispatchesRaw.map(d => d.customerId).filter(Boolean))] as number[];
       const dispatchTransporterIds = [...new Set(archivedDispatchesRaw.map(d => d.transporterId).filter(Boolean))] as number[];

@@ -169,6 +169,7 @@ model Dispatch {
   customerName  String?
   address       String
   transporterId Int?
+  transporterName String?
   vehicleNumber String
   attachments   Json?
   createdBy     Int
@@ -267,6 +268,7 @@ model DispatchArchive {
   customerName  String?
   address       String
   transporterId Int?
+  transporterName String?
   vehicleNumber String
   attachments   Json?
   createdBy     Int
