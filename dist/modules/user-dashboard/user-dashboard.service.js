@@ -250,7 +250,8 @@ let UserDashboardService = class UserDashboardService {
                     Issue_stage: material.Issue_stage,
                     Packing_stage: material.Packing_stage,
                     UpdatedBy: userName,
-                    UpdatedDate: new Date()
+                    // Use the provided timestamp if it exists, otherwise use the sync time
+                    UpdatedDate: material.UpdatedDate ? new Date(material.UpdatedDate) : new Date()
                 }
             });
         }
@@ -262,7 +263,8 @@ let UserDashboardService = class UserDashboardService {
     async processAttachmentsUpload(saleOrderNumber, attachments, tx) {
         const prismaClient = tx || this.prisma;
         if (!attachments || attachments.length === 0) {
-            throw new _common.BadRequestException('No attachment files provided.');
+            // Allow data-only updates
+            return;
         }
         const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_ORDER || '', saleOrderNumber);
         await this.sftpService.ensureDir(remoteDir);

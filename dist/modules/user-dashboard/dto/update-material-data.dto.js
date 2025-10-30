@@ -48,6 +48,15 @@ _ts_decorate([
     (0, _classvalidator.IsNotEmpty)(),
     _ts_metadata("design:type", Number)
 ], MaterialDataDto.prototype, "Packing_stage", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
+        description: 'The ISO 8601 timestamp of when the update was made offline',
+        example: '2025-10-30T10:30:00.000Z'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsDateString)(),
+    _ts_metadata("design:type", String)
+], MaterialDataDto.prototype, "UpdatedDate", void 0);
 let UpdateMaterialDataDto = class UpdateMaterialDataDto {
 };
 _ts_decorate([
