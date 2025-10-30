@@ -16,7 +16,7 @@ import * as fs from 'fs';
 import { Prisma } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 
-interface AttachmentData {
+export interface AttachmentData {
   fileName: string;
   path: string;
   mimeType: string;
@@ -189,6 +189,19 @@ export class DispatchService {
         attachments: uploadedAttachments as unknown as Prisma.JsonArray,
       };
     });
+  }
+
+  async findAttachmentsByDispatchId(dispatchId: number) {
+    const dispatch = await this.prisma.dispatch.findUnique({
+      where: { id: dispatchId },
+      select: { attachments: true },
+    });
+
+    if (!dispatch) {
+      throw new NotFoundException(`Dispatch with ID ${dispatchId} not found.`);
+    }
+
+    return (dispatch.attachments as unknown as AttachmentData[] | null) || [];
   }
 
   async createMobileDispatchHeader(

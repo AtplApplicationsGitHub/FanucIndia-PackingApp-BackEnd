@@ -58,6 +58,9 @@ let DispatchController = class DispatchController {
     findAll() {
         return this.dispatchService.findAll();
     }
+    findAttachments(id) {
+        return this.dispatchService.findAttachmentsByDispatchId(id);
+    }
     update(id, updateDispatchDto, req) {
         return this.dispatchService.update(id, updateDispatchDto, req.user.userId);
     }
@@ -212,6 +215,32 @@ _ts_decorate([
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", void 0)
 ], DispatchController.prototype, "findAll", null);
+_ts_decorate([
+    (0, _common.Get)(':id/attachments'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get the list of attachments for a specific dispatch ID'
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'id',
+        description: 'The ID of the dispatch record',
+        type: Number
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Returns an array of attachment objects.'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 404,
+        description: 'Dispatch not found.'
+    }),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], DispatchController.prototype, "findAttachments", null);
 _ts_decorate([
     (0, _common.Patch)(':id'),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),

@@ -26,7 +26,7 @@ import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { CreateMobileDispatchDto } from './dto/create-mobile-dispatch.dto';
 import { UpdateMobileDispatchDto } from './dto/update-mobile-dispatch.dto';
 import { Response } from 'express';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody, ApiParam, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Dispatch')
 @ApiBearerAuth()
@@ -126,6 +126,16 @@ export class DispatchController {
   @Roles('ADMIN', 'USER')
   findAll() {
     return this.dispatchService.findAll();
+  }
+
+  @Get(':id/attachments')
+  @Roles('ADMIN', 'USER') // Or adjust roles as needed for mobile
+  @ApiOperation({ summary: 'Get the list of attachments for a specific dispatch ID' })
+  @ApiParam({ name: 'id', description: 'The ID of the dispatch record', type: Number })
+  @ApiResponse({ status: 200, description: 'Returns an array of attachment objects.' })
+  @ApiResponse({ status: 404, description: 'Dispatch not found.' })
+  findAttachments(@Param('id', ParseIntPipe) id: number) {
+    return this.dispatchService.findAttachmentsByDispatchId(id);
   }
 
   @Patch(':id')

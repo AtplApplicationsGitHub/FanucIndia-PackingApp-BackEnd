@@ -212,6 +212,20 @@ let DispatchService = class DispatchService {
             };
         });
     }
+    async findAttachmentsByDispatchId(dispatchId) {
+        const dispatch = await this.prisma.dispatch.findUnique({
+            where: {
+                id: dispatchId
+            },
+            select: {
+                attachments: true
+            }
+        });
+        if (!dispatch) {
+            throw new _common.NotFoundException(`Dispatch with ID ${dispatchId} not found.`);
+        }
+        return dispatch.attachments || [];
+    }
     async createMobileDispatchHeader(dto, userId) {
         const { customerId, customerName, address, transporterId, transporterName, vehicleNumber } = dto;
         return this.prisma.$transaction(async (tx)=>{
