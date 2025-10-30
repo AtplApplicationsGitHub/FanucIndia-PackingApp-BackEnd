@@ -165,7 +165,8 @@ model ERP_Material_File {
 
 model Dispatch {
   id            Int           @id @default(autoincrement())
-  customerId    Int
+  customerId    Int?
+  customerName  String?
   address       String
   transporterId Int?
   vehicleNumber String
@@ -173,7 +174,7 @@ model Dispatch {
   createdBy     Int
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  customer      Customer      @relation(fields: [customerId], references: [id])
+  customer      Customer?      @relation(fields: [customerId], references: [id])
   transporter   Transporter?  @relation(fields: [transporterId], references: [id])
   user          User          @relation(fields: [createdBy], references: [id])
   dispatchSOs   Dispatch_SO[]
@@ -212,7 +213,7 @@ model SalesOrderArchive {
   printerId           Int?
   specialRemarks      String?
   fgLocation          String?
-  status              String
+  status              String?
   priority            Int?
   createdAt           DateTime
   UpdatedBy           String?             
@@ -262,7 +263,8 @@ model ERP_Material_FileArchive {
 
 model DispatchArchive {
   id            Int           @id 
-  customerId    Int
+  customerId    Int?
+  customerName  String?
   address       String
   transporterId Int?
   vehicleNumber String

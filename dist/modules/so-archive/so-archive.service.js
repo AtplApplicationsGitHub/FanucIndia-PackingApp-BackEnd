@@ -113,6 +113,7 @@ let SoArchiveService = class SoArchiveService {
                 await tx.dispatchArchive.createMany({
                     data: dispatches.map(({ updatedAt, _count, ...d })=>({
                             ...d,
+                            customerName: d.customerName,
                             attachments: d.attachments ?? _client.Prisma.DbNull
                         })),
                     skipDuplicates: true

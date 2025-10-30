@@ -82,27 +82,10 @@ let DispatchService = class DispatchService {
     async create(dto, files, userId) {
         const { customerId: customerIdString, customerName, address, transporterId: transporterIdString, vehicleNumber, saleOrderNumbers } = dto;
         return this.prisma.$transaction(async (tx)=>{
-            let finalCustomerId;
-            if (customerName) {
-                let customer = await tx.customer.findFirst({
-                    where: {
-                        name: {
-                            equals: customerName,
-                            mode: 'insensitive'
-                        }
-                    }
-                });
-                if (!customer) {
-                    this.logger.log(`Customer "${customerName}" not found, creating new one.`);
-                    customer = await tx.customer.create({
-                        data: {
-                            name: customerName,
-                            address: address
-                        }
-                    });
-                }
-                finalCustomerId = customer.id;
-            } else if (customerIdString) {
+            let finalCustomerId = null;
+            let finalCustomerName = null;
+            if (customerIdString) {
+                // User selected an existing customer from dropdown
                 const parsedCustomerId = parseInt(customerIdString, 10);
                 if (isNaN(parsedCustomerId)) {
                     throw new _common.BadRequestException('Invalid customerId provided.');
@@ -116,6 +99,10 @@ let DispatchService = class DispatchService {
                     throw new _common.BadRequestException(`Customer with ID ${parsedCustomerId} not found.`);
                 }
                 finalCustomerId = parsedCustomerId;
+            } else if (customerName) {
+                // User typed a new customer name
+                this.logger.log(`Saving dispatch with direct customer name: "${customerName}".`);
+                finalCustomerName = customerName;
             } else {
                 throw new _common.BadRequestException('Either customerId or customerName must be provided.');
             }
@@ -142,6 +129,7 @@ let DispatchService = class DispatchService {
             const newDispatch = await tx.dispatch.create({
                 data: {
                     customerId: finalCustomerId,
+                    customerName: finalCustomerName,
                     address: address,
                     transporterId: finalTransporterId === null ? undefined : finalTransporterId,
                     vehicleNumber,
@@ -183,10 +171,6 @@ let DispatchService = class DispatchService {
                         }
                     });
                     if (!salesOrder) throw new _common.BadRequestException(`Sale Order ${so} not found.`);
-                // if (salesOrder.customerId !== Number(customerId))
-                //   throw new BadRequestException(
-                //     `Sale Order ${so} belongs to a different customer.`,
-                //   );
                 }
                 await tx.dispatch_SO.createMany({
                     data: saleOrderNumbers.map((so)=>({
@@ -229,8 +213,9 @@ let DispatchService = class DispatchService {
     async createMobileDispatchHeader(dto, userId) {
         const { customerId, customerName, address, transporterId, transporterName, vehicleNumber } = dto;
         return this.prisma.$transaction(async (tx)=>{
-            let finalCustomerId;
-            let finalTransporterId;
+            let finalCustomerId = null;
+            let finalCustomerName = null;
+            let finalTransporterId = null;
             if (customerId) {
                 finalCustomerId = Number(customerId);
                 const customerExists = await tx.customer.findUnique({
@@ -242,23 +227,7 @@ let DispatchService = class DispatchService {
                     throw new _common.BadRequestException(`Customer with ID ${customerId} not found.`);
                 }
             } else if (customerName) {
-                let customer = await tx.customer.findFirst({
-                    where: {
-                        name: {
-                            equals: customerName,
-                            mode: 'insensitive'
-                        }
-                    }
-                });
-                if (!customer) {
-                    customer = await tx.customer.create({
-                        data: {
-                            name: customerName,
-                            address: address
-                        }
-                    });
-                }
-                finalCustomerId = customer.id;
+                finalCustomerName = customerName;
             } else {
                 throw new _common.BadRequestException('Either customerId or customerName must be provided.');
             }
@@ -290,7 +259,7 @@ let DispatchService = class DispatchService {
                 }
                 finalTransporterId = transporter.id;
             } else {
-                throw new _common.BadRequestException('Either transporterId or transporterName must be provided.');
+                finalTransporterId = null;
             }
             const user = await tx.user.findUnique({
                 where: {
@@ -301,6 +270,7 @@ let DispatchService = class DispatchService {
             const newDispatch = await tx.dispatch.create({
                 data: {
                     customerId: finalCustomerId,
+                    customerName: finalCustomerName,
                     address,
                     transporterId: finalTransporterId,
                     vehicleNumber,
@@ -417,6 +387,7 @@ let DispatchService = class DispatchService {
             select: {
                 id: true,
                 customerId: true,
+                customerName: true,
                 address: true,
                 transporterId: true,
                 vehicleNumber: true,
@@ -449,7 +420,7 @@ let DispatchService = class DispatchService {
             }));
     }
     async update(id, dto, userId) {
-        const { customerId, transporterId, vehicleNumber } = dto;
+        const { customerId, customerName, address, transporterId, vehicleNumber } = dto;
         const user = await this.prisma.user.findUnique({
             where: {
                 id: userId
@@ -463,12 +434,29 @@ let DispatchService = class DispatchService {
         if (!existingDispatch) {
             throw new _common.NotFoundException(`Dispatch with ID ${id} not found.`);
         }
+        let finalCustomerId = null;
+        let finalCustomerName = null;
+        // [CHANGE] Add update logic
+        if (customerId) {
+            finalCustomerId = Number(customerId);
+        } else if (customerName) {
+            finalCustomerName = customerName;
+        } else {
+            // If user clears the field, we respect that (though UI shouldn't allow it)
+            finalCustomerId = null;
+            finalCustomerName = null;
+        }
+        // [END CHANGE]
         return this.prisma.dispatch.update({
             where: {
                 id
             },
             data: {
-                customerId: customerId ? Number(customerId) : undefined,
+                // [CHANGE] Update data
+                customerId: finalCustomerId,
+                customerName: finalCustomerName,
+                address: address,
+                // [END CHANGE]
                 transporterId: transporterId ? Number(transporterId) : undefined,
                 vehicleNumber,
                 UpdatedBy: user?.name || 'System',
@@ -489,7 +477,8 @@ let DispatchService = class DispatchService {
                 throw new _common.NotFoundException(`Dispatch with ID ${dispatchId} not found.`);
             }
             // 2. Determine Customer ID (Find by ID, Find by Name, or Create)
-            let finalCustomerId;
+            let finalCustomerId = null;
+            let finalCustomerName = null;
             if (customerId) {
                 finalCustomerId = Number(customerId);
                 const customerExists = await tx.customer.findUnique({
@@ -501,43 +490,12 @@ let DispatchService = class DispatchService {
                     throw new _common.BadRequestException(`Customer with ID ${customerId} not found.`);
                 }
             } else if (customerName) {
-                let customer = await tx.customer.findFirst({
-                    where: {
-                        name: {
-                            equals: customerName,
-                            mode: 'insensitive'
-                        }
-                    }
-                });
-                if (!customer) {
-                    this.logger.log(`Customer "${customerName}" not found during update, creating new one.`);
-                    customer = await tx.customer.create({
-                        data: {
-                            name: customerName,
-                            address: address
-                        }
-                    }); // Use provided address for new customer
-                } else {
-                    // If customer exists but address is different, update the customer's address
-                    if (customer.address !== address) {
-                        await tx.customer.update({
-                            where: {
-                                id: customer.id
-                            },
-                            data: {
-                                address: address
-                            }
-                        });
-                        this.logger.log(`Updated address for existing customer "${customerName}".`);
-                    }
-                }
-                finalCustomerId = customer.id;
+                // This is the key change: just store the name, don't create/update customer
+                finalCustomerName = customerName;
             } else {
-                // This case should ideally be prevented by DTO validation, but handle defensively
                 throw new _common.BadRequestException('Either customerId or customerName must be provided for update.');
             }
-            // 3. Determine Transporter ID (Find by ID, Find by Name, or Create)
-            let finalTransporterId = null; // Allow transporter to be optional potentially
+            let finalTransporterId = null;
             if (transporterId) {
                 finalTransporterId = Number(transporterId);
                 const transporterExists = await tx.transporter.findUnique({
@@ -567,8 +525,6 @@ let DispatchService = class DispatchService {
                 }
                 finalTransporterId = transporter.id;
             }
-            // If neither transporterId nor transporterName is provided, finalTransporterId remains null
-            // 4. Get User Name for Audit
             const userName = await this.getUserName(userId);
             // 5. Update Dispatch Record
             const updatedDispatch = await tx.dispatch.update({
@@ -577,6 +533,7 @@ let DispatchService = class DispatchService {
                 },
                 data: {
                     customerId: finalCustomerId,
+                    customerName: finalCustomerName,
                     address: address,
                     transporterId: finalTransporterId,
                     vehicleNumber: vehicleNumber,
@@ -730,8 +687,8 @@ let DispatchService = class DispatchService {
             align: 'center'
         });
         doc.moveDown();
-        doc.fontSize(12).text(`Customer Name: ${dispatch.customer.name}`);
-        doc.text(`Address: ${dispatch.customer.address}`);
+        doc.fontSize(12).text(`Customer Name: ${dispatch.customerName || dispatch.customer?.name || 'N/A'}`);
+        doc.text(`Address: ${dispatch.address}`);
         doc.moveDown();
         const tableTop = doc.y;
         const tableHeaders = [

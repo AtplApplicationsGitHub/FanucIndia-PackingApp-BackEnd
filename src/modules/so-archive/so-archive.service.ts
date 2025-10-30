@@ -62,6 +62,7 @@ export class SoArchiveService {
         await tx.dispatchArchive.createMany({
             data: dispatches.map(({ updatedAt, _count, ...d }) => ({
               ...d,
+              customerName: d.customerName,
               attachments: d.attachments ?? Prisma.DbNull, 
             })),
             skipDuplicates: true, 

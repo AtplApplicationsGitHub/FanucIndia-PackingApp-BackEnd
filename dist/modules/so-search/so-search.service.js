@@ -188,7 +188,7 @@ let SoSearchService = class SoSearchService {
                 }
             });
             const dispatchCustomerIds = [
-                ...new Set(archivedDispatchesRaw.map((d)=>d.customerId))
+                ...new Set(archivedDispatchesRaw.map((d)=>d.customerId).filter(Boolean))
             ];
             const dispatchTransporterIds = [
                 ...new Set(archivedDispatchesRaw.map((d)=>d.transporterId).filter(Boolean))
@@ -219,7 +219,7 @@ let SoSearchService = class SoSearchService {
                 ]));
             const dispatchInfo = archivedDispatchesRaw.map((dispatch)=>({
                     ...dispatch,
-                    customer: customerMap.get(dispatch.customerId),
+                    customer: dispatch.customerId ? customerMap.get(dispatch.customerId) : null,
                     transporter: dispatch.transporterId ? transporterMap.get(dispatch.transporterId) : null
                 }));
             const result = {

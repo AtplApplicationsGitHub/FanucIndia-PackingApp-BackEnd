@@ -120,7 +120,7 @@ export class SoSearchService {
       const dispatchIds = dispatchSOArchives.map((d) => d.dispatchId);
       const archivedDispatchesRaw = await this.prisma.dispatchArchive.findMany({ where: { id: { in: dispatchIds } } });
       
-      const dispatchCustomerIds = [...new Set(archivedDispatchesRaw.map(d => d.customerId))];
+      const dispatchCustomerIds = [...new Set(archivedDispatchesRaw.map(d => d.customerId).filter(Boolean))] as number[];
       const dispatchTransporterIds = [...new Set(archivedDispatchesRaw.map(d => d.transporterId).filter(Boolean))] as number[];
 
       const [dispatchCustomers, dispatchTransporters] = await Promise.all([
@@ -133,7 +133,7 @@ export class SoSearchService {
 
       const dispatchInfo = archivedDispatchesRaw.map(dispatch => ({
         ...dispatch,
-        customer: customerMap.get(dispatch.customerId),
+        customer: dispatch.customerId ? customerMap.get(dispatch.customerId) : null,
         transporter: dispatch.transporterId ? transporterMap.get(dispatch.transporterId) : null,
       }));
 
