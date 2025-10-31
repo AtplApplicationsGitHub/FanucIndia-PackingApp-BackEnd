@@ -361,6 +361,7 @@ export class DispatchService {
       await tx.salesOrder.update({
         where: { saleOrderNumber: salesOrder.saleOrderNumber },
         data: {
+          assignedUserId: null,
           status: 'Dispatched',
           fgLocation: null,
           UpdatedBy: userName,
@@ -573,6 +574,7 @@ export class DispatchService {
         await tx.salesOrder.update({
           where: { saleOrderNumber: salesOrder.saleOrderNumber },
           data: {
+            assignedUserId: null,
             status: 'Dispatched',
             fgLocation: null,
             UpdatedBy: userName,

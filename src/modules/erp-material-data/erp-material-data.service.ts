@@ -136,7 +136,7 @@ export class ErpMaterialDataService {
     if (allCompleted) {
       await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
+        data: { status: 'W105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
       });
       issueStageCompleted = true;
     }
@@ -214,7 +214,7 @@ export class ErpMaterialDataService {
     if (allCompleted) {
       await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
+        data: { status: 'W105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
       });
       issueStageCompleted = true;
     }
@@ -282,7 +282,7 @@ export class ErpMaterialDataService {
     if (allPacked) {
       await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
+        data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
       });
       packingStageCompleted = true;
     }
@@ -355,7 +355,7 @@ export class ErpMaterialDataService {
     if (allPacked) {
       await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
+        data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
       });
       packingStageCompleted = true;
     }
