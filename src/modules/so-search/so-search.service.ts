@@ -45,6 +45,7 @@ export class SoSearchService {
         packConfig: true,
         user: { select: { name: true } },
         assignedUser: { select: { name: true } },
+        statusStepper: true,
       },
     });
 
@@ -109,10 +110,12 @@ export class SoSearchService {
         dispatchSOArchives,
         materialDetails,
         materialFiles,
+        statusStepper,
       ] = await Promise.all([
         this.prisma.dispatch_SOArchive.findMany({ where: { saleOrderNumber }, select: { dispatchId: true } }),
         this.prisma.eRP_Material_DataArchive.findMany({ where: { saleOrderNumber }, orderBy: { ID: 'asc' } }),
         this.prisma.eRP_Material_FileArchive.findMany({ where: { saleOrderNumber } }),
+        this.prisma.sO_Status_StepperArchive.findMany({ where: { salesOrderNumber: saleOrderNumber } }),
       ]);
 
       // Fetch related names for archived SalesOrder
@@ -172,7 +175,7 @@ export class SoSearchService {
       }));
 
       const result = {
-        salesOrder: salesOrderWithDetails,
+        salesOrder: { ...salesOrderWithDetails, statusStepper },
         dispatchInfo,
         materialDetails,
         materialFiles,

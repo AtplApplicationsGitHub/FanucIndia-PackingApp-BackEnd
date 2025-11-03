@@ -295,10 +295,21 @@ export class SalesOrderService {
       const insertedCount = await this.prisma.$transaction(async (tx) => {
         let count = 0;
         for (const orderData of ordersToInsert) {
-          await tx.salesOrder.create({
+          const newOrder = await tx.salesOrder.create({
             data: orderData,
           });
           count++;
+
+          const statuses = ["Created", "Assigned", "Issued", "Packed", "Stored/Ready for Dispatch", "Dispatched"];
+          await tx.sO_Status_Stepper.createMany({
+            data: statuses.map(status => ({
+              salesOrderNumber: newOrder.saleOrderNumber,
+              status: status,
+              createdDateTime: status === 'Created' ? newOrder.createdAt : null,
+              updatedBy: null,
+            })),
+          });
+
           await delay(10);
         }
         return count;

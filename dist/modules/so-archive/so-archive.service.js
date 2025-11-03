@@ -72,6 +72,7 @@ let SoArchiveService = class SoArchiveService {
             include: {
                 materialData: true,
                 materialFilesByNumber: true,
+                statusStepper: true,
                 Dispatch_SO: {
                     include: {
                         dispatch: {
@@ -94,7 +95,7 @@ let SoArchiveService = class SoArchiveService {
             throw new _common.BadRequestException(`Sales Order ${saleOrderNumber} cannot be archived as its status is not 'Dispatched'.`);
         }
         return this.prisma.$transaction(async (tx)=>{
-            const { id, updatedAt, materialData, materialFilesByNumber, Dispatch_SO, ...soData } = so;
+            const { id, updatedAt, materialData, materialFilesByNumber, Dispatch_SO, statusStepper, ...soData } = so;
             await tx.salesOrderArchive.create({
                 data: soData
             });
@@ -147,6 +148,19 @@ let SoArchiveService = class SoArchiveService {
                         }
                     });
                 }
+            }
+            if (so.statusStepper.length > 0) {
+                await tx.sO_Status_StepperArchive.createMany({
+                    data: so.statusStepper.map(({ id, salesOrderNumber, ...d })=>({
+                            ...d,
+                            salesOrderNumber: so.saleOrderNumber
+                        }))
+                });
+                await tx.sO_Status_Stepper.deleteMany({
+                    where: {
+                        salesOrderNumber: saleOrderNumber
+                    }
+                });
             }
             await tx.salesOrder.delete({
                 where: {
@@ -258,6 +272,11 @@ let SoArchiveService = class SoArchiveService {
             await tx.eRP_Material_DataArchive.deleteMany({
                 where: {
                     saleOrderNumber
+                }
+            });
+            await tx.sO_Status_StepperArchive.deleteMany({
+                where: {
+                    salesOrderNumber: saleOrderNumber
                 }
             });
             await tx.salesOrderArchive.deleteMany({

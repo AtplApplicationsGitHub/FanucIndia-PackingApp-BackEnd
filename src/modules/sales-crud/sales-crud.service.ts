@@ -48,7 +48,7 @@ export class SalesCrudService {
           ? new Date(dto.deliveryDate).toISOString()
           : dto.deliveryDate;
 
-      return await this.prisma.salesOrder.create({
+      const newOrder = await this.prisma.salesOrder.create({
         data: {
           ...dto,
           deliveryDate,
@@ -59,6 +59,19 @@ export class SalesCrudService {
         },
         include: { customer: true },
       });
+
+      const statuses = ["Created", "Assigned", "Issued", "Packed", "Stored/Ready for Dispatch", "Dispatched"];
+      await this.prisma.sO_Status_Stepper.createMany({
+        data: statuses.map(status => ({
+          salesOrderNumber: newOrder.saleOrderNumber,
+          status: status,
+          createdDateTime: status === 'Created' ? newOrder.createdAt : null,
+          updatedBy: null,
+        })),
+      });
+
+      return newOrder;
+
     } catch (err: any) {
       throw new InternalServerErrorException(
         'Failed to create sales order.',

@@ -61,7 +61,8 @@ let SoSearchService = class SoSearchService {
                     select: {
                         name: true
                     }
-                }
+                },
+                statusStepper: true
             }
         });
         if (salesOrder) {
@@ -136,7 +137,7 @@ let SoSearchService = class SoSearchService {
             }
         });
         if (archivedSalesOrder) {
-            const [dispatchSOArchives, materialDetails, materialFiles] = await Promise.all([
+            const [dispatchSOArchives, materialDetails, materialFiles, statusStepper] = await Promise.all([
                 this.prisma.dispatch_SOArchive.findMany({
                     where: {
                         saleOrderNumber
@@ -156,6 +157,11 @@ let SoSearchService = class SoSearchService {
                 this.prisma.eRP_Material_FileArchive.findMany({
                     where: {
                         saleOrderNumber
+                    }
+                }),
+                this.prisma.sO_Status_StepperArchive.findMany({
+                    where: {
+                        salesOrderNumber: saleOrderNumber
                     }
                 })
             ]);
@@ -258,7 +264,10 @@ let SoSearchService = class SoSearchService {
                     transporter: dispatch.transporterId ? transporterMap.get(dispatch.transporterId) : null
                 }));
             const result = {
-                salesOrder: salesOrderWithDetails,
+                salesOrder: {
+                    ...salesOrderWithDetails,
+                    statusStepper
+                },
                 dispatchInfo,
                 materialDetails,
                 materialFiles,

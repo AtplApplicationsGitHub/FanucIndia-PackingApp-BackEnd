@@ -144,18 +144,28 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         const allCompleted = allMaterials.every((m)=>m.Issue_stage >= m.Required_Qty);
         let issueStageCompleted = false;
         if (allCompleted) {
-            await this.prisma.salesOrder.update({
+            const updatedOrder = await this.prisma.salesOrder.update({
                 where: {
                     id: orderId
                 },
                 data: {
-                    status: 'F105',
+                    status: 'W105',
                     assignedUserId: null,
                     UpdatedBy: userName,
                     UpdatedDate: new Date()
                 }
             });
             issueStageCompleted = true;
+            await this.prisma.sO_Status_Stepper.updateMany({
+                where: {
+                    salesOrderNumber: updatedOrder.saleOrderNumber,
+                    status: "Issued"
+                },
+                data: {
+                    createdDateTime: new Date(),
+                    updatedBy: userName
+                }
+            });
         }
         return convertBigInts({
             message: 'Issue_stage incremented successfully',
@@ -222,18 +232,28 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         const allCompleted = allMaterials.every((m)=>m.Issue_stage >= m.Required_Qty);
         let issueStageCompleted = false;
         if (allCompleted) {
-            await this.prisma.salesOrder.update({
+            const updatedOrder = await this.prisma.salesOrder.update({
                 where: {
                     id: orderId
                 },
                 data: {
-                    status: 'F105',
+                    status: 'W105',
                     assignedUserId: null,
                     UpdatedBy: userName,
                     UpdatedDate: new Date()
                 }
             });
             issueStageCompleted = true;
+            await this.prisma.sO_Status_Stepper.updateMany({
+                where: {
+                    salesOrderNumber: updatedOrder.saleOrderNumber,
+                    status: "Issued"
+                },
+                data: {
+                    createdDateTime: new Date(),
+                    updatedBy: userName
+                }
+            });
         }
         return convertBigInts({
             message: 'Issue_stage updated successfully',
@@ -293,17 +313,28 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         const allPacked = allMaterials.every((m)=>m.Packing_stage >= m.Required_Qty);
         let packingStageCompleted = false;
         if (allPacked) {
-            await this.prisma.salesOrder.update({
+            const updatedOrder = await this.prisma.salesOrder.update({
                 where: {
                     id: orderId
                 },
                 data: {
+                    status: 'F105',
                     assignedUserId: null,
                     UpdatedBy: userName,
                     UpdatedDate: new Date()
                 }
             });
             packingStageCompleted = true;
+            await this.prisma.sO_Status_Stepper.updateMany({
+                where: {
+                    salesOrderNumber: updatedOrder.saleOrderNumber,
+                    status: "Packed"
+                },
+                data: {
+                    createdDateTime: new Date(),
+                    updatedBy: userName
+                }
+            });
         }
         return convertBigInts({
             message: 'Packing_stage incremented successfully',
@@ -364,17 +395,28 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         const allPacked = allMaterials.every((m)=>m.Packing_stage >= m.Required_Qty);
         let packingStageCompleted = false;
         if (allPacked) {
-            await this.prisma.salesOrder.update({
+            const updatedOrder = await this.prisma.salesOrder.update({
                 where: {
                     id: orderId
                 },
                 data: {
+                    status: 'F105',
                     assignedUserId: null,
                     UpdatedBy: userName,
                     UpdatedDate: new Date()
                 }
             });
             packingStageCompleted = true;
+            await this.prisma.sO_Status_Stepper.updateMany({
+                where: {
+                    salesOrderNumber: updatedOrder.saleOrderNumber,
+                    status: "Packed"
+                },
+                data: {
+                    createdDateTime: new Date(),
+                    updatedBy: userName
+                }
+            });
         }
         return convertBigInts({
             message: 'Packing_stage updated successfully',

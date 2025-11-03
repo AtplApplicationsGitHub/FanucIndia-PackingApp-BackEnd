@@ -134,11 +134,21 @@ export class ErpMaterialDataService {
     let issueStageCompleted = false;
 
     if (allCompleted) {
-      await this.prisma.salesOrder.update({
+      const updatedOrder = await this.prisma.salesOrder.update({
         where: { id: orderId },
         data: { status: 'W105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
       });
       issueStageCompleted = true;
+      await this.prisma.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderNumber: updatedOrder.saleOrderNumber,
+          status: "Issued"
+        },
+        data: {
+          createdDateTime: new Date(),
+          updatedBy: userName
+        }
+      });
     }
 
     return convertBigInts({
@@ -212,11 +222,21 @@ export class ErpMaterialDataService {
     );
     let issueStageCompleted = false;
     if (allCompleted) {
-      await this.prisma.salesOrder.update({
+      const updatedOrder = await this.prisma.salesOrder.update({
         where: { id: orderId },
         data: { status: 'W105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
       });
       issueStageCompleted = true;
+      await this.prisma.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderNumber: updatedOrder.saleOrderNumber,
+          status: "Issued"
+        },
+        data: {
+          createdDateTime: new Date(),
+          updatedBy: userName
+        }
+      });
     }
 
     return convertBigInts({
@@ -280,11 +300,21 @@ export class ErpMaterialDataService {
     );
     let packingStageCompleted = false;
     if (allPacked) {
-      await this.prisma.salesOrder.update({
+      const updatedOrder = await this.prisma.salesOrder.update({
         where: { id: orderId },
         data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
       });
       packingStageCompleted = true;
+      await this.prisma.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderNumber: updatedOrder.saleOrderNumber,
+          status: "Packed"
+        },
+        data: {
+          createdDateTime: new Date(),
+          updatedBy: userName
+        }
+      });
     }
 
     return convertBigInts({
@@ -353,11 +383,21 @@ export class ErpMaterialDataService {
     );
     let packingStageCompleted = false;
     if (allPacked) {
-      await this.prisma.salesOrder.update({
+      const updatedOrder = await this.prisma.salesOrder.update({
         where: { id: orderId },
         data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
       });
       packingStageCompleted = true;
+      await this.prisma.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderNumber: updatedOrder.saleOrderNumber,
+          status: "Packed"
+        },
+        data: {
+          createdDateTime: new Date(),
+          updatedBy: userName
+        }
+      });
     }
 
     return convertBigInts({

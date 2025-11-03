@@ -358,10 +358,21 @@ let DispatchService = class DispatchService {
                     saleOrderNumber: salesOrder.saleOrderNumber
                 },
                 data: {
+                    assignedUserId: null,
                     status: 'Dispatched',
                     fgLocation: null,
                     UpdatedBy: userName,
                     UpdatedDate: new Date()
+                }
+            });
+            await tx.sO_Status_Stepper.updateMany({
+                where: {
+                    salesOrderNumber: salesOrder.saleOrderNumber,
+                    status: "Dispatched"
+                },
+                data: {
+                    createdDateTime: new Date(),
+                    updatedBy: userName
                 }
             });
             return createdLink;
@@ -584,10 +595,21 @@ let DispatchService = class DispatchService {
                         saleOrderNumber: salesOrder.saleOrderNumber
                     },
                     data: {
+                        assignedUserId: null,
                         status: 'Dispatched',
                         fgLocation: null,
                         UpdatedBy: userName,
                         UpdatedDate: new Date()
+                    }
+                });
+                await tx.sO_Status_Stepper.updateMany({
+                    where: {
+                        salesOrderNumber: salesOrder.saleOrderNumber,
+                        status: "Dispatched"
+                    },
+                    data: {
+                        createdDateTime: new Date(),
+                        updatedBy: userName
                     }
                 });
                 return newDispatchSO;

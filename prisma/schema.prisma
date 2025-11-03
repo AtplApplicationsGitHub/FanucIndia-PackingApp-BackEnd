@@ -104,6 +104,7 @@ model SalesOrder {
   Dispatch_SO      Dispatch_SO[]
   UpdatedBy        String?
   UpdatedDate      DateTime?           @updatedAt
+  statusStepper     SO_Status_Stepper[]
 }
 
 model ERP_Material_Data {
@@ -284,4 +285,27 @@ model Dispatch_SOArchive {
   saleOrderNumber String     @db.VarChar(500)
   createdAt       DateTime
   archivedAt      DateTime   @default(now())
+}
+
+model SO_Status_Stepper {
+  id               Int        @id @default(autoincrement())
+  salesOrderNumber String     @db.VarChar(500)
+  status           String
+  createdDateTime  DateTime?
+  updatedBy        String?
+  salesOrder       SalesOrder @relation(fields: [salesOrderNumber], references: [saleOrderNumber], onDelete: Cascade)
+
+  @@unique([salesOrderNumber, status])
+  @@map("SO_Status_Stepper")
+}
+
+model SO_Status_StepperArchive {
+  id               Int       @id @default(autoincrement())
+  salesOrderNumber String    @db.VarChar(500)
+  status           String
+  createdDateTime  DateTime?
+  updatedBy        String?
+  archivedAt       DateTime  @default(now())
+
+  @@map("SO_Status_StepperArchive")
 }

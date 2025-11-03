@@ -368,6 +368,18 @@ export class DispatchService {
           UpdatedDate: new Date(),
         },
       });
+
+      await tx.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderNumber: salesOrder.saleOrderNumber,
+          status: "Dispatched"
+        },
+        data: {
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        }
+      });
+
       return createdLink;
     });
   }
@@ -580,6 +592,17 @@ export class DispatchService {
             UpdatedBy: userName,
             UpdatedDate: new Date(),
           },
+        });
+
+        await tx.sO_Status_Stepper.updateMany({
+          where: {
+            salesOrderNumber: salesOrder.saleOrderNumber,
+            status: "Dispatched"
+          },
+          data: {
+            createdDateTime: new Date(),
+            updatedBy: userName,
+          }
         });
 
         return newDispatchSO;

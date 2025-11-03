@@ -18,6 +18,7 @@ export class SoArchiveService {
       include: {
         materialData: true,
         materialFilesByNumber: true,
+        statusStepper: true,
         Dispatch_SO: {
           include: {
             dispatch: {
@@ -41,7 +42,7 @@ export class SoArchiveService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const { id, updatedAt, materialData, materialFilesByNumber, Dispatch_SO, ...soData } = so;
+      const { id, updatedAt, materialData, materialFilesByNumber, Dispatch_SO, statusStepper, ...soData } = so;
       
       await tx.salesOrderArchive.create({ data: soData });
 
@@ -82,6 +83,16 @@ export class SoArchiveService {
         if (totalSOsLinked <= 1) {
           await tx.dispatch.delete({ where: { id: dispatch.id } });
         }
+      }
+
+      if (so.statusStepper.length > 0) {
+        await tx.sO_Status_StepperArchive.createMany({
+          data: so.statusStepper.map(({ id, salesOrderNumber, ...d }) => ({
+            ...d,
+            salesOrderNumber: so.saleOrderNumber,
+          })),
+        });
+        await tx.sO_Status_Stepper.deleteMany({ where: { salesOrderNumber: saleOrderNumber } });
       }
       
       await tx.salesOrder.delete({ where: { saleOrderNumber } });
@@ -155,6 +166,7 @@ export class SoArchiveService {
         await tx.dispatch_SOArchive.deleteMany({ where: { saleOrderNumber } });
         await tx.eRP_Material_FileArchive.deleteMany({ where: { saleOrderNumber } });
         await tx.eRP_Material_DataArchive.deleteMany({ where: { saleOrderNumber } });
+        await tx.sO_Status_StepperArchive.deleteMany({ where: { salesOrderNumber: saleOrderNumber } });
         await tx.salesOrderArchive.deleteMany({ where: { saleOrderNumber } });
     });
 

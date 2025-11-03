@@ -43,6 +43,16 @@ let FgStorageService = class FgStorageService {
                 UpdatedDate: new Date()
             }
         });
+        await this.prisma.sO_Status_Stepper.updateMany({
+            where: {
+                salesOrderNumber: updatedOrder.saleOrderNumber,
+                status: "Stored/Ready for Dispatch"
+            },
+            data: {
+                createdDateTime: new Date(),
+                updatedBy: user.name
+            }
+        });
         return {
             message: 'FG Location updated successfully.',
             saleOrderNumber: updatedOrder.saleOrderNumber,

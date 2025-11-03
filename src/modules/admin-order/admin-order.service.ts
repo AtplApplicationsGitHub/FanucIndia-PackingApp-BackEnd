@@ -207,6 +207,44 @@ export class AdminOrderService {
       data.status = 'R105';
     }
 
+    const now = new Date();
+
+    // Trigger for "Assigned" status - only if not already set
+    if (dto.assignedUserId && order.assignedUserId !== dto.assignedUserId) {
+      const assignedStep = await this.prisma.sO_Status_Stepper.findUnique({
+        where: {
+          salesOrderNumber_status: {
+            salesOrderNumber: order.saleOrderNumber,
+            status: "Assigned",
+          },
+        },
+      });
+
+      if (assignedStep && !assignedStep.createdDateTime) {
+        await this.prisma.sO_Status_Stepper.update({
+          where: { id: assignedStep.id },
+          data: {
+            createdDateTime: now,
+            updatedBy: user.name,
+          },
+        });
+      }
+    }
+
+    // Trigger for "Stored/Ready for Dispatch" status
+    if (dto.fgLocation && order.fgLocation !== dto.fgLocation) {
+      await this.prisma.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderNumber: order.saleOrderNumber,
+          status: "Stored/Ready for Dispatch"
+        },
+        data: {
+          createdDateTime: now,
+          updatedBy: user.name,
+        }
+      });
+    }
+
     return this.prisma.salesOrder.update({
       where: { id },
       data,
