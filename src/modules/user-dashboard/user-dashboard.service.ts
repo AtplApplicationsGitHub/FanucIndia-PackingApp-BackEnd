@@ -286,7 +286,7 @@ export class UserDashboardService {
       });
     }
 
-    await this._checkAndUpdateOrderStatus(saleOrderNumber, prismaClient);
+    await this._checkAndUpdateOrderStatus(saleOrderNumber, prismaClient, userName);
 
     return { message: 'Data updated successfully.' };
   }
@@ -348,6 +348,7 @@ export class UserDashboardService {
   private async _checkAndUpdateOrderStatus(
     saleOrderNumber: string,
     prismaClient: Prisma.TransactionClient | PrismaService,
+    userName: string,
   ) {
     const order = await prismaClient.salesOrder.findUnique({
       where: { saleOrderNumber },
@@ -371,6 +372,17 @@ export class UserDashboardService {
         where: { id: order.id },
         data: { status: 'F105', assignedUserId: null },
       });
+
+      await prismaClient.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderNumber: saleOrderNumber,
+          status: 'Issued',
+        },
+        data: {
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
+      });
     }
 
     const packingStageCompleted = allMaterials.every(
@@ -381,6 +393,17 @@ export class UserDashboardService {
       await prismaClient.salesOrder.update({
         where: { id: order.id },
         data: { assignedUserId: null },
+      });
+
+      await prismaClient.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderNumber: saleOrderNumber,
+          status: 'Packed',
+        },
+        data: {
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
       });
     }
   }
