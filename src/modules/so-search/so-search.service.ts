@@ -34,8 +34,13 @@ export class SoSearchService {
     user: { userId: number; role: string },
   ) {
     // 1. Search in primary tables (This part remains unchanged)
-    const salesOrder = await this.prisma.salesOrder.findUnique({
-      where: { saleOrderNumber },
+    const salesOrder = await this.prisma.salesOrder.findFirst({
+      where: {
+        saleOrderNumber: {
+          equals: saleOrderNumber,
+          mode: 'insensitive',
+        },
+      },
       include: {
         customer: true,
         product: true,
@@ -68,11 +73,6 @@ export class SoSearchService {
 
       const dispatchIds = dispatchSOs.map((dso) => dso.dispatchId);
 
-      // const dispatchInfo = await this.prisma.dispatch.findMany({
-      //   where: { id: { in: dispatchIds } },
-      //   include: { customer: true, transporter: true },
-      // });
-
       const dispatchInfo = await this.prisma.dispatch.findMany({
         where: { id: { in: dispatchIds } },
         select: {
@@ -100,9 +100,13 @@ export class SoSearchService {
       return convertBigInts(result);
     }
 
-    // 2. If not found, search in archive tables (UPDATED LOGIC)
     const archivedSalesOrder = await this.prisma.salesOrderArchive.findFirst({
-      where: { saleOrderNumber },
+      where: {
+        saleOrderNumber: {
+          equals: saleOrderNumber,
+          mode: 'insensitive',
+        },
+      },
     });
 
     if (archivedSalesOrder) {

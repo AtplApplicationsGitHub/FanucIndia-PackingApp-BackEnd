@@ -367,10 +367,10 @@ export class UserDashboardService {
       (m) => m.Required_Qty > 0 && m.Issue_stage >= m.Required_Qty,
     );
 
-    if (issueStageCompleted && order.status !== 'F105') {
+    if (issueStageCompleted && order.status !== 'W105' && order.status !== 'F105') {
       await prismaClient.salesOrder.update({
         where: { id: order.id },
-        data: { status: 'F105', assignedUserId: null },
+        data: { status: 'W105', assignedUserId: null },
       });
 
       await prismaClient.sO_Status_Stepper.updateMany({
@@ -392,7 +392,7 @@ export class UserDashboardService {
     if (packingStageCompleted) {
       await prismaClient.salesOrder.update({
         where: { id: order.id },
-        data: { assignedUserId: null },
+        data: { status: 'F105', assignedUserId: null },
       });
 
       await prismaClient.sO_Status_Stepper.updateMany({
