@@ -41,9 +41,12 @@ function convertBigInts(obj) {
 let SoSearchService = class SoSearchService {
     async findDetailsBySoNumber(saleOrderNumber, user) {
         // 1. Search in primary tables (This part remains unchanged)
-        const salesOrder = await this.prisma.salesOrder.findUnique({
+        const salesOrder = await this.prisma.salesOrder.findFirst({
             where: {
-                saleOrderNumber
+                saleOrderNumber: {
+                    equals: saleOrderNumber,
+                    mode: 'insensitive'
+                }
             },
             include: {
                 customer: true,
@@ -88,10 +91,6 @@ let SoSearchService = class SoSearchService {
                 })
             ]);
             const dispatchIds = dispatchSOs.map((dso)=>dso.dispatchId);
-            // const dispatchInfo = await this.prisma.dispatch.findMany({
-            //   where: { id: { in: dispatchIds } },
-            //   include: { customer: true, transporter: true },
-            // });
             const dispatchInfo = await this.prisma.dispatch.findMany({
                 where: {
                     id: {
@@ -130,10 +129,12 @@ let SoSearchService = class SoSearchService {
             };
             return convertBigInts(result);
         }
-        // 2. If not found, search in archive tables (UPDATED LOGIC)
         const archivedSalesOrder = await this.prisma.salesOrderArchive.findFirst({
             where: {
-                saleOrderNumber
+                saleOrderNumber: {
+                    equals: saleOrderNumber,
+                    mode: 'insensitive'
+                }
             }
         });
         if (archivedSalesOrder) {

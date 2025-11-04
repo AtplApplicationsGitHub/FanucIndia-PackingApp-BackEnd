@@ -24,9 +24,9 @@ let FgDashboardService = class FgDashboardService {
         const { search, date, page = 1, limit = 10 } = query;
         const skip = (page - 1) * limit;
         const where = {};
-        if (user.role === 'USER') {
-            where.assignedUserId = user.userId;
-        }
+        // if (user.role === 'USER') {
+        //   where.assignedUserId = user.userId;
+        // }
         if (date) {
             const parseYMD = (s)=>{
                 const [y, m, d] = s.split('-').map(Number);

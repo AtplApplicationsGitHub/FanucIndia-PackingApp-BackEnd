@@ -14,9 +14,9 @@ export class FgDashboardService {
     const skip = (page - 1) * limit;
     const where: Prisma.SalesOrderWhereInput = {};
 
-    if (user.role === 'USER') {
-      where.assignedUserId = user.userId;
-    }
+    // if (user.role === 'USER') {
+    //   where.assignedUserId = user.userId;
+    // }
 
     if (date) {
       const parseYMD = (s: string) => {

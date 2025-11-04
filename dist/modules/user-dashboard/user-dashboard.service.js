@@ -255,7 +255,7 @@ let UserDashboardService = class UserDashboardService {
                 }
             });
         }
-        await this._checkAndUpdateOrderStatus(saleOrderNumber, prismaClient);
+        await this._checkAndUpdateOrderStatus(saleOrderNumber, prismaClient, userName);
         return {
             message: 'Data updated successfully.'
         };
@@ -300,7 +300,7 @@ let UserDashboardService = class UserDashboardService {
             throw new _common.ForbiddenException('You are not authorized to modify this order.');
         }
     }
-    async _checkAndUpdateOrderStatus(saleOrderNumber, prismaClient) {
+    async _checkAndUpdateOrderStatus(saleOrderNumber, prismaClient, userName) {
         const order = await prismaClient.salesOrder.findUnique({
             where: {
                 saleOrderNumber
@@ -323,14 +323,24 @@ let UserDashboardService = class UserDashboardService {
         });
         if (allMaterials.length === 0) return;
         const issueStageCompleted = allMaterials.every((m)=>m.Required_Qty > 0 && m.Issue_stage >= m.Required_Qty);
-        if (issueStageCompleted && order.status !== 'F105') {
+        if (issueStageCompleted && order.status !== 'W105' && order.status !== 'F105') {
             await prismaClient.salesOrder.update({
                 where: {
                     id: order.id
                 },
                 data: {
-                    status: 'F105',
+                    status: 'W105',
                     assignedUserId: null
+                }
+            });
+            await prismaClient.sO_Status_Stepper.updateMany({
+                where: {
+                    salesOrderNumber: saleOrderNumber,
+                    status: 'Issued'
+                },
+                data: {
+                    createdDateTime: new Date(),
+                    updatedBy: userName
                 }
             });
         }
@@ -341,7 +351,18 @@ let UserDashboardService = class UserDashboardService {
                     id: order.id
                 },
                 data: {
+                    status: 'F105',
                     assignedUserId: null
+                }
+            });
+            await prismaClient.sO_Status_Stepper.updateMany({
+                where: {
+                    salesOrderNumber: saleOrderNumber,
+                    status: 'Packed'
+                },
+                data: {
+                    createdDateTime: new Date(),
+                    updatedBy: userName
                 }
             });
         }
