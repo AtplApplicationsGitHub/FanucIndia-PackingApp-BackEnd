@@ -19,9 +19,10 @@ import { SoSearchModule } from './modules/so-search/so-search.module';
 import { FgDashboardModule } from './modules/fg-dashboard/fg-dashboard.module';
 import { FgStorageModule } from './modules/fg-storage/fg-storage.module';
 import { SoArchiveModule } from './modules/so-archive/so-archive.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule, ErpMaterialImporterModule, DispatchModule, SoSearchModule, FgDashboardModule, FgStorageModule, SoArchiveModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule, ErpMaterialImporterModule, DispatchModule, SoSearchModule, FgDashboardModule, FgStorageModule, SoArchiveModule, DashboardModule],
   controllers: [AppController],
   providers: [AppService],
 })
