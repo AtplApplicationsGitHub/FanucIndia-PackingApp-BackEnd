@@ -19,13 +19,112 @@ function _ts_decorate(decorators, target, key, desc) {
 function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
+/**
+ * Calculates percentage change, handling division by zero.
+ */ function calculatePercentageChange(current, previous) {
+    if (previous === 0) {
+        return current > 0 ? 100.0 : 0.0; // If previous was 0, any increase is 100%
+    }
+    const change = (current - previous) / previous * 100;
+    return parseFloat(change.toFixed(1)); // Return with one decimal place
+}
 let DashboardService = class DashboardService {
+    /**
+   * Gets the KPI counts for the ADMIN dashboard.
+   */ async getAdminKpis() {
+        const now = new Date();
+        const firstDayCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const firstDayNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const firstDayPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const [totalSoCount, newSoCurrentMonth, newSoPreviousMonth, overdueCount, overdueCountPrevious, dispatchedTotalCount, dispatchedCurrentMonth, dispatchedPreviousMonth] = await this.prisma.$transaction([
+            // 1. Total SO Count (Main KPI)
+            this.prisma.salesOrder.count(),
+            // 2. New SO This Month (for % change)
+            this.prisma.salesOrder.count({
+                where: {
+                    createdAt: {
+                        gte: firstDayCurrentMonth,
+                        lt: firstDayNextMonth
+                    }
+                }
+            }),
+            // 3. New SO Last Month (for % change)
+            this.prisma.salesOrder.count({
+                where: {
+                    createdAt: {
+                        gte: firstDayPreviousMonth,
+                        lt: firstDayCurrentMonth
+                    }
+                }
+            }),
+            // 4. Overdue Count (Main KPI - Snapshot NOW)
+            this.prisma.salesOrder.count({
+                where: {
+                    deliveryDate: {
+                        lt: now
+                    },
+                    status: {
+                        not: 'Dispatched'
+                    }
+                }
+            }),
+            // 5. Overdue Count (Snapshot at START of month - for % change)
+            this.prisma.salesOrder.count({
+                where: {
+                    deliveryDate: {
+                        lt: firstDayCurrentMonth
+                    },
+                    status: {
+                        not: 'Dispatched'
+                    }
+                }
+            }),
+            // 6. Dispatched Count (Main KPI)
+            this.prisma.salesOrder.count({
+                where: {
+                    status: 'Dispatched'
+                }
+            }),
+            // 7. Dispatched This Month (for % change - from Stepper)
+            this.prisma.sO_Status_Stepper.count({
+                where: {
+                    status: 'Dispatched',
+                    createdDateTime: {
+                        gte: firstDayCurrentMonth,
+                        lt: firstDayNextMonth
+                    }
+                }
+            }),
+            // 8. Dispatched Last Month (for % change - from Stepper)
+            this.prisma.sO_Status_Stepper.count({
+                where: {
+                    status: 'Dispatched',
+                    createdDateTime: {
+                        gte: firstDayPreviousMonth,
+                        lt: firstDayCurrentMonth
+                    }
+                }
+            })
+        ]);
+        // Calculate percentages
+        const totalSoCountPercentageChange = calculatePercentageChange(newSoCurrentMonth, newSoPreviousMonth);
+        const overdueSoCountPercentageChange = calculatePercentageChange(overdueCount, overdueCountPrevious);
+        const dispatchedSoCountPercentageChange = calculatePercentageChange(dispatchedCurrentMonth, dispatchedPreviousMonth);
+        return {
+            totalSoCount,
+            totalSoCountPercentageChange,
+            overdueSoCount: overdueCount,
+            overdueSoCountPercentageChange,
+            dispatchedSoCount: dispatchedTotalCount,
+            dispatchedSoCountPercentageChange
+        };
+    }
     /**
    * Gets the KPI counts for a specific SALES user.
    * @param userId The ID of the logged-in SALES user.
    */ async getSalesKpis(userId) {
+        // ... existing getSalesKpis logic remains unchanged
         const now = new Date();
-        // We run all count queries concurrently for best performance
         const [totalSoCount, dispatchedSoCount, overdueSoCount, r105Count, w105Count, f105Count] = await this.prisma.$transaction([
             // 1. TOTAL SO COUNT
             this.prisma.salesOrder.count({
@@ -88,7 +187,7 @@ let DashboardService = class DashboardService {
    * Gets the 5 most recent activities for a SALES user.
    * @param userId The ID of the logged-in SALES user.
    */ async getSalesRecentActivity(userId) {
-        // 1. Find all SO Numbers created by this sales user
+        // ... existing getSalesRecentActivity logic remains unchanged
         const userOrders = await this.prisma.salesOrder.findMany({
             where: {
                 userId: userId
@@ -98,10 +197,9 @@ let DashboardService = class DashboardService {
             }
         });
         if (userOrders.length === 0) {
-            return []; // No orders, so no activity
+            return [];
         }
         const userSoNumbers = userOrders.map((o)=>o.saleOrderNumber);
-        // 2. Find the 5 most recent "stepper" events for those SOs
         const activities = await this.prisma.sO_Status_Stepper.findMany({
             where: {
                 salesOrderNumber: {
@@ -121,7 +219,6 @@ let DashboardService = class DashboardService {
             },
             take: 5
         });
-        // 3. Map to the DTO
         return activities.map((act)=>({
                 salesOrderNumber: act.salesOrderNumber,
                 status: act.status,

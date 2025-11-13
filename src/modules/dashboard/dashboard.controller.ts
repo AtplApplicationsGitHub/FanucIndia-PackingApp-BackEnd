@@ -6,6 +6,8 @@ import { AuthRequest } from '../auth/types/auth-request.type';
 import { DashboardService } from './dashboard.service';
 import { SalesKpiDto } from './dto/sales-kpi.dto';
 import { SalesActivityDto } from './dto/sales-activity.dto';
+import { AdminKpiDto } from './dto/admin-kpi.dto';
+import { SalesPaymentClearanceDto } from './dto/sales-payment-clearance.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -13,6 +15,14 @@ import { SalesActivityDto } from './dto/sales-activity.dto';
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
+
+  @Get('admin-kpis')
+  @Roles('ADMIN') // This endpoint is only for the ADMIN role
+  @ApiOperation({ summary: 'Get KPI counters for the ADMIN dashboard' })
+  @ApiResponse({ status: 200, type: AdminKpiDto })
+  async getAdminKpis(): Promise<AdminKpiDto> {
+    return this.dashboardService.getAdminKpis();
+  }
 
   @Get('sales-kpis')
   @Roles('SALES') // This endpoint is only for the SALES role
@@ -32,5 +42,20 @@ export class DashboardController {
     @Req() req: AuthRequest,
   ): Promise<SalesActivityDto[]> {
     return this.dashboardService.getSalesRecentActivity(req.user.userId);
+  }
+
+  @Get('sales-payment-clearance')
+  @Roles('SALES')
+  @ApiOperation({
+    summary:
+      'Get payment clearance counts by sales zone for the SALES user (for graph)',
+  })
+  @ApiResponse({ status: 200, type: [SalesPaymentClearanceDto] })
+  async getSalesPaymentClearance(
+    @Req() req: AuthRequest,
+  ): Promise<SalesPaymentClearanceDto[]> {
+    return this.dashboardService.getSalesPaymentClearanceByZone(
+      req.user.userId,
+    );
   }
 }

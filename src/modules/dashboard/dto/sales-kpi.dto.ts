@@ -7,8 +7,8 @@ export class SalesKpiDto {
   @ApiProperty({ example: 5, description: 'Total SOs created by the user that are Dispatched' })
   dispatchedSoCount: number;
 
-  @ApiProperty({ example: 2, description: 'Total SOs created by the user that are Overdue' })
-  overdueSoCount: number;
+  // @ApiProperty({ example: 2, description: 'Total SOs created by the user that are Overdue' })
+  // overdueSoCount: number;
 
   @ApiProperty({ example: 3, description: 'Count of orders with status R105 (Assigned)' })
   r105Count: number;

@@ -16,6 +16,7 @@ const _authrequesttype = require("../auth/types/auth-request.type");
 const _dashboardservice = require("./dashboard.service");
 const _saleskpidto = require("./dto/sales-kpi.dto");
 const _salesactivitydto = require("./dto/sales-activity.dto");
+const _adminkpidto = require("./dto/admin-kpi.dto");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -31,6 +32,9 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let DashboardController = class DashboardController {
+    async getAdminKpis() {
+        return this.dashboardService.getAdminKpis();
+    }
     async getSalesKpis(req) {
         return this.dashboardService.getSalesKpis(req.user.userId);
     }
@@ -41,6 +45,20 @@ let DashboardController = class DashboardController {
         this.dashboardService = dashboardService;
     }
 };
+_ts_decorate([
+    (0, _common.Get)('admin-kpis'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get KPI counters for the ADMIN dashboard'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        type: _adminkpidto.AdminKpiDto
+    }),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], DashboardController.prototype, "getAdminKpis", null);
 _ts_decorate([
     (0, _common.Get)('sales-kpis'),
     (0, _rolesdecorator.Roles)('SALES'),
