@@ -387,48 +387,56 @@ let DashboardService = class DashboardService {
     }
     /**
    * [FIXED] Gets payment clearance counts grouped by sales zone for a SALES user.
-   * Does NOT filter by status, as requested.
+   * This now *only* returns zones that the user has orders in.
+   *
    * @param userId The ID of the logged-in SALES user.
    */ async getSalesPaymentClearanceByZone(userId) {
-        // 1. Get all possible sales zones
-        const allZones = await this.prisma.salesZone.findMany({
-            select: {
-                id: true,
-                name: true
-            },
-            orderBy: {
-                name: 'asc'
-            }
-        });
-        // 2. Get the grouped counts for the specific user
+        // 1. Get the grouped counts for the specific user
         const rawCounts = await this.prisma.salesOrder.groupBy({
             by: [
                 'salesZoneId',
                 'paymentClearance'
             ],
-            // --- [THE FIX] ---
-            // Removed all 'status' filtering.
-            // Now it only filters by the logged-in user.
             where: {
                 userId: userId
             },
-            // --- [END FIX] ---
             _count: {
                 id: true
             }
         });
-        // 3. Process the raw data into the desired DTO format
+        // 2. If no orders are found for this user, return an empty array.
+        if (rawCounts.length === 0) {
+            return [];
+        }
+        // 3. Get the unique Zone IDs *from the results*
+        const zoneIds = [
+            ...new Set(rawCounts.map((r)=>r.salesZoneId))
+        ];
+        // 4. Fetch the names for *only* those zones
+        const zones = await this.prisma.salesZone.findMany({
+            where: {
+                id: {
+                    in: zoneIds
+                }
+            },
+            select: {
+                id: true,
+                name: true
+            }
+        });
+        // 5. Initialize the results map *only* with the zones found
         const resultsMap = new Map();
-        for (const zone of allZones){
+        for (const zone of zones){
             resultsMap.set(zone.id, {
                 zoneName: zone.name,
                 paymentCleared: 0,
                 paymentPending: 0
             });
         }
-        // 4. Populate the map with actual counts from the query
+        // 6. Populate the map with actual counts
         for (const countData of rawCounts){
             const zone = resultsMap.get(countData.salesZoneId);
+            // We can be sure the zone exists in the map because we built it from the results
             if (zone) {
                 if (countData.paymentClearance === true) {
                     zone.paymentCleared = countData._count.id;
@@ -438,7 +446,7 @@ let DashboardService = class DashboardService {
                 }
             }
         }
-        // 5. Return the values from the map as an array
+        // 7. Return the values as an array
         return Array.from(resultsMap.values());
     }
     constructor(prisma){
