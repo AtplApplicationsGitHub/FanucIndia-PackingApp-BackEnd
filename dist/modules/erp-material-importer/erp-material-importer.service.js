@@ -91,6 +91,25 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         }
         const renamedRecords = this.renameColumns(records);
         await this.upsertRecords(renamedRecords);
+        // --- [FIX] ADD LOGGING ---
+        // After upsert is successful, log the event to ERPMaterialLog
+        const soNumber = String(records[0]["SO Number"]);
+        try {
+            await this.prisma.eRPMaterialLog.create({
+                data: {
+                    dateTime: new Date(),
+                    fileName: file.originalname,
+                    exceptionStatus: 'Success',
+                    soNo: soNumber,
+                    noOfFilesExecuted: 1
+                }
+            });
+            this.logger.log(`Successfully logged import for SO: ${soNumber}`);
+        } catch (logError) {
+            // Log the error but don't fail the entire request
+            this.logger.error(`Failed to write to ERPMaterialLog for SO: ${soNumber}`, logError);
+        }
+        // --- END OF FIX ---
         this.logger.log(`Successfully processed file: ${file.originalname}`);
         return {
             message: `File processed successfully. ${renamedRecords.length} records upserted.`

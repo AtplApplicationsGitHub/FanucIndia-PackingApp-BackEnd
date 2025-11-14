@@ -2,10 +2,10 @@
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-Object.defineProperty(exports, "SalesKpiDto", {
+Object.defineProperty(exports, "SalesPaymentClearanceDto", {
     enumerable: true,
     get: function() {
-        return SalesKpiDto;
+        return SalesPaymentClearanceDto;
     }
 });
 const _swagger = require("@nestjs/swagger");
@@ -18,42 +18,28 @@ function _ts_decorate(decorators, target, key, desc) {
 function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
-let SalesKpiDto = class SalesKpiDto {
+let SalesPaymentClearanceDto = class SalesPaymentClearanceDto {
 };
 _ts_decorate([
     (0, _swagger.ApiProperty)({
-        example: 10,
-        description: 'Total SOs created by the user'
+        example: 'North Zone',
+        description: "The name of the sales zone"
     }),
-    _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "totalSoCount", void 0);
+    _ts_metadata("design:type", String)
+], SalesPaymentClearanceDto.prototype, "zoneName", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
-        example: 5,
-        description: 'Total SOs created by the user that are Dispatched'
+        example: 60,
+        description: 'Count of non-dispatched orders with payment cleared'
     }),
     _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "dispatchedSoCount", void 0);
+], SalesPaymentClearanceDto.prototype, "paymentCleared", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
-        example: 3,
-        description: 'Count of orders with status R105 (Assigned)'
+        example: 15,
+        description: 'Count of non-dispatched orders with payment pending'
     }),
     _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "r105Count", void 0);
-_ts_decorate([
-    (0, _swagger.ApiProperty)({
-        example: 2,
-        description: 'Count of orders with status W105 (Issued)'
-    }),
-    _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "w105Count", void 0);
-_ts_decorate([
-    (0, _swagger.ApiProperty)({
-        example: 1,
-        description: 'Count of orders with status F105 (Packed)'
-    }),
-    _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "f105Count", void 0);
+], SalesPaymentClearanceDto.prototype, "paymentPending", void 0);
 
-//# sourceMappingURL=sales-kpi.dto.js.map
+//# sourceMappingURL=sales-payment-clearance.dto.js.map

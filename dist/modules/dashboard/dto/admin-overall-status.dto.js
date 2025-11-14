@@ -2,10 +2,10 @@
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-Object.defineProperty(exports, "SalesKpiDto", {
+Object.defineProperty(exports, "AdminOverallStatusDto", {
     enumerable: true,
     get: function() {
-        return SalesKpiDto;
+        return AdminOverallStatusDto;
     }
 });
 const _swagger = require("@nestjs/swagger");
@@ -18,42 +18,35 @@ function _ts_decorate(decorators, target, key, desc) {
 function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
-let SalesKpiDto = class SalesKpiDto {
+let AdminOverallStatusDto = class AdminOverallStatusDto {
 };
 _ts_decorate([
     (0, _swagger.ApiProperty)({
-        example: 10,
-        description: 'Total SOs created by the user'
+        example: 150,
+        description: "Total count of orders with status 'R105' (Imported/Assigned)"
     }),
     _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "totalSoCount", void 0);
+], AdminOverallStatusDto.prototype, "r105Count", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
-        example: 5,
-        description: 'Total SOs created by the user that are Dispatched'
+        example: 85,
+        description: "Total count of orders with status 'W105' (Issued)"
     }),
     _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "dispatchedSoCount", void 0);
+], AdminOverallStatusDto.prototype, "w105Count", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
-        example: 3,
-        description: 'Count of orders with status R105 (Assigned)'
+        example: 62,
+        description: "Total count of orders with status 'F105' (Packed/Awaiting Dispatch)"
     }),
     _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "r105Count", void 0);
+], AdminOverallStatusDto.prototype, "f105Count", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
-        example: 2,
-        description: 'Count of orders with status W105 (Issued)'
+        example: 850,
+        description: "Total count of orders with status 'Dispatched'"
     }),
     _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "w105Count", void 0);
-_ts_decorate([
-    (0, _swagger.ApiProperty)({
-        example: 1,
-        description: 'Count of orders with status F105 (Packed)'
-    }),
-    _ts_metadata("design:type", Number)
-], SalesKpiDto.prototype, "f105Count", void 0);
+], AdminOverallStatusDto.prototype, "dispatchedCount", void 0);
 
-//# sourceMappingURL=sales-kpi.dto.js.map
+//# sourceMappingURL=admin-overall-status.dto.js.map

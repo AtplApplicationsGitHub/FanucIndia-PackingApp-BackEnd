@@ -1,5 +1,10 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthRequest } from '../auth/types/auth-request.type';
@@ -8,6 +13,9 @@ import { SalesKpiDto } from './dto/sales-kpi.dto';
 import { SalesActivityDto } from './dto/sales-activity.dto';
 import { AdminKpiDto } from './dto/admin-kpi.dto';
 import { SalesPaymentClearanceDto } from './dto/sales-payment-clearance.dto';
+import { AdminNewImportDto } from './dto/admin-new-imports.dto'; // <-- NEW
+import { AdminDispatchSummaryDto } from './dto/admin-dispatch-summary.dto'; // <-- NEW
+import { AdminOverallStatusDto } from './dto/admin-overall-status.dto'; // <-- NEW
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -16,20 +24,48 @@ import { SalesPaymentClearanceDto } from './dto/sales-payment-clearance.dto';
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
+  // --- ADMIN ENDPOINTS ---
+
   @Get('admin-kpis')
-  @Roles('ADMIN') // This endpoint is only for the ADMIN role
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get KPI counters for the ADMIN dashboard' })
   @ApiResponse({ status: 200, type: AdminKpiDto })
   async getAdminKpis(): Promise<AdminKpiDto> {
     return this.dashboardService.getAdminKpis();
   }
 
+  @Get('admin-new-imports')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get new material import counts for the last 5 days' })
+  @ApiResponse({ status: 200, type: [AdminNewImportDto] })
+  async getAdminNewImports(): Promise<AdminNewImportDto[]> {
+    return this.dashboardService.getAdminNewImports();
+  }
+
+  @Get('admin-dispatch-summary')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: "Get today's dispatch summary" })
+  @ApiResponse({ status: 200, type: AdminDispatchSummaryDto })
+  async getAdminDispatchSummary(): Promise<AdminDispatchSummaryDto> {
+    return this.dashboardService.getAdminDispatchSummary();
+  }
+
+  @Get('admin-overall-status')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get system-wide counts of orders by status' })
+  @ApiResponse({ status: 200, type: AdminOverallStatusDto })
+  async getAdminOverallStatus(): Promise<AdminOverallStatusDto> {
+    return this.dashboardService.getAdminOverallStatus();
+  }
+
+  // --- SALES ENDPOINTS ---
+
   @Get('sales-kpis')
-  @Roles('SALES') // This endpoint is only for the SALES role
+  @Roles('SALES')
   @ApiOperation({ summary: 'Get KPI counters for the SALES dashboard' })
   @ApiResponse({ status: 200, type: SalesKpiDto })
   async getSalesKpis(
-    @Req() req: AuthRequest, // We get the logged-in user's ID from the AuthRequest
+    @Req() req: AuthRequest,
   ): Promise<SalesKpiDto> {
     return this.dashboardService.getSalesKpis(req.user.userId);
   }

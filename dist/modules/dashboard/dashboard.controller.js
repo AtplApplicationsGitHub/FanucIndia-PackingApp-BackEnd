@@ -17,6 +17,10 @@ const _dashboardservice = require("./dashboard.service");
 const _saleskpidto = require("./dto/sales-kpi.dto");
 const _salesactivitydto = require("./dto/sales-activity.dto");
 const _adminkpidto = require("./dto/admin-kpi.dto");
+const _salespaymentclearancedto = require("./dto/sales-payment-clearance.dto");
+const _adminnewimportsdto = require("./dto/admin-new-imports.dto");
+const _admindispatchsummarydto = require("./dto/admin-dispatch-summary.dto");
+const _adminoverallstatusdto = require("./dto/admin-overall-status.dto");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -32,14 +36,28 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let DashboardController = class DashboardController {
+    // --- ADMIN ENDPOINTS ---
     async getAdminKpis() {
         return this.dashboardService.getAdminKpis();
     }
+    async getAdminNewImports() {
+        return this.dashboardService.getAdminNewImports();
+    }
+    async getAdminDispatchSummary() {
+        return this.dashboardService.getAdminDispatchSummary();
+    }
+    async getAdminOverallStatus() {
+        return this.dashboardService.getAdminOverallStatus();
+    }
+    // --- SALES ENDPOINTS ---
     async getSalesKpis(req) {
         return this.dashboardService.getSalesKpis(req.user.userId);
     }
     async getSalesRecentActivity(req) {
         return this.dashboardService.getSalesRecentActivity(req.user.userId);
+    }
+    async getSalesPaymentClearance(req) {
+        return this.dashboardService.getSalesPaymentClearanceByZone(req.user.userId);
     }
     constructor(dashboardService){
         this.dashboardService = dashboardService;
@@ -59,6 +77,50 @@ _ts_decorate([
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
 ], DashboardController.prototype, "getAdminKpis", null);
+_ts_decorate([
+    (0, _common.Get)('admin-new-imports'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get new material import counts for the last 5 days'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        type: [
+            _adminnewimportsdto.AdminNewImportDto
+        ]
+    }),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], DashboardController.prototype, "getAdminNewImports", null);
+_ts_decorate([
+    (0, _common.Get)('admin-dispatch-summary'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: "Get today's dispatch summary"
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        type: _admindispatchsummarydto.AdminDispatchSummaryDto
+    }),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], DashboardController.prototype, "getAdminDispatchSummary", null);
+_ts_decorate([
+    (0, _common.Get)('admin-overall-status'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get system-wide counts of orders by status'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        type: _adminoverallstatusdto.AdminOverallStatusDto
+    }),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], DashboardController.prototype, "getAdminOverallStatus", null);
 _ts_decorate([
     (0, _common.Get)('sales-kpis'),
     (0, _rolesdecorator.Roles)('SALES'),
@@ -95,6 +157,25 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], DashboardController.prototype, "getSalesRecentActivity", null);
+_ts_decorate([
+    (0, _common.Get)('sales-payment-clearance'),
+    (0, _rolesdecorator.Roles)('SALES'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get payment clearance counts by sales zone for the SALES user (for graph)'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        type: [
+            _salespaymentclearancedto.SalesPaymentClearanceDto
+        ]
+    }),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], DashboardController.prototype, "getSalesPaymentClearance", null);
 DashboardController = _ts_decorate([
     (0, _swagger.ApiTags)('Dashboard'),
     (0, _swagger.ApiBearerAuth)(),
