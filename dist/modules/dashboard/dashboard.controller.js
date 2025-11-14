@@ -21,6 +21,9 @@ const _salespaymentclearancedto = require("./dto/sales-payment-clearance.dto");
 const _adminnewimportsdto = require("./dto/admin-new-imports.dto");
 const _admindispatchsummarydto = require("./dto/admin-dispatch-summary.dto");
 const _adminoverallstatusdto = require("./dto/admin-overall-status.dto");
+const _adminstatusbyzonedto = require("./dto/admin-status-by-zone.dto");
+const _adminpaymentbyzonedto = require("./dto/admin-payment-by-zone.dto");
+const _admincountbyentitydto = require("./dto/admin-count-by-entity.dto");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -48,6 +51,19 @@ let DashboardController = class DashboardController {
     }
     async getAdminOverallStatus() {
         return this.dashboardService.getAdminOverallStatus();
+    }
+    // --- NEW ADMIN ENDPOINTS (ROWS 3, 4, 5) ---
+    async getAdminStatusByZone() {
+        return this.dashboardService.getAdminStatusByZone();
+    }
+    async getAdminPaymentByZone() {
+        return this.dashboardService.getAdminPaymentByZone();
+    }
+    async getAdminOrdersByProduct() {
+        return this.dashboardService.getAdminOrdersByProduct();
+    }
+    async getAdminOrdersByCustomer() {
+        return this.dashboardService.getAdminOrdersByCustomer();
     }
     // --- SALES ENDPOINTS ---
     async getSalesKpis(req) {
@@ -121,6 +137,70 @@ _ts_decorate([
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
 ], DashboardController.prototype, "getAdminOverallStatus", null);
+_ts_decorate([
+    (0, _common.Get)('admin-status-by-zone'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get system-wide order status counts by sales zone (Row 3)'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        type: [
+            _adminstatusbyzonedto.AdminStatusByZoneDto
+        ]
+    }),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], DashboardController.prototype, "getAdminStatusByZone", null);
+_ts_decorate([
+    (0, _common.Get)('admin-payment-by-zone'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get system-wide payment clearance counts by sales zone (Row 4)'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        type: [
+            _adminpaymentbyzonedto.AdminPaymentByZoneDto
+        ]
+    }),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], DashboardController.prototype, "getAdminPaymentByZone", null);
+_ts_decorate([
+    (0, _common.Get)('admin-orders-by-product'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get system-wide order counts by product (Row 5)'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        type: [
+            _admincountbyentitydto.AdminCountByEntityDto
+        ]
+    }),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], DashboardController.prototype, "getAdminOrdersByProduct", null);
+_ts_decorate([
+    (0, _common.Get)('admin-orders-by-customer'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get system-wide order counts by customer (Row 5)'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        type: [
+            _admincountbyentitydto.AdminCountByEntityDto
+        ]
+    }),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], DashboardController.prototype, "getAdminOrdersByCustomer", null);
 _ts_decorate([
     (0, _common.Get)('sales-kpis'),
     (0, _rolesdecorator.Roles)('SALES'),

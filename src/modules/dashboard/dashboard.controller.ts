@@ -16,6 +16,9 @@ import { SalesPaymentClearanceDto } from './dto/sales-payment-clearance.dto';
 import { AdminNewImportDto } from './dto/admin-new-imports.dto'; // <-- NEW
 import { AdminDispatchSummaryDto } from './dto/admin-dispatch-summary.dto'; // <-- NEW
 import { AdminOverallStatusDto } from './dto/admin-overall-status.dto'; // <-- NEW
+import { AdminStatusByZoneDto } from './dto/admin-status-by-zone.dto';
+import { AdminPaymentByZoneDto } from './dto/admin-payment-by-zone.dto';
+import { AdminCountByEntityDto } from './dto/admin-count-by-entity.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -56,6 +59,40 @@ export class DashboardController {
   @ApiResponse({ status: 200, type: AdminOverallStatusDto })
   async getAdminOverallStatus(): Promise<AdminOverallStatusDto> {
     return this.dashboardService.getAdminOverallStatus();
+  }
+
+  // --- NEW ADMIN ENDPOINTS (ROWS 3, 4, 5) ---
+
+  @Get('admin-status-by-zone')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get system-wide order status counts by sales zone (Row 3)' })
+  @ApiResponse({ status: 200, type: [AdminStatusByZoneDto] })
+  async getAdminStatusByZone(): Promise<AdminStatusByZoneDto[]> {
+    return this.dashboardService.getAdminStatusByZone();
+  }
+
+  @Get('admin-payment-by-zone')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get system-wide payment clearance counts by sales zone (Row 4)' })
+  @ApiResponse({ status: 200, type: [AdminPaymentByZoneDto] })
+  async getAdminPaymentByZone(): Promise<AdminPaymentByZoneDto[]> {
+    return this.dashboardService.getAdminPaymentByZone();
+  }
+
+  @Get('admin-orders-by-product')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get system-wide order counts by product (Row 5)' })
+  @ApiResponse({ status: 200, type: [AdminCountByEntityDto] })
+  async getAdminOrdersByProduct(): Promise<AdminCountByEntityDto[]> {
+    return this.dashboardService.getAdminOrdersByProduct();
+  }
+
+  @Get('admin-orders-by-customer')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get system-wide order counts by customer (Row 5)' })
+  @ApiResponse({ status: 200, type: [AdminCountByEntityDto] })
+  async getAdminOrdersByCustomer(): Promise<AdminCountByEntityDto[]> {
+    return this.dashboardService.getAdminOrdersByCustomer();
   }
 
   // --- SALES ENDPOINTS ---

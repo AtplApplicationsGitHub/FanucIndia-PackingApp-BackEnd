@@ -143,22 +143,17 @@ let DashboardService = class DashboardService {
     }
     // --- NEW ADMIN METHODS ---
     /**
-   * Gets the count of new ERP material imports for the last 5 days.
+   * [FIXED] Gets the count of new ERP material imports for the last 5 days.
+   * This relies on the fix in erp-material-importer.service.ts to log data.
    */ async getAdminNewImports() {
         const results = [];
         const today = new Date();
-        const dayLabels = [
-            'Today',
-            'Yesterday',
-            '2 days ago',
-            '3 days ago',
-            '4 days ago'
-        ];
         for(let i = 0; i < 5; i++){
             const targetDate = new Date(today);
             targetDate.setDate(today.getDate() - i);
+            // [FIX] Use IST-aware boundaries
             const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
-            // We count distinct SO numbers from the log table for that day
+            // Counts distinct SOs from the log table
             const distinctImports = await this.prisma.eRPMaterialLog.findMany({
                 where: {
                     dateTime: {
@@ -174,18 +169,21 @@ let DashboardService = class DashboardService {
                 ]
             });
             const formattedDate = targetDate.toISOString().split('T')[0];
-            const label = i < 2 ? `${dayLabels[i]} (${targetDate.toLocaleDateString('en-US', {
+            let dayLabel;
+            if (i === 0) dayLabel = `Today (${targetDate.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric'
-            })})` : targetDate.toLocaleDateString('en-US', {
+            })})`;
+            else if (i === 1) dayLabel = `Yesterday (${targetDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+            })})`;
+            else dayLabel = targetDate.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric'
             });
             results.push({
-                dayLabel: i === 0 ? `Today (${targetDate.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                })})` : label,
+                dayLabel: dayLabel,
                 date: formattedDate,
                 count: distinctImports.length
             });
@@ -193,8 +191,9 @@ let DashboardService = class DashboardService {
         return results;
     }
     /**
-   * Gets a summary of dispatch statuses for today.
+   * [FIXED] Gets a summary of dispatch statuses for today.
    */ async getAdminDispatchSummary() {
+        // [FIX] Use IST-aware boundaries
         const { startOfDay, endOfDay } = getDayBoundariesIST(new Date());
         const [ordersToBeDispatched, ordersDispatchedToday] = await this.prisma.$transaction([
             // Orders to be Dispatched: Delivery date is today AND status is NOT Dispatched
@@ -226,7 +225,7 @@ let DashboardService = class DashboardService {
         };
     }
     /**
-   * Gets the system-wide count of orders by their current status.
+   * [VERIFIED] Gets the system-wide count of orders by their current status.
    */ async getAdminOverallStatus() {
         const statusCounts = await this.prisma.salesOrder.groupBy({
             by: [
@@ -269,6 +268,172 @@ let DashboardService = class DashboardService {
             }
         }
         return result;
+    }
+    // --- ROW 3: ORDER STATUS BY ZONE (NEW) ---
+    async getAdminStatusByZone() {
+        const allZones = await this.prisma.salesZone.findMany({
+            select: {
+                id: true,
+                name: true
+            }
+        });
+        const statusCounts = await this.prisma.salesOrder.groupBy({
+            by: [
+                'salesZoneId',
+                'status'
+            ],
+            _count: {
+                id: true
+            },
+            where: {
+                status: {
+                    in: [
+                        'R105',
+                        'W105',
+                        'F105',
+                        'Dispatched'
+                    ]
+                }
+            }
+        });
+        const resultsMap = new Map();
+        for (const zone of allZones){
+            resultsMap.set(zone.id, {
+                zoneName: zone.name,
+                r105Count: 0,
+                w105Count: 0,
+                f105Count: 0,
+                dispatchedCount: 0
+            });
+        }
+        for (const group of statusCounts){
+            const zone = resultsMap.get(group.salesZoneId);
+            if (zone) {
+                switch(group.status){
+                    case 'R105':
+                        zone.r105Count = group._count.id;
+                        break;
+                    case 'W105':
+                        zone.w105Count = group._count.id;
+                        break;
+                    case 'F105':
+                        zone.f105Count = group._count.id;
+                        break;
+                    case 'Dispatched':
+                        zone.dispatchedCount = group._count.id;
+                        break;
+                }
+            }
+        }
+        return Array.from(resultsMap.values());
+    }
+    // --- ROW 4: PAYMENT CLEARANCE BY ZONE (NEW) ---
+    async getAdminPaymentByZone() {
+        const allZones = await this.prisma.salesZone.findMany({
+            select: {
+                id: true,
+                name: true
+            }
+        });
+        const paymentCounts = await this.prisma.salesOrder.groupBy({
+            by: [
+                'salesZoneId',
+                'paymentClearance'
+            ],
+            _count: {
+                id: true
+            }
+        });
+        const resultsMap = new Map();
+        for (const zone of allZones){
+            resultsMap.set(zone.id, {
+                zoneName: zone.name,
+                paymentCleared: 0,
+                paymentPending: 0
+            });
+        }
+        for (const group of paymentCounts){
+            const zone = resultsMap.get(group.salesZoneId);
+            if (zone) {
+                if (group.paymentClearance === true) {
+                    zone.paymentCleared = group._count.id;
+                } else {
+                    zone.paymentPending = group._count.id;
+                }
+            }
+        }
+        return Array.from(resultsMap.values());
+    }
+    // --- ROW 5: ORDERS BY PRODUCT & CUSTOMER (NEW) ---
+    async getAdminOrdersByProduct() {
+        const counts = await this.prisma.salesOrder.groupBy({
+            by: [
+                'productId'
+            ],
+            _count: {
+                id: true
+            },
+            orderBy: {
+                _count: {
+                    id: 'desc'
+                }
+            }
+        });
+        const productIds = counts.map((c)=>c.productId);
+        const products = await this.prisma.product.findMany({
+            where: {
+                id: {
+                    in: productIds
+                }
+            },
+            select: {
+                id: true,
+                name: true
+            }
+        });
+        const productMap = new Map(products.map((p)=>[
+                p.id,
+                p.name
+            ]));
+        return counts.map((group)=>({
+                name: productMap.get(group.productId) || 'Unknown Product',
+                count: group._count.id
+            }));
+    }
+    async getAdminOrdersByCustomer() {
+        const counts = await this.prisma.salesOrder.groupBy({
+            by: [
+                'customerId'
+            ],
+            _count: {
+                id: true
+            },
+            orderBy: {
+                _count: {
+                    id: 'desc'
+                }
+            }
+        });
+        const customerIds = counts.map((c)=>c.customerId).filter(Boolean);
+        const customers = await this.prisma.customer.findMany({
+            where: {
+                id: {
+                    in: customerIds
+                }
+            },
+            select: {
+                id: true,
+                name: true
+            }
+        });
+        const customerMap = new Map(customers.map((c)=>[
+                c.id,
+                c.name
+            ]));
+        return counts.map((group)=>({
+                name: group.customerId ? customerMap.get(group.customerId) || 'Unknown Customer' : 'No Customer',
+                count: group._count.id
+            }));
     }
     // --- EXISTING SALES METHODS ---
     /**
