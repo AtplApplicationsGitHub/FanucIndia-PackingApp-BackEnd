@@ -390,28 +390,37 @@ export class DashboardService {
   }
 
   /**
-   * Gets payment clearance counts grouped by sales zone for a SALES user.
+   * [FIXED] Gets payment clearance counts grouped by sales zone for a SALES user.
+   * Does NOT filter by status, as requested.
+   * @param userId The ID of the logged-in SALES user.
    */
   async getSalesPaymentClearanceByZone(
     userId: number,
   ): Promise<SalesPaymentClearanceDto[]> {
-    // ... (existing getSalesPaymentClearanceByZone logic)
+    // 1. Get all possible sales zones
     const allZones = await this.prisma.salesZone.findMany({
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     });
 
+    // 2. Get the grouped counts for the specific user
     const rawCounts = await this.prisma.salesOrder.groupBy({
       by: ['salesZoneId', 'paymentClearance'],
+
+      // --- [THE FIX] ---
+      // Removed all 'status' filtering.
+      // Now it only filters by the logged-in user.
       where: {
         userId: userId,
-        status: { not: 'Dispatched' },
       },
+      // --- [END FIX] ---
+
       _count: {
-        id: true,
+        id: true, // Count orders
       },
     });
 
+    // 3. Process the raw data into the desired DTO format
     const resultsMap = new Map<number, SalesPaymentClearanceDto>();
     for (const zone of allZones) {
       resultsMap.set(zone.id, {
@@ -421,16 +430,20 @@ export class DashboardService {
       });
     }
 
+    // 4. Populate the map with actual counts from the query
     for (const countData of rawCounts) {
       const zone = resultsMap.get(countData.salesZoneId);
       if (zone) {
         if (countData.paymentClearance === true) {
           zone.paymentCleared = countData._count.id;
         } else {
+          // This will catch false and null values
           zone.paymentPending = countData._count.id;
         }
       }
     }
+
+    // 5. Return the values from the map as an array
     return Array.from(resultsMap.values());
   }
 }
