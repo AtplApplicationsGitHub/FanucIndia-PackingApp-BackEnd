@@ -17,7 +17,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
     }),
-  );
+  ); 
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Fanuc Packing App API')
