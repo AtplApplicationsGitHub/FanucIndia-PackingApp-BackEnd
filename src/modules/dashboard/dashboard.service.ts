@@ -252,15 +252,19 @@ export class DashboardService {
    * [VERIFIED] Gets the system-wide count of orders by their current status.
    */
   async getAdminOverallStatus(): Promise<AdminOverallStatusDto> {
-    const statusCounts = await this.prisma.salesOrder.groupBy({
+    const [statusCounts, totalOrders] = await Promise.all([
+    this.prisma.salesOrder.groupBy({
       by: ['status'],
       _count: { id: true },
       where: {
         status: { in: ['R105', 'W105', 'F105', 'Dispatched'] },
       },
-    });
+    }),
+    this.prisma.salesOrder.count(), // <--- Fetch total count
+  ]);
 
     const result: AdminOverallStatusDto = {
+      totalOrders,
       r105Count: 0,
       w105Count: 0,
       f105Count: 0,

@@ -2,6 +2,12 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class AdminOverallStatusDto {
   @ApiProperty({
+    example: 1200,
+    description: "Total count of all sales orders in the system",
+  })
+  totalOrders: number;
+
+  @ApiProperty({
     example: 150,
     description: "Total count of orders with status 'R105' (Imported/Assigned)",
   })

@@ -22,6 +22,13 @@ let AdminOverallStatusDto = class AdminOverallStatusDto {
 };
 _ts_decorate([
     (0, _swagger.ApiProperty)({
+        example: 1200,
+        description: "Total count of all sales orders in the system"
+    }),
+    _ts_metadata("design:type", Number)
+], AdminOverallStatusDto.prototype, "totalOrders", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
         example: 150,
         description: "Total count of orders with status 'R105' (Imported/Assigned)"
     }),
