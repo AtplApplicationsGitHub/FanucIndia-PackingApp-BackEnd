@@ -9,6 +9,7 @@ const _pinologgerservice = require("./common/pino-logger.service");
 const _swagger = require("@nestjs/swagger");
 const _common = require("@nestjs/common");
 async function bootstrap() {
+    console.log('DEBUG DB URL:', process.env.DATABASE_URL);
     const app = await _core.NestFactory.create(_appmodule.AppModule, {
         logger: false
     });
