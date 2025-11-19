@@ -76,29 +76,47 @@ export class SftpService {
     }
   }
 
-  // async ensureDir(remoteDir: string) {
-  //   return this.withClient(async (c) => {
-  //     const segments = path.posix.normalize(remoteDir).split('/');
-  //     let cur = '';
-  //     for (const seg of segments) {
-  //       if (!seg) continue;
-  //       cur += `/${seg}`;
-  //       const exists = await c.exists(cur);
-  //       if (!exists) {
-  //         await c.mkdir(cur);
-  //       }
-  //     }
-  //   });
-  // }
-  async ensureDir(remoteDir: string) {
-    return this.withClient((c) => c.mkdir(remoteDir, true));
+  // 1. Internal helper that uses an EXISTING client (no new connection)
+  private async _ensureDir(c: Client, remoteDir: string) {
+    try {
+      await c.mkdir(remoteDir, true);
+    } catch (err: any) {
+      // Ignore error if directory already exists (Race condition fix)
+      const type = await c.exists(remoteDir);
+      if (type === 'd') return true;
+      throw err;
+    }
   }
 
+  // 2. Public Ensure Dir (Creates its own connection)
+  async ensureDir(remoteDir: string) {
+    return this.withClient((c) => this._ensureDir(c, remoteDir));
+  }
+
+  // 3. Public Put (Creates its own connection)
   async put(localPath: string, remotePath: string) {
     const remoteDir = path.posix.dirname(remotePath);
-    await this.ensureDir(remoteDir);
-    await this.withClient((c) => c.put(localPath, remotePath));
-    return { remotePath, remoteDir };
+    return this.withClient(async (c) => {
+      await this._ensureDir(c, remoteDir); // Reuse internal logic
+      await c.put(localPath, remotePath);
+      return { remotePath, remoteDir };
+    });
+  }
+
+  // 4. NEW: Batch Upload (One connection for multiple files)
+  async uploadBatch(uploads: { localPath: string; remotePath: string }[]) {
+    return this.withClient(async (c) => {
+      // Optimization: Create directories first (deduplicated)
+      const dirs = new Set(uploads.map((u) => path.posix.dirname(u.remotePath)));
+      for (const dir of dirs) {
+        await this._ensureDir(c, dir);
+      }
+
+      // Upload all files
+      for (const u of uploads) {
+        await c.put(u.localPath, u.remotePath);
+      }
+    });
   }
 
   async getStream(remotePath: string) {
@@ -120,12 +138,7 @@ export class SftpService {
         await c.rmdir(remotePath, true);
         return true;
       } catch (err: any) {
-        if (err.code === 2) {
-          return false;
-        }
-        this.logger.error(
-          `SFTP rmdir failed for ${remotePath}: ${err?.message || err}`,
-        );
+        if (err.code === 2) return false; 
         throw err;
       }
     });

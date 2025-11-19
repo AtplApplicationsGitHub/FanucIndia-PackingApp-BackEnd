@@ -260,35 +260,43 @@ export class ErpMaterialFileService {
     }
 
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
-    const soDir = opts.saleOrderNumber
-      ? sanitize(opts.saleOrderNumber)
-      : 'misc';
+    const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
     const remoteDir = path.posix.join(baseDir, soDir);
 
-    const created: any[] = [];
+    const uploads: { localPath: string; remotePath: string }[] = [];
+    const dbRecords: any[] = [];
+
     try {
+      // 1. Prepare all data locally (Fast)
       for (const f of files) {
         const checksum = await sha256File(f.path);
         const remoteName = f.originalname;
         const remotePath = path.posix.join(remoteDir, remoteName);
 
-        await this.sftp.put(f.path, remotePath);
+        uploads.push({ localPath: f.path, remotePath });
 
-        const row = await this.prisma.eRP_Material_File.create({
-          data: {
-            saleOrderNumber: opts.saleOrderNumber,
-            fileName: f.originalname,
-            description: opts.description,
-            sftpPath: remotePath,
-            sftpDir: remoteDir,
-            fileSizeBytes: BigInt(f.size),
-            mimeType: f.mimetype,
-            checksumSha256: checksum,
-          },
+        dbRecords.push({
+          saleOrderNumber: opts.saleOrderNumber,
+          fileName: f.originalname,
+          description: opts.description,
+          sftpPath: remotePath,
+          sftpDir: remoteDir,
+          fileSizeBytes: BigInt(f.size),
+          mimeType: f.mimetype,
+          checksumSha256: checksum,
         });
-
-        created.push(row);
       }
+
+      // 2. Upload all files in ONE connection (Fast)
+      await this.sftp.uploadBatch(uploads);
+
+      // 3. Create DB records
+      const created: any[] = [];
+      for (const data of dbRecords) {
+         const row = await this.prisma.eRP_Material_File.create({ data });
+         created.push(row);
+      }
+
       return {
         success: true,
         items: created.map((r) => ({
@@ -297,14 +305,10 @@ export class ErpMaterialFileService {
         })),
       };
     } catch (e: any) {
-      throw new InternalServerErrorException(
-        'Upload failed. ' + (e?.message || ''),
-      );
+      throw new InternalServerErrorException('Upload failed. ' + (e?.message || ''));
     } finally {
       for (const f of files) {
-        try {
-          fs.unlinkSync(f.path);
-        } catch {}
+        try { fs.unlinkSync(f.path); } catch {}
       }
     }
   }
@@ -335,12 +339,12 @@ export class ErpMaterialFileService {
     }
 
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
-    const soDir = opts.saleOrderNumber
-      ? sanitize(opts.saleOrderNumber)
-      : 'misc';
+    const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
     const remoteDir = path.posix.join(baseDir, soDir);
 
-    const created: any[] = [];
+    const uploads: { localPath: string; remotePath: string }[] = [];
+    const dbRecords: any[] = [];
+
     try {
       const existingDbFiles = opts.saleOrderNumber
         ? await this.prisma.eRP_Material_File.findMany({
@@ -348,12 +352,10 @@ export class ErpMaterialFileService {
             select: { fileName: true },
           })
         : [];
-      const existingFileNames = new Set(existingDbFiles.map(f => f.fileName));
+      const existingFileNames = new Set(existingDbFiles.map((f) => f.fileName));
 
       for (const f of files) {
         const checksum = await sha256File(f.path);
-        const remoteName = f.filename; 
-        const remotePath = path.posix.join(remoteDir, remoteName);
         const description = descriptionMap[f.originalname] || null;
 
         let finalDbFileName = f.originalname;
@@ -365,26 +367,32 @@ export class ErpMaterialFileService {
             counter++;
           } while (existingFileNames.has(finalDbFileName));
         }
-        // Add the new name to the set for subsequent files in *this* batch
         existingFileNames.add(finalDbFileName);
 
-        await this.sftp.put(f.path, remotePath);
+        const remotePath = path.posix.join(remoteDir, finalDbFileName);
 
-        const row = await this.prisma.eRP_Material_File.create({
-          data: {
-            saleOrderNumber: opts.saleOrderNumber,
-            fileName: finalDbFileName, 
-            description: description,
-            sftpPath: remotePath, 
-            sftpDir: remoteDir,
-            fileSizeBytes: BigInt(f.size),
-            mimeType: f.mimetype,
-            checksumSha256: checksum,
-          },
+        uploads.push({ localPath: f.path, remotePath });
+
+        dbRecords.push({
+          saleOrderNumber: opts.saleOrderNumber,
+          fileName: finalDbFileName,
+          description: description,
+          sftpPath: remotePath,
+          sftpDir: remoteDir,
+          fileSizeBytes: BigInt(f.size),
+          mimeType: f.mimetype,
+          checksumSha256: checksum,
         });
+      }
 
+      await this.sftp.uploadBatch(uploads);
+
+      const created: any[] = [];
+      for (const data of dbRecords) {
+        const row = await this.prisma.eRP_Material_File.create({ data });
         created.push(row);
       }
+
       return {
         success: true,
         items: created.map((r) => ({
@@ -393,20 +401,9 @@ export class ErpMaterialFileService {
         })),
       };
     } catch (e: any) {
-      for (const f of files) {
-        try {
-          fs.unlinkSync(f.path);
-        } catch {}
-      }
-      throw new InternalServerErrorException(
-        'Upload failed. ' + (e?.message || ''),
-      );
+      throw new InternalServerErrorException('Upload failed. ' + (e?.message || ''));
     } finally {
-      for (const f of files) {
-        try {
-          fs.unlinkSync(f.path);
-        } catch {}
-      }
+       for (const f of files) { try { fs.unlinkSync(f.path); } catch {} }
     }
   }
 
