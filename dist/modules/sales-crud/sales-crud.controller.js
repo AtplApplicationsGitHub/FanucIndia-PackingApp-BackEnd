@@ -30,6 +30,9 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let SalesCrudController = class SalesCrudController {
+    verifySoNumber(soNumber) {
+        return this.service.verifySoNumber(soNumber);
+    }
     create(dto, req) {
         return this.service.create(dto, req.user.userId);
     }
@@ -51,6 +54,32 @@ let SalesCrudController = class SalesCrudController {
         this.service = service;
     }
 };
+_ts_decorate([
+    (0, _common.Get)('verify-so/:soNumber'),
+    (0, _rolesdecorator.Roles)('USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Verify SO Number and retrieve Customer details for Label Print'
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'soNumber',
+        type: String,
+        description: 'The Sale Order Number to verify'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Valid SO Number, returns customer details.'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 404,
+        description: 'Invalid SO Number.'
+    }),
+    _ts_param(0, (0, _common.Param)('soNumber')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], SalesCrudController.prototype, "verifySoNumber", null);
 _ts_decorate([
     (0, _common.Post)(),
     (0, _rolesdecorator.Roles)('SALES'),

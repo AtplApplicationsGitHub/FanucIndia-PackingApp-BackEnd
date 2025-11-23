@@ -80,6 +80,47 @@ export class SalesCrudService {
     }
   }
 
+  async verifySoNumber(soNumber: string) {
+    try {
+      const order = await this.prisma.salesOrder.findFirst({
+        where: {
+          saleOrderNumber: {
+            equals: soNumber,
+            mode: 'insensitive',
+          },
+        },
+        select: {
+          saleOrderNumber: true,
+          customer: {
+            select: {
+              name: true,
+              address: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new NotFoundException('Invalid SO Number');
+      }
+
+      return {
+        valid: true,
+        saleOrderNumber: order.saleOrderNumber,
+        customerName: order.customer?.name || '',
+        address: order.customer?.address || '',
+      };
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw err;
+      }
+      throw new InternalServerErrorException(
+        'Failed to verify sales order.',
+        (err as Error).message,
+      );
+    }
+  }
+
   async findAll(userId: number, query: { search?: string }) {
     try {
       const { search } = query;

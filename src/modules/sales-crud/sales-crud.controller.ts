@@ -33,6 +33,16 @@ import {
 export class SalesCrudController {
   constructor(private readonly service: SalesCrudService) {}
 
+  @Get('verify-so/:soNumber')
+  @Roles('USER')
+  @ApiOperation({ summary: 'Verify SO Number and retrieve Customer details for Label Print' })
+  @ApiParam({ name: 'soNumber', type: String, description: 'The Sale Order Number to verify' })
+  @ApiResponse({ status: 200, description: 'Valid SO Number, returns customer details.' })
+  @ApiResponse({ status: 404, description: 'Invalid SO Number.' })
+  verifySoNumber(@Param('soNumber') soNumber: string) {
+    return this.service.verifySoNumber(soNumber);
+  }
+
   @Post()
   @Roles('SALES')
   @ApiOperation({ summary: 'Create a new sales order' })

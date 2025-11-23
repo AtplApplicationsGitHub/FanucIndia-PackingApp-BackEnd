@@ -84,6 +84,41 @@ let SalesCrudService = class SalesCrudService {
             throw new _common.InternalServerErrorException('Failed to create sales order.', err.message);
         }
     }
+    async verifySoNumber(soNumber) {
+        try {
+            const order = await this.prisma.salesOrder.findFirst({
+                where: {
+                    saleOrderNumber: {
+                        equals: soNumber,
+                        mode: 'insensitive'
+                    }
+                },
+                select: {
+                    saleOrderNumber: true,
+                    customer: {
+                        select: {
+                            name: true,
+                            address: true
+                        }
+                    }
+                }
+            });
+            if (!order) {
+                throw new _common.NotFoundException('Invalid SO Number');
+            }
+            return {
+                valid: true,
+                saleOrderNumber: order.saleOrderNumber,
+                customerName: order.customer?.name || '',
+                address: order.customer?.address || ''
+            };
+        } catch (err) {
+            if (err instanceof _common.NotFoundException) {
+                throw err;
+            }
+            throw new _common.InternalServerErrorException('Failed to verify sales order.', err.message);
+        }
+    }
     async findAll(userId, query) {
         try {
             const { search } = query;
