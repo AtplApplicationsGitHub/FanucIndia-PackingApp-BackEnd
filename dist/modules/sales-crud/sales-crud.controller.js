@@ -12,6 +12,7 @@ const _common = require("@nestjs/common");
 const _salescrudservice = require("./sales-crud.service");
 const _createsalescruddto = require("./dto/create-sales-crud.dto");
 const _updatesalescruddto = require("./dto/update-sales-crud.dto");
+const _labelprintdto = require("./dto/label-print.dto");
 const _jwtauthguard = require("../auth/jwt-auth.guard");
 const _rolesdecorator = require("../auth/roles.decorator");
 const _swagger = require("@nestjs/swagger");
@@ -49,6 +50,9 @@ let SalesCrudController = class SalesCrudController {
     }
     remove(id, req) {
         return this.service.remove(id, req.user.userId);
+    }
+    printLabels(dto, req) {
+        return this.service.processLabelPrint(dto, req.user.userId);
     }
     constructor(service){
         this.service = service;
@@ -282,6 +286,32 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], SalesCrudController.prototype, "remove", null);
+_ts_decorate([
+    (0, _common.Post)('label-print'),
+    (0, _rolesdecorator.Roles)('USER', 'ADMIN', 'SALES'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Update status to Ready for Dispatch on Label Print'
+    }),
+    (0, _swagger.ApiBody)({
+        type: _labelprintdto.LabelPrintDto
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Status updated successfully.'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 500,
+        description: 'Internal server error.'
+    }),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _labelprintdto.LabelPrintDto === "undefined" ? Object : _labelprintdto.LabelPrintDto,
+        void 0
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], SalesCrudController.prototype, "printLabels", null);
 SalesCrudController = _ts_decorate([
     (0, _swagger.ApiTags)('Sales Orders'),
     (0, _swagger.ApiBearerAuth)(),

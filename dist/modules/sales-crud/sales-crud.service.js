@@ -420,6 +420,59 @@ let SalesCrudService = class SalesCrudService {
             throw new _common.InternalServerErrorException('Failed to fetch paginated sales orders.', err.message);
         }
     }
+    async processLabelPrint(dto, userId) {
+        const { saleOrderNumbers } = dto;
+        const statusToSet = 'Stored/Ready for Dispatch'; // Matching your system's exact string
+        // Get the user name for the history log
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            }
+        });
+        const userName = user?.name || 'System';
+        const now = new Date();
+        try {
+            await this.prisma.$transaction(async (tx)=>{
+                // 1. Update the main SalesOrder status
+                // We exclude orders that are already 'Dispatched' to prevent reverting status
+                await tx.salesOrder.updateMany({
+                    where: {
+                        saleOrderNumber: {
+                            in: saleOrderNumbers
+                        },
+                        status: {
+                            not: 'Dispatched'
+                        }
+                    },
+                    data: {
+                        status: statusToSet,
+                        UpdatedBy: userName,
+                        UpdatedDate: now
+                    }
+                });
+                // 2. Update the Stepper history
+                // We find the specific step "Stored/Ready for Dispatch" for these orders and mark it as done
+                await tx.sO_Status_Stepper.updateMany({
+                    where: {
+                        salesOrderNumber: {
+                            in: saleOrderNumbers
+                        },
+                        status: statusToSet
+                    },
+                    data: {
+                        createdDateTime: now,
+                        updatedBy: userName
+                    }
+                });
+            });
+            return {
+                message: 'Labels printed and status updated to Ready for Dispatch.',
+                count: saleOrderNumbers.length
+            };
+        } catch (err) {
+            throw new _common.InternalServerErrorException('Failed to update order status for label print.', err.message);
+        }
+    }
     constructor(prisma){
         this.prisma = prisma;
     }

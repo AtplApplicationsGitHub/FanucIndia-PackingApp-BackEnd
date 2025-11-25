@@ -14,6 +14,7 @@ import {
 import { SalesCrudService } from './sales-crud.service';
 import { CreateSalesCrudDto } from './dto/create-sales-crud.dto';
 import { UpdateSalesCrudDto } from './dto/update-sales-crud.dto';
+import { LabelPrintDto } from './dto/label-print.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import {
@@ -35,9 +36,18 @@ export class SalesCrudController {
 
   @Get('verify-so/:soNumber')
   @Roles('USER')
-  @ApiOperation({ summary: 'Verify SO Number and retrieve Customer details for Label Print' })
-  @ApiParam({ name: 'soNumber', type: String, description: 'The Sale Order Number to verify' })
-  @ApiResponse({ status: 200, description: 'Valid SO Number, returns customer details.' })
+  @ApiOperation({
+    summary: 'Verify SO Number and retrieve Customer details for Label Print',
+  })
+  @ApiParam({
+    name: 'soNumber',
+    type: String,
+    description: 'The Sale Order Number to verify',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Valid SO Number, returns customer details.',
+  })
   @ApiResponse({ status: 404, description: 'Invalid SO Number.' })
   verifySoNumber(@Param('soNumber') soNumber: string) {
     return this.service.verifySoNumber(soNumber);
@@ -48,7 +58,10 @@ export class SalesCrudController {
   @ApiOperation({ summary: 'Create a new sales order' })
   @ApiBody({ type: CreateSalesCrudDto })
   @ApiResponse({ status: 201, description: 'Sales order created successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request (validation/business error)' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request (validation/business error)',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 409, description: 'Conflict (duplicate order)' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
@@ -89,10 +102,7 @@ export class SalesCrudController {
   @ApiResponse({ status: 404, description: 'Not found or access denied' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  findOne(
-    @Param('id', ParseIntPipe) id: number,
-    @Req() req,
-  ) {
+  findOne(@Param('id', ParseIntPipe) id: number, @Req() req) {
     return this.service.findOne(id, req.user.userId);
   }
 
@@ -102,7 +112,10 @@ export class SalesCrudController {
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdateSalesCrudDto })
   @ApiResponse({ status: 200, description: 'Sales order updated' })
-  @ApiResponse({ status: 400, description: 'Bad request (validation/business error)' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request (validation/business error)',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Not found' })
   @ApiResponse({ status: 409, description: 'Conflict (unique constraint)' })
@@ -123,10 +136,19 @@ export class SalesCrudController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Not found' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  remove(
-    @Param('id', ParseIntPipe) id: number,
-    @Req() req,
-  ) {
+  remove(@Param('id', ParseIntPipe) id: number, @Req() req) {
     return this.service.remove(id, req.user.userId);
+  }
+
+  @Post('label-print')
+  @Roles('USER', 'ADMIN', 'SALES') // Allowing USER as this is a mobile app feature
+  @ApiOperation({
+    summary: 'Update status to Ready for Dispatch on Label Print',
+  })
+  @ApiBody({ type: LabelPrintDto })
+  @ApiResponse({ status: 200, description: 'Status updated successfully.' })
+  @ApiResponse({ status: 500, description: 'Internal server error.' })
+  printLabels(@Body() dto: LabelPrintDto, @Req() req) {
+    return this.service.processLabelPrint(dto, req.user.userId);
   }
 }
