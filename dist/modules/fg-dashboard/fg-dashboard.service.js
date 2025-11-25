@@ -24,9 +24,6 @@ let FgDashboardService = class FgDashboardService {
         const { search, date, page = 1, limit = 10 } = query;
         const skip = (page - 1) * limit;
         const where = {};
-        // if (user.role === 'USER') {
-        //   where.assignedUserId = user.userId;
-        // }
         if (date) {
             const parseYMD = (s)=>{
                 const [y, m, d] = s.split('-').map(Number);
@@ -116,6 +113,7 @@ let FgDashboardService = class FgDashboardService {
                     id: true,
                     deliveryDate: true,
                     saleOrderNumber: true,
+                    transferOrder: true,
                     paymentClearance: true,
                     status: true,
                     fgLocation: true,
@@ -128,6 +126,11 @@ let FgDashboardService = class FgDashboardService {
                         }
                     },
                     customer: {
+                        select: {
+                            name: true
+                        }
+                    },
+                    salesZone: {
                         select: {
                             name: true
                         }
@@ -147,8 +150,10 @@ let FgDashboardService = class FgDashboardService {
                 id: order.id,
                 deliveryDate: order.deliveryDate,
                 saleOrderNumber: order.saleOrderNumber,
+                transferOrder: order.transferOrder,
                 product: order.product?.name,
                 customerName: order.customer?.name,
+                salesZone: order.salesZone?.name,
                 payment: order.paymentClearance,
                 status: order.status,
                 fgLocation: order.fgLocation,

@@ -14,10 +14,6 @@ export class FgDashboardService {
     const skip = (page - 1) * limit;
     const where: Prisma.SalesOrderWhereInput = {};
 
-    // if (user.role === 'USER') {
-    //   where.assignedUserId = user.userId;
-    // }
-
     if (date) {
       const parseYMD = (s: string) => {
         const [y, m, d] = s.split('-').map(Number);
@@ -65,6 +61,7 @@ export class FgDashboardService {
           id: true,
           deliveryDate: true,
           saleOrderNumber: true,
+          transferOrder: true,
           paymentClearance: true,
           status: true,
           fgLocation: true,
@@ -73,6 +70,7 @@ export class FgDashboardService {
           UpdatedDate: true,
           product: { select: { name: true } },
           customer: { select: { name: true } },
+          salesZone: { select: { name: true } },
         },
         orderBy: {
           id: 'desc',
@@ -87,8 +85,10 @@ export class FgDashboardService {
       id: order.id,
       deliveryDate: order.deliveryDate,
       saleOrderNumber: order.saleOrderNumber,
+      transferOrder: order.transferOrder,
       product: order.product?.name,
       customerName: order.customer?.name,
+      salesZone: order.salesZone?.name,
       payment: order.paymentClearance,
       status: order.status,
       fgLocation: order.fgLocation,
