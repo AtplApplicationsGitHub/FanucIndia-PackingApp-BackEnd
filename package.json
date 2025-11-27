@@ -20,9 +20,12 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "overrides": {
-  "js-yaml": ">=4.1.1",
-  "validator": ">=13.15.20",
-  "fast-redact": ">=3.6.0"
+    "js-yaml": ">=4.1.1",
+    "validator": ">=13.15.20",
+    "fast-redact": ">=3.6.0",
+    "body-parser": "^1.20.3",
+    "glob": "^10.4.5",
+    "cross-spawn": "^7.0.5"
   },
   "dependencies": {
     "@mui/icons-material": "^7.2.0",
@@ -51,8 +54,7 @@
     "rxjs": "^7.8.1",
     "ssh2-sftp-client": "^12.0.1",
     "swagger-ui-express": "^5.0.1",
-    "tedious": "^18.6.1",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "tedious": "^18.6.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -70,7 +72,6 @@
     "@types/node": "^22.10.7",
     "@types/pino": "^7.0.4",
     "@types/supertest": "^6.0.2",
-    "@types/xlsx": "^0.0.35",
     "cpy-cli": "^5.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",

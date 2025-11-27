@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import * as xlsx from 'xlsx';
+import { Workbook } from 'exceljs'; 
 import { Prisma } from '@prisma/client';
 
 const columnMapping = {
@@ -30,7 +30,10 @@ export class ErpMaterialImporterService {
 
   async processFile(file: Express.Multer.File, expectedSaleOrderNumber?: string) {
     this.logger.log(`Starting to process file: ${file.originalname}`);
-    const records = this.readFile(file);
+    
+    // [CHANGED] Added await because readFile is now async
+    const records = await this.readFile(file);
+    
     const validationError = await this.validateRecords(records, expectedSaleOrderNumber);
     if (validationError) {
       this.logger.error(`Validation failed for ${file.originalname}: ${validationError}`);
@@ -40,8 +43,7 @@ export class ErpMaterialImporterService {
     const renamedRecords = this.renameColumns(records);
     await this.upsertRecords(renamedRecords);
 
-    // --- [FIX] ADD LOGGING ---
-    // After upsert is successful, log the event to ERPMaterialLog
+    // Log the event to ERPMaterialLog
     const soNumber = String(records[0]["SO Number"]);
     try {
       await this.prisma.eRPMaterialLog.create({
@@ -50,29 +52,71 @@ export class ErpMaterialImporterService {
           fileName: file.originalname,
           exceptionStatus: 'Success',
           soNo: soNumber,
-          noOfFilesExecuted: 1, // Logs one import event per file
+          noOfFilesExecuted: 1, 
         }
       });
       this.logger.log(`Successfully logged import for SO: ${soNumber}`);
     } catch (logError) {
-      // Log the error but don't fail the entire request
       this.logger.error(`Failed to write to ERPMaterialLog for SO: ${soNumber}`, logError);
     }
-    // --- END OF FIX ---
 
     this.logger.log(`Successfully processed file: ${file.originalname}`);
     return { message: `File processed successfully. ${renamedRecords.length} records upserted.` };
   }
 
-  private readFile(file: Express.Multer.File): any[] {
+  // [CHANGED] Rewritten to use ExcelJS instead of xlsx
+  private async readFile(file: Express.Multer.File): Promise<any[]> {
     try {
-      const workbook = xlsx.read(file.buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      return xlsx.utils.sheet_to_json(worksheet, { defval: null });
+      const workbook = new Workbook();
+      await workbook.xlsx.load(file.buffer as any);
+      const worksheet = workbook.worksheets[0];
+      
+      if (!worksheet) return [];
+
+      const jsonData: any[] = [];
+      const headers: string[] = [];
+
+      // Iterate rows
+      worksheet.eachRow((row, rowNumber) => {
+        // Row 1 contains headers
+        if (rowNumber === 1) {
+          row.eachCell((cell, colNumber) => {
+            // ExcelJS columns are 1-based
+            headers[colNumber] = cell.text ? cell.text.trim() : '';
+          });
+        } else {
+          // Subsequent rows are data
+          const rowData: any = {};
+          let hasData = false;
+
+          headers.forEach((header, colNumber) => {
+            if (!header) return;
+            
+            const cell = row.getCell(colNumber);
+            let val = cell.value;
+
+            // Handle rich text or formulas if necessary
+            if (val && typeof val === 'object') {
+               if ('text' in val) val = (val as any).text;
+               else if ('result' in val) val = (val as any).result;
+            }
+
+            // Map undefined to null to match previous behavior
+            rowData[header] = (val !== undefined && val !== null) ? val : null;
+            
+            if (rowData[header] !== null) hasData = true;
+          });
+
+          if (hasData) {
+            jsonData.push(rowData);
+          }
+        }
+      });
+
+      return jsonData;
     } catch (error) {
       this.logger.error('Failed to read or parse the Excel file.', error);
-      throw new BadRequestException('Invalid or corrupted file. Please upload a valid .xlsx or .csv file.');
+      throw new BadRequestException('Invalid or corrupted file. Please upload a valid .xlsx file.');
     }
   }
 
@@ -141,7 +185,7 @@ export class ErpMaterialImporterService {
   private async upsertRecords(records: any[]) {
     if (records.length === 0) return;
     
-    const soNumber = String(records[0].saleOrderNumber); // Also ensure string here
+    const soNumber = String(records[0].saleOrderNumber); 
     this.logger.log(`Upserting ${records.length} records for SO Number: ${soNumber}`);
 
     const safeParseInt = (val: any, defaultVal: number | null = null): number | null => {

@@ -307,7 +307,9 @@ let SoArchiveService = class SoArchiveService {
             try {
                 if (dir) {
                     const resolvedDir = _path.posix.resolve(dir);
-                    if (!resolvedDir.startsWith(resolvedOrderBase) && !resolvedDir.startsWith(resolvedDispatchBase)) {
+                    const orderBasePrefix = resolvedOrderBase.endsWith('/') ? resolvedOrderBase : resolvedOrderBase + '/';
+                    const dispatchBasePrefix = resolvedDispatchBase.endsWith('/') ? resolvedDispatchBase : resolvedDispatchBase + '/';
+                    if (resolvedDir !== resolvedOrderBase && !resolvedDir.startsWith(orderBasePrefix) && resolvedDir !== resolvedDispatchBase && !resolvedDir.startsWith(dispatchBasePrefix)) {
                         console.warn(`Skipping rmdir: Path ${dir} is outside of configured base directories.`);
                         continue;
                     }
@@ -343,7 +345,7 @@ let SoArchiveService = class SoArchiveService {
             }
             data.pipe(res);
         } catch (error) {
-            console.error("SFTP download error for archived file:", error);
+            console.error('SFTP download error for archived file:', error);
             res.status(404).send('File not found in storage.');
         }
     }

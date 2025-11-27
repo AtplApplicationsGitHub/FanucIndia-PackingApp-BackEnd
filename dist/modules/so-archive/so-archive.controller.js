@@ -34,6 +34,10 @@ let SoArchiveController = class SoArchiveController {
         return this.soArchiveService.archive(soNumber);
     }
     async delete(soNumber) {
+        const isValid = /^[a-zA-Z0-9\-_]+$/.test(soNumber);
+        if (!isValid) {
+            throw new _common.BadRequestException("Invalid Sales Order Number format");
+        }
         return this.soArchiveService.delete(soNumber);
     }
     async downloadArchivedAttachment(fileId, res) {

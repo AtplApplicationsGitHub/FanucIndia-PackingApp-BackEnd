@@ -1,4 +1,4 @@
-import { Controller, Post, Delete, Param, UseGuards, HttpCode, HttpStatus, Get, ParseIntPipe, Res } from '@nestjs/common';
+import { Controller, Post, Delete, Param, UseGuards, HttpCode, HttpStatus, Get, ParseIntPipe, Res, BadRequestException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam } from '@nestjs/swagger';
 import { SoArchiveService } from './so-archive.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -27,6 +27,13 @@ export class SoArchiveController {
   @ApiOperation({ summary: 'Permanently delete an archived Sales Order' })
   @ApiParam({ name: 'soNumber', type: String, description: 'The Sales Order Number to delete from archives' })
   async delete(@Param('soNumber') soNumber: string) {
+    
+    const isValid = /^[a-zA-Z0-9\-_]+$/.test(soNumber);
+
+    if (!isValid) {
+        throw new BadRequestException("Invalid Sales Order Number format");
+    }
+
     return this.soArchiveService.delete(soNumber);
   }
 

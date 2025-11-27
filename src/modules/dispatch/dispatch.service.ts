@@ -15,6 +15,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Prisma } from '@prisma/client';
 import PDFDocument from 'pdfkit';
+import * as os from 'os';
 
 export interface AttachmentData {
   fileName: string;
@@ -26,6 +27,16 @@ export interface AttachmentData {
 @Injectable()
 export class DispatchService {
   private readonly logger = new Logger(DispatchService.name);
+
+  private safeUnlink(filePath: string) {
+    try {
+      const resolvedPath = path.resolve(filePath);
+      const tempDir = path.resolve(os.tmpdir());
+      if (resolvedPath.startsWith(tempDir)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (e) {}
+  }
 
   private async getUserName(userId: number): Promise<string> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -131,14 +142,13 @@ export class DispatchService {
 
         for (const file of files) {
           const remotePath = path.posix.join(remoteDir, file.originalname);
-          await this.sftpService.put(file.path, remotePath);
+          await this.sftpService.put(file.buffer, remotePath);
           uploadedAttachments.push({
             fileName: file.originalname,
             path: remotePath,
             mimeType: file.mimetype,
             size: file.size,
           });
-          fs.unlinkSync(file.path);
         }
 
         await tx.dispatch.update({
@@ -293,19 +303,18 @@ export class DispatchService {
       await this.sftpService.ensureDir(remoteDir);
       for (const file of files) {
         const remotePath = path.posix.join(remoteDir, file.originalname);
-        await this.sftpService.put(file.path, remotePath);
+        await this.sftpService.put(file.buffer, remotePath);
         newAttachments.push({
           fileName: file.originalname,
           path: remotePath,
           mimeType: file.mimetype,
           size: file.size,
         });
-        fs.unlinkSync(file.path);
       }
     } catch (error) {
       files.forEach((file) => {
         try {
-          fs.unlinkSync(file.path);
+          this.safeUnlink(file.path);
         } catch {}
       });
       throw new InternalServerErrorException('Failed to upload attachments.');
@@ -725,15 +734,14 @@ export class DispatchService {
     await this.sftpService.ensureDir(remoteDir);
 
     for (const file of files) {
-      const remotePath = path.posix.join(remoteDir, file.filename);
-      await this.sftpService.put(file.path, remotePath);
+      const remotePath = path.posix.join(remoteDir, file.originalname);
+      await this.sftpService.put(file.buffer, remotePath);
       newAttachments.push({
         fileName: file.originalname,
         path: remotePath,
         mimeType: file.mimetype,
         size: file.size,
       });
-      fs.unlinkSync(file.path);
     }
 
     const allAttachments = [...existingAttachments, ...newAttachments];

@@ -15,6 +15,7 @@ const _path = /*#__PURE__*/ _interop_require_wildcard(require("path"));
 const _fs = /*#__PURE__*/ _interop_require_wildcard(require("fs"));
 const _client = require("@prisma/client");
 const _pdfkit = /*#__PURE__*/ _interop_require_default(require("pdfkit"));
+const _os = /*#__PURE__*/ _interop_require_wildcard(require("os"));
 function _interop_require_default(obj) {
     return obj && obj.__esModule ? obj : {
         default: obj
@@ -71,6 +72,15 @@ function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
 let DispatchService = class DispatchService {
+    safeUnlink(filePath) {
+        try {
+            const resolvedPath = _path.resolve(filePath);
+            const tempDir = _path.resolve(_os.tmpdir());
+            if (resolvedPath.startsWith(tempDir)) {
+                _fs.unlinkSync(filePath);
+            }
+        } catch (e) {}
+    }
     async getUserName(userId) {
         const user = await this.prisma.user.findUnique({
             where: {
@@ -145,14 +155,13 @@ let DispatchService = class DispatchService {
                 await this.sftpService.ensureDir(remoteDir);
                 for (const file of files){
                     const remotePath = _path.posix.join(remoteDir, file.originalname);
-                    await this.sftpService.put(file.path, remotePath);
+                    await this.sftpService.put(file.buffer, remotePath);
                     uploadedAttachments.push({
                         fileName: file.originalname,
                         path: remotePath,
                         mimeType: file.mimetype,
                         size: file.size
                     });
-                    _fs.unlinkSync(file.path);
                 }
                 await tx.dispatch.update({
                     where: {
@@ -287,19 +296,18 @@ let DispatchService = class DispatchService {
             await this.sftpService.ensureDir(remoteDir);
             for (const file of files){
                 const remotePath = _path.posix.join(remoteDir, file.originalname);
-                await this.sftpService.put(file.path, remotePath);
+                await this.sftpService.put(file.buffer, remotePath);
                 newAttachments.push({
                     fileName: file.originalname,
                     path: remotePath,
                     mimeType: file.mimetype,
                     size: file.size
                 });
-                _fs.unlinkSync(file.path);
             }
         } catch (error) {
             files.forEach((file)=>{
                 try {
-                    _fs.unlinkSync(file.path);
+                    this.safeUnlink(file.path);
                 } catch  {}
             });
             throw new _common.InternalServerErrorException('Failed to upload attachments.');
@@ -728,15 +736,14 @@ let DispatchService = class DispatchService {
         const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_DISPATCH || '', String(dispatchId));
         await this.sftpService.ensureDir(remoteDir);
         for (const file of files){
-            const remotePath = _path.posix.join(remoteDir, file.filename);
-            await this.sftpService.put(file.path, remotePath);
+            const remotePath = _path.posix.join(remoteDir, file.originalname);
+            await this.sftpService.put(file.buffer, remotePath);
             newAttachments.push({
                 fileName: file.originalname,
                 path: remotePath,
                 mimeType: file.mimetype,
                 size: file.size
             });
-            _fs.unlinkSync(file.path);
         }
         const allAttachments = [
             ...existingAttachments,

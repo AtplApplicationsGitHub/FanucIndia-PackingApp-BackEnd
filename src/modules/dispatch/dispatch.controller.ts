@@ -37,21 +37,8 @@ export class DispatchController {
 
   @Post()
   @Roles('ADMIN', 'USER')
-  @UseInterceptors(
-    FilesInterceptor('attachments', 10, {
-      storage: diskStorage({
-        destination: './temp_uploads',
-        filename: (req, file, cb) => {
-          const randomName = Array(32)
-            .fill(null)
-            .map(() => Math.round(Math.random() * 16).toString(16))
-            .join('');
-          cb(null, `${randomName}${extname(file.originalname)}`);
-        },
-      }),
-    }),
-  )
-  create(
+  @UseInterceptors(FilesInterceptor('attachments', 10))
+    create(
     @Body() createDispatchDto: CreateDispatchDto,
     @UploadedFiles() files: Express.Multer.File[],
     @Req() req: AuthRequest,
@@ -79,17 +66,7 @@ export class DispatchController {
 
   @Post('mobile/:id/attachments')
   @Roles('ADMIN', 'USER')
-  @UseInterceptors(
-    FilesInterceptor('attachments', 10, {
-      storage: diskStorage({
-        destination: './temp_uploads',
-        filename: (req, file, cb) => {
-          const randomName = Array(32).fill(null).map(() => Math.round(Math.random() * 16).toString(16)).join('');
-          cb(null, `${randomName}${extname(file.originalname)}`);
-        },
-      }),
-    }),
-  )
+  @UseInterceptors(FilesInterceptor('attachments', 10))
   @ApiOperation({ summary: 'Step 2 (Mobile): Upload attachments for a dispatch record.' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -129,7 +106,7 @@ export class DispatchController {
   }
 
   @Get(':id/attachments')
-  @Roles('ADMIN', 'USER') // Or adjust roles as needed for mobile
+  @Roles('ADMIN', 'USER') 
   @ApiOperation({ summary: 'Get the list of attachments for a specific dispatch ID' })
   @ApiParam({ name: 'id', description: 'The ID of the dispatch record', type: Number })
   @ApiResponse({ status: 200, description: 'Returns an array of attachment objects.' })
@@ -207,20 +184,7 @@ export class DispatchController {
 
   @Post(':id/attachments')
   @Roles('ADMIN', 'USER')
-  @UseInterceptors(
-    FilesInterceptor('attachments', 10, {
-      storage: diskStorage({
-        destination: './temp_uploads',
-        filename: (req, file, cb) => {
-          const randomName = Array(32)
-            .fill(null)
-            .map(() => Math.round(Math.random() * 16).toString(16))
-            .join('');
-          cb(null, `${randomName}${extname(file.originalname)}`);
-        },
-      }),
-    }),
-  )
+  @UseInterceptors(FilesInterceptor('attachments', 10))
   addAttachments(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { SftpService } from '../sftp/sftp.service';
 import { Prisma } from '@prisma/client';
@@ -38,12 +42,22 @@ export class SoArchiveService {
     }
 
     if (so.status !== 'Dispatched') {
-      throw new BadRequestException(`Sales Order ${saleOrderNumber} cannot be archived as its status is not 'Dispatched'.`);
+      throw new BadRequestException(
+        `Sales Order ${saleOrderNumber} cannot be archived as its status is not 'Dispatched'.`,
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const { id, updatedAt, materialData, materialFilesByNumber, Dispatch_SO, statusStepper, ...soData } = so;
-      
+      const {
+        id,
+        updatedAt,
+        materialData,
+        materialFilesByNumber,
+        Dispatch_SO,
+        statusStepper,
+        ...soData
+      } = so;
+
       await tx.salesOrderArchive.create({ data: soData });
 
       if (materialData.length > 0) {
@@ -57,27 +71,27 @@ export class SoArchiveService {
           data: materialFilesByNumber.map(({ ID, updatedAt, ...f }) => f),
         });
       }
-      
-      const dispatches = Dispatch_SO.map(dso => dso.dispatch);
+
+      const dispatches = Dispatch_SO.map((dso) => dso.dispatch);
       if (dispatches.length > 0) {
         await tx.dispatchArchive.createMany({
-            data: dispatches.map(({ updatedAt, _count, ...d }) => ({
-              ...d,
-              customerName: d.customerName,
-              transporterName: d.transporterName,
-              attachments: d.attachments ?? Prisma.DbNull, 
-            })),
-            skipDuplicates: true, 
+          data: dispatches.map(({ updatedAt, _count, ...d }) => ({
+            ...d,
+            customerName: d.customerName,
+            transporterName: d.transporterName,
+            attachments: d.attachments ?? Prisma.DbNull,
+          })),
+          skipDuplicates: true,
         });
         await tx.dispatch_SOArchive.createMany({
-            data: Dispatch_SO.map(({ id, dispatch, ...dso }) => dso),
+          data: Dispatch_SO.map(({ id, dispatch, ...dso }) => dso),
         });
       }
 
       await tx.eRP_Material_File.deleteMany({ where: { saleOrderNumber } });
       await tx.eRP_Material_Data.deleteMany({ where: { saleOrderNumber } });
       await tx.dispatch_SO.deleteMany({ where: { saleOrderNumber } });
-      
+
       for (const dispatch of dispatches) {
         const totalSOsLinked = dispatch._count.dispatchSOs;
         if (totalSOsLinked <= 1) {
@@ -92,26 +106,33 @@ export class SoArchiveService {
             salesOrderNumber: so.saleOrderNumber,
           })),
         });
-        await tx.sO_Status_Stepper.deleteMany({ where: { salesOrderNumber: saleOrderNumber } });
+        await tx.sO_Status_Stepper.deleteMany({
+          where: { salesOrderNumber: saleOrderNumber },
+        });
       }
-      
+
       await tx.salesOrder.delete({ where: { saleOrderNumber } });
 
-      return { success: true, message: `Sales Order ${saleOrderNumber} has been successfully archived.` };
+      return {
+        success: true,
+        message: `Sales Order ${saleOrderNumber} has been successfully archived.`,
+      };
     });
   }
 
   async delete(saleOrderNumber: string) {
     const archivedSo = await this.prisma.salesOrderArchive.findFirst({
-        where: { saleOrderNumber },
+      where: { saleOrderNumber },
     });
 
     if (!archivedSo) {
-        throw new NotFoundException(`Archived Sales Order ${saleOrderNumber} not found.`);
+      throw new NotFoundException(
+        `Archived Sales Order ${saleOrderNumber} not found.`,
+      );
     }
 
     // 1. Get lists of files AND directories to delete BEFORE the transaction
-    
+
     // Get material files and directories
     const materialFiles = await this.prisma.eRP_Material_FileArchive.findMany({
       where: { saleOrderNumber },
@@ -123,7 +144,9 @@ export class SoArchiveService {
       where: { saleOrderNumber },
       select: { dispatchId: true },
     });
-    const dispatchIds = [...new Set(dispatchSOArchives.map(d => d.dispatchId))];
+    const dispatchIds = [
+      ...new Set(dispatchSOArchives.map((d) => d.dispatchId)),
+    ];
 
     const dispatchArchivesToDelete: { attachments: Prisma.JsonValue }[] = [];
     for (const dispatchId of dispatchIds) {
@@ -144,30 +167,44 @@ export class SoArchiveService {
         }
       }
     }
-    
+
     const dispatchFiles = dispatchArchivesToDelete
-      .flatMap(d => d.attachments as any[] | null)
-      .filter(att => att && att.path)
-      .map(att => ({ sftpPath: att.path, sftpDir: att.path.substring(0, att.path.lastIndexOf('/')) }));
+      .flatMap((d) => d.attachments as any[] | null)
+      .filter((att) => att && att.path)
+      .map((att) => ({
+        sftpPath: att.path,
+        sftpDir: att.path.substring(0, att.path.lastIndexOf('/')),
+      }));
 
     const allFilesToDelete = [...materialFiles, ...dispatchFiles];
-    const uniqueDirectoriesToDelete = [...new Set(allFilesToDelete.map(f => f.sftpDir).filter(Boolean))];
+    const uniqueDirectoriesToDelete = [
+      ...new Set(allFilesToDelete.map((f) => f.sftpDir).filter(Boolean)),
+    ];
 
     // 2. Run all database deletions within a single, atomic transaction
     await this.prisma.$transaction(async (tx) => {
-        for (const dispatchId of dispatchIds) {
-            const remainingLinks = await tx.dispatch_SOArchive.count({
-                where: { dispatchId: dispatchId, NOT: { saleOrderNumber: saleOrderNumber } },
-            });
-            if (remainingLinks === 0) {
-                await tx.dispatchArchive.delete({ where: { id: dispatchId } });
-            }
+      for (const dispatchId of dispatchIds) {
+        const remainingLinks = await tx.dispatch_SOArchive.count({
+          where: {
+            dispatchId: dispatchId,
+            NOT: { saleOrderNumber: saleOrderNumber },
+          },
+        });
+        if (remainingLinks === 0) {
+          await tx.dispatchArchive.delete({ where: { id: dispatchId } });
         }
-        await tx.dispatch_SOArchive.deleteMany({ where: { saleOrderNumber } });
-        await tx.eRP_Material_FileArchive.deleteMany({ where: { saleOrderNumber } });
-        await tx.eRP_Material_DataArchive.deleteMany({ where: { saleOrderNumber } });
-        await tx.sO_Status_StepperArchive.deleteMany({ where: { salesOrderNumber: saleOrderNumber } });
-        await tx.salesOrderArchive.deleteMany({ where: { saleOrderNumber } });
+      }
+      await tx.dispatch_SOArchive.deleteMany({ where: { saleOrderNumber } });
+      await tx.eRP_Material_FileArchive.deleteMany({
+        where: { saleOrderNumber },
+      });
+      await tx.eRP_Material_DataArchive.deleteMany({
+        where: { saleOrderNumber },
+      });
+      await tx.sO_Status_StepperArchive.deleteMany({
+        where: { salesOrderNumber: saleOrderNumber },
+      });
+      await tx.salesOrderArchive.deleteMany({ where: { saleOrderNumber } });
     });
 
     const orderBaseDir = process.env.SFTP_BASE_DIR_ORDER || '';
@@ -187,7 +224,7 @@ export class SoArchiveService {
             console.warn(
               `Skipping delete: Path ${file.sftpPath} is outside of configured base directories.`,
             );
-            continue; 
+            continue;
           }
 
           await this.sftp.delete(file.sftpPath);
@@ -202,14 +239,23 @@ export class SoArchiveService {
         if (dir) {
           const resolvedDir = path.posix.resolve(dir);
 
+          const orderBasePrefix = resolvedOrderBase.endsWith('/')
+            ? resolvedOrderBase
+            : resolvedOrderBase + '/';
+          const dispatchBasePrefix = resolvedDispatchBase.endsWith('/')
+            ? resolvedDispatchBase
+            : resolvedDispatchBase + '/';
+
           if (
-            !resolvedDir.startsWith(resolvedOrderBase) &&
-            !resolvedDir.startsWith(resolvedDispatchBase)
+            resolvedDir !== resolvedOrderBase &&
+            !resolvedDir.startsWith(orderBasePrefix) &&
+            resolvedDir !== resolvedDispatchBase &&
+            !resolvedDir.startsWith(dispatchBasePrefix)
           ) {
             console.warn(
               `Skipping rmdir: Path ${dir} is outside of configured base directories.`,
             );
-            continue; 
+            continue;
           }
 
           await this.sftp.rmdir(dir);
@@ -219,7 +265,10 @@ export class SoArchiveService {
       }
     }
 
-    return { success: true, message: `Archived Sales Order ${saleOrderNumber} has been permanently deleted.` };
+    return {
+      success: true,
+      message: `Archived Sales Order ${saleOrderNumber} has been permanently deleted.`,
+    };
   }
 
   async downloadArchivedFile(fileId: number, res: Response) {
@@ -233,21 +282,24 @@ export class SoArchiveService {
 
     try {
       const data = await this.sftp.getStream(file.sftpPath);
-      res.setHeader('Content-Type', file.mimeType ?? 'application/octet-stream');
       res.setHeader(
-          'Content-Disposition',
-          `inline; filename="${encodeURIComponent(file.fileName)}"`,
+        'Content-Type',
+        file.mimeType ?? 'application/octet-stream',
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename="${encodeURIComponent(file.fileName)}"`,
       );
       if (file.fileSizeBytes) {
-          res.setHeader('Content-Length', String(file.fileSizeBytes));
+        res.setHeader('Content-Length', String(file.fileSizeBytes));
       }
 
       if (Buffer.isBuffer(data)) {
-          return res.end(data);
+        return res.end(data);
       }
       (data as NodeJS.ReadableStream).pipe(res);
     } catch (error) {
-      console.error("SFTP download error for archived file:", error);
+      console.error('SFTP download error for archived file:', error);
       res.status(404).send('File not found in storage.');
     }
   }

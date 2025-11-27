@@ -10,49 +10,8 @@ Object.defineProperty(exports, "ErpMaterialImporterService", {
 });
 const _common = require("@nestjs/common");
 const _prismaservice = require("../../prisma.service");
-const _xlsx = /*#__PURE__*/ _interop_require_wildcard(require("xlsx"));
+const _exceljs = require("exceljs");
 const _client = require("@prisma/client");
-function _getRequireWildcardCache(nodeInterop) {
-    if (typeof WeakMap !== "function") return null;
-    var cacheBabelInterop = new WeakMap();
-    var cacheNodeInterop = new WeakMap();
-    return (_getRequireWildcardCache = function(nodeInterop) {
-        return nodeInterop ? cacheNodeInterop : cacheBabelInterop;
-    })(nodeInterop);
-}
-function _interop_require_wildcard(obj, nodeInterop) {
-    if (!nodeInterop && obj && obj.__esModule) {
-        return obj;
-    }
-    if (obj === null || typeof obj !== "object" && typeof obj !== "function") {
-        return {
-            default: obj
-        };
-    }
-    var cache = _getRequireWildcardCache(nodeInterop);
-    if (cache && cache.has(obj)) {
-        return cache.get(obj);
-    }
-    var newObj = {
-        __proto__: null
-    };
-    var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor;
-    for(var key in obj){
-        if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) {
-            var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null;
-            if (desc && (desc.get || desc.set)) {
-                Object.defineProperty(newObj, key, desc);
-            } else {
-                newObj[key] = obj[key];
-            }
-        }
-    }
-    newObj.default = obj;
-    if (cache) {
-        cache.set(obj, newObj);
-    }
-    return newObj;
-}
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -83,7 +42,8 @@ const columnMapping = {
 let ErpMaterialImporterService = class ErpMaterialImporterService {
     async processFile(file, expectedSaleOrderNumber) {
         this.logger.log(`Starting to process file: ${file.originalname}`);
-        const records = this.readFile(file);
+        // [CHANGED] Added await because readFile is now async
+        const records = await this.readFile(file);
         const validationError = await this.validateRecords(records, expectedSaleOrderNumber);
         if (validationError) {
             this.logger.error(`Validation failed for ${file.originalname}: ${validationError}`);
@@ -91,8 +51,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         }
         const renamedRecords = this.renameColumns(records);
         await this.upsertRecords(renamedRecords);
-        // --- [FIX] ADD LOGGING ---
-        // After upsert is successful, log the event to ERPMaterialLog
+        // Log the event to ERPMaterialLog
         const soNumber = String(records[0]["SO Number"]);
         try {
             await this.prisma.eRPMaterialLog.create({
@@ -106,28 +65,56 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             });
             this.logger.log(`Successfully logged import for SO: ${soNumber}`);
         } catch (logError) {
-            // Log the error but don't fail the entire request
             this.logger.error(`Failed to write to ERPMaterialLog for SO: ${soNumber}`, logError);
         }
-        // --- END OF FIX ---
         this.logger.log(`Successfully processed file: ${file.originalname}`);
         return {
             message: `File processed successfully. ${renamedRecords.length} records upserted.`
         };
     }
-    readFile(file) {
+    // [CHANGED] Rewritten to use ExcelJS instead of xlsx
+    async readFile(file) {
         try {
-            const workbook = _xlsx.read(file.buffer, {
-                type: 'buffer'
+            const workbook = new _exceljs.Workbook();
+            await workbook.xlsx.load(file.buffer);
+            const worksheet = workbook.worksheets[0];
+            if (!worksheet) return [];
+            const jsonData = [];
+            const headers = [];
+            // Iterate rows
+            worksheet.eachRow((row, rowNumber)=>{
+                // Row 1 contains headers
+                if (rowNumber === 1) {
+                    row.eachCell((cell, colNumber)=>{
+                        // ExcelJS columns are 1-based
+                        headers[colNumber] = cell.text ? cell.text.trim() : '';
+                    });
+                } else {
+                    // Subsequent rows are data
+                    const rowData = {};
+                    let hasData = false;
+                    headers.forEach((header, colNumber)=>{
+                        if (!header) return;
+                        const cell = row.getCell(colNumber);
+                        let val = cell.value;
+                        // Handle rich text or formulas if necessary
+                        if (val && typeof val === 'object') {
+                            if ('text' in val) val = val.text;
+                            else if ('result' in val) val = val.result;
+                        }
+                        // Map undefined to null to match previous behavior
+                        rowData[header] = val !== undefined && val !== null ? val : null;
+                        if (rowData[header] !== null) hasData = true;
+                    });
+                    if (hasData) {
+                        jsonData.push(rowData);
+                    }
+                }
             });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            return _xlsx.utils.sheet_to_json(worksheet, {
-                defval: null
-            });
+            return jsonData;
         } catch (error) {
             this.logger.error('Failed to read or parse the Excel file.', error);
-            throw new _common.BadRequestException('Invalid or corrupted file. Please upload a valid .xlsx or .csv file.');
+            throw new _common.BadRequestException('Invalid or corrupted file. Please upload a valid .xlsx file.');
         }
     }
     async validateRecords(records, expectedSaleOrderNumber) {
@@ -185,7 +172,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
     }
     async upsertRecords(records) {
         if (records.length === 0) return;
-        const soNumber = String(records[0].saleOrderNumber); // Also ensure string here
+        const soNumber = String(records[0].saleOrderNumber);
         this.logger.log(`Upserting ${records.length} records for SO Number: ${soNumber}`);
         const safeParseInt = (val, defaultVal = null)=>{
             if (val === null || val === undefined || String(val).trim() === '') return defaultVal;

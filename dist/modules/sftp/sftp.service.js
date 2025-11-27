@@ -118,11 +118,11 @@ let SftpService = class SftpService {
         return this.withClient((c)=>this._ensureDir(c, remoteDir));
     }
     // 3. Public Put (Creates its own connection)
-    async put(localPath, remotePath) {
+    async put(localPathOrBuffer, remotePath) {
         const remoteDir = _path.posix.dirname(remotePath);
         return this.withClient(async (c)=>{
-            await this._ensureDir(c, remoteDir); // Reuse internal logic
-            await c.put(localPath, remotePath);
+            await this._ensureDir(c, remoteDir);
+            await c.put(localPathOrBuffer, remotePath);
             return {
                 remotePath,
                 remoteDir
@@ -155,9 +155,16 @@ let SftpService = class SftpService {
         });
     }
     async rmdir(remotePath) {
+        if (!remotePath || typeof remotePath !== 'string') {
+            throw new Error('Invalid remote path');
+        }
+        const normalized = _path.posix.normalize(remotePath);
+        if (normalized.split('/').includes('..')) {
+            throw new Error('Invalid remote path: traversal not allowed');
+        }
         return this.withClient(async (c)=>{
             try {
-                await c.rmdir(remotePath, true);
+                await c.rmdir(normalized, true);
                 return true;
             } catch (err) {
                 if (err.code === 2) return false;

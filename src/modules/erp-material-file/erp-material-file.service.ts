@@ -12,6 +12,7 @@ import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
+import * as os from 'os';
 import { CreateErpMaterialFileDto } from './dto/create-erp-material-file.dto';
 import { UpdateErpMaterialFileDto } from './dto/update-erp-material-file.dto';
 import { QueryErpMaterialFileDto } from './dto/query-erp-material-file.dto';
@@ -105,6 +106,22 @@ export class ErpMaterialFileService {
     private readonly prisma: PrismaService,
     private readonly sftp: SftpService,
   ) {}
+
+  private safeUnlink(filePath: string) {
+    try {
+      const resolvedPath = path.resolve(filePath);
+      const tempDir = path.resolve(os.tmpdir());
+      
+      if (resolvedPath.startsWith(tempDir)) {
+        if (fs.existsSync(resolvedPath)) {
+           fs.unlinkSync(resolvedPath);
+        }
+      } else {
+        console.warn(`Security Block: Attempted to delete file outside temp dir: ${filePath}`);
+      }
+    } catch (e) {
+    }
+  }
 
   async list(query: QueryErpMaterialFileDto, userId: number, userRole: string) {
     const {
@@ -267,7 +284,6 @@ export class ErpMaterialFileService {
     const dbRecords: any[] = [];
 
     try {
-      // 1. Prepare all data locally (Fast)
       for (const f of files) {
         const checksum = await sha256File(f.path);
         const remoteName = f.originalname;
@@ -287,10 +303,8 @@ export class ErpMaterialFileService {
         });
       }
 
-      // 2. Upload all files in ONE connection (Fast)
       await this.sftp.uploadBatch(uploads);
 
-      // 3. Create DB records
       const created: any[] = [];
       for (const data of dbRecords) {
          const row = await this.prisma.eRP_Material_File.create({ data });
@@ -308,7 +322,7 @@ export class ErpMaterialFileService {
       throw new InternalServerErrorException('Upload failed. ' + (e?.message || ''));
     } finally {
       for (const f of files) {
-        try { fs.unlinkSync(f.path); } catch {}
+        this.safeUnlink(f.path);
       }
     }
   }
@@ -403,7 +417,9 @@ export class ErpMaterialFileService {
     } catch (e: any) {
       throw new InternalServerErrorException('Upload failed. ' + (e?.message || ''));
     } finally {
-       for (const f of files) { try { fs.unlinkSync(f.path); } catch {} }
+       for (const f of files) { 
+        this.safeUnlink(f.path); 
+      }
     }
   }
 
@@ -420,9 +436,19 @@ export class ErpMaterialFileService {
 }
 
 async function sha256File(localPath: string): Promise<string> {
+  const tmpDir = path.resolve(os.tmpdir());
+  const resolved = path.resolve(localPath);
+
+  const tmpDirWithSep = tmpDir.endsWith(path.sep) ? tmpDir : tmpDir + path.sep;
+  const resolvedWithSep = resolved.endsWith(path.sep) ? resolved : resolved;
+
+  if (!resolved.startsWith(tmpDirWithSep) && resolved !== tmpDir) {
+    throw new BadRequestException('Invalid local file path');
+  }
+
   return new Promise((resolve, reject) => {
     const hash = createHash('sha256');
-    const stream = fs.createReadStream(localPath);
+    const stream = fs.createReadStream(resolved);
     stream.on('error', reject);
     stream.on('data', (d) => hash.update(d));
     stream.on('end', () => resolve(hash.digest('hex')));

@@ -10,8 +10,6 @@ Object.defineProperty(exports, "DispatchController", {
 });
 const _common = require("@nestjs/common");
 const _platformexpress = require("@nestjs/platform-express");
-const _multer = require("multer");
-const _path = require("path");
 const _jwtauthguard = require("../auth/jwt-auth.guard");
 const _rolesdecorator = require("../auth/roles.decorator");
 const _authrequesttype = require("../auth/types/auth-request.type");
@@ -113,15 +111,7 @@ let DispatchController = class DispatchController {
 _ts_decorate([
     (0, _common.Post)(),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
-    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10, {
-        storage: (0, _multer.diskStorage)({
-            destination: './temp_uploads',
-            filename: (req, file, cb)=>{
-                const randomName = Array(32).fill(null).map(()=>Math.round(Math.random() * 16).toString(16)).join('');
-                cb(null, `${randomName}${(0, _path.extname)(file.originalname)}`);
-            }
-        })
-    })),
+    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10)),
     _ts_param(0, (0, _common.Body)()),
     _ts_param(1, (0, _common.UploadedFiles)()),
     _ts_param(2, (0, _common.Req)()),
@@ -155,15 +145,7 @@ _ts_decorate([
 _ts_decorate([
     (0, _common.Post)('mobile/:id/attachments'),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
-    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10, {
-        storage: (0, _multer.diskStorage)({
-            destination: './temp_uploads',
-            filename: (req, file, cb)=>{
-                const randomName = Array(32).fill(null).map(()=>Math.round(Math.random() * 16).toString(16)).join('');
-                cb(null, `${randomName}${(0, _path.extname)(file.originalname)}`);
-            }
-        })
-    })),
+    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10)),
     (0, _swagger.ApiOperation)({
         summary: 'Step 2 (Mobile): Upload attachments for a dispatch record.'
     }),
@@ -331,15 +313,7 @@ _ts_decorate([
 _ts_decorate([
     (0, _common.Post)(':id/attachments'),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
-    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10, {
-        storage: (0, _multer.diskStorage)({
-            destination: './temp_uploads',
-            filename: (req, file, cb)=>{
-                const randomName = Array(32).fill(null).map(()=>Math.round(Math.random() * 16).toString(16)).join('');
-                cb(null, `${randomName}${(0, _path.extname)(file.originalname)}`);
-            }
-        })
-    })),
+    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10)),
     _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
     _ts_param(1, (0, _common.UploadedFiles)()),
     _ts_metadata("design:type", Function),
