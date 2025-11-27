@@ -50,6 +50,13 @@ _ts_decorate([
 ], AdminOverallStatusDto.prototype, "f105Count", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
+        example: 10,
+        description: "Count of orders with status NULL (To be Issued)"
+    }),
+    _ts_metadata("design:type", Number)
+], AdminOverallStatusDto.prototype, "toBeIssuedCount", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
         example: 850,
         description: "Total count of orders with status 'Dispatched'"
     }),

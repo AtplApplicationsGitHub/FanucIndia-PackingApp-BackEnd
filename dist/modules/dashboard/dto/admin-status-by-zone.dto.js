@@ -46,6 +46,12 @@ _ts_decorate([
 ], AdminStatusByZoneDto.prototype, "f105Count", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
+        example: 5
+    }),
+    _ts_metadata("design:type", Number)
+], AdminStatusByZoneDto.prototype, "toBeIssuedCount", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
         example: 210
     }),
     _ts_metadata("design:type", Number)

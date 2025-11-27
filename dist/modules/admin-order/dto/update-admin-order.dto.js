@@ -64,6 +64,9 @@ _ts_decorate([
     }),
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MinLength)(10, {
+        message: 'Sale Order Number must be at least 10 characters long.'
+    }),
     _ts_metadata("design:type", String)
 ], UpdateAdminOrderDto.prototype, "saleOrderNumber", void 0);
 _ts_decorate([
@@ -102,6 +105,15 @@ _ts_decorate([
     (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
 ], UpdateAdminOrderDto.prototype, "specialRemarks", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
+        example: 'Call before arrival',
+        description: 'Additional Remarks'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "additionalRemarks", void 0);
 _ts_decorate([
     (0, _swagger.ApiPropertyOptional)({
         example: 1,
@@ -165,5 +177,14 @@ _ts_decorate([
     (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
 ], UpdateAdminOrderDto.prototype, "fgLocation", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
+        example: '123 Main St, NY',
+        description: 'Delivery Address'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "address", void 0);
 
 //# sourceMappingURL=update-admin-order.dto.js.map

@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsDateString,
   IsOptional,
+  MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -14,6 +15,7 @@ export class CreateSalesCrudDto {
 
   @ApiProperty({ example: 'SO12345', description: 'Sale Order Number' })
   @IsString({ message: 'Sale Order Number must be a string.' })
+  @MinLength(10, { message: 'Sale Order Number must be at least 10 characters long.' })
   saleOrderNumber: string;
 
   @ApiProperty({ example: 'OUT123', description: 'Outbound Delivery' })
@@ -65,4 +67,12 @@ export class CreateSalesCrudDto {
   @IsString({ message: 'Special Remarks must be a string.' })
   @IsOptional()
   specialRemarks?: string;
+
+  @ApiPropertyOptional({
+    example: 'Gate entry required',
+    description: 'Additional Remarks (optional)',
+  })
+  @IsString({ message: 'Additional Remarks must be a string.' })
+  @IsOptional()
+  additionalRemarks?: string;
 }

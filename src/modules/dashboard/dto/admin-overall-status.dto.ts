@@ -26,6 +26,12 @@ export class AdminOverallStatusDto {
   f105Count: number;
 
   @ApiProperty({
+    example: 10,
+    description: "Count of orders with status NULL (To be Issued)",
+  })
+  toBeIssuedCount: number;
+
+  @ApiProperty({
     example: 850,
     description: "Total count of orders with status 'Dispatched'",
   })

@@ -36,6 +36,13 @@ _ts_decorate([
 ], SalesKpiDto.prototype, "dispatchedSoCount", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
+        example: 5,
+        description: 'Count of orders with status NULL (To be Issued)'
+    }),
+    _ts_metadata("design:type", Number)
+], SalesKpiDto.prototype, "toBeIssuedCount", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
         example: 3,
         description: 'Count of orders with status R105 (Assigned)'
     }),

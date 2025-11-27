@@ -13,6 +13,9 @@ export class AdminStatusByZoneDto {
   @ApiProperty({ example: 15 })
   f105Count: number;
 
+  @ApiProperty({ example: 5 })
+  toBeIssuedCount: number;
+
   @ApiProperty({ example: 210 })
   dispatchedCount: number;
 }

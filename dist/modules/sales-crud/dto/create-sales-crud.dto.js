@@ -39,6 +39,9 @@ _ts_decorate([
     (0, _classvalidator.IsString)({
         message: 'Sale Order Number must be a string.'
     }),
+    (0, _classvalidator.MinLength)(10, {
+        message: 'Sale Order Number must be at least 10 characters long.'
+    }),
     _ts_metadata("design:type", String)
 ], CreateSalesCrudDto.prototype, "saleOrderNumber", void 0);
 _ts_decorate([
@@ -142,5 +145,16 @@ _ts_decorate([
     (0, _classvalidator.IsOptional)(),
     _ts_metadata("design:type", String)
 ], CreateSalesCrudDto.prototype, "specialRemarks", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
+        example: 'Gate entry required',
+        description: 'Additional Remarks (optional)'
+    }),
+    (0, _classvalidator.IsString)({
+        message: 'Additional Remarks must be a string.'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    _ts_metadata("design:type", String)
+], CreateSalesCrudDto.prototype, "additionalRemarks", void 0);
 
 //# sourceMappingURL=create-sales-crud.dto.js.map

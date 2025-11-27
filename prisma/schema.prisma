@@ -85,7 +85,9 @@ model SalesOrder {
   customerId       Int?
   printerId        Int?
   specialRemarks   String?
+  additionalRemarks String?
   fgLocation       String?
+  address          String?             @db.VarChar(1000)
   status           String?
   priority         Int?
   createdAt        DateTime            @default(now())
@@ -214,7 +216,9 @@ model SalesOrderArchive {
   customerId          Int?
   printerId           Int?
   specialRemarks      String?
+  additionalRemarks   String?
   fgLocation          String?
+  address             String?
   status              String?
   priority            Int?
   createdAt           DateTime

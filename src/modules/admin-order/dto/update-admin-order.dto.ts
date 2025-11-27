@@ -4,6 +4,7 @@ import {
   IsInt,
   IsBoolean,
   IsDateString,
+  MinLength,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -31,6 +32,7 @@ export class UpdateAdminOrderDto {
   @ApiPropertyOptional({ example: 'SO123456', description: 'Sale Order Number' })
   @IsOptional()
   @IsString()
+  @MinLength(10, { message: 'Sale Order Number must be at least 10 characters long.' })
   saleOrderNumber?: string;
 
   @ApiPropertyOptional({ example: 'OB7890', description: 'Outbound Delivery' })
@@ -52,6 +54,11 @@ export class UpdateAdminOrderDto {
   @IsOptional()
   @IsString()
   specialRemarks?: string;
+
+  @ApiPropertyOptional({ example: 'Call before arrival', description: 'Additional Remarks' })
+  @IsOptional()
+  @IsString()
+  additionalRemarks?: string;
 
   @ApiPropertyOptional({ example: 1, description: 'Product ID' })
   @IsOptional()
@@ -87,4 +94,9 @@ export class UpdateAdminOrderDto {
   @IsOptional()
   @IsString()
   fgLocation?: string;
+
+  @ApiPropertyOptional({ example: '123 Main St, NY', description: 'Delivery Address' })
+  @IsOptional()
+  @IsString()
+  address?: string;
 }

@@ -34,7 +34,7 @@ export class FgStorageService {
     await this.prisma.sO_Status_Stepper.updateMany({
       where: {
         salesOrderNumber: updatedOrder.saleOrderNumber,
-        status: "Stored/Ready for Dispatch"
+        status: "WIP Storage"
       },
       data: {
         createdDateTime: new Date(),

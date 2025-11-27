@@ -234,41 +234,36 @@ let DashboardService = class DashboardService {
                 ],
                 _count: {
                     id: true
-                },
-                where: {
-                    status: {
-                        in: [
-                            'R105',
-                            'W105',
-                            'F105',
-                            'Dispatched'
-                        ]
-                    }
                 }
             }),
             this.prisma.salesOrder.count()
         ]);
         const result = {
             totalOrders,
+            toBeIssuedCount: 0,
             r105Count: 0,
             w105Count: 0,
             f105Count: 0,
             dispatchedCount: 0
         };
         for (const group of statusCounts){
-            switch(group.status){
-                case 'R105':
-                    result.r105Count = group._count.id;
-                    break;
-                case 'W105':
-                    result.w105Count = group._count.id;
-                    break;
-                case 'F105':
-                    result.f105Count = group._count.id;
-                    break;
-                case 'Dispatched':
-                    result.dispatchedCount = group._count.id;
-                    break;
+            if (group.status === null) {
+                result.toBeIssuedCount = group._count.id;
+            } else {
+                switch(group.status){
+                    case 'R105':
+                        result.r105Count = group._count.id;
+                        break;
+                    case 'W105':
+                        result.w105Count = group._count.id;
+                        break;
+                    case 'F105':
+                        result.f105Count = group._count.id;
+                        break;
+                    case 'Dispatched':
+                        result.dispatchedCount = group._count.id;
+                        break;
+                }
             }
         }
         return result;
@@ -288,22 +283,13 @@ let DashboardService = class DashboardService {
             ],
             _count: {
                 id: true
-            },
-            where: {
-                status: {
-                    in: [
-                        'R105',
-                        'W105',
-                        'F105',
-                        'Dispatched'
-                    ]
-                }
             }
         });
         const resultsMap = new Map();
         for (const zone of allZones){
             resultsMap.set(zone.id, {
                 zoneName: zone.name,
+                toBeIssuedCount: 0,
                 r105Count: 0,
                 w105Count: 0,
                 f105Count: 0,
@@ -313,19 +299,23 @@ let DashboardService = class DashboardService {
         for (const group of statusCounts){
             const zone = resultsMap.get(group.salesZoneId);
             if (zone) {
-                switch(group.status){
-                    case 'R105':
-                        zone.r105Count = group._count.id;
-                        break;
-                    case 'W105':
-                        zone.w105Count = group._count.id;
-                        break;
-                    case 'F105':
-                        zone.f105Count = group._count.id;
-                        break;
-                    case 'Dispatched':
-                        zone.dispatchedCount = group._count.id;
-                        break;
+                if (group.status === null) {
+                    zone.toBeIssuedCount = group._count.id;
+                } else {
+                    switch(group.status){
+                        case 'R105':
+                            zone.r105Count = group._count.id;
+                            break;
+                        case 'W105':
+                            zone.w105Count = group._count.id;
+                            break;
+                        case 'F105':
+                            zone.f105Count = group._count.id;
+                            break;
+                        case 'Dispatched':
+                            zone.dispatchedCount = group._count.id;
+                            break;
+                    }
                 }
             }
         }
@@ -443,8 +433,7 @@ let DashboardService = class DashboardService {
     /**
    * Gets the KPI counts for a specific SALES user.
    */ async getSalesKpis(userId) {
-        // ... (existing getSalesKpis logic)
-        const [totalSoCount, dispatchedSoCount, r105Count, w105Count, f105Count] = await this.prisma.$transaction([
+        const [totalSoCount, dispatchedSoCount, r105Count, w105Count, f105Count, toBeIssuedCount] = await this.prisma.$transaction([
             this.prisma.salesOrder.count({
                 where: {
                     userId: userId
@@ -473,6 +462,12 @@ let DashboardService = class DashboardService {
                     userId: userId,
                     status: 'F105'
                 }
+            }),
+            this.prisma.salesOrder.count({
+                where: {
+                    userId: userId,
+                    status: null
+                }
             })
         ]);
         return {
@@ -480,7 +475,8 @@ let DashboardService = class DashboardService {
             dispatchedSoCount,
             r105Count,
             w105Count,
-            f105Count
+            f105Count,
+            toBeIssuedCount
         };
     }
     /**

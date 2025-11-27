@@ -26,54 +26,72 @@ let SalesOrderService = class SalesOrderService {
         try {
             const workbook = new _exceljs.Workbook();
             const worksheet = workbook.addWorksheet('Bulk Import');
+            // [UPDATE] Added "Additional Remarks" to columns
             worksheet.columns = [
                 {
                     header: 'Product',
-                    key: 'product'
+                    key: 'product',
+                    width: 25
                 },
                 {
                     header: 'Sale Order Number',
-                    key: 'saleOrderNumber'
+                    key: 'saleOrderNumber',
+                    width: 20
                 },
                 {
                     header: 'Outbound Delivery',
-                    key: 'outboundDelivery'
+                    key: 'outboundDelivery',
+                    width: 20
                 },
                 {
                     header: 'Transfer Order',
-                    key: 'transferOrder'
+                    key: 'transferOrder',
+                    width: 20
                 },
                 {
                     header: 'Delivery Date',
-                    key: 'deliveryDate'
+                    key: 'deliveryDate',
+                    width: 15
                 },
                 {
                     header: 'Transporter',
-                    key: 'transporter'
+                    key: 'transporter',
+                    width: 20
                 },
                 {
                     header: 'Plant Code',
-                    key: 'plantCode'
+                    key: 'plantCode',
+                    width: 15
                 },
                 {
                     header: 'Payment Clearance',
-                    key: 'paymentClearance'
+                    key: 'paymentClearance',
+                    width: 15
                 },
                 {
                     header: 'Sales Zone',
-                    key: 'salesZone'
+                    key: 'salesZone',
+                    width: 15
                 },
                 {
                     header: 'Packing Config',
-                    key: 'packConfig'
+                    key: 'packConfig',
+                    width: 20
                 },
                 {
                     header: 'Customer',
-                    key: 'customer'
+                    key: 'customer',
+                    width: 25
                 },
                 {
                     header: 'Special Remarks',
-                    key: 'specialRemarks'
+                    key: 'specialRemarks',
+                    width: 30
+                },
+                {
+                    header: 'Additional Remarks',
+                    key: 'additionalRemarks',
+                    width: 30
                 }
             ];
             const [products, transporters, plantCodes, salesZones, packConfigs, customers] = await Promise.all([
@@ -108,6 +126,9 @@ let SalesOrderService = class SalesOrderService {
                     }
                 })
             ]);
+            // [FIX] Create a hidden sheet for dropdown values to bypass 255 char limit
+            const refSheet = workbook.addWorksheet('ReferenceData');
+            refSheet.state = 'hidden';
             const dropdowns = {
                 product: products.map((p)=>p.name),
                 transporter: transporters.map((t)=>t.name),
@@ -120,20 +141,40 @@ let SalesOrderService = class SalesOrderService {
                 ],
                 customer: customers.map((c)=>c.name)
             };
+            const dropdownKeys = Object.keys(dropdowns);
+            // Write dropdown values to columns in the hidden sheet
+            dropdownKeys.forEach((key, idx)=>{
+                const values = dropdowns[key];
+                if (values.length > 0) {
+                    // Column indices are 1-based
+                    refSheet.getColumn(idx + 1).values = [
+                        key,
+                        ...values
+                    ];
+                }
+            });
             const ROW_COUNT = 100;
             for(let i = 0; i < ROW_COUNT; i++)worksheet.addRow({});
-            for (const [colKey, values] of Object.entries(dropdowns)){
-                const letter = worksheet.getColumn(colKey).letter;
+            // Apply Data Validation referencing the hidden sheet ranges
+            dropdownKeys.forEach((key, idx)=>{
+                const values = dropdowns[key];
+                if (values.length === 0) return;
+                const colLetter = refSheet.getColumn(idx + 1).letter;
+                const lastRow = values.length + 1; // +1 for header row
+                // Excel formula referencing the hidden sheet
+                const formula = `ReferenceData!$${colLetter}$2:$${colLetter}$${lastRow}`;
+                const targetCol = worksheet.getColumn(key);
+                // Apply to rows 2 to ROW_COUNT + 1
                 for(let row = 2; row <= ROW_COUNT + 1; row++){
-                    worksheet.getCell(`${letter}${row}`).dataValidation = {
+                    worksheet.getCell(`${targetCol.letter}${row}`).dataValidation = {
                         type: 'list',
                         allowBlank: true,
                         formulae: [
-                            `"${values.join(',')}"`
+                            formula
                         ]
                     };
                 }
-            }
+            });
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             res.setHeader('Content-Disposition', 'attachment; filename="bulk_import_excel.xlsx"');
             return workbook.xlsx.write(res).then(()=>{
@@ -168,6 +209,7 @@ let SalesOrderService = class SalesOrderService {
         } catch (err) {
             throw new _common.InternalServerErrorException('Failed to retrieve reference data', err.message);
         }
+        // [UPDATE] Added explicit type for customer map to store address
         const maps = {
             product: new Map(products.map((p)=>[
                     p.name.trim(),
@@ -191,7 +233,10 @@ let SalesOrderService = class SalesOrderService {
                 ])),
             customer: new Map(customers.map((c)=>[
                     c.name.trim(),
-                    c.id
+                    {
+                        id: c.id,
+                        address: c.address
+                    }
                 ]))
         };
         const ordersToInsert = [];
@@ -200,16 +245,23 @@ let SalesOrderService = class SalesOrderService {
             includeEmpty: false
         }, (row, rowNumber)=>{
             if (rowNumber === 1) return;
-            const [product, saleOrderNumber, outboundDelivery, transferOrder, deliveryDate, transporter, plantCode, paymentClearance, salesZone, packConfig, customer, specialRemarks] = row.values.slice(1);
+            const [product, saleOrderNumber, outboundDelivery, transferOrder, deliveryDate, transporter, plantCode, paymentClearance, salesZone, packConfig, customer, specialRemarks, additionalRemarks] = row.values.slice(1);
             const rowErrors = [];
             const productId = maps.product.get((product || '').toString().trim());
             const transporterId = maps.transporter.get((transporter || '').toString().trim());
             const plantCodeId = maps.plantCode.get((plantCode || '').toString().trim());
             const salesZoneId = maps.salesZone.get((salesZone || '').toString().trim());
             const packConfigId = maps.packConfig.get((packConfig || '').toString().trim());
-            const customerId = maps.customer.get((customer || '').toString().trim());
+            // [UPDATE] Get Customer ID and Address
+            const customerData = maps.customer.get((customer || '').toString().trim());
+            const customerId = customerData?.id;
+            const customerAddress = customerData?.address;
             if (!productId) rowErrors.push('Invalid product');
-            if (!saleOrderNumber) rowErrors.push('Missing saleOrderNumber');
+            if (!saleOrderNumber) {
+                rowErrors.push('Missing saleOrderNumber');
+            } else if (saleOrderNumber.toString().trim().length < 10) {
+                rowErrors.push('Sale Order Number must be at least 10 characters');
+            }
             if (!outboundDelivery) rowErrors.push('Missing outboundDelivery');
             if (!transferOrder) rowErrors.push('Missing transferOrder');
             if (!deliveryDate) rowErrors.push('Missing deliveryDate');
@@ -252,6 +304,8 @@ let SalesOrderService = class SalesOrderService {
                     packConfigId,
                     customerId,
                     specialRemarks: specialRemarks?.toString(),
+                    additionalRemarks: additionalRemarks?.toString(),
+                    address: customerAddress,
                     userId
                 });
             }
@@ -326,10 +380,12 @@ let SalesOrderService = class SalesOrderService {
                     });
                     count++;
                     const statuses = [
-                        "Created",
-                        "Assigned",
+                        "To be Issued",
+                        "Under Issue",
                         "Issued",
+                        "Under Packing",
                         "Packed",
+                        "WIP Storage",
                         "Stored/Ready for Dispatch",
                         "Dispatched"
                     ];
@@ -337,7 +393,7 @@ let SalesOrderService = class SalesOrderService {
                         data: statuses.map((status)=>({
                                 salesOrderNumber: newOrder.saleOrderNumber,
                                 status: status,
-                                createdDateTime: status === 'Created' ? newOrder.createdAt : null,
+                                createdDateTime: status === 'To be Issued' ? newOrder.createdAt : null,
                                 updatedBy: null
                             }))
                     });

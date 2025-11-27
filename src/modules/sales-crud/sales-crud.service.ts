@@ -44,6 +44,11 @@ export class SalesCrudService {
     }
 
     try {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: dto.customerId },
+      });
+      const address = customer?.address || null;
+
       const deliveryDate =
         dto.deliveryDate && dto.deliveryDate.length === 10
           ? new Date(dto.deliveryDate).toISOString()
@@ -57,16 +62,26 @@ export class SalesCrudService {
           assignedUserId: null,
           customerId: dto.customerId,
           printerId: null,
+          address: address,
         },
         include: { customer: true },
       });
 
-      const statuses = ["Created", "Assigned", "Issued", "Packed", "Stored/Ready for Dispatch", "Dispatched"];
+      const statuses = [
+        "To be Issued",
+        "Under Issue",
+        "Issued",
+        "Under Packing",
+        "Packed",
+        "WIP Storage",
+        "Stored/Ready for Dispatch",
+        "Dispatched"
+      ];
       await this.prisma.sO_Status_Stepper.createMany({
         data: statuses.map(status => ({
           salesOrderNumber: newOrder.saleOrderNumber,
           status: status,
-          createdDateTime: status === 'Created' ? newOrder.createdAt : null,
+          createdDateTime: status === 'To be Issued' ? newOrder.createdAt : null,
           updatedBy: null,
         })),
       });
@@ -202,6 +217,14 @@ export class SalesCrudService {
     }
 
     try {
+      let address: string | undefined;
+      if (dto.customerId) {
+        const customer = await this.prisma.customer.findUnique({
+          where: { id: dto.customerId },
+        });
+        if (customer) address = customer.address;
+      }
+
       const deliveryDate =
         dto.deliveryDate && dto.deliveryDate.length === 10
           ? new Date(dto.deliveryDate).toISOString()
@@ -216,6 +239,7 @@ export class SalesCrudService {
           deliveryDate,
           UpdatedBy: user?.name || 'System',
           UpdatedDate: new Date(),
+          ...(address !== undefined && { address }),
         },
         include: {
           customer: true,
@@ -312,12 +336,18 @@ export class SalesCrudService {
             salesZone: true,
             packConfig: true,
             assignedUser: true,
+            _count: { select: { materialData: true } },
           },
         }),
         this.prisma.salesOrder.count({ where: whereClause }),
       ]);
 
-      return { orders, totalCount };
+      const mappedOrders = orders.map((order) => ({
+        ...order,
+        hasMaterialData: order._count.materialData > 0,
+      }));
+
+      return { orders: mappedOrders, totalCount };
     } catch (err: any) {
       throw new InternalServerErrorException(
         'Failed to fetch paginated sales orders.',

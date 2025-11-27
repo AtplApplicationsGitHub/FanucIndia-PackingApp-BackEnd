@@ -49,6 +49,12 @@ let SalesCrudService = class SalesCrudService {
             }
         }
         try {
+            const customer = await this.prisma.customer.findUnique({
+                where: {
+                    id: dto.customerId
+                }
+            });
+            const address = customer?.address || null;
             const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10 ? new Date(dto.deliveryDate).toISOString() : dto.deliveryDate;
             const newOrder = await this.prisma.salesOrder.create({
                 data: {
@@ -57,17 +63,20 @@ let SalesCrudService = class SalesCrudService {
                     userId,
                     assignedUserId: null,
                     customerId: dto.customerId,
-                    printerId: null
+                    printerId: null,
+                    address: address
                 },
                 include: {
                     customer: true
                 }
             });
             const statuses = [
-                "Created",
-                "Assigned",
+                "To be Issued",
+                "Under Issue",
                 "Issued",
+                "Under Packing",
                 "Packed",
+                "WIP Storage",
                 "Stored/Ready for Dispatch",
                 "Dispatched"
             ];
@@ -75,7 +84,7 @@ let SalesCrudService = class SalesCrudService {
                 data: statuses.map((status)=>({
                         salesOrderNumber: newOrder.saleOrderNumber,
                         status: status,
-                        createdDateTime: status === 'Created' ? newOrder.createdAt : null,
+                        createdDateTime: status === 'To be Issued' ? newOrder.createdAt : null,
                         updatedBy: null
                     }))
             });
@@ -251,6 +260,15 @@ let SalesCrudService = class SalesCrudService {
             throw new _common.NotFoundException('Sales order not found or access denied.');
         }
         try {
+            let address;
+            if (dto.customerId) {
+                const customer = await this.prisma.customer.findUnique({
+                    where: {
+                        id: dto.customerId
+                    }
+                });
+                if (customer) address = customer.address;
+            }
             const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10 ? new Date(dto.deliveryDate).toISOString() : dto.deliveryDate;
             const user = await this.prisma.user.findUnique({
                 where: {
@@ -265,7 +283,10 @@ let SalesCrudService = class SalesCrudService {
                     ...dto,
                     deliveryDate,
                     UpdatedBy: user?.name || 'System',
-                    UpdatedDate: new Date()
+                    UpdatedDate: new Date(),
+                    ...address !== undefined && {
+                        address
+                    }
                 },
                 include: {
                     customer: true,
@@ -405,15 +426,24 @@ let SalesCrudService = class SalesCrudService {
                         plantCode: true,
                         salesZone: true,
                         packConfig: true,
-                        assignedUser: true
+                        assignedUser: true,
+                        _count: {
+                            select: {
+                                materialData: true
+                            }
+                        }
                     }
                 }),
                 this.prisma.salesOrder.count({
                     where: whereClause
                 })
             ]);
+            const mappedOrders = orders.map((order)=>({
+                    ...order,
+                    hasMaterialData: order._count.materialData > 0
+                }));
             return {
-                orders,
+                orders: mappedOrders,
                 totalCount
             };
         } catch (err) {

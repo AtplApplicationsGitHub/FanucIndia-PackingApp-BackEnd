@@ -301,29 +301,40 @@ let AdminOrderService = class AdminOrderService {
                 throw new _common.ForbiddenException('You are only allowed to update the FG Location.');
             }
         }
+        let addressToSave = dto.address;
+        if (addressToSave === undefined && dto.customerId) {
+            const customer = await this.prisma.customer.findUnique({
+                where: {
+                    id: dto.customerId
+                }
+            });
+            if (customer) addressToSave = customer.address;
+        }
         const data = {
             ...dto,
             UpdatedBy: user.name,
-            UpdatedDate: new Date()
+            UpdatedDate: new Date(),
+            ...addressToSave !== undefined && {
+                address: addressToSave
+            }
         };
         if (dto.priority !== undefined && dto.priority !== null && order.status === null) {
             data.status = 'R105';
         }
         const now = new Date();
-        // Trigger for "Assigned" status - only if not already set
         if (dto.assignedUserId && order.assignedUserId !== dto.assignedUserId) {
-            const assignedStep = await this.prisma.sO_Status_Stepper.findUnique({
-                where: {
-                    salesOrderNumber_status: {
-                        salesOrderNumber: order.saleOrderNumber,
-                        status: "Assigned"
-                    }
-                }
-            });
-            if (assignedStep && !assignedStep.createdDateTime) {
-                await this.prisma.sO_Status_Stepper.update({
+            let targetStatus = "";
+            if (order.status === 'R105' || !order.status) {
+                targetStatus = "Under Issue";
+            } else if (order.status === 'W105') {
+                targetStatus = "Under Packing";
+            }
+            if (targetStatus) {
+                await this.prisma.sO_Status_Stepper.updateMany({
                     where: {
-                        id: assignedStep.id
+                        salesOrderNumber: order.saleOrderNumber,
+                        status: targetStatus,
+                        createdDateTime: null
                     },
                     data: {
                         createdDateTime: now,
@@ -332,12 +343,11 @@ let AdminOrderService = class AdminOrderService {
                 });
             }
         }
-        // Trigger for "Stored/Ready for Dispatch" status
         if (dto.fgLocation && order.fgLocation !== dto.fgLocation) {
             await this.prisma.sO_Status_Stepper.updateMany({
                 where: {
                     salesOrderNumber: order.saleOrderNumber,
-                    status: "Stored/Ready for Dispatch"
+                    status: "WIP Storage"
                 },
                 data: {
                     createdDateTime: now,
