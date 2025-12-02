@@ -42,7 +42,6 @@ const columnMapping = {
 let ErpMaterialImporterService = class ErpMaterialImporterService {
     async processFile(file, expectedSaleOrderNumber) {
         this.logger.log(`Starting to process file: ${file.originalname}`);
-        // [CHANGED] Added await because readFile is now async
         const records = await this.readFile(file);
         const validationError = await this.validateRecords(records, expectedSaleOrderNumber);
         if (validationError) {
@@ -54,6 +53,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         // Log the event to ERPMaterialLog
         const soNumber = String(records[0]["SO Number"]);
         try {
+            // Fixed Typo: eRPMaterialLog (CamelCase of ERPMaterialLog)
             await this.prisma.eRPMaterialLog.create({
                 data: {
                     dateTime: new Date(),
@@ -72,7 +72,6 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             message: `File processed successfully. ${renamedRecords.length} records upserted.`
         };
     }
-    // [CHANGED] Rewritten to use ExcelJS instead of xlsx
     async readFile(file) {
         try {
             const workbook = new _exceljs.Workbook();
@@ -127,15 +126,10 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         if (missingHeaders.length > 0) {
             return `Header mismatch. Missing columns: ${missingHeaders.join(', ')}`;
         }
-        const materialCodes = new Set();
+        // Removed duplicate material code check loop.
+        // We now iterate only to check for missing Material Code values.
         for (const record of records){
-            const materialCode = record['Material Code'];
-            if (materialCode) {
-                if (materialCodes.has(materialCode)) {
-                    return `Duplicate Material Code found in the file: ${materialCode}. Please ensure all material codes are unique.`;
-                }
-                materialCodes.add(materialCode);
-            } else {
+            if (!record['Material Code']) {
                 return 'Missing Material Code in one or more rows.';
             }
         }

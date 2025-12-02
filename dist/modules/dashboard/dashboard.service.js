@@ -22,7 +22,6 @@ function _ts_metadata(k, v) {
 /**
  * Calculates percentage change, handling division by zero.
  */ function calculatePercentageChange(current, previous) {
-    // ... (existing function)
     if (previous === 0) {
         return current > 0 ? 100.0 : 0.0; // If previous was 0, any increase is 100%
     }
@@ -30,7 +29,7 @@ function _ts_metadata(k, v) {
     return parseFloat(change.toFixed(1)); // Return with one decimal place
 }
 /**
- * [FIX] Helper to get date boundaries for queries, aware of IST.
+ * Helper to get date boundaries for queries, aware of IST.
  * This creates UTC timestamps that represent the start/end of a day in IST.
  */ function getDayBoundariesIST(date) {
     const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -51,12 +50,11 @@ let DashboardService = class DashboardService {
     /**
    * Gets the KPI counts for the ADMIN dashboard.
    */ async getAdminKpis() {
-        // ... (existing getAdminKpis logic)
         const now = new Date();
         const firstDayCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const firstDayNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         const firstDayPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        // [FIX] Use the IST-aware helper to get the start of today
+        // Use the IST-aware helper to get the start of today
         const { startOfDay: startOfToday } = getDayBoundariesIST(now);
         const [totalSoCount, newSoCurrentMonth, newSoPreviousMonth, overdueCount, overdueCountPrevious, dispatchedTotalCount, dispatchedCurrentMonth, dispatchedPreviousMonth] = await this.prisma.$transaction([
             // 1. Total SO Count (Main KPI)
@@ -142,31 +140,22 @@ let DashboardService = class DashboardService {
         };
     }
     // --- NEW ADMIN METHODS ---
-    /**
-   * [FIXED] Gets the count of new ERP material imports for the last 5 days.
-   * This relies on the fix in erp-material-importer.service.ts to log data.
-   */ async getAdminNewImports() {
+    async getAdminNewImports() {
         const results = [];
         const today = new Date();
         for(let i = 0; i < 5; i++){
             const targetDate = new Date(today);
             targetDate.setDate(today.getDate() - i);
-            // [FIX] Use IST-aware boundaries
+            // Use IST-aware boundaries
             const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
-            // Counts distinct SOs from the log table
-            const distinctImports = await this.prisma.eRPMaterialLog.findMany({
+            // Count SalesOrders created on this day
+            const count = await this.prisma.salesOrder.count({
                 where: {
-                    dateTime: {
+                    createdAt: {
                         gte: startOfDay,
                         lt: endOfDay
                     }
-                },
-                select: {
-                    soNo: true
-                },
-                distinct: [
-                    'soNo'
-                ]
+                }
             });
             const formattedDate = targetDate.toISOString().split('T')[0];
             let dayLabel;
@@ -185,18 +174,35 @@ let DashboardService = class DashboardService {
             results.push({
                 dayLabel: dayLabel,
                 date: formattedDate,
-                count: distinctImports.length
+                count: count
             });
         }
         return results;
     }
-    /**
-   * [FIXED] Gets a summary of dispatch statuses for today.
-   */ async getAdminDispatchSummary() {
-        // [FIX] Use IST-aware boundaries
+    async getAdminDispatchSummary() {
         const { startOfDay, endOfDay } = getDayBoundariesIST(new Date());
-        const [ordersToBeDispatched, ordersDispatchedToday] = await this.prisma.$transaction([
-            // Orders to be Dispatched: Delivery date is today AND status is NOT Dispatched
+        const [ordersToBeDispatched, readyForDispatchToday, ordersDispatchedToday] = await this.prisma.$transaction([
+            // 1. Orders to be Dispatched Today (Pending + Ready)
+            this.prisma.salesOrder.count({
+                where: {
+                    deliveryDate: {
+                        gte: startOfDay,
+                        lt: endOfDay
+                    },
+                    OR: [
+                        {
+                            status: null
+                        },
+                        {
+                            status: {
+                                not: 'Dispatched'
+                            }
+                        }
+                    ]
+                }
+            }),
+            // 2. Ready for Dispatch Today
+            // Since status is no longer updated on SalesOrder, we check the Stepper
             this.prisma.salesOrder.count({
                 where: {
                     deliveryDate: {
@@ -205,10 +211,18 @@ let DashboardService = class DashboardService {
                     },
                     status: {
                         not: 'Dispatched'
+                    },
+                    statusStepper: {
+                        some: {
+                            status: 'Ready for Dispatch',
+                            createdDateTime: {
+                                not: null
+                            }
+                        }
                     }
                 }
             }),
-            // Orders Dispatched Today: Stepper status 'Dispatched' was timestamped today
+            // 3. Orders Dispatched Today
             this.prisma.sO_Status_Stepper.count({
                 where: {
                     status: 'Dispatched',
@@ -221,12 +235,11 @@ let DashboardService = class DashboardService {
         ]);
         return {
             ordersToBeDispatched,
+            readyForDispatchToday,
             ordersDispatchedToday
         };
     }
-    /**
-   * [VERIFIED] Gets the system-wide count of orders by their current status.
-   */ async getAdminOverallStatus() {
+    async getAdminOverallStatus() {
         const [statusCounts, totalOrders] = await Promise.all([
             this.prisma.salesOrder.groupBy({
                 by: [
@@ -268,7 +281,7 @@ let DashboardService = class DashboardService {
         }
         return result;
     }
-    // --- ROW 3: ORDER STATUS BY ZONE (NEW) ---
+    // --- ROW 3: ORDER STATUS BY ZONE ---
     async getAdminStatusByZone() {
         const allZones = await this.prisma.salesZone.findMany({
             select: {
@@ -321,7 +334,7 @@ let DashboardService = class DashboardService {
         }
         return Array.from(resultsMap.values());
     }
-    // --- ROW 4: PAYMENT CLEARANCE BY ZONE (NEW) ---
+    // --- ROW 4: PAYMENT CLEARANCE BY ZONE ---
     async getAdminPaymentByZone() {
         const allZones = await this.prisma.salesZone.findMany({
             select: {
@@ -358,7 +371,7 @@ let DashboardService = class DashboardService {
         }
         return Array.from(resultsMap.values());
     }
-    // --- ROW 5: ORDERS BY PRODUCT & CUSTOMER (NEW) ---
+    // --- ROW 5: ORDERS BY PRODUCT & CUSTOMER (TOP 5) ---
     async getAdminOrdersByProduct() {
         const counts = await this.prisma.salesOrder.groupBy({
             by: [
@@ -371,7 +384,8 @@ let DashboardService = class DashboardService {
                 _count: {
                     id: 'desc'
                 }
-            }
+            },
+            take: 5
         });
         const productIds = counts.map((c)=>c.productId);
         const products = await this.prisma.product.findMany({
@@ -406,7 +420,8 @@ let DashboardService = class DashboardService {
                 _count: {
                     id: 'desc'
                 }
-            }
+            },
+            take: 5
         });
         const customerIds = counts.map((c)=>c.customerId).filter(Boolean);
         const customers = await this.prisma.customer.findMany({
@@ -430,9 +445,7 @@ let DashboardService = class DashboardService {
             }));
     }
     // --- EXISTING SALES METHODS ---
-    /**
-   * Gets the KPI counts for a specific SALES user.
-   */ async getSalesKpis(userId) {
+    async getSalesKpis(userId) {
         const [totalSoCount, dispatchedSoCount, r105Count, w105Count, f105Count, toBeIssuedCount] = await this.prisma.$transaction([
             this.prisma.salesOrder.count({
                 where: {
@@ -479,12 +492,7 @@ let DashboardService = class DashboardService {
             toBeIssuedCount
         };
     }
-    /**
-   * Gets the 5 most recent activities for a SALES user.
-   * [MODIFIED] This now returns the 5 most recently active *unique* orders.
-   * @param userId The ID of the logged-in SALES user.
-   */ async getSalesRecentActivity(userId) {
-        // 1. Get user's SO numbers
+    async getSalesRecentActivity(userId) {
         const userOrders = await this.prisma.salesOrder.findMany({
             where: {
                 userId: userId
@@ -497,7 +505,6 @@ let DashboardService = class DashboardService {
             return [];
         }
         const userSoNumbers = userOrders.map((o)=>o.saleOrderNumber);
-        // 2. Group by SO number, find the max (latest) timestamp for each
         const latestActivityGroups = await this.prisma.sO_Status_Stepper.groupBy({
             by: [
                 'salesOrderNumber'
@@ -513,7 +520,6 @@ let DashboardService = class DashboardService {
                     not: null
                 }
             },
-            // 3. Order by that latest timestamp (desc) and take the top 5
             orderBy: {
                 _max: {
                     createdDateTime: 'desc'
@@ -524,12 +530,10 @@ let DashboardService = class DashboardService {
         if (latestActivityGroups.length === 0) {
             return [];
         }
-        // 4. Create a list of 'where' conditions to find these specific rows
         const whereConditions = latestActivityGroups.map((group)=>({
                 salesOrderNumber: group.salesOrderNumber,
                 createdDateTime: group._max.createdDateTime
             }));
-        // 5. Fetch all matching full records in one query
         const activities = await this.prisma.sO_Status_Stepper.findMany({
             where: {
                 OR: whereConditions
@@ -539,7 +543,6 @@ let DashboardService = class DashboardService {
                 status: true,
                 createdDateTime: true
             },
-            // 6. Order the final list
             orderBy: {
                 createdDateTime: 'desc'
             }
@@ -550,13 +553,7 @@ let DashboardService = class DashboardService {
                 activityTimestamp: act.createdDateTime
             }));
     }
-    /**
-   * [FIXED] Gets payment clearance counts grouped by sales zone for a SALES user.
-   * This now *only* returns zones that the user has orders in.
-   *
-   * @param userId The ID of the logged-in SALES user.
-   */ async getSalesPaymentClearanceByZone(userId) {
-        // 1. Get the grouped counts for the specific user
+    async getSalesPaymentClearanceByZone(userId) {
         const rawCounts = await this.prisma.salesOrder.groupBy({
             by: [
                 'salesZoneId',
@@ -569,15 +566,12 @@ let DashboardService = class DashboardService {
                 id: true
             }
         });
-        // 2. If no orders are found for this user, return an empty array.
         if (rawCounts.length === 0) {
             return [];
         }
-        // 3. Get the unique Zone IDs *from the results*
         const zoneIds = [
             ...new Set(rawCounts.map((r)=>r.salesZoneId))
         ];
-        // 4. Fetch the names for *only* those zones
         const zones = await this.prisma.salesZone.findMany({
             where: {
                 id: {
@@ -589,7 +583,6 @@ let DashboardService = class DashboardService {
                 name: true
             }
         });
-        // 5. Initialize the results map *only* with the zones found
         const resultsMap = new Map();
         for (const zone of zones){
             resultsMap.set(zone.id, {
@@ -598,20 +591,16 @@ let DashboardService = class DashboardService {
                 paymentPending: 0
             });
         }
-        // 6. Populate the map with actual counts
         for (const countData of rawCounts){
             const zone = resultsMap.get(countData.salesZoneId);
-            // We can be sure the zone exists in the map because we built it from the results
             if (zone) {
                 if (countData.paymentClearance === true) {
                     zone.paymentCleared = countData._count.id;
                 } else {
-                    // This will catch false and null values
                     zone.paymentPending = countData._count.id;
                 }
             }
         }
-        // 7. Return the values as an array
         return Array.from(resultsMap.values());
     }
     constructor(prisma){

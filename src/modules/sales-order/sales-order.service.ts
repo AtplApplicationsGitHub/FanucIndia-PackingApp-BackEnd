@@ -350,7 +350,7 @@ export class SalesOrderService {
             "Under Packing",
             "Packed",
             "WIP Storage",
-            "Stored/Ready for Dispatch",
+            "Ready for Dispatch", // RENAMED
             "Dispatched"
           ];
           await tx.sO_Status_Stepper.createMany({

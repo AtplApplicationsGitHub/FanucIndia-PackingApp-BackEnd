@@ -95,27 +95,32 @@ export class ErpMaterialDataService {
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
-    const material = await this.prisma.eRP_Material_Data.findFirst({
+    // [UPDATED] Support duplicate materials: Find ALL matching records sorted by ID (insertion order)
+    const materials = await this.prisma.eRP_Material_Data.findMany({
       where: {
         Material_Code: materialCode,
         saleOrderNumber: salesOrder.saleOrderNumber,
       },
+      orderBy: { ID: 'asc' },
     });
 
-    if (!material)
+    if (materials.length === 0)
       throw new NotFoundException(
         'Material with specified code not found for this order.',
       );
 
-    if (material.Issue_stage >= material.Required_Qty) {
-      throw new BadRequestException('Cannot exceed the Required_Qty value');
+    // Find the first material record that hasn't reached its required quantity
+    const materialToUpdate = materials.find(m => m.Issue_stage < m.Required_Qty);
+
+    if (!materialToUpdate) {
+      throw new BadRequestException('Cannot exceed the Required_Qty value (all records full)');
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user ? user.name : 'System';
 
     const updatedMaterial = await this.prisma.eRP_Material_Data.update({
-      where: { ID: material.ID },
+      where: { ID: materialToUpdate.ID },
       data: {
         Issue_stage: { increment: 1 },
         UpdatedBy: userName,
@@ -174,6 +179,11 @@ export class ErpMaterialDataService {
 
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
+    // For manual update/edit, we default to the first record found to keep it simple,
+    // or you might want specific logic to target a specific row ID if the frontend supports it.
+    // For now, retaining findFirst as manual edit usually targets a specific line in UI
+    // but the DTO only sends materialCode. Ideally, DTO should send row ID for exact targeting.
+    // Assuming manual edit applies to the "first active" one or just the first one found.
     const material = await this.prisma.eRP_Material_Data.findFirst({
       where: {
         Material_Code: materialCode,
@@ -259,22 +269,31 @@ export class ErpMaterialDataService {
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
-    const material = await this.prisma.eRP_Material_Data.findFirst({
+    // [UPDATED] Support duplicate materials
+    const materials = await this.prisma.eRP_Material_Data.findMany({
       where: {
         Material_Code: materialCode,
         saleOrderNumber: salesOrder.saleOrderNumber,
       },
+      orderBy: { ID: 'asc' },
     });
 
-    if (!material)
+    if (materials.length === 0)
       throw new NotFoundException(
         'Material with specified code not found for this order.',
       );
 
-    const cap = Math.min(material.Required_Qty, material.Issue_stage);
-    if (material.Packing_stage >= cap) {
+    // Find the first material where packing stage < allowed cap
+    // Cap is min(Required_Qty, Issue_stage). Usually Issue_stage should be full before packing,
+    // but the system allows packing up to what's issued.
+    const materialToUpdate = materials.find(m => {
+        const cap = Math.min(m.Required_Qty, m.Issue_stage);
+        return m.Packing_stage < cap;
+    });
+
+    if (!materialToUpdate) {
       throw new BadRequestException(
-        'Cannot exceed the min(Required_Qty, Issue_stage) cap',
+        'Cannot exceed the min(Required_Qty, Issue_stage) cap (all records full)',
       );
     }
 
@@ -282,7 +301,7 @@ export class ErpMaterialDataService {
     const userName = user ? user.name : 'System';
 
     const updatedMaterial = await this.prisma.eRP_Material_Data.update({
-      where: { ID: material.ID },
+      where: { ID: materialToUpdate.ID },
       data: {
         Packing_stage: { increment: 1 },
         UpdatedBy: userName,

@@ -74,7 +74,7 @@ export class SalesCrudService {
         "Under Packing",
         "Packed",
         "WIP Storage",
-        "Stored/Ready for Dispatch",
+        "Ready for Dispatch", // RENAMED
         "Dispatched"
       ];
       await this.prisma.sO_Status_Stepper.createMany({
@@ -107,10 +107,10 @@ export class SalesCrudService {
         },
         select: {
           saleOrderNumber: true,
+          address: true,
           customer: {
             select: {
               name: true,
-              address: true,
             },
           },
         },
@@ -124,7 +124,7 @@ export class SalesCrudService {
         valid: true,
         saleOrderNumber: order.saleOrderNumber,
         customerName: order.customer?.name || '',
-        address: order.customer?.address || '',
+        address: order.address || '',
       };
     } catch (err) {
       if (err instanceof NotFoundException) {
@@ -358,7 +358,7 @@ export class SalesCrudService {
 
   async processLabelPrint(dto: LabelPrintDto, userId: number) {
     const { saleOrderNumbers } = dto;
-    const statusToSet = 'Stored/Ready for Dispatch'; // Matching your system's exact string
+    const statusToSet = 'Ready for Dispatch'; // RENAMED
 
     // Get the user name for the history log
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -375,14 +375,13 @@ export class SalesCrudService {
             status: { not: 'Dispatched' }, 
           },
           data: {
-            status: statusToSet,
             UpdatedBy: userName,
             UpdatedDate: now,
           },
         });
 
         // 2. Update the Stepper history
-        // We find the specific step "Stored/Ready for Dispatch" for these orders and mark it as done
+        // We find the specific step "Ready for Dispatch" for these orders and mark it as done
         await tx.sO_Status_Stepper.updateMany({
           where: {
             salesOrderNumber: { in: saleOrderNumbers },

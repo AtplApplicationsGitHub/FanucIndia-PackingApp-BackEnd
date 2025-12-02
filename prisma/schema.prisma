@@ -18,6 +18,7 @@ model User {
   salesOrders    SalesOrder[] @relation("CreatedOrders")
   assignedOrders SalesOrder[] @relation("AssignedOrders")
   dispatches     Dispatch[]
+  vehicleEntries VehicleEntry[]
 }
 
 model Product {
@@ -312,4 +313,21 @@ model SO_Status_StepperArchive {
   archivedAt       DateTime  @default(now())
 
   @@map("SO_Status_StepperArchive")
+}
+
+model VehicleEntry {
+  id              Int      @id @default(autoincrement())
+  customerName    String
+  vehicleNumber   String
+  transporterName String
+  driverNumber    String
+  
+  attachments     Json?
+  
+  createdBy       Int
+  createdAt       DateTime @default(now())
+  updatedBy       String?
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [createdBy], references: [id])
 }

@@ -20,9 +20,10 @@ import { FgDashboardModule } from './modules/fg-dashboard/fg-dashboard.module';
 import { FgStorageModule } from './modules/fg-storage/fg-storage.module';
 import { SoArchiveModule } from './modules/so-archive/so-archive.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { VehicleEntryModule } from './modules/vehicle-entry/vehicle-entry.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule, ErpMaterialImporterModule, DispatchModule, SoSearchModule, FgDashboardModule, FgStorageModule, SoArchiveModule, DashboardModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule, ErpMaterialImporterModule, DispatchModule, SoSearchModule, FgDashboardModule, FgStorageModule, SoArchiveModule, DashboardModule, VehicleEntryModule],
   controllers: [AppController],
   providers: [AppService],
 })

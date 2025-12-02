@@ -77,7 +77,7 @@ let SalesCrudService = class SalesCrudService {
                 "Under Packing",
                 "Packed",
                 "WIP Storage",
-                "Stored/Ready for Dispatch",
+                "Ready for Dispatch",
                 "Dispatched"
             ];
             await this.prisma.sO_Status_Stepper.createMany({
@@ -104,10 +104,10 @@ let SalesCrudService = class SalesCrudService {
                 },
                 select: {
                     saleOrderNumber: true,
+                    address: true,
                     customer: {
                         select: {
-                            name: true,
-                            address: true
+                            name: true
                         }
                     }
                 }
@@ -119,7 +119,7 @@ let SalesCrudService = class SalesCrudService {
                 valid: true,
                 saleOrderNumber: order.saleOrderNumber,
                 customerName: order.customer?.name || '',
-                address: order.customer?.address || ''
+                address: order.address || ''
             };
         } catch (err) {
             if (err instanceof _common.NotFoundException) {
@@ -452,7 +452,7 @@ let SalesCrudService = class SalesCrudService {
     }
     async processLabelPrint(dto, userId) {
         const { saleOrderNumbers } = dto;
-        const statusToSet = 'Stored/Ready for Dispatch'; // Matching your system's exact string
+        const statusToSet = 'Ready for Dispatch'; // RENAMED
         // Get the user name for the history log
         const user = await this.prisma.user.findUnique({
             where: {
@@ -475,13 +475,12 @@ let SalesCrudService = class SalesCrudService {
                         }
                     },
                     data: {
-                        status: statusToSet,
                         UpdatedBy: userName,
                         UpdatedDate: now
                     }
                 });
                 // 2. Update the Stepper history
-                // We find the specific step "Stored/Ready for Dispatch" for these orders and mark it as done
+                // We find the specific step "Ready for Dispatch" for these orders and mark it as done
                 await tx.sO_Status_Stepper.updateMany({
                     where: {
                         salesOrderNumber: {

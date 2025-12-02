@@ -23,10 +23,17 @@ let AdminDispatchSummaryDto = class AdminDispatchSummaryDto {
 _ts_decorate([
     (0, _swagger.ApiProperty)({
         example: 8,
-        description: "Count of orders with deliveryDate of today that are not yet dispatched"
+        description: "Count of orders with deliveryDate of today that are not yet dispatched (includes status NULL)"
     }),
     _ts_metadata("design:type", Number)
 ], AdminDispatchSummaryDto.prototype, "ordersToBeDispatched", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        example: 5,
+        description: "Count of orders with status 'Stored/Ready for Dispatch' and deliveryDate of today"
+    }),
+    _ts_metadata("design:type", Number)
+], AdminDispatchSummaryDto.prototype, "readyForDispatchToday", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
         example: 22,
