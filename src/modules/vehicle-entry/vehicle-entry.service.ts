@@ -82,4 +82,18 @@ export class VehicleEntryService {
       throw new InternalServerErrorException('Failed to upload attachments');
     }
   }
+
+  async getAttachments(entryId: number) {
+    const entry = await this.prisma.vehicleEntry.findUnique({
+      where: { id: entryId },
+      select: { attachments: true },
+    });
+
+    if (!entry) {
+      throw new NotFoundException(`Vehicle Entry with ID ${entryId} not found.`);
+    }
+
+    // Return the list of attachment objects (which contains fileName, path, etc.)
+    return (entry.attachments as any[]) || [];
+  }
 }

@@ -9,6 +9,7 @@ import {
   UseInterceptors,
   UploadedFiles,
   BadRequestException,
+  Get,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -58,5 +59,14 @@ export class VehicleEntryController {
       throw new BadRequestException('No files provided');
     }
     return this.service.uploadAttachments(id, files, req.user.userId);
+  }
+
+  @Get(':id/attachments')
+  @Roles('USER') 
+  @ApiOperation({ summary: 'Get the list of uploaded attachments for a vehicle entry' })
+  @ApiResponse({ status: 200, description: 'Returns an array of attachment objects.' })
+  @ApiResponse({ status: 404, description: 'Vehicle Entry not found.' })
+  getAttachments(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getAttachments(id);
   }
 }

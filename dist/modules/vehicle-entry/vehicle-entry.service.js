@@ -131,6 +131,21 @@ let VehicleEntryService = class VehicleEntryService {
             throw new _common.InternalServerErrorException('Failed to upload attachments');
         }
     }
+    async getAttachments(entryId) {
+        const entry = await this.prisma.vehicleEntry.findUnique({
+            where: {
+                id: entryId
+            },
+            select: {
+                attachments: true
+            }
+        });
+        if (!entry) {
+            throw new _common.NotFoundException(`Vehicle Entry with ID ${entryId} not found.`);
+        }
+        // Return the list of attachment objects (which contains fileName, path, etc.)
+        return entry.attachments || [];
+    }
     constructor(prisma, sftpService){
         this.prisma = prisma;
         this.sftpService = sftpService;

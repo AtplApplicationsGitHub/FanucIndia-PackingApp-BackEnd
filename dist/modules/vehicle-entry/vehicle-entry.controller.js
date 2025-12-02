@@ -40,6 +40,9 @@ let VehicleEntryController = class VehicleEntryController {
         }
         return this.service.uploadAttachments(id, files, req.user.userId);
     }
+    getAttachments(id) {
+        return this.service.getAttachments(id);
+    }
     constructor(service){
         this.service = service;
     }
@@ -96,6 +99,27 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], VehicleEntryController.prototype, "uploadAttachments", null);
+_ts_decorate([
+    (0, _common.Get)(':id/attachments'),
+    (0, _rolesdecorator.Roles)('USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get the list of uploaded attachments for a vehicle entry'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Returns an array of attachment objects.'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 404,
+        description: 'Vehicle Entry not found.'
+    }),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], VehicleEntryController.prototype, "getAttachments", null);
 VehicleEntryController = _ts_decorate([
     (0, _swagger.ApiTags)('Vehicle Entry'),
     (0, _swagger.ApiBearerAuth)(),
