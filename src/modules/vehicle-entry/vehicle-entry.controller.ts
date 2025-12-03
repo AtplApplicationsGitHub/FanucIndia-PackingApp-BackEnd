@@ -10,6 +10,7 @@ import {
   UploadedFiles,
   BadRequestException,
   Get,
+  Res,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -68,5 +69,15 @@ export class VehicleEntryController {
   @ApiResponse({ status: 404, description: 'Vehicle Entry not found.' })
   getAttachments(@Param('id', ParseIntPipe) id: number) {
     return this.service.getAttachments(id);
+  }
+
+  @Get(':id/attachments/:fileName')
+  @Roles('ADMIN', 'USER', 'SALES')
+  async downloadAttachment(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
+  ) {
+    return this.service.getAttachmentStream(id, fileName, res);
   }
 }

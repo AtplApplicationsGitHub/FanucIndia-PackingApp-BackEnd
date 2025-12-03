@@ -43,6 +43,9 @@ let VehicleEntryController = class VehicleEntryController {
     getAttachments(id) {
         return this.service.getAttachments(id);
     }
+    async downloadAttachment(id, fileName, res) {
+        return this.service.getAttachmentStream(id, fileName, res);
+    }
     constructor(service){
         this.service = service;
     }
@@ -120,6 +123,20 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], VehicleEntryController.prototype, "getAttachments", null);
+_ts_decorate([
+    (0, _common.Get)(':id/attachments/:fileName'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER', 'SALES'),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Param)('fileName')),
+    _ts_param(2, (0, _common.Res)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        String,
+        typeof Response === "undefined" ? Object : Response
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], VehicleEntryController.prototype, "downloadAttachment", null);
 VehicleEntryController = _ts_decorate([
     (0, _swagger.ApiTags)('Vehicle Entry'),
     (0, _swagger.ApiBearerAuth)(),

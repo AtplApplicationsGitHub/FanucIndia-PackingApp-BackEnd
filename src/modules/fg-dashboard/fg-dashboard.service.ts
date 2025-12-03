@@ -68,6 +68,13 @@ export class FgDashboardService {
           specialRemarks: true,
           UpdatedBy: true,
           UpdatedDate: true,
+          assignedUserId: true,
+          statusStepper: {
+            where: {
+              status: { in: ['Ready for Dispatch', 'WIP Storage'] }
+            },
+            select: { status: true }
+          },
           product: { select: { name: true } },
           customer: { select: { name: true } },
           salesZone: { select: { name: true } },
@@ -81,21 +88,29 @@ export class FgDashboardService {
       this.prisma.salesOrder.count({ where }),
     ]);
 
-    const fgData = salesOrders.map((order) => ({
-      id: order.id,
-      deliveryDate: order.deliveryDate,
-      saleOrderNumber: order.saleOrderNumber,
-      transferOrder: order.transferOrder,
-      product: order.product?.name,
-      customerName: order.customer?.name,
-      salesZone: order.salesZone?.name,
-      payment: order.paymentClearance,
-      status: order.status,
-      fgLocation: order.fgLocation,
-      specialRemarks: order.specialRemarks,
-      updatedBy: order.UpdatedBy,
-      updatedDate: order.UpdatedDate,
-    }));
+    const fgData = salesOrders.map((order) => {
+      const isReadyForDispatch = order.statusStepper.some(s => s.status === 'Ready for Dispatch');
+      const isWipStorage = order.statusStepper.some(s => s.status === 'WIP Storage');
+
+      return {
+        id: order.id,
+        deliveryDate: order.deliveryDate,
+        saleOrderNumber: order.saleOrderNumber,
+        transferOrder: order.transferOrder,
+        product: order.product?.name,
+        customerName: order.customer?.name,
+        salesZone: order.salesZone?.name,
+        payment: order.paymentClearance,
+        status: order.status,
+        fgLocation: order.fgLocation,
+        specialRemarks: order.specialRemarks,
+        updatedBy: order.UpdatedBy,
+        updatedDate: order.UpdatedDate,
+        assignedUserId: order.assignedUserId, 
+        isReadyForDispatch, 
+        isWipStorage, 
+      };
+    });
 
     return { data: fgData, totalCount };
   }

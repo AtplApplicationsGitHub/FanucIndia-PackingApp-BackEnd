@@ -53,8 +53,8 @@ let DispatchController = class DispatchController {
         }
         return this.dispatchService.addMobileDispatchSO(id, saleOrderNumber, req.user.userId);
     }
-    findAll() {
-        return this.dispatchService.findAll();
+    findAll(startDate, endDate) {
+        return this.dispatchService.findAll(startDate, endDate);
     }
     findAttachments(id) {
         return this.dispatchService.findAttachmentsByDispatchId(id);
@@ -193,8 +193,24 @@ _ts_decorate([
 _ts_decorate([
     (0, _common.Get)(),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get all dispatches with optional date filtering'
+    }),
+    (0, _swagger.ApiQuery)({
+        name: 'startDate',
+        required: false
+    }),
+    (0, _swagger.ApiQuery)({
+        name: 'endDate',
+        required: false
+    }),
+    _ts_param(0, (0, _common.Query)('startDate')),
+    _ts_param(1, (0, _common.Query)('endDate')),
     _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:paramtypes", [
+        String,
+        String
+    ]),
     _ts_metadata("design:returntype", void 0)
 ], DispatchController.prototype, "findAll", null);
 _ts_decorate([

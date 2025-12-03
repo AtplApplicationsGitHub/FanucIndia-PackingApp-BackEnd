@@ -99,24 +99,21 @@ let SoSearchService = class SoSearchService {
                 },
                 select: {
                     id: true,
-                    address: true,
                     vehicleNumber: true,
                     attachments: true,
                     UpdatedBy: true,
                     UpdatedDate: true,
-                    customerName: true,
-                    customerId: true,
-                    customer: {
-                        select: {
-                            name: true,
-                            address: true
-                        }
-                    },
                     transporterName: true,
                     transporterId: true,
                     transporter: {
                         select: {
                             name: true
+                        }
+                    },
+                    vehicleEntry: {
+                        select: {
+                            id: true,
+                            attachments: true
                         }
                     }
                 }

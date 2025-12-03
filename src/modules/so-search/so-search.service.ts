@@ -77,17 +77,19 @@ export class SoSearchService {
         where: { id: { in: dispatchIds } },
         select: {
           id: true,
-          address: true,
           vehicleNumber: true,
           attachments: true,
           UpdatedBy: true,
           UpdatedDate: true,
-          customerName: true, // For Customer fix
-          customerId: true,
-          customer: { select: { name: true, address: true } },
-          transporterName: true, // [ADD] For Transporter fix
+          transporterName: true, 
           transporterId: true,
           transporter: { select: { name: true } },
+          vehicleEntry: {
+            select: {
+              id: true,
+              attachments: true 
+            }
+          },
         },
       });
 

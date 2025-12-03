@@ -120,6 +120,20 @@ let FgDashboardService = class FgDashboardService {
                     specialRemarks: true,
                     UpdatedBy: true,
                     UpdatedDate: true,
+                    assignedUserId: true,
+                    statusStepper: {
+                        where: {
+                            status: {
+                                in: [
+                                    'Ready for Dispatch',
+                                    'WIP Storage'
+                                ]
+                            }
+                        },
+                        select: {
+                            status: true
+                        }
+                    },
                     product: {
                         select: {
                             name: true
@@ -146,7 +160,10 @@ let FgDashboardService = class FgDashboardService {
                 where
             })
         ]);
-        const fgData = salesOrders.map((order)=>({
+        const fgData = salesOrders.map((order)=>{
+            const isReadyForDispatch = order.statusStepper.some((s)=>s.status === 'Ready for Dispatch');
+            const isWipStorage = order.statusStepper.some((s)=>s.status === 'WIP Storage');
+            return {
                 id: order.id,
                 deliveryDate: order.deliveryDate,
                 saleOrderNumber: order.saleOrderNumber,
@@ -159,8 +176,12 @@ let FgDashboardService = class FgDashboardService {
                 fgLocation: order.fgLocation,
                 specialRemarks: order.specialRemarks,
                 updatedBy: order.UpdatedBy,
-                updatedDate: order.UpdatedDate
-            }));
+                updatedDate: order.UpdatedDate,
+                assignedUserId: order.assignedUserId,
+                isReadyForDispatch,
+                isWipStorage
+            };
+        });
         return {
             data: fgData,
             totalCount

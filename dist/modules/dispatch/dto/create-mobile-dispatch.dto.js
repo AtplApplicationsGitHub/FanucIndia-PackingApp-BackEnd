@@ -23,42 +23,6 @@ let CreateMobileDispatchDto = class CreateMobileDispatchDto {
 };
 _ts_decorate([
     (0, _swagger.ApiPropertyOptional)({
-        description: 'The ID of the existing customer.',
-        example: '1'
-    }),
-    (0, _classvalidator.IsOptional)(),
-    (0, _classvalidator.IsNumberString)(),
-    (0, _classvalidator.ValidateIf)((o)=>!o.customerName),
-    (0, _classvalidator.IsDefined)({
-        message: 'Either customerId or customerName must be provided.'
-    }),
-    _ts_metadata("design:type", Number)
-], CreateMobileDispatchDto.prototype, "customerId", void 0);
-_ts_decorate([
-    (0, _swagger.ApiPropertyOptional)({
-        description: 'The name of the new or existing customer.',
-        example: 'Tata Motors'
-    }),
-    (0, _classvalidator.IsOptional)(),
-    (0, _classvalidator.IsString)(),
-    (0, _classvalidator.IsNotEmpty)(),
-    (0, _classvalidator.ValidateIf)((o)=>!o.customerId),
-    (0, _classvalidator.IsDefined)({
-        message: 'Either customerId or customerName must be provided.'
-    }),
-    _ts_metadata("design:type", String)
-], CreateMobileDispatchDto.prototype, "customerName", void 0);
-_ts_decorate([
-    (0, _swagger.ApiProperty)({
-        description: 'The dispatch address.',
-        example: '123 Industrial Area, Pune'
-    }),
-    (0, _classvalidator.IsString)(),
-    (0, _classvalidator.IsNotEmpty)(),
-    _ts_metadata("design:type", String)
-], CreateMobileDispatchDto.prototype, "address", void 0);
-_ts_decorate([
-    (0, _swagger.ApiPropertyOptional)({
         description: 'The ID of the existing transporter.',
         example: '2'
     }),

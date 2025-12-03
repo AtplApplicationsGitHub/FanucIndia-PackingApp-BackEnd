@@ -96,4 +96,27 @@ export class VehicleEntryService {
     // Return the list of attachment objects (which contains fileName, path, etc.)
     return (entry.attachments as any[]) || [];
   }
+
+  async getAttachmentStream(entryId: number, fileName: string, res: any) {
+    const entry = await this.prisma.vehicleEntry.findUnique({ where: { id: entryId } });
+    if (!entry) throw new NotFoundException('Entry not found');
+
+    const attachments = (entry.attachments as any[]) || [];
+    const fileData = attachments.find(a => a.fileName === fileName);
+    
+    if (!fileData) throw new NotFoundException('File not found in record');
+
+    try {
+      const stream = await this.sftpService.getStream(fileData.path);
+      res.setHeader('Content-Type', fileData.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+      
+      if (Buffer.isBuffer(stream)) return res.end(stream);
+
+      return (stream as NodeJS.ReadableStream).pipe(res);
+      
+    } catch (e) {
+      throw new InternalServerErrorException('Could not retrieve file from storage');
+    }
+  }
 }

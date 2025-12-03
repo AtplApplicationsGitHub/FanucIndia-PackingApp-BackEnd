@@ -90,32 +90,19 @@ let DispatchService = class DispatchService {
         return user?.name || 'System';
     }
     async create(dto, files, userId) {
-        const { customerId: customerIdString, customerName, address, transporterId: transporterIdString, vehicleNumber, saleOrderNumbers } = dto;
-        return this.prisma.$transaction(async (tx)=>{
-            let finalCustomerId = null;
-            let finalCustomerName = null;
-            if (customerIdString) {
-                // User selected an existing customer from dropdown
-                const parsedCustomerId = parseInt(customerIdString, 10);
-                if (isNaN(parsedCustomerId)) {
-                    throw new _common.BadRequestException('Invalid customerId provided.');
-                }
-                const customerExists = await tx.customer.findUnique({
-                    where: {
-                        id: parsedCustomerId
-                    }
-                });
-                if (!customerExists) {
-                    throw new _common.BadRequestException(`Customer with ID ${parsedCustomerId} not found.`);
-                }
-                finalCustomerId = parsedCustomerId;
-            } else if (customerName) {
-                // User typed a new customer name
-                this.logger.log(`Saving dispatch with direct customer name: "${customerName}".`);
-                finalCustomerName = customerName;
-            } else {
-                throw new _common.BadRequestException('Either customerId or customerName must be provided.');
+        const { transporterId: transporterIdString, vehicleNumber, saleOrderNumbers } = dto;
+        const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
+            where: {
+                vehicleNumber: vehicleNumber
+            },
+            orderBy: {
+                createdAt: 'desc'
             }
+        });
+        if (!vehicleEntry) {
+            throw new _common.BadRequestException(`Vehicle Number '${vehicleNumber}' not found in Vehicle Entry records.`);
+        }
+        return this.prisma.$transaction(async (tx)=>{
             const user = await tx.user.findUnique({
                 where: {
                     id: userId
@@ -138,11 +125,9 @@ let DispatchService = class DispatchService {
             }
             const newDispatch = await tx.dispatch.create({
                 data: {
-                    customerId: finalCustomerId,
-                    customerName: finalCustomerName,
-                    address: address,
                     transporterId: finalTransporterId === null ? undefined : finalTransporterId,
                     vehicleNumber,
+                    vehicleEntryId: vehicleEntry.id,
                     createdBy: userId,
                     UpdatedBy: userName,
                     UpdatedDate: new Date(),
@@ -220,25 +205,16 @@ let DispatchService = class DispatchService {
         return dispatch.attachments || [];
     }
     async createMobileDispatchHeader(dto, userId) {
-        const { customerId, customerName, address, transporterId, transporterName, vehicleNumber } = dto;
-        return this.prisma.$transaction(async (tx)=>{
-            let finalCustomerId = null;
-            let finalCustomerName = null;
-            if (customerId) {
-                finalCustomerId = Number(customerId);
-                const customerExists = await tx.customer.findUnique({
-                    where: {
-                        id: finalCustomerId
-                    }
-                });
-                if (!customerExists) {
-                    throw new _common.BadRequestException(`Customer with ID ${customerId} not found.`);
-                }
-            } else if (customerName) {
-                finalCustomerName = customerName;
-            } else {
-                throw new _common.BadRequestException('Either customerId or customerName must be provided.');
+        const { transporterId, transporterName, vehicleNumber } = dto;
+        const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
+            where: {
+                vehicleNumber: vehicleNumber
             }
+        });
+        if (!vehicleEntry) {
+            throw new _common.BadRequestException(`Vehicle Number '${vehicleNumber}' not found in Vehicle Entry records.`);
+        }
+        return this.prisma.$transaction(async (tx)=>{
             let finalTransporterId = null;
             let finalTransporterName = null;
             if (transporterId) {
@@ -265,9 +241,6 @@ let DispatchService = class DispatchService {
             const userName = user?.name || 'System';
             const newDispatch = await tx.dispatch.create({
                 data: {
-                    customerId: finalCustomerId,
-                    customerName: finalCustomerName,
-                    address,
                     transporterId: finalTransporterId,
                     transporterName: finalTransporterName,
                     vehicleNumber,
@@ -386,17 +359,26 @@ let DispatchService = class DispatchService {
             return createdLink;
         });
     }
-    async findAll() {
+    async findAll(startDate, endDate) {
+        const where = {};
+        if (startDate || endDate) {
+            const start = startDate ? new Date(startDate) : new Date(0);
+            const end = endDate ? new Date(endDate) : new Date();
+            end.setHours(23, 59, 59, 999);
+            where.createdAt = {
+                gte: start,
+                lte: end
+            };
+        }
         const dispatches = await this.prisma.dispatch.findMany({
+            where,
             orderBy: {
                 createdAt: 'desc'
             },
             select: {
                 id: true,
-                customerId: true,
-                customerName: true,
-                address: true,
                 transporterId: true,
+                transporterName: true,
                 vehicleNumber: true,
                 attachments: true,
                 createdBy: true,
@@ -404,11 +386,6 @@ let DispatchService = class DispatchService {
                 updatedAt: true,
                 UpdatedBy: true,
                 UpdatedDate: true,
-                customer: {
-                    select: {
-                        name: true
-                    }
-                },
                 transporter: {
                     select: {
                         name: true
@@ -427,7 +404,7 @@ let DispatchService = class DispatchService {
             }));
     }
     async update(id, dto, userId) {
-        const { customerId, customerName, address, transporterId, vehicleNumber } = dto;
+        const { transporterId, vehicleNumber } = dto;
         const user = await this.prisma.user.findUnique({
             where: {
                 id: userId
@@ -441,29 +418,11 @@ let DispatchService = class DispatchService {
         if (!existingDispatch) {
             throw new _common.NotFoundException(`Dispatch with ID ${id} not found.`);
         }
-        let finalCustomerId = null;
-        let finalCustomerName = null;
-        // [CHANGE] Add update logic
-        if (customerId) {
-            finalCustomerId = Number(customerId);
-        } else if (customerName) {
-            finalCustomerName = customerName;
-        } else {
-            // If user clears the field, we respect that (though UI shouldn't allow it)
-            finalCustomerId = null;
-            finalCustomerName = null;
-        }
-        // [END CHANGE]
         return this.prisma.dispatch.update({
             where: {
                 id
             },
             data: {
-                // [CHANGE] Update data
-                customerId: finalCustomerId,
-                customerName: finalCustomerName,
-                address: address,
-                // [END CHANGE]
                 transporterId: transporterId ? Number(transporterId) : undefined,
                 vehicleNumber,
                 UpdatedBy: user?.name || 'System',
@@ -472,9 +431,8 @@ let DispatchService = class DispatchService {
         });
     }
     async updateMobileDispatch(dispatchId, dto, userId) {
-        const { customerId, customerName, address, transporterId, transporterName, vehicleNumber } = dto;
+        const { transporterId, transporterName, vehicleNumber } = dto;
         return this.prisma.$transaction(async (tx)=>{
-            // 1. Verify Dispatch Exists
             const dispatch = await tx.dispatch.findUnique({
                 where: {
                     id: dispatchId
@@ -482,25 +440,6 @@ let DispatchService = class DispatchService {
             });
             if (!dispatch) {
                 throw new _common.NotFoundException(`Dispatch with ID ${dispatchId} not found.`);
-            }
-            // 2. Determine Customer ID (Find by ID, Find by Name, or Create)
-            let finalCustomerId = null;
-            let finalCustomerName = null;
-            if (customerId) {
-                finalCustomerId = Number(customerId);
-                const customerExists = await tx.customer.findUnique({
-                    where: {
-                        id: finalCustomerId
-                    }
-                });
-                if (!customerExists) {
-                    throw new _common.BadRequestException(`Customer with ID ${customerId} not found.`);
-                }
-            } else if (customerName) {
-                // This is the key change: just store the name, don't create/update customer
-                finalCustomerName = customerName;
-            } else {
-                throw new _common.BadRequestException('Either customerId or customerName must be provided for update.');
             }
             let finalTransporterId = null;
             let finalTransporterName = null;
@@ -521,15 +460,11 @@ let DispatchService = class DispatchService {
                 finalTransporterName = null;
             }
             const userName = await this.getUserName(userId);
-            // 5. Update Dispatch Record
             const updatedDispatch = await tx.dispatch.update({
                 where: {
                     id: dispatchId
                 },
                 data: {
-                    customerId: finalCustomerId,
-                    customerName: finalCustomerName,
-                    address: address,
                     transporterId: finalTransporterId,
                     transporterName: finalTransporterName,
                     vehicleNumber: vehicleNumber,
@@ -537,7 +472,6 @@ let DispatchService = class DispatchService {
                     UpdatedDate: new Date()
                 },
                 include: {
-                    customer: true,
                     transporter: true
                 }
             });
@@ -551,6 +485,17 @@ let DispatchService = class DispatchService {
             },
             orderBy: {
                 createdAt: 'asc'
+            },
+            include: {
+                salesOrder: {
+                    select: {
+                        customer: {
+                            select: {
+                                name: true
+                            }
+                        }
+                    }
+                }
             }
         });
     }
@@ -558,9 +503,6 @@ let DispatchService = class DispatchService {
         const dispatch = await this.prisma.dispatch.findUnique({
             where: {
                 id: dispatchId
-            },
-            select: {
-                customerId: true
             }
         });
         if (!dispatch) {
@@ -574,7 +516,6 @@ let DispatchService = class DispatchService {
                 }
             },
             select: {
-                customerId: true,
                 saleOrderNumber: true
             }
         });
@@ -674,7 +615,6 @@ let DispatchService = class DispatchService {
                 id: dispatchId
             },
             include: {
-                customer: true,
                 dispatchSOs: {
                     select: {
                         saleOrderNumber: true
@@ -694,31 +634,27 @@ let DispatchService = class DispatchService {
             align: 'center'
         });
         doc.moveDown();
-        doc.fontSize(12).text(`Customer Name: ${dispatch.customerName || dispatch.customer?.name || 'N/A'}`);
-        doc.text(`Address: ${dispatch.address}`);
-        doc.moveDown();
         const tableTop = doc.y;
-        const tableHeaders = [
-            'S.No',
-            'Sale Order Number'
-        ];
-        const col1X = 50; // X position for S.No
-        const col2X = 150; // X position for Sale Order Number (matches data)
-        doc.font('Helvetica-Bold');
-        // Draw Headers using specific X positions
-        doc.text(tableHeaders[0], col1X, tableTop); // "S.No" at 50
-        doc.text(tableHeaders[1], col2X, tableTop); // "Sale Order Number" at 150
+        const itemHeight = 25;
+        const col1X = 50;
+        const col2X = 150;
+        const col1Width = 100;
+        const col2Width = 200;
+        doc.rect(col1X, tableTop, col1Width + col2Width, itemHeight).fillAndStroke('#FFD200', '#000000');
+        doc.fillColor('#000000').font('Helvetica-Bold');
+        doc.text('S.No', col1X + 10, tableTop + 8);
+        doc.text('Sale Order Number', col2X + 10, tableTop + 8);
         doc.font('Helvetica');
-        // Draw Rows (This part is already correct)
         dispatch.dispatchSOs.forEach((so, index)=>{
-            const y = tableTop + 25 + index * 25;
-            doc.text(String(index + 1), col1X, y); // S.No data at 50
-            doc.text(so.saleOrderNumber, col2X, y); // Sale Order Number data at 150
+            const y = tableTop + itemHeight + index * itemHeight;
+            const bgColor = index % 2 === 0 ? '#FFF4CC' : '#FFFFFF';
+            doc.rect(col1X, y, col1Width + col2Width, itemHeight).fillAndStroke(bgColor, '#000000');
+            doc.fillColor('#000000');
+            doc.text(String(index + 1), col1X + 10, y + 8);
+            doc.text(so.saleOrderNumber, col2X + 10, y + 8);
         });
         return new Promise((resolve)=>{
-            doc.on('end', ()=>{
-                resolve(Buffer.concat(buffers));
-            });
+            doc.on('end', ()=>resolve(Buffer.concat(buffers)));
             doc.end();
         });
     }

@@ -15,8 +15,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthRequest } from '../auth/types/auth-request.type';
@@ -26,7 +25,7 @@ import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { CreateMobileDispatchDto } from './dto/create-mobile-dispatch.dto';
 import { UpdateMobileDispatchDto } from './dto/update-mobile-dispatch.dto';
 import { Response } from 'express';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody, ApiParam, ApiResponse, ApiQuery } from '@nestjs/swagger';
 
 @ApiTags('Dispatch')
 @ApiBearerAuth()
@@ -101,8 +100,14 @@ export class DispatchController {
 
   @Get()
   @Roles('ADMIN', 'USER')
-  findAll() {
-    return this.dispatchService.findAll();
+  @ApiOperation({ summary: 'Get all dispatches with optional date filtering' })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  findAll(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.dispatchService.findAll(startDate, endDate);
   }
 
   @Get(':id/attachments')
