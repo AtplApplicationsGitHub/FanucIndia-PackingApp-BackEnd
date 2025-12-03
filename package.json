@@ -25,7 +25,8 @@
     "fast-redact": ">=3.6.0",
     "body-parser": "^1.20.3",
     "glob": "^10.4.5",
-    "cross-spawn": "^7.0.5"
+    "cross-spawn": "^7.0.5",
+    "express": "^5.2.0"
   },
   "dependencies": {
     "@mui/icons-material": "^7.2.0",
