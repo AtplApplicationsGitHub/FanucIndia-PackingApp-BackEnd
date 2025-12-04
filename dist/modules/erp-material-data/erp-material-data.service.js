@@ -179,7 +179,7 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             issueStageCompleted
         });
     }
-    async updateIssueStage(orderId, materialCode, newIssueStage, userId, userRole) {
+    async updateIssueStage(orderId, materialCode, newIssueStage, userId, userRole, materialId) {
         await verifyOrderAccess(this.prisma, orderId, userId, userRole);
         const salesOrder = await this.prisma.salesOrder.findUnique({
             where: {
@@ -190,17 +190,21 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             }
         });
         if (!salesOrder) throw new _common.NotFoundException('Sales Order not found');
-        // For manual update/edit, we default to the first record found to keep it simple,
-        // or you might want specific logic to target a specific row ID if the frontend supports it.
-        // For now, retaining findFirst as manual edit usually targets a specific line in UI
-        // but the DTO only sends materialCode. Ideally, DTO should send row ID for exact targeting.
-        // Assuming manual edit applies to the "first active" one or just the first one found.
-        const material = await this.prisma.eRP_Material_Data.findFirst({
-            where: {
-                Material_Code: materialCode,
-                saleOrderNumber: salesOrder.saleOrderNumber
-            }
-        });
+        let material;
+        if (materialId) {
+            material = await this.prisma.eRP_Material_Data.findUnique({
+                where: {
+                    ID: materialId
+                }
+            });
+        } else {
+            material = await this.prisma.eRP_Material_Data.findFirst({
+                where: {
+                    Material_Code: materialCode,
+                    saleOrderNumber: salesOrder.saleOrderNumber
+                }
+            });
+        }
         if (!material) throw new _common.NotFoundException('Material with specified code not found for this order.');
         if (newIssueStage > material.Required_Qty) {
             throw new _common.BadRequestException('Cannot exceed the Required_Qty value');
@@ -363,7 +367,7 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             packingStageCompleted
         });
     }
-    async updatePackingStage(orderId, materialCode, newPackingStage, userId, userRole) {
+    async updatePackingStage(orderId, materialCode, newPackingStage, userId, userRole, materialId) {
         await verifyOrderAccess(this.prisma, orderId, userId, userRole);
         if (newPackingStage < 0) {
             throw new _common.BadRequestException('Packing_stage cannot be negative');
@@ -377,12 +381,21 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             }
         });
         if (!salesOrder) throw new _common.NotFoundException('Sales Order not found');
-        const material = await this.prisma.eRP_Material_Data.findFirst({
-            where: {
-                Material_Code: materialCode,
-                saleOrderNumber: salesOrder.saleOrderNumber
-            }
-        });
+        let material;
+        if (materialId) {
+            material = await this.prisma.eRP_Material_Data.findUnique({
+                where: {
+                    ID: materialId
+                }
+            });
+        } else {
+            material = await this.prisma.eRP_Material_Data.findFirst({
+                where: {
+                    Material_Code: materialCode,
+                    saleOrderNumber: salesOrder.saleOrderNumber
+                }
+            });
+        }
         if (!material) throw new _common.NotFoundException('Material with specified code not found for this order.');
         const cap = Math.min(material.Required_Qty, material.Issue_stage);
         if (newPackingStage > cap) {

@@ -90,7 +90,8 @@ export class ErpMaterialDataController {
       body.materialCode,
       body.issueStage,
       userId,
-      role
+      role,
+      body.materialId,
     );
   }
 
@@ -129,7 +130,8 @@ export class ErpMaterialDataController {
       body.materialCode,
       body.packingStage,
       userId,
-      role
+      role,
+      body.materialId,
     );
   }
 }

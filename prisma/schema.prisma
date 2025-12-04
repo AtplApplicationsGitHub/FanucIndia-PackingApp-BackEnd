@@ -269,9 +269,6 @@ model ERP_Material_FileArchive {
 
 model DispatchArchive {
   id            Int           @id 
-  customerId    Int?
-  customerName  String?
-  address       String
   transporterId Int?
   transporterName String?
   vehicleNumber String
@@ -279,7 +276,8 @@ model DispatchArchive {
   createdBy     Int
   createdAt     DateTime
   UpdatedBy     String?             
-  UpdatedDate   DateTime?          
+  UpdatedDate   DateTime?
+  vehicleEntryId  Int?          
   archivedAt    DateTime      @default(now())
 }
 
@@ -330,4 +328,21 @@ model VehicleEntry {
 
   user            User     @relation(fields: [createdBy], references: [id])
   dispatches      Dispatch[]
+}
+
+model VehicleEntryArchive {
+  id              Int      @id
+  customerName    String
+  vehicleNumber   String
+  transporterName String
+  driverNumber    String
+
+  attachments     Json?
+
+  createdBy       Int
+  createdAt       DateTime
+  updatedBy       String?
+  updatedAt       DateTime
+  
+  archivedAt      DateTime @default(now())
 }

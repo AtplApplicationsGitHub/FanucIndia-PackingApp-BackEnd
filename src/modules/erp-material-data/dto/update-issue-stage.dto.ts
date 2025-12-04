@@ -1,5 +1,5 @@
-import { IsString, IsInt, Min } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsInt, Min, IsOptional, IsNumber } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateIssueStageDto {
   @ApiProperty({ example: 'MAT-12345', description: 'The material code.' })
@@ -10,4 +10,9 @@ export class UpdateIssueStageDto {
   @IsInt()
   @Min(0)
   issueStage: number;
+
+  @ApiPropertyOptional({ example: 101, description: 'The unique ID of the material row.' })
+  @IsOptional()
+  @IsNumber()
+  materialId?: number;
 }

@@ -38,5 +38,14 @@ _ts_decorate([
     (0, _classvalidator.Min)(0),
     _ts_metadata("design:type", Number)
 ], UpdateIssueStageDto.prototype, "issueStage", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
+        example: 101,
+        description: 'The unique ID of the material row.'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsNumber)(),
+    _ts_metadata("design:type", Number)
+], UpdateIssueStageDto.prototype, "materialId", void 0);
 
 //# sourceMappingURL=update-issue-stage.dto.js.map

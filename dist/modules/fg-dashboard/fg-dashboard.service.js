@@ -128,10 +128,14 @@ let FgDashboardService = class FgDashboardService {
                                     'Ready for Dispatch',
                                     'WIP Storage'
                                 ]
+                            },
+                            createdDateTime: {
+                                not: null
                             }
                         },
                         select: {
-                            status: true
+                            status: true,
+                            createdDateTime: true
                         }
                     },
                     product: {

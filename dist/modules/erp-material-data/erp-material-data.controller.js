@@ -43,7 +43,7 @@ let ErpMaterialDataController = class ErpMaterialDataController {
     }
     updateIssueStage(orderId, body, req) {
         const { userId, role } = req.user;
-        return this.erpMaterialDataService.updateIssueStage(orderId, body.materialCode, body.issueStage, userId, role);
+        return this.erpMaterialDataService.updateIssueStage(orderId, body.materialCode, body.issueStage, userId, role, body.materialId);
     }
     incrementPackingStage(orderId, body, req) {
         const { userId, role } = req.user;
@@ -51,7 +51,7 @@ let ErpMaterialDataController = class ErpMaterialDataController {
     }
     updatePackingStage(orderId, body, req) {
         const { userId, role } = req.user;
-        return this.erpMaterialDataService.updatePackingStage(orderId, body.materialCode, body.packingStage, userId, role);
+        return this.erpMaterialDataService.updatePackingStage(orderId, body.materialCode, body.packingStage, userId, role, body.materialId);
     }
     constructor(erpMaterialDataService){
         this.erpMaterialDataService = erpMaterialDataService;

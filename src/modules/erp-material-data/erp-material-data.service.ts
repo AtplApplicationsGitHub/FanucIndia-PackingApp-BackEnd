@@ -169,6 +169,7 @@ export class ErpMaterialDataService {
     newIssueStage: number,
     userId: number,
     userRole: string,
+    materialId?: number,
   ) {
     await verifyOrderAccess(this.prisma, orderId, userId, userRole);
 
@@ -179,17 +180,19 @@ export class ErpMaterialDataService {
 
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
-    // For manual update/edit, we default to the first record found to keep it simple,
-    // or you might want specific logic to target a specific row ID if the frontend supports it.
-    // For now, retaining findFirst as manual edit usually targets a specific line in UI
-    // but the DTO only sends materialCode. Ideally, DTO should send row ID for exact targeting.
-    // Assuming manual edit applies to the "first active" one or just the first one found.
-    const material = await this.prisma.eRP_Material_Data.findFirst({
-      where: {
-        Material_Code: materialCode,
-        saleOrderNumber: salesOrder.saleOrderNumber,
-      },
-    });
+    let material;
+    if (materialId) {
+      material = await this.prisma.eRP_Material_Data.findUnique({
+        where: { ID: materialId },
+      });
+    } else {
+      material = await this.prisma.eRP_Material_Data.findFirst({
+        where: {
+          Material_Code: materialCode,
+          saleOrderNumber: salesOrder.saleOrderNumber,
+        },
+      });
+    }
 
     if (!material)
       throw new NotFoundException(
@@ -349,6 +352,7 @@ export class ErpMaterialDataService {
     newPackingStage: number,
     userId: number,
     userRole: string,
+    materialId?: number,
   ) {
     await verifyOrderAccess(this.prisma, orderId, userId, userRole);
     if (newPackingStage < 0) {
@@ -361,12 +365,19 @@ export class ErpMaterialDataService {
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
-    const material = await this.prisma.eRP_Material_Data.findFirst({
-      where: {
-        Material_Code: materialCode,
-        saleOrderNumber: salesOrder.saleOrderNumber,
-      },
-    });
+    let material;
+    if (materialId) {
+      material = await this.prisma.eRP_Material_Data.findUnique({
+        where: { ID: materialId },
+      });
+    } else {
+      material = await this.prisma.eRP_Material_Data.findFirst({
+        where: {
+          Material_Code: materialCode,
+          saleOrderNumber: salesOrder.saleOrderNumber,
+        },
+      });
+    }
 
     if (!material)
       throw new NotFoundException(

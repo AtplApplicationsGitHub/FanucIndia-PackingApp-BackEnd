@@ -71,9 +71,13 @@ export class FgDashboardService {
           assignedUserId: true,
           statusStepper: {
             where: {
-              status: { in: ['Ready for Dispatch', 'WIP Storage'] }
+              status: { in: ['Ready for Dispatch', 'WIP Storage'] },
+              createdDateTime: { not: null }, 
             },
-            select: { status: true }
+            select: {
+              status: true,
+              createdDateTime: true,                 
+            },
           },
           product: { select: { name: true } },
           customer: { select: { name: true } },

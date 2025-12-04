@@ -81,7 +81,8 @@ let SoArchiveService = class SoArchiveService {
                                     select: {
                                         dispatchSOs: true
                                     }
-                                }
+                                },
+                                vehicleEntry: true
                             }
                         }
                     }
@@ -96,25 +97,45 @@ let SoArchiveService = class SoArchiveService {
         }
         return this.prisma.$transaction(async (tx)=>{
             const { id, updatedAt, materialData, materialFilesByNumber, Dispatch_SO, statusStepper, ...soData } = so;
+            // 1. Archive Sales Order
             await tx.salesOrderArchive.create({
                 data: soData
             });
+            // 2. Archive Material Data
             if (materialData.length > 0) {
                 await tx.eRP_Material_DataArchive.createMany({
                     data: materialData.map(({ ID, ...d })=>d)
                 });
             }
+            // 3. Archive Material Files
             if (materialFilesByNumber.length > 0) {
                 await tx.eRP_Material_FileArchive.createMany({
                     data: materialFilesByNumber.map(({ ID, updatedAt, ...f })=>f)
                 });
             }
             const dispatches = Dispatch_SO.map((dso)=>dso.dispatch);
+            // 4. Archive Vehicle Entries (New Logic)
+            // Extract unique Vehicle Entries from the dispatches
+            const vehicleEntries = [
+                ...new Map(dispatches.map((d)=>d.vehicleEntry).filter((ve)=>!!ve).map((ve)=>[
+                        ve.id,
+                        ve
+                    ])).values()
+            ];
+            if (vehicleEntries.length > 0) {
+                await tx.vehicleEntryArchive.createMany({
+                    data: vehicleEntries.map(({ attachments, ...ve })=>({
+                            ...ve,
+                            attachments: attachments ?? _client.Prisma.DbNull
+                        })),
+                    skipDuplicates: true
+                });
+            }
+            // 5. Archive Dispatches
             if (dispatches.length > 0) {
                 await tx.dispatchArchive.createMany({
-                    data: dispatches.map(({ updatedAt, _count, ...d })=>({
+                    data: dispatches.map(({ updatedAt, _count, vehicleEntry, ...d })=>({
                             ...d,
-                            customerName: d.customerName,
                             transporterName: d.transporterName,
                             attachments: d.attachments ?? _client.Prisma.DbNull
                         })),
@@ -124,6 +145,7 @@ let SoArchiveService = class SoArchiveService {
                     data: Dispatch_SO.map(({ id, dispatch, ...dso })=>dso)
                 });
             }
+            // 6. Delete Original Records
             await tx.eRP_Material_File.deleteMany({
                 where: {
                     saleOrderNumber
@@ -139,14 +161,31 @@ let SoArchiveService = class SoArchiveService {
                     saleOrderNumber
                 }
             });
+            // 7. Cleanup Dispatches and Vehicle Entries
             for (const dispatch of dispatches){
                 const totalSOsLinked = dispatch._count.dispatchSOs;
+                // If this was the last SO for this dispatch, delete the dispatch
                 if (totalSOsLinked <= 1) {
                     await tx.dispatch.delete({
                         where: {
                             id: dispatch.id
                         }
                     });
+                    // [Updated] Check if the linked Vehicle Entry is now orphan (no other active dispatches use it)
+                    if (dispatch.vehicleEntryId) {
+                        const activeUsageCount = await tx.dispatch.count({
+                            where: {
+                                vehicleEntryId: dispatch.vehicleEntryId
+                            }
+                        });
+                        if (activeUsageCount === 0) {
+                            await tx.vehicleEntry.delete({
+                                where: {
+                                    id: dispatch.vehicleEntryId
+                                }
+                            });
+                        }
+                    }
                 }
             }
             if (so.statusStepper.length > 0) {
@@ -182,8 +221,8 @@ let SoArchiveService = class SoArchiveService {
         if (!archivedSo) {
             throw new _common.NotFoundException(`Archived Sales Order ${saleOrderNumber} not found.`);
         }
-        // 1. Get lists of files AND directories to delete BEFORE the transaction
-        // Get material files and directories
+        // --- 1. Identify Files to Delete ---
+        // A. Material Files
         const materialFiles = await this.prisma.eRP_Material_FileArchive.findMany({
             where: {
                 saleOrderNumber
@@ -193,7 +232,7 @@ let SoArchiveService = class SoArchiveService {
                 sftpDir: true
             }
         });
-        // Get dispatch file and directory paths for dispatches that will be deleted
+        // B. Identify Dispatches to delete (and their files)
         const dispatchSOArchives = await this.prisma.dispatch_SOArchive.findMany({
             where: {
                 saleOrderNumber
@@ -205,7 +244,7 @@ let SoArchiveService = class SoArchiveService {
         const dispatchIds = [
             ...new Set(dispatchSOArchives.map((d)=>d.dispatchId))
         ];
-        const dispatchArchivesToDelete = [];
+        const dispatchesToDelete = [];
         for (const dispatchId of dispatchIds){
             const remainingLinks = await this.prisma.dispatch_SOArchive.count({
                 where: {
@@ -221,43 +260,80 @@ let SoArchiveService = class SoArchiveService {
                         id: dispatchId
                     },
                     select: {
-                        attachments: true
+                        id: true,
+                        attachments: true,
+                        vehicleEntryId: true
                     }
                 });
                 if (dispatchArchive) {
-                    dispatchArchivesToDelete.push(dispatchArchive);
+                    dispatchesToDelete.push(dispatchArchive);
                 }
             }
         }
-        const dispatchFiles = dispatchArchivesToDelete.flatMap((d)=>d.attachments).filter((att)=>att && att.path).map((att)=>({
+        const dispatchFiles = dispatchesToDelete.flatMap((d)=>d.attachments).filter((att)=>att && att.path).map((att)=>({
                 sftpPath: att.path,
                 sftpDir: att.path.substring(0, att.path.lastIndexOf('/'))
             }));
+        // C. Identify Vehicle Entries to delete (and their files) [Updated]
+        const vehicleEntriesToDelete = [];
+        const uniqueVehicleEntryIds = [
+            ...new Set(dispatchesToDelete.map((d)=>d.vehicleEntryId).filter((id)=>!!id))
+        ];
+        for (const veId of uniqueVehicleEntryIds){
+            // Count how many DispatchArchives *globally* use this VehicleEntryId
+            const totalUsages = await this.prisma.dispatchArchive.count({
+                where: {
+                    vehicleEntryId: veId
+                }
+            });
+            // Count how many of those usages are being deleted right now
+            const usagesBeingDeleted = dispatchesToDelete.filter((d)=>d.vehicleEntryId === veId).length;
+            // If all usages are being deleted, then the VehicleEntry is orphan
+            if (totalUsages === usagesBeingDeleted) {
+                const veArchive = await this.prisma.vehicleEntryArchive.findUnique({
+                    where: {
+                        id: veId
+                    },
+                    select: {
+                        id: true,
+                        attachments: true
+                    }
+                });
+                if (veArchive) {
+                    vehicleEntriesToDelete.push(veArchive);
+                }
+            }
+        }
+        const vehicleFiles = vehicleEntriesToDelete.flatMap((ve)=>ve.attachments).filter((att)=>att && att.path).map((att)=>({
+                sftpPath: att.path,
+                sftpDir: att.path.substring(0, att.path.lastIndexOf('/'))
+            }));
+        // Combine all files
         const allFilesToDelete = [
             ...materialFiles,
-            ...dispatchFiles
+            ...dispatchFiles,
+            ...vehicleFiles
         ];
         const uniqueDirectoriesToDelete = [
             ...new Set(allFilesToDelete.map((f)=>f.sftpDir).filter(Boolean))
         ];
-        // 2. Run all database deletions within a single, atomic transaction
+        // --- 2. Database Deletion Transaction ---
         await this.prisma.$transaction(async (tx)=>{
-            for (const dispatchId of dispatchIds){
-                const remainingLinks = await tx.dispatch_SOArchive.count({
+            // Delete Dispatches
+            for (const d of dispatchesToDelete){
+                await tx.dispatchArchive.delete({
                     where: {
-                        dispatchId: dispatchId,
-                        NOT: {
-                            saleOrderNumber: saleOrderNumber
-                        }
+                        id: d.id
                     }
                 });
-                if (remainingLinks === 0) {
-                    await tx.dispatchArchive.delete({
-                        where: {
-                            id: dispatchId
-                        }
-                    });
-                }
+            }
+            // [Updated] Delete Vehicle Entries
+            for (const ve of vehicleEntriesToDelete){
+                await tx.vehicleEntryArchive.delete({
+                    where: {
+                        id: ve.id
+                    }
+                });
             }
             await tx.dispatch_SOArchive.deleteMany({
                 where: {
@@ -285,15 +361,19 @@ let SoArchiveService = class SoArchiveService {
                 }
             });
         });
+        // --- 3. SFTP Cleanup ---
         const orderBaseDir = process.env.SFTP_BASE_DIR_ORDER || '';
         const dispatchBaseDir = process.env.SFTP_BASE_DIR_DISPATCH || '';
+        const vehicleBaseDir = process.env.SFTP_BASE_DIR_VEHICLE_ENTRY || ''; // [Updated]
         const resolvedOrderBase = _path.posix.resolve(orderBaseDir);
         const resolvedDispatchBase = _path.posix.resolve(dispatchBaseDir);
+        const resolvedVehicleBase = _path.posix.resolve(vehicleBaseDir); // [Updated]
         for (const file of allFilesToDelete){
             try {
                 if (file.sftpPath) {
                     const resolvedPath = _path.posix.resolve(file.sftpPath);
-                    if (!resolvedPath.startsWith(resolvedOrderBase) && !resolvedPath.startsWith(resolvedDispatchBase)) {
+                    // [Updated] Security check for Vehicle Entry path as well
+                    if (!resolvedPath.startsWith(resolvedOrderBase) && !resolvedPath.startsWith(resolvedDispatchBase) && !resolvedPath.startsWith(resolvedVehicleBase)) {
                         console.warn(`Skipping delete: Path ${file.sftpPath} is outside of configured base directories.`);
                         continue;
                     }
@@ -309,7 +389,9 @@ let SoArchiveService = class SoArchiveService {
                     const resolvedDir = _path.posix.resolve(dir);
                     const orderBasePrefix = resolvedOrderBase.endsWith('/') ? resolvedOrderBase : resolvedOrderBase + '/';
                     const dispatchBasePrefix = resolvedDispatchBase.endsWith('/') ? resolvedDispatchBase : resolvedDispatchBase + '/';
-                    if (resolvedDir !== resolvedOrderBase && !resolvedDir.startsWith(orderBasePrefix) && resolvedDir !== resolvedDispatchBase && !resolvedDir.startsWith(dispatchBasePrefix)) {
+                    const vehicleBasePrefix = resolvedVehicleBase.endsWith('/') ? resolvedVehicleBase : resolvedVehicleBase + '/';
+                    // [Updated] Security check for Vehicle Entry directory as well
+                    if (resolvedDir !== resolvedOrderBase && !resolvedDir.startsWith(orderBasePrefix) && resolvedDir !== resolvedDispatchBase && !resolvedDir.startsWith(dispatchBasePrefix) && resolvedDir !== resolvedVehicleBase && !resolvedDir.startsWith(vehicleBasePrefix)) {
                         console.warn(`Skipping rmdir: Path ${dir} is outside of configured base directories.`);
                         continue;
                     }

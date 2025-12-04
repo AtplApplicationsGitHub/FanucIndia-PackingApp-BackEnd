@@ -33,7 +33,7 @@ export class SoSearchService {
     saleOrderNumber: string,
     user: { userId: number; role: string },
   ) {
-    // 1. Search in primary tables (This part remains unchanged)
+    // 1. Search in primary tables (Active Orders)
     const salesOrder = await this.prisma.salesOrder.findFirst({
       where: {
         saleOrderNumber: {
@@ -102,6 +102,7 @@ export class SoSearchService {
       return convertBigInts(result);
     }
 
+    // 2. Search in Archive tables (Archived Orders)
     const archivedSalesOrder = await this.prisma.salesOrderArchive.findFirst({
       where: {
         saleOrderNumber: {
@@ -147,37 +148,43 @@ export class SoSearchService {
       // Fetch related names for archived Dispatch
       const dispatchIds = dispatchSOArchives.map((d) => d.dispatchId);
 
+      // [UPDATED] Removed 'address', 'customerId', 'customerName'. Added 'vehicleEntryId'.
       const archivedDispatchesRaw = await this.prisma.dispatchArchive.findMany({ 
         where: { id: { in: dispatchIds } },
         select: {
           id: true,
-          address: true,
           vehicleNumber: true,
           attachments: true,
           UpdatedBy: true,
           UpdatedDate: true,
-          customerName: true, // For Customer fix
-          customerId: true,
-          transporterName: true, // [ADD] For Transporter fix
+          transporterName: true,
           transporterId: true,
+          vehicleEntryId: true, // Fetch ID to link to VehicleEntryArchive
         }
       });
       
-      const dispatchCustomerIds = [...new Set(archivedDispatchesRaw.map(d => d.customerId).filter(Boolean))] as number[];
       const dispatchTransporterIds = [...new Set(archivedDispatchesRaw.map(d => d.transporterId).filter(Boolean))] as number[];
+      // [UPDATED] Fetch VehicleEntryArchive IDs
+      const vehicleEntryIds = [...new Set(archivedDispatchesRaw.map(d => d.vehicleEntryId).filter(Boolean))] as number[];
 
-      const [dispatchCustomers, dispatchTransporters] = await Promise.all([
-        this.prisma.customer.findMany({ where: { id: { in: dispatchCustomerIds } } }),
+      const [dispatchTransporters, vehicleEntries] = await Promise.all([
         this.prisma.transporter.findMany({ where: { id: { in: dispatchTransporterIds } } }),
+        // [UPDATED] Fetch archived vehicle entries
+        this.prisma.vehicleEntryArchive.findMany({ 
+          where: { id: { in: vehicleEntryIds } },
+          select: { id: true, attachments: true } 
+        }),
       ]);
       
-      const customerMap = new Map(dispatchCustomers.map(c => [c.id, c]));
       const transporterMap = new Map(dispatchTransporters.map(t => [t.id, t]));
+      // [UPDATED] Map for vehicle entries
+      const vehicleEntryMap = new Map(vehicleEntries.map(ve => [ve.id, ve]));
 
       const dispatchInfo = archivedDispatchesRaw.map(dispatch => ({
         ...dispatch,
-        customer: dispatch.customerId ? customerMap.get(dispatch.customerId) : null,
         transporter: dispatch.transporterId ? transporterMap.get(dispatch.transporterId) : null,
+        // [UPDATED] Attach vehicle entry data so frontend can show attachments
+        vehicleEntry: dispatch.vehicleEntryId ? vehicleEntryMap.get(dispatch.vehicleEntryId) : null,
       }));
 
       const result = {

@@ -59,8 +59,13 @@ export class DispatchService {
       saleOrderNumbers,
     } = dto;
 
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
     const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
-      where: { vehicleNumber: vehicleNumber },
+      where: { 
+        vehicleNumber: vehicleNumber,
+        createdAt: { gte: oneDayAgo } 
+      },
       orderBy: { createdAt: 'desc' }, 
     });
 
