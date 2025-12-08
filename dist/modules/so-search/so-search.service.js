@@ -72,10 +72,12 @@ let SoSearchService = class SoSearchService {
             if (user.role === 'SALES' && salesOrder.userId !== user.userId) {
                 throw new _common.ForbiddenException('You are not authorized to view this order.');
             }
+            // [FIX] Use the canonical SO Number from the DB record for related queries
+            const canonicalSoNumber = salesOrder.saleOrderNumber;
             const [dispatchSOs, materialDetails] = await Promise.all([
                 this.prisma.dispatch_SO.findMany({
                     where: {
-                        saleOrderNumber
+                        saleOrderNumber: canonicalSoNumber
                     },
                     select: {
                         dispatchId: true
@@ -83,7 +85,7 @@ let SoSearchService = class SoSearchService {
                 }),
                 this.prisma.eRP_Material_Data.findMany({
                     where: {
-                        saleOrderNumber
+                        saleOrderNumber: canonicalSoNumber
                     },
                     orderBy: {
                         ID: 'asc'
@@ -136,10 +138,12 @@ let SoSearchService = class SoSearchService {
             }
         });
         if (archivedSalesOrder) {
+            // [FIX] Use the canonical SO Number from the DB record
+            const canonicalSoNumber = archivedSalesOrder.saleOrderNumber;
             const [dispatchSOArchives, materialDetails, materialFiles, statusStepper] = await Promise.all([
                 this.prisma.dispatch_SOArchive.findMany({
                     where: {
-                        saleOrderNumber
+                        saleOrderNumber: canonicalSoNumber
                     },
                     select: {
                         dispatchId: true
@@ -147,7 +151,7 @@ let SoSearchService = class SoSearchService {
                 }),
                 this.prisma.eRP_Material_DataArchive.findMany({
                     where: {
-                        saleOrderNumber
+                        saleOrderNumber: canonicalSoNumber
                     },
                     orderBy: {
                         ID: 'asc'
@@ -155,12 +159,12 @@ let SoSearchService = class SoSearchService {
                 }),
                 this.prisma.eRP_Material_FileArchive.findMany({
                     where: {
-                        saleOrderNumber
+                        saleOrderNumber: canonicalSoNumber
                     }
                 }),
                 this.prisma.sO_Status_StepperArchive.findMany({
                     where: {
-                        salesOrderNumber: saleOrderNumber
+                        salesOrderNumber: canonicalSoNumber
                     }
                 })
             ]);
@@ -208,7 +212,6 @@ let SoSearchService = class SoSearchService {
             };
             // Fetch related names for archived Dispatch
             const dispatchIds = dispatchSOArchives.map((d)=>d.dispatchId);
-            // [UPDATED] Removed 'address', 'customerId', 'customerName'. Added 'vehicleEntryId'.
             const archivedDispatchesRaw = await this.prisma.dispatchArchive.findMany({
                 where: {
                     id: {
@@ -229,7 +232,6 @@ let SoSearchService = class SoSearchService {
             const dispatchTransporterIds = [
                 ...new Set(archivedDispatchesRaw.map((d)=>d.transporterId).filter(Boolean))
             ];
-            // [UPDATED] Fetch VehicleEntryArchive IDs
             const vehicleEntryIds = [
                 ...new Set(archivedDispatchesRaw.map((d)=>d.vehicleEntryId).filter(Boolean))
             ];
@@ -241,7 +243,6 @@ let SoSearchService = class SoSearchService {
                         }
                     }
                 }),
-                // [UPDATED] Fetch archived vehicle entries
                 this.prisma.vehicleEntryArchive.findMany({
                     where: {
                         id: {
@@ -258,7 +259,6 @@ let SoSearchService = class SoSearchService {
                     t.id,
                     t
                 ]));
-            // [UPDATED] Map for vehicle entries
             const vehicleEntryMap = new Map(vehicleEntries.map((ve)=>[
                     ve.id,
                     ve
@@ -266,7 +266,6 @@ let SoSearchService = class SoSearchService {
             const dispatchInfo = archivedDispatchesRaw.map((dispatch)=>({
                     ...dispatch,
                     transporter: dispatch.transporterId ? transporterMap.get(dispatch.transporterId) : null,
-                    // [UPDATED] Attach vehicle entry data so frontend can show attachments
                     vehicleEntry: dispatch.vehicleEntryId ? vehicleEntryMap.get(dispatch.vehicleEntryId) : null
                 }));
             const result = {

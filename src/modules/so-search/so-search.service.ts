@@ -60,13 +60,17 @@ export class SoSearchService {
           'You are not authorized to view this order.',
         );
       }
+
+      // [FIX] Use the canonical SO Number from the DB record for related queries
+      const canonicalSoNumber = salesOrder.saleOrderNumber;
+
       const [dispatchSOs, materialDetails] = await Promise.all([
         this.prisma.dispatch_SO.findMany({
-          where: { saleOrderNumber },
+          where: { saleOrderNumber: canonicalSoNumber }, // Use canonical
           select: { dispatchId: true },
         }),
         this.prisma.eRP_Material_Data.findMany({
-          where: { saleOrderNumber },
+          where: { saleOrderNumber: canonicalSoNumber }, // Use canonical
           orderBy: { ID: 'asc' },
         }),
       ]);
@@ -113,16 +117,19 @@ export class SoSearchService {
     });
 
     if (archivedSalesOrder) {
+      // [FIX] Use the canonical SO Number from the DB record
+      const canonicalSoNumber = archivedSalesOrder.saleOrderNumber;
+
       const [
         dispatchSOArchives,
         materialDetails,
         materialFiles,
         statusStepper,
       ] = await Promise.all([
-        this.prisma.dispatch_SOArchive.findMany({ where: { saleOrderNumber }, select: { dispatchId: true } }),
-        this.prisma.eRP_Material_DataArchive.findMany({ where: { saleOrderNumber }, orderBy: { ID: 'asc' } }),
-        this.prisma.eRP_Material_FileArchive.findMany({ where: { saleOrderNumber } }),
-        this.prisma.sO_Status_StepperArchive.findMany({ where: { salesOrderNumber: saleOrderNumber } }),
+        this.prisma.dispatch_SOArchive.findMany({ where: { saleOrderNumber: canonicalSoNumber }, select: { dispatchId: true } }),
+        this.prisma.eRP_Material_DataArchive.findMany({ where: { saleOrderNumber: canonicalSoNumber }, orderBy: { ID: 'asc' } }),
+        this.prisma.eRP_Material_FileArchive.findMany({ where: { saleOrderNumber: canonicalSoNumber } }),
+        this.prisma.sO_Status_StepperArchive.findMany({ where: { salesOrderNumber: canonicalSoNumber } }),
       ]);
 
       // Fetch related names for archived SalesOrder
@@ -148,7 +155,6 @@ export class SoSearchService {
       // Fetch related names for archived Dispatch
       const dispatchIds = dispatchSOArchives.map((d) => d.dispatchId);
 
-      // [UPDATED] Removed 'address', 'customerId', 'customerName'. Added 'vehicleEntryId'.
       const archivedDispatchesRaw = await this.prisma.dispatchArchive.findMany({ 
         where: { id: { in: dispatchIds } },
         select: {
@@ -159,17 +165,15 @@ export class SoSearchService {
           UpdatedDate: true,
           transporterName: true,
           transporterId: true,
-          vehicleEntryId: true, // Fetch ID to link to VehicleEntryArchive
+          vehicleEntryId: true,
         }
       });
       
       const dispatchTransporterIds = [...new Set(archivedDispatchesRaw.map(d => d.transporterId).filter(Boolean))] as number[];
-      // [UPDATED] Fetch VehicleEntryArchive IDs
       const vehicleEntryIds = [...new Set(archivedDispatchesRaw.map(d => d.vehicleEntryId).filter(Boolean))] as number[];
 
       const [dispatchTransporters, vehicleEntries] = await Promise.all([
         this.prisma.transporter.findMany({ where: { id: { in: dispatchTransporterIds } } }),
-        // [UPDATED] Fetch archived vehicle entries
         this.prisma.vehicleEntryArchive.findMany({ 
           where: { id: { in: vehicleEntryIds } },
           select: { id: true, attachments: true } 
@@ -177,13 +181,11 @@ export class SoSearchService {
       ]);
       
       const transporterMap = new Map(dispatchTransporters.map(t => [t.id, t]));
-      // [UPDATED] Map for vehicle entries
       const vehicleEntryMap = new Map(vehicleEntries.map(ve => [ve.id, ve]));
 
       const dispatchInfo = archivedDispatchesRaw.map(dispatch => ({
         ...dispatch,
         transporter: dispatch.transporterId ? transporterMap.get(dispatch.transporterId) : null,
-        // [UPDATED] Attach vehicle entry data so frontend can show attachments
         vehicleEntry: dispatch.vehicleEntryId ? vehicleEntryMap.get(dispatch.vehicleEntryId) : null,
       }));
 

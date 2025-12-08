@@ -143,9 +143,10 @@ export class UserDashboardService {
   }
 
   private async getMaterialDetails(saleOrderNumber: string) {
-    return this.prisma.eRP_Material_Data.findMany({
+    const materials = await this.prisma.eRP_Material_Data.findMany({
       where: { saleOrderNumber },
       select: {
+        ID: true,
         Material_Code: true,
         Material_Description: true,
         Batch_No: true,
@@ -159,6 +160,10 @@ export class UserDashboardService {
         UpdatedDate: true,
       },
     });
+    return materials.map((material) => ({
+      ...material,
+      ID: material.ID.toString(),
+    }));
   }
 
   async syncOrderById(
