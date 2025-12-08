@@ -274,21 +274,34 @@ export class UserDashboardService {
     }
 
     for (const material of materials) {
-      await prismaClient.eRP_Material_Data.updateMany({
-        where: {
-          saleOrderNumber: saleOrderNumber,
-          Material_Code: material.Material_Code,
-        },
-        data: {
-          Issue_stage: material.Issue_stage,
-          Packing_stage: material.Packing_stage,
-          UpdatedBy: userName,
-          // Use the provided timestamp if it exists, otherwise use the sync time
-          UpdatedDate: material.UpdatedDate
-            ? new Date(material.UpdatedDate)
-            : new Date(),
-        },
-      });
+      if (material.ID) {
+        await prismaClient.eRP_Material_Data.update({
+          where: { ID: BigInt(material.ID) },
+          data: {
+            Issue_stage: material.Issue_stage,
+            Packing_stage: material.Packing_stage,
+            UpdatedBy: userName,
+            UpdatedDate: material.UpdatedDate
+              ? new Date(material.UpdatedDate)
+              : new Date(),
+          },
+        });
+      } else {
+        await prismaClient.eRP_Material_Data.updateMany({
+          where: {
+            saleOrderNumber: saleOrderNumber,
+            Material_Code: material.Material_Code,
+          },
+          data: {
+            Issue_stage: material.Issue_stage,
+            Packing_stage: material.Packing_stage,
+            UpdatedBy: userName,
+            UpdatedDate: material.UpdatedDate
+              ? new Date(material.UpdatedDate)
+              : new Date(),
+          },
+        });
+      }
     }
 
     await this._checkAndUpdateOrderStatus(saleOrderNumber, prismaClient, userName);
