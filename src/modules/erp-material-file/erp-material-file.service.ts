@@ -188,7 +188,7 @@ export class ErpMaterialFileService {
     await verifySaleOrderAccess(this.prisma, soNumber, userId, userRole);
     const items = await this.prisma.eRP_Material_File.findMany({
       where: { saleOrderNumber: soNumber },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { ID: 'desc' },
     });
     return normalizeBigInt(items);
   }

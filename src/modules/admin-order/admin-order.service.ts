@@ -72,6 +72,9 @@ export class AdminOrderService {
       const num = Number(search);
 
       where.OR = [
+        { 
+          customer: { is: { name: { contains: search, mode: 'insensitive' } } } 
+        },
         { user: { is: { name: { contains: search, mode: 'insensitive' } } } },
         {
           product: { is: { name: { contains: search, mode: 'insensitive' } } },
@@ -204,6 +207,10 @@ export class AdminOrderService {
         where: { id: dto.customerId },
       });
       if (customer) addressToSave = customer.address;
+    }
+
+    if (dto.deliveryDate && dto.deliveryDate.length === 10) {
+       dto.deliveryDate = new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString();
     }
     
     const data: Prisma.SalesOrderUpdateInput = {

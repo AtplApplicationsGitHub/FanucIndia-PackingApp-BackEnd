@@ -33,7 +33,6 @@ export class SoSearchService {
     saleOrderNumber: string,
     user: { userId: number; role: string },
   ) {
-    // 1. Search in primary tables (Active Orders)
     const salesOrder = await this.prisma.salesOrder.findFirst({
       where: {
         saleOrderNumber: {
@@ -61,16 +60,15 @@ export class SoSearchService {
         );
       }
 
-      // [FIX] Use the canonical SO Number from the DB record for related queries
       const canonicalSoNumber = salesOrder.saleOrderNumber;
 
       const [dispatchSOs, materialDetails] = await Promise.all([
         this.prisma.dispatch_SO.findMany({
-          where: { saleOrderNumber: canonicalSoNumber }, // Use canonical
+          where: { saleOrderNumber: canonicalSoNumber }, 
           select: { dispatchId: true },
         }),
         this.prisma.eRP_Material_Data.findMany({
-          where: { saleOrderNumber: canonicalSoNumber }, // Use canonical
+          where: { saleOrderNumber: canonicalSoNumber }, 
           orderBy: { ID: 'asc' },
         }),
       ]);
@@ -96,6 +94,41 @@ export class SoSearchService {
           },
         },
       });
+
+      const vehicleEntryIds = dispatchInfo
+        .map((d) => d.vehicleEntry?.id)
+        .filter((id): id is number => !!id);
+
+      if (vehicleEntryIds.length > 0) {
+        const archivedEntries = await this.prisma.vehicleEntryArchive.findMany({
+          where: { id: { in: vehicleEntryIds } },
+          select: { id: true, attachments: true },
+        });
+
+        const archivedPathsMap = new Map<number, Set<string>>();
+        for (const arch of archivedEntries) {
+          const paths = new Set<string>();
+          const atts = (arch.attachments as any[]) || [];
+          atts.forEach((a: any) => {
+            if (a.path) paths.add(a.path);
+            if (a.sftpPath) paths.add(a.sftpPath);
+          });
+          archivedPathsMap.set(arch.id, paths);
+        }
+
+        for (const d of dispatchInfo) {
+          if (d.vehicleEntry && d.vehicleEntry.attachments) {
+            const archivedPaths = archivedPathsMap.get(d.vehicleEntry.id);
+            if (archivedPaths && archivedPaths.size > 0) {
+              const activeAtts = (d.vehicleEntry.attachments as any[]) || [];
+              d.vehicleEntry.attachments = activeAtts.filter((a) => {
+                const p = a.path || a.sftpPath;
+                return !archivedPaths.has(p);
+              });
+            }
+          }
+        }
+      }
 
       const result = {
         salesOrder,

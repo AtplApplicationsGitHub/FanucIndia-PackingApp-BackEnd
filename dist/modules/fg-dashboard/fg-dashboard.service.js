@@ -58,6 +58,12 @@ let FgDashboardService = class FgDashboardService {
                     }
                 },
                 {
+                    transferOrder: {
+                        contains: search,
+                        mode: 'insensitive'
+                    }
+                },
+                {
                     product: {
                         name: {
                             contains: search,
@@ -67,6 +73,14 @@ let FgDashboardService = class FgDashboardService {
                 },
                 {
                     customer: {
+                        name: {
+                            contains: search,
+                            mode: 'insensitive'
+                        }
+                    }
+                },
+                {
+                    salesZone: {
                         name: {
                             contains: search,
                             mode: 'insensitive'

@@ -211,7 +211,7 @@ let ErpMaterialFileService = class ErpMaterialFileService {
                 saleOrderNumber: soNumber
             },
             orderBy: {
-                createdAt: 'desc'
+                ID: 'desc'
             }
         });
         return normalizeBigInt(items);

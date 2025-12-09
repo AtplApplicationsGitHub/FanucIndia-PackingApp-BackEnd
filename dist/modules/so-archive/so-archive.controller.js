@@ -43,6 +43,12 @@ let SoArchiveController = class SoArchiveController {
     async downloadArchivedAttachment(fileId, res) {
         return this.soArchiveService.downloadArchivedFile(fileId, res);
     }
+    async downloadArchivedDispatchAttachment(id, fileName, res) {
+        return this.soArchiveService.downloadDispatchFile(id, fileName, res);
+    }
+    async downloadArchivedVehicleAttachment(id, fileName, res) {
+        return this.soArchiveService.downloadVehicleFile(id, fileName, res);
+    }
     constructor(soArchiveService){
         this.soArchiveService = soArchiveService;
     }
@@ -95,6 +101,34 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], SoArchiveController.prototype, "downloadArchivedAttachment", null);
+_ts_decorate([
+    (0, _common.Get)('dispatch/:id/attachments/:fileName'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER', 'SALES'),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Param)('fileName')),
+    _ts_param(2, (0, _common.Res)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        String,
+        typeof _express.Response === "undefined" ? Object : _express.Response
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], SoArchiveController.prototype, "downloadArchivedDispatchAttachment", null);
+_ts_decorate([
+    (0, _common.Get)('vehicle-entry/:id/attachments/:fileName'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER', 'SALES'),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Param)('fileName')),
+    _ts_param(2, (0, _common.Res)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        String,
+        typeof _express.Response === "undefined" ? Object : _express.Response
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], SoArchiveController.prototype, "downloadArchivedVehicleAttachment", null);
 SoArchiveController = _ts_decorate([
     (0, _swagger.ApiTags)('so-archive'),
     (0, _swagger.ApiBearerAuth)(),

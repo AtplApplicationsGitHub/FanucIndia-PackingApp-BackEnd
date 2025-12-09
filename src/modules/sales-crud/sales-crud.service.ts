@@ -51,7 +51,7 @@ export class SalesCrudService {
 
       const deliveryDate =
         dto.deliveryDate && dto.deliveryDate.length === 10
-          ? new Date(dto.deliveryDate).toISOString()
+          ? new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString()
           : dto.deliveryDate;
 
       const newOrder = await this.prisma.salesOrder.create({
@@ -227,7 +227,7 @@ export class SalesCrudService {
 
       const deliveryDate =
         dto.deliveryDate && dto.deliveryDate.length === 10
-          ? new Date(dto.deliveryDate).toISOString()
+          ? new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString()
           : dto.deliveryDate;
 
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -236,7 +236,7 @@ export class SalesCrudService {
         where: { id },
         data: {
           ...dto,
-          deliveryDate,
+          ...(deliveryDate ? { deliveryDate } : {}),
           UpdatedBy: user?.name || 'System',
           UpdatedDate: new Date(),
           ...(address !== undefined && { address }),

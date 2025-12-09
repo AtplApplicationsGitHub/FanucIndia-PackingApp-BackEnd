@@ -44,8 +44,10 @@ export class FgDashboardService {
 
       where.OR = [
         { saleOrderNumber: { contains: search, mode: 'insensitive' } },
+        { transferOrder: { contains: search, mode: 'insensitive' } },
         { product: { name: { contains: search, mode: 'insensitive' } } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
+        { salesZone: { name: { contains: search, mode: 'insensitive' } } },
         { status: { contains: search, mode: 'insensitive' } },
         { fgLocation: { contains: search, mode: 'insensitive' } },
         { specialRemarks: { contains: search, mode: 'insensitive' } },

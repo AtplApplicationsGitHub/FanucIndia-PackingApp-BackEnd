@@ -45,4 +45,24 @@ export class SoArchiveController {
   ) {
     return this.soArchiveService.downloadArchivedFile(fileId, res);
   }
+
+  @Get('dispatch/:id/attachments/:fileName')
+  @Roles('ADMIN', 'USER', 'SALES')
+  async downloadArchivedDispatchAttachment(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
+  ) {
+    return this.soArchiveService.downloadDispatchFile(id, fileName, res);
+  }
+
+  @Get('vehicle-entry/:id/attachments/:fileName')
+  @Roles('ADMIN', 'USER', 'SALES')
+  async downloadArchivedVehicleAttachment(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
+  ) {
+    return this.soArchiveService.downloadVehicleFile(id, fileName, res);
+  }
 }

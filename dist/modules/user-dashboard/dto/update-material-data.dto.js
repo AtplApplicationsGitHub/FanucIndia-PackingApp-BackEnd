@@ -31,6 +31,14 @@ function _ts_metadata(k, v) {
 let MaterialDataDto = class MaterialDataDto {
 };
 _ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
+        description: 'Unique ID of the material row (BigInt)',
+        example: '101'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    _ts_metadata("design:type", Object)
+], MaterialDataDto.prototype, "ID", void 0);
+_ts_decorate([
     (0, _swagger.ApiProperty)(),
     (0, _classvalidator.IsString)(),
     (0, _classvalidator.IsNotEmpty)(),

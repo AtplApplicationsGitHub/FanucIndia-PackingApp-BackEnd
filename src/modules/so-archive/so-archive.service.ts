@@ -364,10 +364,12 @@ export class SoArchiveService {
         'Content-Type',
         file.mimeType ?? 'application/octet-stream',
       );
+      
       res.setHeader(
         'Content-Disposition',
-        `inline; filename="${encodeURIComponent(file.fileName)}"`,
+        `attachment; filename="${file.fileName}"`,
       );
+      
       if (file.fileSizeBytes) {
         res.setHeader('Content-Length', String(file.fileSizeBytes));
       }
@@ -378,6 +380,68 @@ export class SoArchiveService {
       (data as NodeJS.ReadableStream).pipe(res);
     } catch (error) {
       console.error('SFTP download error for archived file:', error);
+      res.status(404).send('File not found in storage.');
+    }
+  }
+
+  async downloadDispatchFile(dispatchId: number, fileName: string, res: Response) {
+    const dispatch = await this.prisma.dispatchArchive.findUnique({
+      where: { id: dispatchId },
+    });
+
+    if (!dispatch) {
+      throw new NotFoundException('Archived Dispatch not found.');
+    }
+
+    const attachments = (dispatch.attachments as any[]) || [];
+    const file = attachments.find((f) => f.fileName === fileName);
+
+    if (!file) {
+      throw new NotFoundException('Attachment not found in archive.');
+    }
+
+    return this.streamFile(file, res);
+  }
+
+  async downloadVehicleFile(vehicleId: number, fileName: string, res: Response) {
+    const entry = await this.prisma.vehicleEntryArchive.findUnique({
+      where: { id: vehicleId },
+    });
+
+    if (!entry) {
+      throw new NotFoundException('Archived Vehicle Entry not found.');
+    }
+
+    const attachments = (entry.attachments as any[]) || [];
+    const file = attachments.find((f) => f.fileName === fileName);
+
+    if (!file) {
+      throw new NotFoundException('Attachment not found in archive.');
+    }
+
+    return this.streamFile(file, res);
+  }
+
+  private async streamFile(file: any, res: Response) {
+    try {
+      const filePath = file.path || file.sftpPath;
+      const fileSize = file.size || file.fileSizeBytes;
+
+      const data = await this.sftp.getStream(filePath);
+      
+      res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+      
+      if (fileSize) {
+        res.setHeader('Content-Length', String(fileSize));
+      }
+
+      if (Buffer.isBuffer(data)) {
+        return res.end(data);
+      }
+      (data as NodeJS.ReadableStream).pipe(res);
+    } catch (error) {
+      console.error('SFTP download error:', error);
       res.status(404).send('File not found in storage.');
     }
   }

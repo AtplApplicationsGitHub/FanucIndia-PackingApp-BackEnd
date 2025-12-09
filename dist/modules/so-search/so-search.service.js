@@ -40,7 +40,6 @@ function convertBigInts(obj) {
 }
 let SoSearchService = class SoSearchService {
     async findDetailsBySoNumber(saleOrderNumber, user) {
-        // 1. Search in primary tables (Active Orders)
         const salesOrder = await this.prisma.salesOrder.findFirst({
             where: {
                 saleOrderNumber: {
@@ -72,7 +71,6 @@ let SoSearchService = class SoSearchService {
             if (user.role === 'SALES' && salesOrder.userId !== user.userId) {
                 throw new _common.ForbiddenException('You are not authorized to view this order.');
             }
-            // [FIX] Use the canonical SO Number from the DB record for related queries
             const canonicalSoNumber = salesOrder.saleOrderNumber;
             const [dispatchSOs, materialDetails] = await Promise.all([
                 this.prisma.dispatch_SO.findMany({
@@ -120,6 +118,42 @@ let SoSearchService = class SoSearchService {
                     }
                 }
             });
+            const vehicleEntryIds = dispatchInfo.map((d)=>d.vehicleEntry?.id).filter((id)=>!!id);
+            if (vehicleEntryIds.length > 0) {
+                const archivedEntries = await this.prisma.vehicleEntryArchive.findMany({
+                    where: {
+                        id: {
+                            in: vehicleEntryIds
+                        }
+                    },
+                    select: {
+                        id: true,
+                        attachments: true
+                    }
+                });
+                const archivedPathsMap = new Map();
+                for (const arch of archivedEntries){
+                    const paths = new Set();
+                    const atts = arch.attachments || [];
+                    atts.forEach((a)=>{
+                        if (a.path) paths.add(a.path);
+                        if (a.sftpPath) paths.add(a.sftpPath);
+                    });
+                    archivedPathsMap.set(arch.id, paths);
+                }
+                for (const d of dispatchInfo){
+                    if (d.vehicleEntry && d.vehicleEntry.attachments) {
+                        const archivedPaths = archivedPathsMap.get(d.vehicleEntry.id);
+                        if (archivedPaths && archivedPaths.size > 0) {
+                            const activeAtts = d.vehicleEntry.attachments || [];
+                            d.vehicleEntry.attachments = activeAtts.filter((a)=>{
+                                const p = a.path || a.sftpPath;
+                                return !archivedPaths.has(p);
+                            });
+                        }
+                    }
+                }
+            }
             const result = {
                 salesOrder,
                 dispatchInfo,
