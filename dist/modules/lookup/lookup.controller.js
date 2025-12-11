@@ -26,6 +26,10 @@ const _createCustomerDto = require("./dto/createCustomerDto");
 const _updateCustomerDto = require("./dto/updateCustomerDto");
 const _createPrinterDto = require("./dto/createPrinterDto");
 const _updatePrinterDto = require("./dto/updatePrinterDto");
+const _createMaterialBarcodeDto = require("./dto/createMaterialBarcodeDto");
+const _updateMaterialBarcodeDto = require("./dto/updateMaterialBarcodeDto");
+const _platformexpress = require("@nestjs/platform-express");
+const _express = require("express");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -124,6 +128,24 @@ let LookupController = class LookupController {
     }
     deletePrinter(id) {
         return this.lookupService.deletePrinter(id);
+    }
+    getMaterialBarcodes() {
+        return this.lookupService.getMaterialBarcodes();
+    }
+    createMaterialBarcode(dto) {
+        return this.lookupService.createMaterialBarcode(dto);
+    }
+    updateMaterialBarcode(id, dto) {
+        return this.lookupService.updateMaterialBarcode(id, dto);
+    }
+    deleteMaterialBarcode(id) {
+        return this.lookupService.deleteMaterialBarcode(id);
+    }
+    async downloadBulkTemplate(res) {
+        return this.lookupService.generateBulkTemplate(res);
+    }
+    async bulkImport(file) {
+        return this.lookupService.processBulkImport(file);
     }
     constructor(lookupService){
         this.lookupService = lookupService;
@@ -562,6 +584,104 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], LookupController.prototype, "deletePrinter", null);
+_ts_decorate([
+    (0, _common.Get)('material-barcodes'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get all material barcodes'
+    }),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", void 0)
+], LookupController.prototype, "getMaterialBarcodes", null);
+_ts_decorate([
+    (0, _common.Post)('material-barcodes'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Create a material barcode'
+    }),
+    (0, _swagger.ApiBody)({
+        type: _createMaterialBarcodeDto.CreateMaterialBarcodeDto
+    }),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _createMaterialBarcodeDto.CreateMaterialBarcodeDto === "undefined" ? Object : _createMaterialBarcodeDto.CreateMaterialBarcodeDto
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], LookupController.prototype, "createMaterialBarcode", null);
+_ts_decorate([
+    (0, _common.Patch)('material-barcodes/:id'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Update a material barcode'
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'id',
+        type: Number
+    }),
+    (0, _swagger.ApiBody)({
+        type: _updateMaterialBarcodeDto.UpdateMaterialBarcodeDto
+    }),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        typeof _updateMaterialBarcodeDto.UpdateMaterialBarcodeDto === "undefined" ? Object : _updateMaterialBarcodeDto.UpdateMaterialBarcodeDto
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], LookupController.prototype, "updateMaterialBarcode", null);
+_ts_decorate([
+    (0, _common.Delete)('material-barcodes/:id'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Delete a material barcode'
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'id',
+        type: Number
+    }),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], LookupController.prototype, "deleteMaterialBarcode", null);
+_ts_decorate([
+    (0, _common.Get)('bulk-template'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Download Excel template with all master data'
+    }),
+    _ts_param(0, (0, _common.Res)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _express.Response === "undefined" ? Object : _express.Response
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], LookupController.prototype, "downloadBulkTemplate", null);
+_ts_decorate([
+    (0, _common.Post)('bulk-import'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Bulk import/update master data from Excel'
+    }),
+    (0, _swagger.ApiConsumes)('multipart/form-data'),
+    (0, _common.UseInterceptors)((0, _platformexpress.FileInterceptor)('file')),
+    (0, _swagger.ApiBody)({
+        schema: {
+            type: 'object',
+            properties: {
+                file: {
+                    type: 'string',
+                    format: 'binary'
+                }
+            }
+        }
+    }),
+    _ts_param(0, (0, _common.UploadedFile)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof Express === "undefined" || typeof Express.Multer === "undefined" || typeof Express.Multer.File === "undefined" ? Object : Express.Multer.File
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], LookupController.prototype, "bulkImport", null);
 LookupController = _ts_decorate([
     (0, _swagger.ApiTags)('Lookup'),
     (0, _swagger.ApiBearerAuth)(),

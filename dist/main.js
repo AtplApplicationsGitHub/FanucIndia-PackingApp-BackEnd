@@ -24,10 +24,7 @@ async function bootstrap() {
     _swagger.SwaggerModule.setup('api', app, document);
     app.useGlobalFilters(new _allexceptionsfilter.AllExceptionsFilter());
     app.enableCors({
-        origin: [
-            'http://localhost:3000',
-            'https://fanuc.goval.app:444'
-        ],
+        origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : true,
         credentials: true
     });
     const port = process.env.PORT || 3011;

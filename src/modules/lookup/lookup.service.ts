@@ -15,13 +15,17 @@ import { CreateCustomerDto } from './dto/createCustomerDto';
 import { UpdateCustomerDto } from './dto/updateCustomerDto';
 import { CreatePrinterDto } from './dto/createPrinterDto';
 import { UpdatePrinterDto } from './dto/updatePrinterDto';
+import { CreateMaterialBarcodeDto } from './dto/createMaterialBarcodeDto';
+import { UpdateMaterialBarcodeDto } from './dto/updateMaterialBarcodeDto';
+import { Workbook } from 'exceljs';
+import { Response } from 'express';
 
 @Injectable()
 export class LookupService {
   constructor(private prisma: PrismaService) {}
 
   getProducts() {
-    return this.prisma.product.findMany({ orderBy: { id: 'desc' } });
+    return this.prisma.product.findMany({ orderBy: { id: 'asc' } });
   }
 
   createProduct(dto: CreateProductDto) {
@@ -47,7 +51,7 @@ export class LookupService {
   }
 
   getTransporters() {
-    return this.prisma.transporter.findMany({ orderBy: { id: 'desc' } });
+    return this.prisma.transporter.findMany({ orderBy: { id: 'asc' } });
   }
 
   createTransporter(dto: CreateTransporterDto) {
@@ -72,7 +76,7 @@ export class LookupService {
   }
 
   getPlantCodes() {
-    return this.prisma.plantCode.findMany({ orderBy: { id: 'desc' } });
+    return this.prisma.plantCode.findMany({ orderBy: { id: 'asc' } });
   }
 
   createPlantCode(dto: CreatePlantCodeDto) {
@@ -97,7 +101,7 @@ export class LookupService {
   }
 
   getSalesZones() {
-    return this.prisma.salesZone.findMany({ orderBy: { id: 'desc' } });
+    return this.prisma.salesZone.findMany({ orderBy: { id: 'asc' } });
   }
 
   createSalesZone(dto: CreateSalesZoneDto) {
@@ -122,7 +126,7 @@ export class LookupService {
   }
 
   getPackConfigs() {
-    return this.prisma.packConfig.findMany({ orderBy: { id: 'desc' } });
+    return this.prisma.packConfig.findMany({ orderBy: { id: 'asc' } });
   }
 
   createPackConfig(dto: CreatePackConfigDto) {
@@ -147,7 +151,7 @@ export class LookupService {
   }
 
   getCustomers() {
-    return this.prisma.customer.findMany({ orderBy: { id: 'desc' } });
+    return this.prisma.customer.findMany({ orderBy: { id: 'asc' } });
   }
 
   createCustomer(dto: CreateCustomerDto) {
@@ -172,7 +176,7 @@ export class LookupService {
   }
 
   getPrinters() {
-    return this.prisma.printer.findMany({ orderBy: { id: 'desc' } });
+    return this.prisma.printer.findMany({ orderBy: { id: 'asc' } });
   }
 
   createPrinter(dto: CreatePrinterDto) {
@@ -194,5 +198,293 @@ export class LookupService {
       }
       throw error;
     }
+  }
+
+  getMaterialBarcodes() {
+    return this.prisma.materialBarcode.findMany({ orderBy: { id: 'asc' } });
+  }
+
+  createMaterialBarcode(dto: CreateMaterialBarcodeDto) {
+    return this.prisma.materialBarcode.create({ data: dto });
+  }
+
+  updateMaterialBarcode(id: number, dto: UpdateMaterialBarcodeDto) {
+    return this.prisma.materialBarcode.update({ where: { id }, data: dto });
+  }
+
+  async deleteMaterialBarcode(id: number) {
+    return await this.prisma.materialBarcode.delete({ where: { id } });
+  }
+
+  async generateBulkTemplate(res: Response) {
+    const workbook = new Workbook();
+
+    // Define the schema for all 8 master tables
+    const sheets = [
+      { 
+        name: 'Products', 
+        data: await this.getProducts(), 
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'Name', key: 'name', width: 30 },
+          { header: 'Code', key: 'code', width: 20 }
+        ]
+      },
+      { 
+        name: 'Transporters', 
+        data: await this.getTransporters(), 
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'Name', key: 'name', width: 30 }
+        ]
+      },
+      { 
+        name: 'Plant Codes', 
+        data: await this.getPlantCodes(), 
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'Code', key: 'code', width: 15 },
+          { header: 'Description', key: 'description', width: 30 }
+        ]
+      },
+      { 
+        name: 'Sales Zones', 
+        data: await this.getSalesZones(), 
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'Name', key: 'name', width: 30 }
+        ]
+      },
+      { 
+        name: 'Packing Configs', 
+        data: await this.getPackConfigs(), 
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'Config Name', key: 'configName', width: 30 }
+        ]
+      },
+      { 
+        name: 'Customers', 
+        data: await this.getCustomers(), 
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'Name', key: 'name', width: 30 },
+          { header: 'Address', key: 'address', width: 40 }
+        ]
+      },
+      { 
+        name: 'Printers', 
+        data: await this.getPrinters(), 
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'Name', key: 'name', width: 30 }
+        ]
+      },
+      { 
+        name: 'Material Barcodes', 
+        data: await this.getMaterialBarcodes(), 
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'ERP Code', key: 'erpCode', width: 20 },
+          { header: 'Mapping Barcode', key: 'mappingBarcode', width: 20 },
+          { header: 'Group', key: 'group', width: 15 },
+          { header: 'Accept Bulk Data (True/False)', key: 'acceptBulkData', width: 25 },
+          { header: 'Remarks Required (True/False)', key: 'remarksRequired', width: 25 },
+          { header: 'Classification', key: 'classification', width: 20 }
+        ]
+      },
+    ];
+
+    for (const sheetDef of sheets) {
+      const sheet = workbook.addWorksheet(sheetDef.name);
+      sheet.columns = sheetDef.columns;
+      // Add existing data
+      sheet.addRows(sheetDef.data);
+    }
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="master_data_bulk.xlsx"'
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  }
+
+  async processBulkImport(file: Express.Multer.File) {
+    const workbook = new Workbook();
+    await workbook.xlsx.load(file.buffer as any);
+
+    const results: string[] = [];
+
+    // Helper to safely get cell string value
+    const getVal = (row, colIdx) => {
+      const val = row.getCell(colIdx).value;
+      // Handle rich text or other object types if strictly string needed, 
+      // but usually toString() works for simple imports
+      return val ? String(val).trim() : null;
+    };
+    
+    // Helper for boolean
+    const getBool = (row, colIdx) => {
+      const val = row.getCell(colIdx).value;
+      if (typeof val === 'boolean') return val;
+      const s = String(val).toLowerCase().trim();
+      return s === 'true' || s === 'yes' || s === '1';
+    };
+
+    // Use a transaction to ensure data consistency
+    await this.prisma.$transaction(async (tx) => {
+      const promises: Promise<any>[] = []; // We will store all operations here
+
+      // 1. Products
+      const productSheet = workbook.getWorksheet('Products');
+      if (productSheet) {
+        productSheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return; // Skip header
+          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+          const name = getVal(row, 2);
+          const code = getVal(row, 3);
+
+          if (name) { // 'code' is optional
+            if (id) {
+              promises.push(tx.product.update({ where: { id }, data: { name, code } }).catch(() => {}));
+            } else {
+              promises.push(tx.product.create({ data: { name, code } }).catch(() => {}));
+            }
+          }
+        });
+        results.push('Products processed');
+      }
+
+      // 2. Transporters
+      const transpSheet = workbook.getWorksheet('Transporters');
+      if (transpSheet) {
+        transpSheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+          const name = getVal(row, 2);
+          if (name) {
+            if (id) promises.push(tx.transporter.update({ where: { id }, data: { name } }).catch(() => {}));
+            else promises.push(tx.transporter.create({ data: { name } }).catch(() => {}));
+          }
+        });
+        results.push('Transporters processed');
+      }
+
+      // 3. Plant Codes
+      const plantSheet = workbook.getWorksheet('Plant Codes');
+      if (plantSheet) {
+        plantSheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+          const code = getVal(row, 2);
+          const description = getVal(row, 3) || '';
+          if (code) {
+            if (id) promises.push(tx.plantCode.update({ where: { id }, data: { code, description } }).catch(() => {}));
+            else promises.push(tx.plantCode.create({ data: { code, description } }).catch(() => {}));
+          }
+        });
+        results.push('Plant Codes processed');
+      }
+
+      // 4. Sales Zones
+      const zoneSheet = workbook.getWorksheet('Sales Zones');
+      if (zoneSheet) {
+        zoneSheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+          const name = getVal(row, 2);
+          if (name) {
+            if (id) promises.push(tx.salesZone.update({ where: { id }, data: { name } }).catch(() => {}));
+            else promises.push(tx.salesZone.create({ data: { name } }).catch(() => {}));
+          }
+        });
+        results.push('Sales Zones processed');
+      }
+
+      // 5. Packing Configs
+      const packSheet = workbook.getWorksheet('Packing Configs');
+      if (packSheet) {
+        packSheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+          const configName = getVal(row, 2);
+          if (configName) {
+            if (id) promises.push(tx.packConfig.update({ where: { id }, data: { configName } }).catch(() => {}));
+            else promises.push(tx.packConfig.create({ data: { configName } }).catch(() => {}));
+          }
+        });
+        results.push('Packing Configs processed');
+      }
+
+      // 6. Customers
+      const custSheet = workbook.getWorksheet('Customers');
+      if (custSheet) {
+        custSheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+          const name = getVal(row, 2);
+          const address = getVal(row, 3) || '';
+          if (name) {
+            if (id) promises.push(tx.customer.update({ where: { id }, data: { name, address } }).catch(() => {}));
+            else promises.push(tx.customer.create({ data: { name, address } }).catch(() => {}));
+          }
+        });
+        results.push('Customers processed');
+      }
+
+      // 7. Printers
+      const printSheet = workbook.getWorksheet('Printers');
+      if (printSheet) {
+        printSheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+          const name = getVal(row, 2);
+          if (name) {
+            if (id) promises.push(tx.printer.update({ where: { id }, data: { name } }).catch(() => {}));
+            else promises.push(tx.printer.create({ data: { name } }).catch(() => {}));
+          }
+        });
+        results.push('Printers processed');
+      }
+
+      // 8. Material Barcodes
+      const matSheet = workbook.getWorksheet('Material Barcodes');
+      if (matSheet) {
+        matSheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+          const erpCode = getVal(row, 2);
+          const mappingBarcode = getVal(row, 3);
+          const group = getVal(row, 4);
+          const acceptBulkData = getBool(row, 5);
+          const remarksRequired = getBool(row, 6);
+          const classification = getVal(row, 7);
+
+          if (erpCode) {
+            const data = {
+              erpCode,
+              mappingBarcode,
+              group,
+              acceptBulkData,
+              remarksRequired,
+              classification
+            };
+            if (id) promises.push(tx.materialBarcode.update({ where: { id }, data }).catch(() => {}));
+            else promises.push(tx.materialBarcode.create({ data }).catch(() => {}));
+          }
+        });
+        results.push('Material Barcodes processed');
+      }
+
+      await Promise.all(promises);
+    });
+
+    return { message: 'Bulk import completed successfully', details: results };
   }
 }

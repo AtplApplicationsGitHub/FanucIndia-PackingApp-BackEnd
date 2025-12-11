@@ -31,7 +31,7 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   app.enableCors({
-    origin: ['http://localhost:3000', 'https://fanuc.goval.app:444'],
+    origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : true,
     credentials: true,
   });
 

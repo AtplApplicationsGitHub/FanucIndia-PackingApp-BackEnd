@@ -16,7 +16,7 @@ const columnMapping = {
   "Certificate No": "Cert_No",
   "Bin No": "Bin_No",
   "A D F": "A_D_F",
-  "Required Qty": "Required_Qty",
+  "Required Quantity": "Required_Qty", 
   "Issue Stage": "Issue_stage",
   "Packing Stage": "Packing_stage",
   "Status": "Status",
@@ -42,10 +42,8 @@ export class ErpMaterialImporterService {
     const renamedRecords = this.renameColumns(records);
     await this.upsertRecords(renamedRecords);
 
-    // Log the event to ERPMaterialLog
     const soNumber = String(records[0]["SO Number"]);
     try {
-      // Fixed Typo: eRPMaterialLog (CamelCase of ERPMaterialLog)
       await this.prisma.eRPMaterialLog.create({
         data: {
           dateTime: new Date(),
@@ -75,16 +73,22 @@ export class ErpMaterialImporterService {
       const jsonData: any[] = [];
       const headers: string[] = [];
 
-      // Iterate rows
+      const headerLookup = new Map<string, string>();
+      Object.keys(columnMapping).forEach(key => {
+        headerLookup.set(key.toLowerCase(), key);
+      });
+
       worksheet.eachRow((row, rowNumber) => {
-        // Row 1 contains headers
         if (rowNumber === 1) {
           row.eachCell((cell, colNumber) => {
-            // ExcelJS columns are 1-based
-            headers[colNumber] = cell.text ? cell.text.trim() : '';
+            const cellText = cell.text ? cell.text.trim() : '';
+            const lowerText = cellText.toLowerCase();
+            
+            const canonicalHeader = headerLookup.get(lowerText) || cellText;
+            
+            headers[colNumber] = canonicalHeader;
           });
         } else {
-          // Subsequent rows are data
           const rowData: any = {};
           let hasData = false;
 
@@ -94,13 +98,15 @@ export class ErpMaterialImporterService {
             const cell = row.getCell(colNumber);
             let val = cell.value;
 
-            // Handle rich text or formulas if necessary
             if (val && typeof val === 'object') {
                if ('text' in val) val = (val as any).text;
                else if ('result' in val) val = (val as any).result;
             }
 
-            // Map undefined to null to match previous behavior
+            if (typeof val === 'string') {
+              val = val.trim();
+            }
+
             rowData[header] = (val !== undefined && val !== null) ? val : null;
             
             if (rowData[header] !== null) hasData = true;
@@ -132,15 +138,15 @@ export class ErpMaterialImporterService {
         return `Header mismatch. Missing columns: ${missingHeaders.join(', ')}`;
     }
 
-    // Removed duplicate material code check loop.
-    // We now iterate only to check for missing Material Code values.
+    const matCodeHeader = "Material Code"; 
     for (const record of records) {
-        if (!record['Material Code']) {
+        if (!record[matCodeHeader]) {
             return 'Missing Material Code in one or more rows.';
         }
     }
 
-    const soNumbers = new Set(records.map(r => r['SO Number']).filter(Boolean));
+    const soNumberHeader = "SO Number";
+    const soNumbers = new Set(records.map(r => r[soNumberHeader]).filter(Boolean));
     if (soNumbers.size > 1) {
       return 'Inconsistent SO Numbers found in the file. All records must belong to the same SO Number.';
     }
@@ -190,7 +196,7 @@ export class ErpMaterialImporterService {
     
     const safeToString = (val: any, defaultVal: string | null = null): string | null => {
         if (val === null || val === undefined) return defaultVal;
-        return String(val);
+        return String(val).trim(); // Ensure trim here as well
     };
 
     const recordsToCreate = records.map(r => ({

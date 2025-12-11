@@ -8,6 +8,9 @@ import {
   Body,
   UseGuards,
   ParseIntPipe,
+  UploadedFile, 
+  UseInterceptors, 
+  Res
 } from '@nestjs/common';
 import { LookupService } from './lookup.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -18,6 +21,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { CreateProductDto } from './dto/createProductDto';
 import { UpdateProductDto } from './dto/updateProductDto';
@@ -33,6 +37,10 @@ import { CreateCustomerDto } from './dto/createCustomerDto';
 import { UpdateCustomerDto } from './dto/updateCustomerDto';
 import { CreatePrinterDto } from './dto/createPrinterDto';
 import { UpdatePrinterDto } from './dto/updatePrinterDto';
+import { CreateMaterialBarcodeDto } from './dto/createMaterialBarcodeDto';
+import { UpdateMaterialBarcodeDto } from './dto/updateMaterialBarcodeDto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 
 @ApiTags('Lookup')
 @ApiBearerAuth()
@@ -237,5 +245,55 @@ export class LookupController {
   @ApiParam({ name: 'id', type: Number })
   deletePrinter(@Param('id', ParseIntPipe) id: number) {
     return this.lookupService.deletePrinter(id);
+  }
+
+  @Get('material-barcodes')
+  @ApiOperation({ summary: 'Get all material barcodes' })
+  getMaterialBarcodes() {
+    return this.lookupService.getMaterialBarcodes();
+  }
+
+  @Post('material-barcodes')
+  @ApiOperation({ summary: 'Create a material barcode' })
+  @ApiBody({ type: CreateMaterialBarcodeDto })
+  createMaterialBarcode(@Body() dto: CreateMaterialBarcodeDto) {
+    return this.lookupService.createMaterialBarcode(dto);
+  }
+
+  @Patch('material-barcodes/:id')
+  @ApiOperation({ summary: 'Update a material barcode' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiBody({ type: UpdateMaterialBarcodeDto })
+  updateMaterialBarcode(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMaterialBarcodeDto) {
+    return this.lookupService.updateMaterialBarcode(id, dto);
+  }
+
+  @Delete('material-barcodes/:id')
+  @ApiOperation({ summary: 'Delete a material barcode' })
+  @ApiParam({ name: 'id', type: Number })
+  deleteMaterialBarcode(@Param('id', ParseIntPipe) id: number) {
+    return this.lookupService.deleteMaterialBarcode(id);
+  }
+
+  @Get('bulk-template')
+  @ApiOperation({ summary: 'Download Excel template with all master data' })
+  async downloadBulkTemplate(@Res() res: Response) {
+    return this.lookupService.generateBulkTemplate(res);
+  }
+
+  @Post('bulk-import')
+  @ApiOperation({ summary: 'Bulk import/update master data from Excel' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  async bulkImport(@UploadedFile() file: Express.Multer.File) {
+    return this.lookupService.processBulkImport(file);
   }
 }

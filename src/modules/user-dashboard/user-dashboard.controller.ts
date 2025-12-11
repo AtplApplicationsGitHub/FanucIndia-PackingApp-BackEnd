@@ -6,7 +6,6 @@ import {
   ParseIntPipe,
   Req,
   UseGuards,
-  NotFoundException,
   UseInterceptors,
   BadRequestException,
   UploadedFile,
@@ -27,6 +26,7 @@ import {
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthRequest } from '../auth/types/auth-request.type';
@@ -35,7 +35,7 @@ import { UpdateMaterialDataDto } from './dto/update-material-data.dto';
 
 const storageOptions = {
   storage: diskStorage({
-    destination: './temp_uploads',
+    destination: os.tmpdir(),
     filename: (req, file, cb) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
       cb(

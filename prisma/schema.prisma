@@ -346,3 +346,13 @@ model VehicleEntryArchive {
   
   archivedAt      DateTime @default(now())
 }
+
+model MaterialBarcode {
+  id              Int      @id @default(autoincrement())
+  erpCode         String   
+  mappingBarcode  String?  
+  group           String?  
+  acceptBulkData  Boolean  @default(false)
+  remarksRequired Boolean  @default(false)
+  classification  String?  
+}

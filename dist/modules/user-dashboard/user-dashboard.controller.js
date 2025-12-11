@@ -14,6 +14,7 @@ const _platformexpress = require("@nestjs/platform-express");
 const _multer = require("multer");
 const _path = /*#__PURE__*/ _interop_require_wildcard(require("path"));
 const _fs = /*#__PURE__*/ _interop_require_wildcard(require("fs"));
+const _os = /*#__PURE__*/ _interop_require_wildcard(require("os"));
 const _jwtauthguard = require("../auth/jwt-auth.guard");
 const _rolesdecorator = require("../auth/roles.decorator");
 const _authrequesttype = require("../auth/types/auth-request.type");
@@ -75,7 +76,7 @@ function _ts_param(paramIndex, decorator) {
 }
 const storageOptions = {
     storage: (0, _multer.diskStorage)({
-        destination: './temp_uploads',
+        destination: _os.tmpdir(),
         filename: (req, file, cb)=>{
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
             cb(null, file.fieldname + '-' + uniqueSuffix + _path.extname(file.originalname));
