@@ -1,29 +1,18 @@
-# Stage 1: Build the application
-FROM node:22-alpine AS builder
+# Stage 1: Build the NestJS application
+FROM node:18-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
-
-COPY prisma ./prisma/
-RUN npx prisma generate
-
+RUN npm install
 COPY . .
 RUN npm run build
-RUN npm prune --production
-# Stage 2: Create the final, minimal production image
-FROM node:22-alpine
+
+# Stage 2: Production image
+FROM node:18-alpine
 WORKDIR /app
-
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/prisma ./prisma/
+RUN npm install --only=production
+COPY --from=builder /app/dist ./dist
+EXPOSE 3010
 
-#COPY --from-builder /app/dist ./dist
-#COPY --from-builder /app/node_modules ./node_modules
-#COPY --from-builder /app/package*.json ./
-#COPY --from-builder /app/prisma ./prisma/
-
-EXPOSE 3011
-
+# Start the application
 CMD ["node", "dist/main"]
