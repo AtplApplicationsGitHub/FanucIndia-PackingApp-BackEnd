@@ -19,7 +19,7 @@ const columnMapping = {
   "Required Quantity": "Required_Qty", 
   "Issue Stage": "Issue_stage",
   "Packing Stage": "Packing_stage",
-  "Status": "Status",
+  "Remarks": "Remarks",
 };
 
 @Injectable()
@@ -233,7 +233,7 @@ export class ErpMaterialImporterService {
         Required_Qty: safeParseInt(r.Required_Qty, 0)!,
         Issue_stage: safeParseInt(r.Issue_stage, 0)!,
         Packing_stage: safeParseInt(r.Packing_stage, 0)!,
-        Status: safeToString(r.Status),
+        Remarks: safeToString(r.Remarks),
 
         Mapping_Barcode: barcodeData?.mappingBarcode ?? null,
         Group: barcodeData?.group ?? null,
