@@ -22,6 +22,8 @@ import { UpdateIssueStageDto } from './dto/update-issue-stage.dto';
 import { IncrementIssueStageDto } from './dto/increment-issue-stage.dto';
 import { UpdatePackingStageDto } from './dto/update-packing-stage.dto';
 import { IncrementPackingStageDto } from './dto/increment-packing-stage.dto';
+import { BulkAcceptGroupDto } from './dto/bulk-accept-group.dto';
+import { UpdateRemarksDto } from './dto/update-remarks.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthRequest } from '../auth/types/auth-request.type';
@@ -132,6 +134,48 @@ export class ErpMaterialDataController {
       userId,
       role,
       body.materialId,
+    );
+  }
+
+  @ApiOperation({ summary: 'Bulk accept items for a specific group' })
+  @ApiParam({ name: 'orderId', type: Number, description: 'Sales Order ID' })
+  @ApiBody({ type: BulkAcceptGroupDto })
+  @Post('bulk-accept-group')
+  @Roles('ADMIN', 'USER')
+  bulkAcceptGroup(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body() body: BulkAcceptGroupDto,
+    @Req() req: AuthRequest,
+  ) {
+    const { userId, role } = req.user;
+    return this.erpMaterialDataService.bulkAcceptGroup(
+      orderId,
+      body.group,
+      body.stageType,
+      userId,
+      role
+    );
+  }
+
+  @ApiOperation({ summary: 'Update remarks for a material row' })
+  @ApiParam({ name: 'orderId', type: Number })
+  @ApiParam({ name: 'materialId', type: Number })
+  @ApiBody({ type: UpdateRemarksDto })
+  @Patch(':materialId/remarks')
+  @Roles('ADMIN', 'USER')
+  updateRemarks(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Param('materialId', ParseIntPipe) materialId: number,
+    @Body() body: UpdateRemarksDto,
+    @Req() req: AuthRequest,
+  ) {
+    const { userId, role } = req.user;
+    return this.erpMaterialDataService.updateRemarks(
+      orderId,
+      materialId,
+      body.remarks,
+      userId,
+      role,
     );
   }
 }

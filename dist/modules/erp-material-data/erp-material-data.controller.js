@@ -15,6 +15,8 @@ const _updateissuestagedto = require("./dto/update-issue-stage.dto");
 const _incrementissuestagedto = require("./dto/increment-issue-stage.dto");
 const _updatepackingstagedto = require("./dto/update-packing-stage.dto");
 const _incrementpackingstagedto = require("./dto/increment-packing-stage.dto");
+const _bulkacceptgroupdto = require("./dto/bulk-accept-group.dto");
+const _updateremarksdto = require("./dto/update-remarks.dto");
 const _jwtauthguard = require("../auth/jwt-auth.guard");
 const _rolesdecorator = require("../auth/roles.decorator");
 const _authrequesttype = require("../auth/types/auth-request.type");
@@ -52,6 +54,14 @@ let ErpMaterialDataController = class ErpMaterialDataController {
     updatePackingStage(orderId, body, req) {
         const { userId, role } = req.user;
         return this.erpMaterialDataService.updatePackingStage(orderId, body.materialCode, body.packingStage, userId, role, body.materialId);
+    }
+    bulkAcceptGroup(orderId, body, req) {
+        const { userId, role } = req.user;
+        return this.erpMaterialDataService.bulkAcceptGroup(orderId, body.group, body.stageType, userId, role);
+    }
+    updateRemarks(orderId, materialId, body, req) {
+        const { userId, role } = req.user;
+        return this.erpMaterialDataService.updateRemarks(orderId, materialId, body.remarks, userId, role);
     }
     constructor(erpMaterialDataService){
         this.erpMaterialDataService = erpMaterialDataService;
@@ -185,6 +195,61 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], ErpMaterialDataController.prototype, "updatePackingStage", null);
+_ts_decorate([
+    (0, _swagger.ApiOperation)({
+        summary: 'Bulk accept items for a specific group'
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'orderId',
+        type: Number,
+        description: 'Sales Order ID'
+    }),
+    (0, _swagger.ApiBody)({
+        type: _bulkacceptgroupdto.BulkAcceptGroupDto
+    }),
+    (0, _common.Post)('bulk-accept-group'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    _ts_param(0, (0, _common.Param)('orderId', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_param(2, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        typeof _bulkacceptgroupdto.BulkAcceptGroupDto === "undefined" ? Object : _bulkacceptgroupdto.BulkAcceptGroupDto,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], ErpMaterialDataController.prototype, "bulkAcceptGroup", null);
+_ts_decorate([
+    (0, _swagger.ApiOperation)({
+        summary: 'Update remarks for a material row'
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'orderId',
+        type: Number
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'materialId',
+        type: Number
+    }),
+    (0, _swagger.ApiBody)({
+        type: _updateremarksdto.UpdateRemarksDto
+    }),
+    (0, _common.Patch)(':materialId/remarks'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    _ts_param(0, (0, _common.Param)('orderId', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Param)('materialId', _common.ParseIntPipe)),
+    _ts_param(2, (0, _common.Body)()),
+    _ts_param(3, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        Number,
+        typeof _updateremarksdto.UpdateRemarksDto === "undefined" ? Object : _updateremarksdto.UpdateRemarksDto,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], ErpMaterialDataController.prototype, "updateRemarks", null);
 ErpMaterialDataController = _ts_decorate([
     (0, _swagger.ApiTags)('ERP Material Data'),
     (0, _swagger.ApiBearerAuth)(),

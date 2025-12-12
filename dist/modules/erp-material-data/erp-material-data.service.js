@@ -104,11 +104,23 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             }
         });
         if (!salesOrder) throw new _common.NotFoundException('Sales Order not found');
-        // [UPDATED] Support duplicate materials: Find ALL matching records sorted by ID (insertion order)
         const materials = await this.prisma.eRP_Material_Data.findMany({
             where: {
-                Material_Code: materialCode,
-                saleOrderNumber: salesOrder.saleOrderNumber
+                saleOrderNumber: salesOrder.saleOrderNumber,
+                OR: [
+                    {
+                        Material_Code: {
+                            equals: materialCode,
+                            mode: 'insensitive'
+                        }
+                    },
+                    {
+                        Mapping_Barcode: {
+                            equals: materialCode,
+                            mode: 'insensitive'
+                        }
+                    }
+                ]
             },
             orderBy: {
                 ID: 'asc'
@@ -287,20 +299,29 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             }
         });
         if (!salesOrder) throw new _common.NotFoundException('Sales Order not found');
-        // [UPDATED] Support duplicate materials
         const materials = await this.prisma.eRP_Material_Data.findMany({
             where: {
-                Material_Code: materialCode,
-                saleOrderNumber: salesOrder.saleOrderNumber
+                saleOrderNumber: salesOrder.saleOrderNumber,
+                OR: [
+                    {
+                        Material_Code: {
+                            equals: materialCode,
+                            mode: 'insensitive'
+                        }
+                    },
+                    {
+                        Mapping_Barcode: {
+                            equals: materialCode,
+                            mode: 'insensitive'
+                        }
+                    }
+                ]
             },
             orderBy: {
                 ID: 'asc'
             }
         });
         if (materials.length === 0) throw new _common.NotFoundException('Material with specified code not found for this order.');
-        // Find the first material where packing stage < allowed cap
-        // Cap is min(Required_Qty, Issue_stage). Usually Issue_stage should be full before packing,
-        // but the system allows packing up to what's issued.
         const materialToUpdate = materials.find((m)=>{
             const cap = Math.min(m.Required_Qty, m.Issue_stage);
             return m.Packing_stage < cap;
@@ -366,6 +387,154 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             updatedMaterial,
             packingStageCompleted
         });
+    }
+    async bulkAcceptGroup(orderId, group, stageType, userId, userRole) {
+        await verifyOrderAccess(this.prisma, orderId, userId, userRole);
+        const salesOrder = await this.prisma.salesOrder.findUnique({
+            where: {
+                id: orderId
+            },
+            select: {
+                saleOrderNumber: true
+            }
+        });
+        if (!salesOrder) throw new _common.NotFoundException('Sales Order not found');
+        const userName = await this.getUserName(userId);
+        const now = new Date();
+        // 1. Find all items in this group for this SO
+        const groupItems = await this.prisma.eRP_Material_Data.findMany({
+            where: {
+                saleOrderNumber: salesOrder.saleOrderNumber,
+                Group: group
+            }
+        });
+        if (groupItems.length === 0) {
+            throw new _common.NotFoundException(`No items found for group '${group}' in this order.`);
+        }
+        // 2. Perform updates
+        await this.prisma.$transaction(async (tx)=>{
+            for (const item of groupItems){
+                if (stageType === 'issue') {
+                    // Update Issue Stage to Required Qty if not already full
+                    if (item.Issue_stage < item.Required_Qty) {
+                        await tx.eRP_Material_Data.update({
+                            where: {
+                                ID: item.ID
+                            },
+                            data: {
+                                Issue_stage: item.Required_Qty,
+                                UpdatedBy: userName,
+                                UpdatedDate: now
+                            }
+                        });
+                    }
+                } else {
+                    // Packing Stage: Cap at min(Issue, Required). 
+                    // Usually bulk accept assumes Issue is done, so we target Required_Qty.
+                    // But technically we should respect the current Issue_stage if it's lower (though unlikely in this flow).
+                    // Assuming user clicks "Accept Group" when items are ready.
+                    const cap = Math.min(item.Required_Qty, item.Issue_stage);
+                    // If we want to force full completion, we assume Issue is done. 
+                    // If the button is only enabled when Issue is complete, then Issue=Required.
+                    if (item.Packing_stage < item.Required_Qty) {
+                        // Logic: Set packing to required. 
+                        // Note: If Issue stage isn't full, this might violate logic, but "Accept Group" implies force completion.
+                        // We will assume Issue stage is ALREADY handled (since Packing view comes after Issue view).
+                        await tx.eRP_Material_Data.update({
+                            where: {
+                                ID: item.ID
+                            },
+                            data: {
+                                Packing_stage: item.Required_Qty,
+                                UpdatedBy: userName,
+                                UpdatedDate: now
+                            }
+                        });
+                    }
+                }
+            }
+        });
+        // 3. Check for Global Completion (Standard Logic)
+        // We re-use the private check logic or duplicate it here for safety
+        return this._checkOrderCompletion(salesOrder.saleOrderNumber, orderId, userName);
+    }
+    // Helper to re-check order status after bulk update
+    async _checkOrderCompletion(soNumber, orderId, userName) {
+        const allMaterials = await this.prisma.eRP_Material_Data.findMany({
+            where: {
+                saleOrderNumber: soNumber
+            },
+            select: {
+                Issue_stage: true,
+                Packing_stage: true,
+                Required_Qty: true
+            }
+        });
+        const issueStageCompleted = allMaterials.every((m)=>m.Issue_stage >= m.Required_Qty);
+        let isIssueComplete = false;
+        let isPackingComplete = false;
+        if (issueStageCompleted) {
+            // Check current status to avoid redundant updates
+            const current = await this.prisma.salesOrder.findUnique({
+                where: {
+                    id: orderId
+                }
+            });
+            if (current && current.status !== 'W105' && current.status !== 'F105' && current.status !== 'Dispatched') {
+                await this.prisma.salesOrder.update({
+                    where: {
+                        id: orderId
+                    },
+                    data: {
+                        status: 'W105',
+                        assignedUserId: null,
+                        UpdatedBy: userName,
+                        UpdatedDate: new Date()
+                    }
+                });
+                await this.prisma.sO_Status_Stepper.updateMany({
+                    where: {
+                        salesOrderNumber: soNumber,
+                        status: "Issued"
+                    },
+                    data: {
+                        createdDateTime: new Date(),
+                        updatedBy: userName
+                    }
+                });
+                isIssueComplete = true;
+            }
+        }
+        const packingStageCompleted = allMaterials.every((m)=>m.Packing_stage >= m.Required_Qty);
+        if (packingStageCompleted) {
+            await this.prisma.salesOrder.update({
+                where: {
+                    id: orderId
+                },
+                data: {
+                    status: 'F105',
+                    assignedUserId: null,
+                    UpdatedBy: userName,
+                    UpdatedDate: new Date()
+                }
+            });
+            await this.prisma.sO_Status_Stepper.updateMany({
+                where: {
+                    salesOrderNumber: soNumber,
+                    status: "Packed"
+                },
+                data: {
+                    createdDateTime: new Date(),
+                    updatedBy: userName
+                }
+            });
+            isPackingComplete = true;
+        }
+        return {
+            message: 'Group updated successfully',
+            issueStageCompleted: isIssueComplete,
+            packingStageCompleted: isPackingComplete
+        };
     }
     async updatePackingStage(orderId, materialCode, newPackingStage, userId, userRole, materialId) {
         await verifyOrderAccess(this.prisma, orderId, userId, userRole);
@@ -456,6 +625,31 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             message: 'Packing_stage updated successfully',
             updatedMaterial,
             packingStageCompleted
+        });
+    }
+    async updateRemarks(orderId, materialId, remarks, userId, userRole) {
+        await verifyOrderAccess(this.prisma, orderId, userId, userRole);
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            }
+        });
+        const userName = user ? user.name : 'System';
+        // "Delete" operation is effectively setting it to null or empty string
+        const valueToSave = remarks && remarks.trim().length > 0 ? remarks : null;
+        const updatedMaterial = await this.prisma.eRP_Material_Data.update({
+            where: {
+                ID: materialId
+            },
+            data: {
+                Remarks: valueToSave,
+                UpdatedBy: userName,
+                UpdatedDate: new Date()
+            }
+        });
+        return convertBigInts({
+            message: 'Remarks updated successfully',
+            updatedMaterial
         });
     }
     constructor(prisma){

@@ -127,7 +127,15 @@ model ERP_Material_Data {
   Required_Qty         Int
   Issue_stage          Int         @default(0)
   Packing_stage        Int         @default(0)
-  Status               String?     @db.VarChar(100)
+  Remarks              String?     @db.VarChar(500)
+
+  Mapping_Barcode      String?     @db.VarChar(100)
+  Group                String?     @db.VarChar(100)
+  Accept_Bulk_Data     Boolean?
+  Remarks_Required     Boolean?
+  Classification       String?     @db.VarChar(100)
+
+
   UpdatedDate          DateTime?   @db.Timestamp(3)
   UpdatedBy            String?     @db.VarChar(50)
   customer             Customer?   @relation("Customer_ERP_Material_Data", fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -245,7 +253,14 @@ model ERP_Material_DataArchive {
   Required_Qty         Int
   Issue_stage          Int
   Packing_stage        Int
-  Status               String?     @db.VarChar(100)
+  Remarks              String?     @db.VarChar(500)
+
+  Mapping_Barcode      String?     @db.VarChar(100)
+  Group                String?     @db.VarChar(100)
+  Accept_Bulk_Data     Boolean?
+  Remarks_Required     Boolean?
+  Classification       String?     @db.VarChar(100)
+
   UpdatedDate          DateTime?   @db.Timestamp(3)
   UpdatedBy            String?     @db.VarChar(50)
   archivedAt           DateTime    @default(now())

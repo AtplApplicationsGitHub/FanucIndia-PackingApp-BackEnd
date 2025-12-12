@@ -199,25 +199,49 @@ export class ErpMaterialImporterService {
         return String(val).trim(); // Ensure trim here as well
     };
 
-    const recordsToCreate = records.map(r => ({
-      saleOrderNumber: safeToString(r.saleOrderNumber)!,
-      customerId: safeParseInt(r.customerId),
-      transferOrder: safeToString(r.transferOrder),
-      FG_OBD: safeToString(r.FG_OBD),
-      Machine_Model: safeToString(r.Machine_Model),
-      CNC_Serial_No: safeToString(r.CNC_Serial_No),
-      Material_Code: safeToString(r.Material_Code, '')!,
-      Material_Description: safeToString(r.Material_Description, '')!,
-      Batch_No: safeToString(r.Batch_No, '')!,
-      SO_Donor_Batch: safeToString(r.SO_Donor_Batch, '')!,
-      Cert_No: safeToString(r.Cert_No, '')!,
-      Bin_No: safeToString(r.Bin_No, '')!,
-      A_D_F: safeToString(r.A_D_F, '')!,
-      Required_Qty: safeParseInt(r.Required_Qty, 0)!,
-      Issue_stage: safeParseInt(r.Issue_stage, 0)!,
-      Packing_stage: safeParseInt(r.Packing_stage, 0)!,
-      Status: safeToString(r.Status),
-    }));
+    const allMaterialCodes = records
+      .map((r) => safeToString(r.Material_Code, ''))
+      .filter((code): code is string => !!code);
+
+    const distinctCodes = [...new Set(allMaterialCodes)];
+
+    const materialBarcodes = await this.prisma.materialBarcode.findMany({
+      where: { erpCode: { in: distinctCodes } },
+    });
+
+    const barcodeMap = new Map(materialBarcodes.map((mb) => [mb.erpCode, mb]));
+
+    const recordsToCreate = records.map(r => {
+      const matCode = safeToString(r.Material_Code, '')!;
+      
+      const barcodeData = barcodeMap.get(matCode);
+
+      return {
+        saleOrderNumber: safeToString(r.saleOrderNumber)!,
+        customerId: safeParseInt(r.customerId),
+        transferOrder: safeToString(r.transferOrder),
+        FG_OBD: safeToString(r.FG_OBD),
+        Machine_Model: safeToString(r.Machine_Model),
+        CNC_Serial_No: safeToString(r.CNC_Serial_No),
+        Material_Code: matCode,
+        Material_Description: safeToString(r.Material_Description, '')!,
+        Batch_No: safeToString(r.Batch_No, '')!,
+        SO_Donor_Batch: safeToString(r.SO_Donor_Batch, '')!,
+        Cert_No: safeToString(r.Cert_No, '')!,
+        Bin_No: safeToString(r.Bin_No, '')!,
+        A_D_F: safeToString(r.A_D_F, '')!,
+        Required_Qty: safeParseInt(r.Required_Qty, 0)!,
+        Issue_stage: safeParseInt(r.Issue_stage, 0)!,
+        Packing_stage: safeParseInt(r.Packing_stage, 0)!,
+        Status: safeToString(r.Status),
+
+        Mapping_Barcode: barcodeData?.mappingBarcode ?? null,
+        Group: barcodeData?.group ?? null,
+        Accept_Bulk_Data: barcodeData?.acceptBulkData ?? null,
+        Remarks_Required: barcodeData?.remarksRequired ?? null,
+        Classification: barcodeData?.classification ?? null,
+      };
+    });
 
     try {
       await this.prisma.$transaction(async (tx) => {
