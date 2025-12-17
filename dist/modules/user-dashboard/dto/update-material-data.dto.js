@@ -65,6 +65,42 @@ _ts_decorate([
     (0, _classvalidator.IsDateString)(),
     _ts_metadata("design:type", String)
 ], MaterialDataDto.prototype, "UpdatedDate", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)(),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], MaterialDataDto.prototype, "Remarks", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)(),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], MaterialDataDto.prototype, "Accept_Bulk_Data", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)(),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], MaterialDataDto.prototype, "Classification", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)(),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], MaterialDataDto.prototype, "Group", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)(),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], MaterialDataDto.prototype, "Mapping_Barcode", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)(),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], MaterialDataDto.prototype, "Remarks_Required", void 0);
 let UpdateMaterialDataDto = class UpdateMaterialDataDto {
 };
 _ts_decorate([

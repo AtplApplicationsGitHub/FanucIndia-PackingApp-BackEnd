@@ -184,7 +184,13 @@ let UserDashboardService = class UserDashboardService {
                 Required_Qty: true,
                 Issue_stage: true,
                 Packing_stage: true,
-                UpdatedDate: true
+                UpdatedDate: true,
+                Accept_Bulk_Data: true,
+                Classification: true,
+                Group: true,
+                Mapping_Barcode: true,
+                Remarks_Required: true,
+                Remarks: true
             }
         });
         return materials.map((material)=>({
@@ -254,6 +260,7 @@ let UserDashboardService = class UserDashboardService {
                     data: {
                         Issue_stage: material.Issue_stage,
                         Packing_stage: material.Packing_stage,
+                        Remarks: material.Remarks,
                         UpdatedBy: userName,
                         UpdatedDate: material.UpdatedDate ? new Date(material.UpdatedDate) : new Date()
                     }
@@ -267,6 +274,7 @@ let UserDashboardService = class UserDashboardService {
                     data: {
                         Issue_stage: material.Issue_stage,
                         Packing_stage: material.Packing_stage,
+                        Remarks: material.Remarks,
                         UpdatedBy: userName,
                         UpdatedDate: material.UpdatedDate ? new Date(material.UpdatedDate) : new Date()
                     }
