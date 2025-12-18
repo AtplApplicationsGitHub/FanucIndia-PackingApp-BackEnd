@@ -5,6 +5,7 @@ import {
   ValidateIf,
   Matches,
   IsOptional,
+  IsNotEmpty
 } from 'class-validator';
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 
@@ -52,4 +53,21 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
     message: 'Password must be a 4-digit PIN for the USER role',
   })
   password?: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ example: 'oldPassword123' })
+  @IsString()
+  @IsNotEmpty()
+  oldPassword: string;
+
+  @ApiProperty({ description: 'New password/PIN' })
+  @IsString()
+  @IsNotEmpty()
+  newPassword: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  confirmPassword: string;
 }

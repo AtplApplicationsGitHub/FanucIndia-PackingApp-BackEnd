@@ -16,9 +16,23 @@ export class FgDashboardController {
   @Roles('ADMIN', 'USER')
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'date', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'payment', required: false, type: String, description: 'true/false' })
+  @ApiQuery({ name: 'zone', required: false, type: String, description: 'Sales Zone ID' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Status string' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number for pagination' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of items per page' })
-  getFgDashboardData(@Req() req: AuthRequest, @Query() query: { search?: string, date?: string, page?: string, limit?: string }) {
+  getFgDashboardData(
+    @Req() req: AuthRequest, 
+    @Query() query: { 
+      search?: string, 
+      date?: string, 
+      payment?: string,
+      zone?: string,
+      status?: string,
+      page?: string, 
+      limit?: string 
+    }
+  ) {
     const page = query.page ? parseInt(query.page, 10) : 1;
     const limit = query.limit ? parseInt(query.limit, 10) : 10;
     return this.fgDashboardService.getFgDashboardData(req.user, { ...query, page, limit });

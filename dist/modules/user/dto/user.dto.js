@@ -12,6 +12,9 @@ _export(exports, {
     get CreateUserDto () {
         return CreateUserDto;
     },
+    get ResetPasswordDto () {
+        return ResetPasswordDto;
+    },
     get UpdateUserDto () {
         return UpdateUserDto;
     }
@@ -94,5 +97,29 @@ _ts_decorate([
     }),
     _ts_metadata("design:type", String)
 ], UpdateUserDto.prototype, "password", void 0);
+let ResetPasswordDto = class ResetPasswordDto {
+};
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        example: 'oldPassword123'
+    }),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.IsNotEmpty)(),
+    _ts_metadata("design:type", String)
+], ResetPasswordDto.prototype, "oldPassword", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'New password/PIN'
+    }),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.IsNotEmpty)(),
+    _ts_metadata("design:type", String)
+], ResetPasswordDto.prototype, "newPassword", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.IsNotEmpty)(),
+    _ts_metadata("design:type", String)
+], ResetPasswordDto.prototype, "confirmPassword", void 0);
 
 //# sourceMappingURL=user.dto.js.map

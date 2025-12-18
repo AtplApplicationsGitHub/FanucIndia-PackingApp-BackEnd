@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
+import { ResetPasswordDto } from './dto/user.dto';
 
 @Injectable()
 export class UserService {
@@ -108,5 +109,24 @@ export class UserService {
 
     await this.prisma.user.delete({ where: { id } });
     return { message: 'User deleted successfully' };
+  }
+
+  async resetPassword(userId: number, dto: ResetPasswordDto) {
+  const user = await this.prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  const isMatch = await bcrypt.compare(dto.oldPassword, user.password);
+  if (!isMatch) {
+    throw new BadRequestException('Incorrect old password');
+  }
+
+  const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+  return this.prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword },
+    select: { id: true, email: true }
+  });
   }
 }

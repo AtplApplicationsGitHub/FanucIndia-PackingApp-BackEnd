@@ -8,9 +8,17 @@ export class FgDashboardService {
 
   async getFgDashboardData(
     user: { userId: number; role: string },
-    query: { search?: string; date?: string; page?: number; limit?: number }
+    query: { 
+      search?: string; 
+      date?: string; 
+      payment?: string;
+      zone?: string;
+      status?: string;
+      page?: number; 
+      limit?: number 
+    }
   ) {
-    const { search, date, page = 1, limit = 10 } = query;
+    const { search, date, payment, zone, status, page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
     const where: Prisma.SalesOrderWhereInput = {};
 
@@ -19,9 +27,7 @@ export class FgDashboardService {
         const [y, m, d] = s.split('-').map(Number);
         return { y, m, d };
       };
-
       const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-
       const { y, m, d } = parseYMD(date);
       const startIST = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
       const endISTExclusive = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
@@ -32,9 +38,28 @@ export class FgDashboardService {
       };
     }
 
+    if (payment) {
+      where.paymentClearance = payment === 'true';
+    }
+
+    if (zone) {
+      where.salesZoneId = parseInt(zone, 10);
+    }
+
+    if (status) {
+      if (status === 'None') {
+         where.OR = [
+           { status: { equals: null } },
+           { status: { equals: '' } }
+         ];
+      } else {
+        where.status = { equals: status, mode: 'insensitive' };
+      }
+    }
+
     if (search) {
       const lowerSearch = search.toLowerCase();
-      let paymentBoolean: boolean | undefined = undefined;
+       let paymentBoolean: boolean | undefined = undefined;
 
       if (lowerSearch === 'yes') {
         paymentBoolean = true;
@@ -42,7 +67,7 @@ export class FgDashboardService {
         paymentBoolean = false;
       }
 
-      where.OR = [
+      const searchConditions: Prisma.SalesOrderWhereInput[] = [
         { saleOrderNumber: { contains: search, mode: 'insensitive' } },
         { transferOrder: { contains: search, mode: 'insensitive' } },
         { product: { name: { contains: search, mode: 'insensitive' } } },
@@ -52,7 +77,15 @@ export class FgDashboardService {
         { fgLocation: { contains: search, mode: 'insensitive' } },
         { specialRemarks: { contains: search, mode: 'insensitive' } },
         { UpdatedBy: { contains: search, mode: 'insensitive' } },
-        ...(paymentBoolean !== undefined ? [{ paymentClearance: { equals: paymentBoolean } }] : []),
+      ];
+
+      if (paymentBoolean !== undefined) {
+         searchConditions.push({ paymentClearance: { equals: paymentBoolean } });
+      }
+
+      where.AND = [
+        ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
+        { OR: searchConditions }
       ];
     }
 

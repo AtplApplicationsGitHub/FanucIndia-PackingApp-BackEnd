@@ -204,11 +204,36 @@ export class LookupService {
     return this.prisma.materialBarcode.findMany({ orderBy: { id: 'asc' } });
   }
 
-  createMaterialBarcode(dto: CreateMaterialBarcodeDto) {
+  async createMaterialBarcode(dto: CreateMaterialBarcodeDto) {
+    const existing = await this.prisma.materialBarcode.findFirst({
+      where: { erpCode: dto.erpCode },
+    });
+
+    if (existing) {
+      throw new BadRequestException(
+        `Material Barcode with ERP Code "${dto.erpCode}" already exists.`
+      );
+    }
+
     return this.prisma.materialBarcode.create({ data: dto });
   }
 
-  updateMaterialBarcode(id: number, dto: UpdateMaterialBarcodeDto) {
+  async updateMaterialBarcode(id: number, dto: UpdateMaterialBarcodeDto) {
+    if (dto.erpCode) {
+      const existing = await this.prisma.materialBarcode.findFirst({
+        where: { 
+          erpCode: dto.erpCode,
+          id: { not: id } 
+        },
+      });
+
+      if (existing) {
+        throw new BadRequestException(
+          `Material Barcode with ERP Code "${dto.erpCode}" already exists.`
+        );
+      }
+    }
+
     return this.prisma.materialBarcode.update({ where: { id }, data: dto });
   }
 
@@ -219,7 +244,6 @@ export class LookupService {
   async generateBulkTemplate(res: Response) {
     const workbook = new Workbook();
 
-    // Define the schema for all 8 master tables
     const sheets = [
       { 
         name: 'Products', 
@@ -298,7 +322,6 @@ export class LookupService {
     for (const sheetDef of sheets) {
       const sheet = workbook.addWorksheet(sheetDef.name);
       sheet.columns = sheetDef.columns;
-      // Add existing data
       sheet.addRows(sheetDef.data);
     }
 
@@ -321,15 +344,11 @@ export class LookupService {
 
     const results: string[] = [];
 
-    // Helper to safely get cell string value
     const getVal = (row, colIdx) => {
       const val = row.getCell(colIdx).value;
-      // Handle rich text or other object types if strictly string needed, 
-      // but usually toString() works for simple imports
       return val ? String(val).trim() : null;
     };
     
-    // Helper for boolean
     const getBool = (row, colIdx) => {
       const val = row.getCell(colIdx).value;
       if (typeof val === 'boolean') return val;
@@ -337,20 +356,18 @@ export class LookupService {
       return s === 'true' || s === 'yes' || s === '1';
     };
 
-    // Use a transaction to ensure data consistency
     await this.prisma.$transaction(async (tx) => {
-      const promises: Promise<any>[] = []; // We will store all operations here
+      const promises: Promise<any>[] = []; 
 
-      // 1. Products
       const productSheet = workbook.getWorksheet('Products');
       if (productSheet) {
         productSheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return; // Skip header
+          if (rowNumber === 1) return; 
           const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
           const name = getVal(row, 2);
           const code = getVal(row, 3);
 
-          if (name) { // 'code' is optional
+          if (name) { 
             if (id) {
               promises.push(tx.product.update({ where: { id }, data: { name, code } }).catch(() => {}));
             } else {
@@ -361,7 +378,6 @@ export class LookupService {
         results.push('Products processed');
       }
 
-      // 2. Transporters
       const transpSheet = workbook.getWorksheet('Transporters');
       if (transpSheet) {
         transpSheet.eachRow((row, rowNumber) => {
@@ -376,7 +392,6 @@ export class LookupService {
         results.push('Transporters processed');
       }
 
-      // 3. Plant Codes
       const plantSheet = workbook.getWorksheet('Plant Codes');
       if (plantSheet) {
         plantSheet.eachRow((row, rowNumber) => {
@@ -392,7 +407,6 @@ export class LookupService {
         results.push('Plant Codes processed');
       }
 
-      // 4. Sales Zones
       const zoneSheet = workbook.getWorksheet('Sales Zones');
       if (zoneSheet) {
         zoneSheet.eachRow((row, rowNumber) => {
@@ -407,7 +421,6 @@ export class LookupService {
         results.push('Sales Zones processed');
       }
 
-      // 5. Packing Configs
       const packSheet = workbook.getWorksheet('Packing Configs');
       if (packSheet) {
         packSheet.eachRow((row, rowNumber) => {
@@ -422,7 +435,6 @@ export class LookupService {
         results.push('Packing Configs processed');
       }
 
-      // 6. Customers
       const custSheet = workbook.getWorksheet('Customers');
       if (custSheet) {
         custSheet.eachRow((row, rowNumber) => {
@@ -438,7 +450,6 @@ export class LookupService {
         results.push('Customers processed');
       }
 
-      // 7. Printers
       const printSheet = workbook.getWorksheet('Printers');
       if (printSheet) {
         printSheet.eachRow((row, rowNumber) => {
@@ -453,7 +464,6 @@ export class LookupService {
         results.push('Printers processed');
       }
 
-      // 8. Material Barcodes
       const matSheet = workbook.getWorksheet('Material Barcodes');
       if (matSheet) {
         matSheet.eachRow((row, rowNumber) => {

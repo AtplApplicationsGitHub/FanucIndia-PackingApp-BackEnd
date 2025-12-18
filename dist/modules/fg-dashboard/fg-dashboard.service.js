@@ -21,7 +21,7 @@ function _ts_metadata(k, v) {
 }
 let FgDashboardService = class FgDashboardService {
     async getFgDashboardData(user, query) {
-        const { search, date, page = 1, limit = 10 } = query;
+        const { search, date, payment, zone, status, page = 1, limit = 10 } = query;
         const skip = (page - 1) * limit;
         const where = {};
         if (date) {
@@ -42,6 +42,33 @@ let FgDashboardService = class FgDashboardService {
                 lt: endISTExclusive
             };
         }
+        if (payment) {
+            where.paymentClearance = payment === 'true';
+        }
+        if (zone) {
+            where.salesZoneId = parseInt(zone, 10);
+        }
+        if (status) {
+            if (status === 'None') {
+                where.OR = [
+                    {
+                        status: {
+                            equals: null
+                        }
+                    },
+                    {
+                        status: {
+                            equals: ''
+                        }
+                    }
+                ];
+            } else {
+                where.status = {
+                    equals: status,
+                    mode: 'insensitive'
+                };
+            }
+        }
         if (search) {
             const lowerSearch = search.toLowerCase();
             let paymentBoolean = undefined;
@@ -50,7 +77,7 @@ let FgDashboardService = class FgDashboardService {
             } else if (lowerSearch === 'no') {
                 paymentBoolean = false;
             }
-            where.OR = [
+            const searchConditions = [
                 {
                     saleOrderNumber: {
                         contains: search,
@@ -110,14 +137,22 @@ let FgDashboardService = class FgDashboardService {
                         contains: search,
                         mode: 'insensitive'
                     }
-                },
-                ...paymentBoolean !== undefined ? [
-                    {
-                        paymentClearance: {
-                            equals: paymentBoolean
-                        }
+                }
+            ];
+            if (paymentBoolean !== undefined) {
+                searchConditions.push({
+                    paymentClearance: {
+                        equals: paymentBoolean
                     }
-                ] : []
+                });
+            }
+            where.AND = [
+                ...where.AND ? Array.isArray(where.AND) ? where.AND : [
+                    where.AND
+                ] : [],
+                {
+                    OR: searchConditions
+                }
             ];
         }
         const [salesOrders, totalCount] = await this.prisma.$transaction([

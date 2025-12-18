@@ -171,6 +171,33 @@ let UserService = class UserService {
             message: 'User deleted successfully'
         };
     }
+    async resetPassword(userId, dto) {
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            }
+        });
+        if (!user) {
+            throw new _common.NotFoundException('User not found');
+        }
+        const isMatch = await _bcryptjs.compare(dto.oldPassword, user.password);
+        if (!isMatch) {
+            throw new _common.BadRequestException('Incorrect old password');
+        }
+        const hashedPassword = await _bcryptjs.hash(dto.newPassword, 10);
+        return this.prisma.user.update({
+            where: {
+                id: userId
+            },
+            data: {
+                password: hashedPassword
+            },
+            select: {
+                id: true,
+                email: true
+            }
+        });
+    }
     constructor(prisma){
         this.prisma = prisma;
     }

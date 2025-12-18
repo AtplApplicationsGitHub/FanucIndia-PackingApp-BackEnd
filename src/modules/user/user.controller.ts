@@ -12,7 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { CreateUserDto, UpdateUserDto, ResetPasswordDto } from './dto/user.dto';
 import {
   ApiTags,
   ApiOperation,
@@ -66,5 +66,12 @@ export class UserController {
       throw new ForbiddenException('You cannot delete your own admin account.');
     }
     return this.userService.remove(id);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset own password' })
+  @ApiResponse({ status: 200, description: 'Password reset successful' })
+  resetPassword(@Req() req: AuthRequest, @Body() dto: ResetPasswordDto) {
+    return this.userService.resetPassword(req.user.userId, dto);
   }
 }

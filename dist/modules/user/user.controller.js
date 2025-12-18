@@ -44,6 +44,9 @@ let UserController = class UserController {
         }
         return this.userService.remove(id);
     }
+    resetPassword(req, dto) {
+        return this.userService.resetPassword(req.user.userId, dto);
+    }
     constructor(userService){
         this.userService = userService;
     }
@@ -148,6 +151,24 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], UserController.prototype, "remove", null);
+_ts_decorate([
+    (0, _common.Post)('reset-password'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Reset own password'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Password reset successful'
+    }),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest,
+        typeof _userdto.ResetPasswordDto === "undefined" ? Object : _userdto.ResetPasswordDto
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UserController.prototype, "resetPassword", null);
 UserController = _ts_decorate([
     (0, _swagger.ApiTags)('Users'),
     (0, _common.Controller)('users'),

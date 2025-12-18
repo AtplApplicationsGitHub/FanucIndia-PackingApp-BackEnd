@@ -57,6 +57,24 @@ _ts_decorate([
         description: 'YYYY-MM-DD'
     }),
     (0, _swagger.ApiQuery)({
+        name: 'payment',
+        required: false,
+        type: String,
+        description: 'true/false'
+    }),
+    (0, _swagger.ApiQuery)({
+        name: 'zone',
+        required: false,
+        type: String,
+        description: 'Sales Zone ID'
+    }),
+    (0, _swagger.ApiQuery)({
+        name: 'status',
+        required: false,
+        type: String,
+        description: 'Status string'
+    }),
+    (0, _swagger.ApiQuery)({
         name: 'page',
         required: false,
         type: Number,

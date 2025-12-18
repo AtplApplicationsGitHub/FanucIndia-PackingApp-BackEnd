@@ -364,7 +364,7 @@ model VehicleEntryArchive {
 
 model MaterialBarcode {
   id              Int      @id @default(autoincrement())
-  erpCode         String   
+  erpCode         String   @unique
   mappingBarcode  String?  
   group           String?  
   acceptBulkData  Boolean  @default(false)
