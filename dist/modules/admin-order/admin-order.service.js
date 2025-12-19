@@ -22,7 +22,7 @@ function _ts_metadata(k, v) {
 }
 let AdminOrderService = class AdminOrderService {
     async findAll(query) {
-        const { page = 1, limit = 20, search, date, sortBy = 'createdAt', sortOrder = 'desc', startDate, endDate } = query;
+        const { page = 1, limit = 20, search, date, sortBy = 'createdAt', sortOrder = 'desc', startDate, endDate, paymentClearance, salesZoneId, statusFilter } = query;
         const parsedPage = Number(page) > 0 ? Number(page) : 1;
         const parsedLimit = Number(limit) > 0 && Number(limit) <= 100 ? Number(limit) : 20;
         const allowedSortFields = [
@@ -38,6 +38,32 @@ let AdminOrderService = class AdminOrderService {
         const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
         const orderDirection = allowedSortOrders.includes(sortOrder) ? sortOrder : 'desc';
         const where = {};
+        if (typeof paymentClearance === 'string' && paymentClearance !== '') {
+            where.paymentClearance = paymentClearance === 'true';
+        }
+        if (typeof salesZoneId === 'string' && salesZoneId !== '') {
+            const zoneIdNum = Number(salesZoneId);
+            if (!Number.isNaN(zoneIdNum)) where.salesZoneId = zoneIdNum;
+        }
+        if (typeof statusFilter === 'string' && statusFilter !== '') {
+            if (statusFilter === 'None') {
+                where.AND = [
+                    ...Array.isArray(where.AND) ? where.AND : [],
+                    {
+                        OR: [
+                            {
+                                status: null
+                            },
+                            {
+                                status: ''
+                            }
+                        ]
+                    }
+                ];
+            } else {
+                where.status = statusFilter;
+            }
+        }
         const parseYMD = (s)=>{
             const [y, m, d] = s.split('-').map(Number);
             return {
@@ -336,11 +362,11 @@ let AdminOrderService = class AdminOrderService {
         }
         const now = new Date();
         if (dto.assignedUserId && order.assignedUserId !== dto.assignedUserId) {
-            let targetStatus = "";
+            let targetStatus = '';
             if (order.status === 'R105' || !order.status) {
-                targetStatus = "Under Issue";
+                targetStatus = 'Under Issue';
             } else if (order.status === 'W105') {
-                targetStatus = "Under Packing";
+                targetStatus = 'Under Packing';
             }
             if (targetStatus) {
                 await this.prisma.sO_Status_Stepper.updateMany({
@@ -360,7 +386,7 @@ let AdminOrderService = class AdminOrderService {
             await this.prisma.sO_Status_Stepper.updateMany({
                 where: {
                     salesOrderNumber: order.saleOrderNumber,
-                    status: "WIP Storage"
+                    status: 'WIP Storage'
                 },
                 data: {
                     createdDateTime: now,

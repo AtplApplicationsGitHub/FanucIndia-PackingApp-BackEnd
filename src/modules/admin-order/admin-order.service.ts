@@ -22,6 +22,9 @@ export class AdminOrderService {
       sortOrder = 'desc',
       startDate,
       endDate,
+      paymentClearance,
+      salesZoneId,
+      statusFilter,
     } = query;
 
     const parsedPage = Number(page) > 0 ? Number(page) : 1;
@@ -41,6 +44,26 @@ export class AdminOrderService {
       : 'desc';
 
     const where: Prisma.SalesOrderWhereInput = {};
+
+    if (typeof paymentClearance === 'string' && paymentClearance !== '') {
+      where.paymentClearance = paymentClearance === 'true';
+    }
+
+    if (typeof salesZoneId === 'string' && salesZoneId !== '') {
+      const zoneIdNum = Number(salesZoneId);
+      if (!Number.isNaN(zoneIdNum)) where.salesZoneId = zoneIdNum;
+    }
+
+    if (typeof statusFilter === 'string' && statusFilter !== '') {
+      if (statusFilter === 'None') {
+        where.AND = [
+          ...(Array.isArray(where.AND) ? where.AND : []),
+          { OR: [{ status: null }, { status: '' }] },
+        ];
+      } else {
+        where.status = statusFilter;
+      }
+    }
 
     const parseYMD = (s: string) => {
       const [y, m, d] = s.split('-').map(Number);
@@ -72,8 +95,8 @@ export class AdminOrderService {
       const num = Number(search);
 
       where.OR = [
-        { 
-          customer: { is: { name: { contains: search, mode: 'insensitive' } } } 
+        {
+          customer: { is: { name: { contains: search, mode: 'insensitive' } } },
         },
         { user: { is: { name: { contains: search, mode: 'insensitive' } } } },
         {
@@ -179,7 +202,7 @@ export class AdminOrderService {
   async update(
     id: number,
     dto: UpdateAdminOrderDto,
-    user: { userId: number; role: string; name: string; },
+    user: { userId: number; role: string; name: string },
   ) {
     const order = await this.prisma.salesOrder.findUnique({ where: { id } });
     if (!order) {
@@ -200,7 +223,7 @@ export class AdminOrderService {
       }
     }
 
-    let addressToSave = dto.address; 
+    let addressToSave = dto.address;
 
     if (addressToSave === undefined && dto.customerId) {
       const customer = await this.prisma.customer.findUnique({
@@ -210,9 +233,11 @@ export class AdminOrderService {
     }
 
     if (dto.deliveryDate && dto.deliveryDate.length === 10) {
-       dto.deliveryDate = new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString();
+      dto.deliveryDate = new Date(
+        `${dto.deliveryDate}T00:00:00.000Z`,
+      ).toISOString();
     }
-    
+
     const data: Prisma.SalesOrderUpdateInput = {
       ...dto,
       UpdatedBy: user.name,
@@ -220,20 +245,23 @@ export class AdminOrderService {
       ...(addressToSave !== undefined && { address: addressToSave }),
     };
 
-    if (dto.priority !== undefined && dto.priority !== null && order.status === null) {
+    if (
+      dto.priority !== undefined &&
+      dto.priority !== null &&
+      order.status === null
+    ) {
       data.status = 'R105';
     }
 
     const now = new Date();
 
     if (dto.assignedUserId && order.assignedUserId !== dto.assignedUserId) {
-      let targetStatus = "";
-      
+      let targetStatus = '';
+
       if (order.status === 'R105' || !order.status) {
-        targetStatus = "Under Issue";
-      } 
-      else if (order.status === 'W105') {
-        targetStatus = "Under Packing";
+        targetStatus = 'Under Issue';
+      } else if (order.status === 'W105') {
+        targetStatus = 'Under Packing';
       }
 
       if (targetStatus) {
@@ -241,7 +269,7 @@ export class AdminOrderService {
           where: {
             salesOrderNumber: order.saleOrderNumber,
             status: targetStatus,
-            createdDateTime: null 
+            createdDateTime: null,
           },
           data: {
             createdDateTime: now,
@@ -255,12 +283,12 @@ export class AdminOrderService {
       await this.prisma.sO_Status_Stepper.updateMany({
         where: {
           salesOrderNumber: order.saleOrderNumber,
-          status: "WIP Storage"
+          status: 'WIP Storage',
         },
         data: {
           createdDateTime: now,
           updatedBy: user.name,
-        }
+        },
       });
     }
 
