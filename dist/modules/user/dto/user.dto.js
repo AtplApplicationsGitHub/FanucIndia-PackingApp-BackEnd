@@ -78,6 +78,51 @@ _ts_decorate([
     ]),
     _ts_metadata("design:type", String)
 ], CreateUserDto.prototype, "role", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'Access to Pick & Pack module',
+        required: false
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], CreateUserDto.prototype, "accessPickPack", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'Access to Customer Label Print module',
+        required: false
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], CreateUserDto.prototype, "accessLabelPrint", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'Access to Material FG/Transfer module',
+        required: false
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], CreateUserDto.prototype, "accessMaterialFgTransfer", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'Access to Material Dispatch module',
+        required: false
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], CreateUserDto.prototype, "accessMaterialDispatch", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'Access to Vehicle Entry module',
+        required: false
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], CreateUserDto.prototype, "accessVehicleEntry", void 0);
 let UpdateUserDto = class UpdateUserDto extends (0, _swagger.PartialType)(CreateUserDto) {
 };
 _ts_decorate([

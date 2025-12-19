@@ -26,6 +26,11 @@ export class UserService {
         email: dto.email,
         password: hashedPassword,
         role: dto.role,
+        accessPickPack: dto.accessPickPack || false,
+        accessLabelPrint: dto.accessLabelPrint || false,
+        accessMaterialFgTransfer: dto.accessMaterialFgTransfer || false,
+        accessMaterialDispatch: dto.accessMaterialDispatch || false,
+        accessVehicleEntry: dto.accessVehicleEntry || false,
       },
       select: {
         id: true,
@@ -34,6 +39,11 @@ export class UserService {
         role: true,
         createdAt: true,
         updatedAt: true,
+        accessPickPack: true,
+        accessLabelPrint: true,
+        accessMaterialFgTransfer: true,
+        accessMaterialDispatch: true,
+        accessVehicleEntry: true,
       },
     });
   }
@@ -53,6 +63,11 @@ export class UserService {
         role: true,
         createdAt: true,
         updatedAt: true,
+        accessPickPack: true,
+        accessLabelPrint: true,
+        accessMaterialFgTransfer: true,
+        accessMaterialDispatch: true,
+        accessVehicleEntry: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -79,6 +94,11 @@ export class UserService {
         role: true,
         createdAt: true,
         updatedAt: true,
+        accessPickPack: true,
+        accessLabelPrint: true,
+        accessMaterialFgTransfer: true,
+        accessMaterialDispatch: true,
+        accessVehicleEntry: true,
       },
     });
   }

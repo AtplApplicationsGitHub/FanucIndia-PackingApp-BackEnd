@@ -75,7 +75,12 @@ let UserService = class UserService {
                 name: dto.name,
                 email: dto.email,
                 password: hashedPassword,
-                role: dto.role
+                role: dto.role,
+                accessPickPack: dto.accessPickPack || false,
+                accessLabelPrint: dto.accessLabelPrint || false,
+                accessMaterialFgTransfer: dto.accessMaterialFgTransfer || false,
+                accessMaterialDispatch: dto.accessMaterialDispatch || false,
+                accessVehicleEntry: dto.accessVehicleEntry || false
             },
             select: {
                 id: true,
@@ -83,7 +88,12 @@ let UserService = class UserService {
                 email: true,
                 role: true,
                 createdAt: true,
-                updatedAt: true
+                updatedAt: true,
+                accessPickPack: true,
+                accessLabelPrint: true,
+                accessMaterialFgTransfer: true,
+                accessMaterialDispatch: true,
+                accessVehicleEntry: true
             }
         });
     }
@@ -100,7 +110,12 @@ let UserService = class UserService {
                 email: true,
                 role: true,
                 createdAt: true,
-                updatedAt: true
+                updatedAt: true,
+                accessPickPack: true,
+                accessLabelPrint: true,
+                accessMaterialFgTransfer: true,
+                accessMaterialDispatch: true,
+                accessVehicleEntry: true
             },
             orderBy: {
                 createdAt: 'desc'
@@ -133,7 +148,12 @@ let UserService = class UserService {
                 email: true,
                 role: true,
                 createdAt: true,
-                updatedAt: true
+                updatedAt: true,
+                accessPickPack: true,
+                accessLabelPrint: true,
+                accessMaterialFgTransfer: true,
+                accessMaterialDispatch: true,
+                accessVehicleEntry: true
             }
         });
     }

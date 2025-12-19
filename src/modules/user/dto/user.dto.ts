@@ -5,7 +5,8 @@ import {
   ValidateIf,
   Matches,
   IsOptional,
-  IsNotEmpty
+  IsNotEmpty,
+  IsBoolean,
 } from 'class-validator';
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 
@@ -37,6 +38,31 @@ export class CreateUserDto {
   @IsString()
   @IsIn(['ADMIN', 'SALES', 'USER'])
   role: string;
+
+  @ApiProperty({ description: 'Access to Pick & Pack module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessPickPack?: boolean;
+
+  @ApiProperty({ description: 'Access to Customer Label Print module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessLabelPrint?: boolean;
+
+  @ApiProperty({ description: 'Access to Material FG/Transfer module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessMaterialFgTransfer?: boolean;
+
+  @ApiProperty({ description: 'Access to Material Dispatch module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessMaterialDispatch?: boolean;
+
+  @ApiProperty({ description: 'Access to Vehicle Entry module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessVehicleEntry?: boolean;
 }
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
