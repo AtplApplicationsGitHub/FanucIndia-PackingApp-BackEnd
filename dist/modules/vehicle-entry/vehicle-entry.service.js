@@ -64,7 +64,6 @@ function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
 let VehicleEntryService = class VehicleEntryService {
-    // 1. SAVE API
     async create(dto, userId) {
         const user = await this.prisma.user.findUnique({
             where: {
@@ -84,7 +83,6 @@ let VehicleEntryService = class VehicleEntryService {
             }
         });
     }
-    // 2. UPLOAD API
     async uploadAttachments(entryId, files, userId) {
         const entry = await this.prisma.vehicleEntry.findUnique({
             where: {
@@ -100,9 +98,7 @@ let VehicleEntryService = class VehicleEntryService {
             await this.sftpService.ensureDir(remoteDir);
             for (const file of files){
                 const remotePath = _path.posix.join(remoteDir, file.originalname);
-                // Upload to SFTP
                 await this.sftpService.put(file.buffer, remotePath);
-                // Add metadata
                 uploadedFiles.push({
                     fileName: file.originalname,
                     path: remotePath,
@@ -111,7 +107,6 @@ let VehicleEntryService = class VehicleEntryService {
                     uploadedAt: new Date().toISOString()
                 });
             }
-            // Update DB
             const user = await this.prisma.user.findUnique({
                 where: {
                     id: userId
@@ -143,7 +138,6 @@ let VehicleEntryService = class VehicleEntryService {
         if (!entry) {
             throw new _common.NotFoundException(`Vehicle Entry with ID ${entryId} not found.`);
         }
-        // Return the list of attachment objects (which contains fileName, path, etc.)
         return entry.attachments || [];
     }
     async getAttachmentStream(entryId, fileName, res) {

@@ -196,7 +196,7 @@ export class ErpMaterialImporterService {
     
     const safeToString = (val: any, defaultVal: string | null = null): string | null => {
         if (val === null || val === undefined) return defaultVal;
-        return String(val).trim(); // Ensure trim here as well
+        return String(val).trim(); 
     };
 
     const allMaterialCodes = records

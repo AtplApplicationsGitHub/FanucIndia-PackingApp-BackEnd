@@ -135,7 +135,6 @@ export class AuthService {
       });
     }
 
-    // This is the key change: check the user's role
     if (user.role !== 'USER') {
       logAuthFailure({
         code: 'INVALID_ROLE_FOR_MOBILE',

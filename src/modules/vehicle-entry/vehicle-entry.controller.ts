@@ -50,7 +50,7 @@ export class VehicleEntryController {
       },
     },
   })
-  @UseInterceptors(FilesInterceptor('files', 10)) // Allow up to 10 files
+  @UseInterceptors(FilesInterceptor('files', 10))
   uploadAttachments(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],

@@ -11,33 +11,23 @@ import { AdminStatusByZoneDto } from './dto/admin-status-by-zone.dto';
 import { AdminPaymentByZoneDto } from './dto/admin-payment-by-zone.dto';
 import { AdminCountByEntityDto } from './dto/admin-count-by-entity.dto';
 
-/**
- * Calculates percentage change, handling division by zero.
- */
 function calculatePercentageChange(current: number, previous: number): number {
   if (previous === 0) {
-    return current > 0 ? 100.0 : 0.0; // If previous was 0, any increase is 100%
+    return current > 0 ? 100.0 : 0.0; 
   }
   const change = ((current - previous) / previous) * 100;
-  return parseFloat(change.toFixed(1)); // Return with one decimal place
+  return parseFloat(change.toFixed(1)); 
 }
 
-/**
- * Helper to get date boundaries for queries, aware of IST.
- * This creates UTC timestamps that represent the start/end of a day in IST.
- */
 function getDayBoundariesIST(date: Date) {
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
-  // Get date components in local time (which we assume is IST for the server)
   const y = date.getFullYear();
-  const m = date.getMonth(); // 0-11
+  const m = date.getMonth(); 
   const d = date.getDate();
 
-  // Create start of day in UTC, then subtract offset to get IST start-of-day
   const startOfDay = new Date(Date.UTC(y, m, d, 0, 0, 0) - IST_OFFSET_MS);
 
-  // Create start of *next* day in UTC, then subtract offset
   const endOfDay = new Date(Date.UTC(y, m, d + 1, 0, 0, 0) - IST_OFFSET_MS);
 
   return { startOfDay, endOfDay };
@@ -47,9 +37,6 @@ function getDayBoundariesIST(date: Date) {
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Gets the KPI counts for the ADMIN dashboard.
-   */
   async getAdminKpis(): Promise<AdminKpiDto> {
     const now = new Date();
     const firstDayCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -60,7 +47,6 @@ export class DashboardService {
       1,
     );
     
-    // Use the IST-aware helper to get the start of today
     const { startOfDay: startOfToday } = getDayBoundariesIST(now);
 
     const [
@@ -73,10 +59,8 @@ export class DashboardService {
       dispatchedCurrentMonth,
       dispatchedPreviousMonth,
     ] = await this.prisma.$transaction([
-      // 1. Total SO Count (Main KPI)
       this.prisma.salesOrder.count(),
 
-      // 2. New SO This Month (for % change)
       this.prisma.salesOrder.count({
         where: {
           createdAt: {
@@ -86,7 +70,6 @@ export class DashboardService {
         },
       }),
 
-      // 3. New SO Last Month (for % change)
       this.prisma.salesOrder.count({
         where: {
           createdAt: {
@@ -96,7 +79,6 @@ export class DashboardService {
         },
       }),
 
-      // 4. Overdue Count (Main KPI - Snapshot NOW)
       this.prisma.salesOrder.count({
         where: {
           deliveryDate: { lt: startOfToday },
@@ -104,7 +86,6 @@ export class DashboardService {
         },
       }),
 
-      // 5. Overdue Count (Snapshot at START of month - for % change)
       this.prisma.salesOrder.count({
         where: {
           deliveryDate: { lt: firstDayCurrentMonth },
@@ -112,12 +93,10 @@ export class DashboardService {
         },
       }),
 
-      // 6. Dispatched Count (Main KPI)
       this.prisma.salesOrder.count({
         where: { status: 'Dispatched' },
       }),
 
-      // 7. Dispatched This Month (for % change - from Stepper)
       this.prisma.sO_Status_Stepper.count({
         where: {
           status: 'Dispatched',
@@ -128,7 +107,6 @@ export class DashboardService {
         },
       }),
 
-      // 8. Dispatched Last Month (for % change - from Stepper)
       this.prisma.sO_Status_Stepper.count({
         where: {
           status: 'Dispatched',
@@ -140,7 +118,6 @@ export class DashboardService {
       }),
     ]);
 
-    // Calculate percentages
     const totalSoCountPercentageChange = calculatePercentageChange(
       newSoCurrentMonth,
       newSoPreviousMonth,
@@ -164,8 +141,6 @@ export class DashboardService {
     };
   }
 
-  // --- NEW ADMIN METHODS ---
-
   async getAdminNewImports(): Promise<AdminNewImportDto[]> {
     const results: AdminNewImportDto[] = [];
     const today = new Date();
@@ -174,10 +149,8 @@ export class DashboardService {
       const targetDate = new Date(today);
       targetDate.setDate(today.getDate() - i);
       
-      // Use IST-aware boundaries
       const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
 
-      // Count SalesOrders created on this day
       const count = await this.prisma.salesOrder.count({
         where: {
           createdAt: {
@@ -208,7 +181,6 @@ export class DashboardService {
 
     const [ordersToBeDispatched, readyForDispatchToday, ordersDispatchedToday] =
       await this.prisma.$transaction([
-        // 1. Orders to be Dispatched Today (Pending + Ready)
         this.prisma.salesOrder.count({
           where: {
             deliveryDate: {
@@ -222,15 +194,13 @@ export class DashboardService {
           },
         }),
 
-        // 2. Ready for Dispatch Today
-        // Since status is no longer updated on SalesOrder, we check the Stepper
         this.prisma.salesOrder.count({
           where: {
             deliveryDate: {
               gte: startOfDay,
               lt: endOfDay,
             },
-            status: { not: 'Dispatched' }, // Ensure not already dispatched
+            status: { not: 'Dispatched' }, 
             statusStepper: {
               some: {
                 status: 'Ready for Dispatch',
@@ -240,7 +210,6 @@ export class DashboardService {
           },
         }),
 
-        // 3. Orders Dispatched Today
         this.prisma.sO_Status_Stepper.count({
           where: {
             status: 'Dispatched',
@@ -292,8 +261,6 @@ export class DashboardService {
     return result;
   }
 
-  // --- ROW 3: ORDER STATUS BY ZONE ---
-
   async getAdminStatusByZone(): Promise<AdminStatusByZoneDto[]> {
     const allZones = await this.prisma.salesZone.findMany({
       select: { id: true, name: true },
@@ -335,8 +302,6 @@ export class DashboardService {
     return Array.from(resultsMap.values());
   }
 
-  // --- ROW 4: PAYMENT CLEARANCE BY ZONE ---
-
   async getAdminPaymentByZone(): Promise<AdminPaymentByZoneDto[]> {
     const allZones = await this.prisma.salesZone.findMany({
       select: { id: true, name: true },
@@ -370,8 +335,6 @@ export class DashboardService {
     return Array.from(resultsMap.values());
   }
 
-  // --- ROW 5: ORDERS BY PRODUCT & CUSTOMER (TOP 5) ---
-
   async getAdminOrdersByProduct(): Promise<AdminCountByEntityDto[]> {
     const counts = await this.prisma.salesOrder.groupBy({
       by: ['productId'],
@@ -379,7 +342,7 @@ export class DashboardService {
       orderBy: {
         _count: { id: 'desc' },
       },
-      take: 5, // Top 5
+      take: 5, 
     });
 
     const productIds = counts.map((c) => c.productId);
@@ -402,7 +365,7 @@ export class DashboardService {
       orderBy: {
         _count: { id: 'desc' },
       },
-      take: 5, // Top 5
+      take: 5, 
     });
 
     const customerIds = counts.map((c) => c.customerId).filter(Boolean) as number[];
@@ -417,8 +380,6 @@ export class DashboardService {
       count: group._count.id,
     }));
   }
-
-  // --- EXISTING SALES METHODS ---
 
   async getSalesKpis(userId: number): Promise<SalesKpiDto> {
     const [

@@ -19,27 +19,19 @@ function _ts_decorate(decorators, target, key, desc) {
 function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
-/**
- * Calculates percentage change, handling division by zero.
- */ function calculatePercentageChange(current, previous) {
+function calculatePercentageChange(current, previous) {
     if (previous === 0) {
-        return current > 0 ? 100.0 : 0.0; // If previous was 0, any increase is 100%
+        return current > 0 ? 100.0 : 0.0;
     }
     const change = (current - previous) / previous * 100;
-    return parseFloat(change.toFixed(1)); // Return with one decimal place
+    return parseFloat(change.toFixed(1));
 }
-/**
- * Helper to get date boundaries for queries, aware of IST.
- * This creates UTC timestamps that represent the start/end of a day in IST.
- */ function getDayBoundariesIST(date) {
+function getDayBoundariesIST(date) {
     const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-    // Get date components in local time (which we assume is IST for the server)
     const y = date.getFullYear();
-    const m = date.getMonth(); // 0-11
+    const m = date.getMonth();
     const d = date.getDate();
-    // Create start of day in UTC, then subtract offset to get IST start-of-day
     const startOfDay = new Date(Date.UTC(y, m, d, 0, 0, 0) - IST_OFFSET_MS);
-    // Create start of *next* day in UTC, then subtract offset
     const endOfDay = new Date(Date.UTC(y, m, d + 1, 0, 0, 0) - IST_OFFSET_MS);
     return {
         startOfDay,
@@ -47,19 +39,14 @@ function _ts_metadata(k, v) {
     };
 }
 let DashboardService = class DashboardService {
-    /**
-   * Gets the KPI counts for the ADMIN dashboard.
-   */ async getAdminKpis() {
+    async getAdminKpis() {
         const now = new Date();
         const firstDayCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const firstDayNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         const firstDayPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        // Use the IST-aware helper to get the start of today
         const { startOfDay: startOfToday } = getDayBoundariesIST(now);
         const [totalSoCount, newSoCurrentMonth, newSoPreviousMonth, overdueCount, overdueCountPrevious, dispatchedTotalCount, dispatchedCurrentMonth, dispatchedPreviousMonth] = await this.prisma.$transaction([
-            // 1. Total SO Count (Main KPI)
             this.prisma.salesOrder.count(),
-            // 2. New SO This Month (for % change)
             this.prisma.salesOrder.count({
                 where: {
                     createdAt: {
@@ -68,7 +55,6 @@ let DashboardService = class DashboardService {
                     }
                 }
             }),
-            // 3. New SO Last Month (for % change)
             this.prisma.salesOrder.count({
                 where: {
                     createdAt: {
@@ -77,7 +63,6 @@ let DashboardService = class DashboardService {
                     }
                 }
             }),
-            // 4. Overdue Count (Main KPI - Snapshot NOW)
             this.prisma.salesOrder.count({
                 where: {
                     deliveryDate: {
@@ -88,7 +73,6 @@ let DashboardService = class DashboardService {
                     }
                 }
             }),
-            // 5. Overdue Count (Snapshot at START of month - for % change)
             this.prisma.salesOrder.count({
                 where: {
                     deliveryDate: {
@@ -99,13 +83,11 @@ let DashboardService = class DashboardService {
                     }
                 }
             }),
-            // 6. Dispatched Count (Main KPI)
             this.prisma.salesOrder.count({
                 where: {
                     status: 'Dispatched'
                 }
             }),
-            // 7. Dispatched This Month (for % change - from Stepper)
             this.prisma.sO_Status_Stepper.count({
                 where: {
                     status: 'Dispatched',
@@ -115,7 +97,6 @@ let DashboardService = class DashboardService {
                     }
                 }
             }),
-            // 8. Dispatched Last Month (for % change - from Stepper)
             this.prisma.sO_Status_Stepper.count({
                 where: {
                     status: 'Dispatched',
@@ -126,7 +107,6 @@ let DashboardService = class DashboardService {
                 }
             })
         ]);
-        // Calculate percentages
         const totalSoCountPercentageChange = calculatePercentageChange(newSoCurrentMonth, newSoPreviousMonth);
         const overdueSoCountPercentageChange = calculatePercentageChange(overdueCount, overdueCountPrevious);
         const dispatchedSoCountPercentageChange = calculatePercentageChange(dispatchedCurrentMonth, dispatchedPreviousMonth);
@@ -139,16 +119,13 @@ let DashboardService = class DashboardService {
             dispatchedSoCountPercentageChange
         };
     }
-    // --- NEW ADMIN METHODS ---
     async getAdminNewImports() {
         const results = [];
         const today = new Date();
         for(let i = 0; i < 5; i++){
             const targetDate = new Date(today);
             targetDate.setDate(today.getDate() - i);
-            // Use IST-aware boundaries
             const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
-            // Count SalesOrders created on this day
             const count = await this.prisma.salesOrder.count({
                 where: {
                     createdAt: {
@@ -182,7 +159,6 @@ let DashboardService = class DashboardService {
     async getAdminDispatchSummary() {
         const { startOfDay, endOfDay } = getDayBoundariesIST(new Date());
         const [ordersToBeDispatched, readyForDispatchToday, ordersDispatchedToday] = await this.prisma.$transaction([
-            // 1. Orders to be Dispatched Today (Pending + Ready)
             this.prisma.salesOrder.count({
                 where: {
                     deliveryDate: {
@@ -201,8 +177,6 @@ let DashboardService = class DashboardService {
                     ]
                 }
             }),
-            // 2. Ready for Dispatch Today
-            // Since status is no longer updated on SalesOrder, we check the Stepper
             this.prisma.salesOrder.count({
                 where: {
                     deliveryDate: {
@@ -222,7 +196,6 @@ let DashboardService = class DashboardService {
                     }
                 }
             }),
-            // 3. Orders Dispatched Today
             this.prisma.sO_Status_Stepper.count({
                 where: {
                     status: 'Dispatched',
@@ -281,7 +254,6 @@ let DashboardService = class DashboardService {
         }
         return result;
     }
-    // --- ROW 3: ORDER STATUS BY ZONE ---
     async getAdminStatusByZone() {
         const allZones = await this.prisma.salesZone.findMany({
             select: {
@@ -334,7 +306,6 @@ let DashboardService = class DashboardService {
         }
         return Array.from(resultsMap.values());
     }
-    // --- ROW 4: PAYMENT CLEARANCE BY ZONE ---
     async getAdminPaymentByZone() {
         const allZones = await this.prisma.salesZone.findMany({
             select: {
@@ -371,7 +342,6 @@ let DashboardService = class DashboardService {
         }
         return Array.from(resultsMap.values());
     }
-    // --- ROW 5: ORDERS BY PRODUCT & CUSTOMER (TOP 5) ---
     async getAdminOrdersByProduct() {
         const counts = await this.prisma.salesOrder.groupBy({
             by: [
@@ -444,7 +414,6 @@ let DashboardService = class DashboardService {
                 count: group._count.id
             }));
     }
-    // --- EXISTING SALES METHODS ---
     async getSalesKpis(userId) {
         const [totalSoCount, dispatchedSoCount, r105Count, w105Count, f105Count, toBeIssuedCount] = await this.prisma.$transaction([
             this.prisma.salesOrder.count({

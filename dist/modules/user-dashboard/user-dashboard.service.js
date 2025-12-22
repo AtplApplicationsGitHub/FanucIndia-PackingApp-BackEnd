@@ -289,7 +289,6 @@ let UserDashboardService = class UserDashboardService {
     async processAttachmentsUpload(saleOrderNumber, attachments, tx) {
         const prismaClient = tx || this.prisma;
         if (!attachments || attachments.length === 0) {
-            // Allow data-only updates
             return;
         }
         const remoteDir = _path.posix.join(process.env.SFTP_BASE_DIR_ORDER || '', saleOrderNumber);

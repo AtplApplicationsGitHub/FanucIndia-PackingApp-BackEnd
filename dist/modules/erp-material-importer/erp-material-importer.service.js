@@ -177,7 +177,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         };
         const safeToString = (val, defaultVal = null)=>{
             if (val === null || val === undefined) return defaultVal;
-            return String(val).trim(); // Ensure trim here as well
+            return String(val).trim();
         };
         const allMaterialCodes = records.map((r)=>safeToString(r.Material_Code, '')).filter((code)=>!!code);
         const distinctCodes = [

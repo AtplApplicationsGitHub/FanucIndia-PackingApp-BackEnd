@@ -90,7 +90,6 @@ let UserDashboardController = class UserDashboardController {
     getAssignedOrdersSummary(req) {
         return this.userDashboardService.getAssignedOrdersSummary(req.user.userId);
     }
-    // --- NEW ENDPOINT TO FIX 404 ---
     async getOrderDetails(id, req) {
         const { userId, role } = req.user;
         return this.userDashboardService.findOrderById(id, userId, role);
@@ -101,7 +100,6 @@ let UserDashboardController = class UserDashboardController {
     async downloadOrderDetailsBySoNumber(soNumber, req) {
         return this.userDashboardService.downloadOrderDetailsBySoNumber(soNumber, req.user.userId, req.user.role);
     }
-    // --- All 3 Upload Endpoints ---
     async syncOrderBySoNumber(soNumber, req, files) {
         if (!files.data || !files.data[0]) {
             throw new _common.BadRequestException('Data file is required for sync.');

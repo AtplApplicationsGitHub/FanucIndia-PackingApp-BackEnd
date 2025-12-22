@@ -65,7 +65,6 @@ export class UserDashboardController {
     return this.userDashboardService.getAssignedOrdersSummary(req.user.userId);
   }
   
-  // --- NEW ENDPOINT TO FIX 404 ---
   @Get('orders/:id')
   @Roles('USER', 'ADMIN')
   @ApiOperation({ summary: 'Get details for a specific sales order by ID' })
@@ -105,7 +104,6 @@ export class UserDashboardController {
     );
   }
 
-  // --- All 3 Upload Endpoints ---
   @Post('orders/son/:soNumber/sync')
   @Roles('USER')
   @UseInterceptors(FileFieldsInterceptor([

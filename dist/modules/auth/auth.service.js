@@ -180,7 +180,6 @@ let AuthService = class AuthService {
                 message: 'Invalid credentials'
             });
         }
-        // This is the key change: check the user's role
         if (user.role !== 'USER') {
             (0, _logger.logAuthFailure)({
                 code: 'INVALID_ROLE_FOR_MOBILE',

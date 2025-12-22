@@ -162,7 +162,6 @@ let SoSearchService = class SoSearchService {
             };
             return convertBigInts(result);
         }
-        // 2. Search in Archive tables (Archived Orders)
         const archivedSalesOrder = await this.prisma.salesOrderArchive.findFirst({
             where: {
                 saleOrderNumber: {
@@ -172,7 +171,6 @@ let SoSearchService = class SoSearchService {
             }
         });
         if (archivedSalesOrder) {
-            // [FIX] Use the canonical SO Number from the DB record
             const canonicalSoNumber = archivedSalesOrder.saleOrderNumber;
             const [dispatchSOArchives, materialDetails, materialFiles, statusStepper] = await Promise.all([
                 this.prisma.dispatch_SOArchive.findMany({
@@ -202,7 +200,6 @@ let SoSearchService = class SoSearchService {
                     }
                 })
             ]);
-            // Fetch related names for archived SalesOrder
             const [product, customer, transporter, plantCode, salesZone, packConfig] = await Promise.all([
                 this.prisma.product.findUnique({
                     where: {
@@ -244,7 +241,6 @@ let SoSearchService = class SoSearchService {
                 salesZone,
                 packConfig
             };
-            // Fetch related names for archived Dispatch
             const dispatchIds = dispatchSOArchives.map((d)=>d.dispatchId);
             const archivedDispatchesRaw = await this.prisma.dispatchArchive.findMany({
                 where: {
@@ -314,7 +310,6 @@ let SoSearchService = class SoSearchService {
             };
             return convertBigInts(result);
         }
-        // 3. If not found in either, throw an error
         throw new _common.NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
     }
     constructor(prisma){

@@ -102,22 +102,18 @@ let SftpService = class SftpService {
             } catch  {}
         }
     }
-    // 1. Internal helper that uses an EXISTING client (no new connection)
     async _ensureDir(c, remoteDir) {
         try {
             await c.mkdir(remoteDir, true);
         } catch (err) {
-            // Ignore error if directory already exists (Race condition fix)
             const type = await c.exists(remoteDir);
             if (type === 'd') return true;
             throw err;
         }
     }
-    // 2. Public Ensure Dir (Creates its own connection)
     async ensureDir(remoteDir) {
         return this.withClient((c)=>this._ensureDir(c, remoteDir));
     }
-    // 3. Public Put (Creates its own connection)
     async put(localPathOrBuffer, remotePath) {
         const remoteDir = _path.posix.dirname(remotePath);
         return this.withClient(async (c)=>{
@@ -129,15 +125,12 @@ let SftpService = class SftpService {
             };
         });
     }
-    // 4. NEW: Batch Upload (One connection for multiple files)
     async uploadBatch(uploads) {
         return this.withClient(async (c)=>{
-            // Optimization: Create directories first (deduplicated)
             const dirs = new Set(uploads.map((u)=>_path.posix.dirname(u.remotePath)));
             for (const dir of dirs){
                 await this._ensureDir(c, dir);
             }
-            // Upload all files
             for (const u of uploads){
                 await c.put(u.localPath, u.remotePath);
             }

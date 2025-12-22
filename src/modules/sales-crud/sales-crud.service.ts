@@ -74,7 +74,7 @@ export class SalesCrudService {
         "Under Packing",
         "Packed",
         "WIP Storage",
-        "Ready for Dispatch", // RENAMED
+        "Ready for Dispatch", 
         "Dispatched"
       ];
       await this.prisma.sO_Status_Stepper.createMany({
@@ -358,17 +358,16 @@ export class SalesCrudService {
 
   async processLabelPrint(dto: LabelPrintDto, userId: number) {
     const { saleOrderNumbers } = dto;
-    const statusToSet = 'Ready for Dispatch'; // RENAMED
+    const statusToSet = 'Ready for Dispatch'; 
 
-    // Get the user name for the history log
+    
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user?.name || 'System';
     const now = new Date();
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        // 1. Update the main SalesOrder status
-        // We exclude orders that are already 'Dispatched' to prevent reverting status
+        
         await tx.salesOrder.updateMany({
           where: {
             saleOrderNumber: { in: saleOrderNumbers },
@@ -380,8 +379,6 @@ export class SalesCrudService {
           },
         });
 
-        // 2. Update the Stepper history
-        // We find the specific step "Ready for Dispatch" for these orders and mark it as done
         await tx.sO_Status_Stepper.updateMany({
           where: {
             salesOrderNumber: { in: saleOrderNumbers },

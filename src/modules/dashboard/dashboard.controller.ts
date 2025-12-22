@@ -13,9 +13,9 @@ import { SalesKpiDto } from './dto/sales-kpi.dto';
 import { SalesActivityDto } from './dto/sales-activity.dto';
 import { AdminKpiDto } from './dto/admin-kpi.dto';
 import { SalesPaymentClearanceDto } from './dto/sales-payment-clearance.dto';
-import { AdminNewImportDto } from './dto/admin-new-imports.dto'; // <-- NEW
-import { AdminDispatchSummaryDto } from './dto/admin-dispatch-summary.dto'; // <-- NEW
-import { AdminOverallStatusDto } from './dto/admin-overall-status.dto'; // <-- NEW
+import { AdminNewImportDto } from './dto/admin-new-imports.dto'; 
+import { AdminDispatchSummaryDto } from './dto/admin-dispatch-summary.dto'; 
+import { AdminOverallStatusDto } from './dto/admin-overall-status.dto'; 
 import { AdminStatusByZoneDto } from './dto/admin-status-by-zone.dto';
 import { AdminPaymentByZoneDto } from './dto/admin-payment-by-zone.dto';
 import { AdminCountByEntityDto } from './dto/admin-count-by-entity.dto';
@@ -26,8 +26,6 @@ import { AdminCountByEntityDto } from './dto/admin-count-by-entity.dto';
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
-
-  // --- ADMIN ENDPOINTS ---
 
   @Get('admin-kpis')
   @Roles('ADMIN')
@@ -61,8 +59,6 @@ export class DashboardController {
     return this.dashboardService.getAdminOverallStatus();
   }
 
-  // --- NEW ADMIN ENDPOINTS (ROWS 3, 4, 5) ---
-
   @Get('admin-status-by-zone')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Get system-wide order status counts by sales zone (Row 3)' })
@@ -94,8 +90,6 @@ export class DashboardController {
   async getAdminOrdersByCustomer(): Promise<AdminCountByEntityDto[]> {
     return this.dashboardService.getAdminOrdersByCustomer();
   }
-
-  // --- SALES ENDPOINTS ---
 
   @Get('sales-kpis')
   @Roles('SALES')

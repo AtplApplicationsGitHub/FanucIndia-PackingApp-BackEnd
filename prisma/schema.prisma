@@ -24,6 +24,9 @@ model User {
   accessMaterialFgTransfer Boolean @default(false)
   accessMaterialDispatch   Boolean @default(false)
   accessVehicleEntry       Boolean @default(false)
+
+  sentSoChatMessages     SalesOrderChatMessage[] @relation("SoChatFrom")
+  receivedSoChatMessages SalesOrderChatMessage[] @relation("SoChatTo")
 }
 
 model Product {
@@ -112,6 +115,7 @@ model SalesOrder {
   UpdatedBy        String?
   UpdatedDate      DateTime?           @updatedAt
   statusStepper     SO_Status_Stepper[]
+  chatMessages SalesOrderChatMessage[]
 }
 
 model ERP_Material_Data {
@@ -375,4 +379,23 @@ model MaterialBarcode {
   acceptBulkData  Boolean  @default(false)
   remarksRequired Boolean  @default(false)
   classification  String?  
+}
+
+model SalesOrderChatMessage {
+  id          Int      @id @default(autoincrement())
+
+  salesOrderId Int
+  fromUserId   Int
+  toUserId     Int
+
+  message     String   @db.VarChar(2000)
+  createdAt   DateTime @default(now())
+
+  salesOrder  SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  fromUser    User @relation("SoChatFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser      User @relation("SoChatTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([salesOrderId, createdAt])
+  @@index([toUserId, createdAt])
 }

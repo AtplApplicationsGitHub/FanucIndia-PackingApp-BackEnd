@@ -454,8 +454,7 @@ let SalesCrudService = class SalesCrudService {
     }
     async processLabelPrint(dto, userId) {
         const { saleOrderNumbers } = dto;
-        const statusToSet = 'Ready for Dispatch'; // RENAMED
-        // Get the user name for the history log
+        const statusToSet = 'Ready for Dispatch';
         const user = await this.prisma.user.findUnique({
             where: {
                 id: userId
@@ -465,8 +464,6 @@ let SalesCrudService = class SalesCrudService {
         const now = new Date();
         try {
             await this.prisma.$transaction(async (tx)=>{
-                // 1. Update the main SalesOrder status
-                // We exclude orders that are already 'Dispatched' to prevent reverting status
                 await tx.salesOrder.updateMany({
                     where: {
                         saleOrderNumber: {
@@ -481,8 +478,6 @@ let SalesCrudService = class SalesCrudService {
                         UpdatedDate: now
                     }
                 });
-                // 2. Update the Stepper history
-                // We find the specific step "Ready for Dispatch" for these orders and mark it as done
                 await tx.sO_Status_Stepper.updateMany({
                     where: {
                         salesOrderNumber: {

@@ -141,7 +141,7 @@ export class SalesCrudController {
   }
 
   @Post('label-print')
-  @Roles('USER', 'ADMIN', 'SALES') // Allowing USER as this is a mobile app feature
+  @Roles('USER', 'ADMIN', 'SALES') 
   @ApiOperation({
     summary: 'Update status to Ready for Dispatch on Label Print',
   })

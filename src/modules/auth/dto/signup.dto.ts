@@ -22,10 +22,8 @@ export class SignupDto {
     description: 'Password (min 8 chars for Admin/Sales, 4-digit PIN for User)',
   })
   @IsString()
-  // Only apply the MinLength validator if the role is NOT 'USER'
   @ValidateIf((o) => o.role !== 'USER')
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
-  // Only apply the Matches validator if the role IS 'USER'
   @ValidateIf((o) => o.role === 'USER')
   @Matches(/^\d{4}$/, {
     message: 'Password must be a 4-digit PIN for the USER role',

@@ -26,7 +26,6 @@ let SalesOrderService = class SalesOrderService {
         try {
             const workbook = new _exceljs.Workbook();
             const worksheet = workbook.addWorksheet('Bulk Import');
-            // [UPDATE] Added "Additional Remarks" to columns
             worksheet.columns = [
                 {
                     header: 'Product',
@@ -126,7 +125,6 @@ let SalesOrderService = class SalesOrderService {
                     }
                 })
             ]);
-            // [FIX] Create a hidden sheet for dropdown values to bypass 255 char limit
             const refSheet = workbook.addWorksheet('ReferenceData');
             refSheet.state = 'hidden';
             const dropdowns = {
@@ -142,11 +140,9 @@ let SalesOrderService = class SalesOrderService {
                 customer: customers.map((c)=>c.name)
             };
             const dropdownKeys = Object.keys(dropdowns);
-            // Write dropdown values to columns in the hidden sheet
             dropdownKeys.forEach((key, idx)=>{
                 const values = dropdowns[key];
                 if (values.length > 0) {
-                    // Column indices are 1-based
                     refSheet.getColumn(idx + 1).values = [
                         key,
                         ...values
@@ -155,16 +151,13 @@ let SalesOrderService = class SalesOrderService {
             });
             const ROW_COUNT = 100;
             for(let i = 0; i < ROW_COUNT; i++)worksheet.addRow({});
-            // Apply Data Validation referencing the hidden sheet ranges
             dropdownKeys.forEach((key, idx)=>{
                 const values = dropdowns[key];
                 if (values.length === 0) return;
                 const colLetter = refSheet.getColumn(idx + 1).letter;
-                const lastRow = values.length + 1; // +1 for header row
-                // Excel formula referencing the hidden sheet
+                const lastRow = values.length + 1;
                 const formula = `ReferenceData!$${colLetter}$2:$${colLetter}$${lastRow}`;
                 const targetCol = worksheet.getColumn(key);
-                // Apply to rows 2 to ROW_COUNT + 1
                 for(let row = 2; row <= ROW_COUNT + 1; row++){
                     worksheet.getCell(`${targetCol.letter}${row}`).dataValidation = {
                         type: 'list',
@@ -209,7 +202,6 @@ let SalesOrderService = class SalesOrderService {
         } catch (err) {
             throw new _common.InternalServerErrorException('Failed to retrieve reference data', err.message);
         }
-        // [UPDATE] Added explicit type for customer map to store address
         const maps = {
             product: new Map(products.map((p)=>[
                     p.name.trim(),
@@ -252,7 +244,6 @@ let SalesOrderService = class SalesOrderService {
             const plantCodeId = maps.plantCode.get((plantCode || '').toString().trim());
             const salesZoneId = maps.salesZone.get((salesZone || '').toString().trim());
             const packConfigId = maps.packConfig.get((packConfig || '').toString().trim());
-            // [UPDATE] Get Customer ID and Address
             const customerData = maps.customer.get((customer || '').toString().trim());
             const customerId = customerData?.id;
             const customerAddress = customerData?.address;

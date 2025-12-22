@@ -324,7 +324,6 @@ export class UserDashboardService {
   ) {
     const prismaClient = tx || this.prisma;
     if (!attachments || attachments.length === 0) {
-      // Allow data-only updates
       return;
     }
 

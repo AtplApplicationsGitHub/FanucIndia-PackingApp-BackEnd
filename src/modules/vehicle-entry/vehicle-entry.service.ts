@@ -12,7 +12,6 @@ export class VehicleEntryService {
     private readonly sftpService: SftpService,
   ) {}
 
-  // 1. SAVE API
   async create(dto: CreateVehicleEntryDto, userId: number) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user?.name || 'System';
@@ -30,7 +29,6 @@ export class VehicleEntryService {
     });
   }
 
-  // 2. UPLOAD API
   async uploadAttachments(entryId: number, files: Express.Multer.File[], userId: number) {
     const entry = await this.prisma.vehicleEntry.findUnique({
       where: { id: entryId },
@@ -53,10 +51,8 @@ export class VehicleEntryService {
       for (const file of files) {
         const remotePath = path.posix.join(remoteDir, file.originalname);
         
-        // Upload to SFTP
         await this.sftpService.put(file.buffer, remotePath);
 
-        // Add metadata
         uploadedFiles.push({
           fileName: file.originalname,
           path: remotePath,
@@ -66,7 +62,6 @@ export class VehicleEntryService {
         });
       }
 
-      // Update DB
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
       
       return await this.prisma.vehicleEntry.update({
@@ -93,7 +88,6 @@ export class VehicleEntryService {
       throw new NotFoundException(`Vehicle Entry with ID ${entryId} not found.`);
     }
 
-    // Return the list of attachment objects (which contains fileName, path, etc.)
     return (entry.attachments as any[]) || [];
   }
 

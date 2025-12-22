@@ -127,7 +127,6 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             }
         });
         if (materials.length === 0) throw new _common.NotFoundException('Material with specified code not found for this order.');
-        // Find the first material record that hasn't reached its required quantity
         const materialToUpdate = materials.find((m)=>m.Issue_stage < m.Required_Qty);
         if (!materialToUpdate) {
             throw new _common.BadRequestException('Cannot exceed the Required_Qty value (all records full)');
@@ -401,7 +400,6 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         if (!salesOrder) throw new _common.NotFoundException('Sales Order not found');
         const userName = await this.getUserName(userId);
         const now = new Date();
-        // 1. Find all items in this group for this SO
         const groupItems = await this.prisma.eRP_Material_Data.findMany({
             where: {
                 saleOrderNumber: salesOrder.saleOrderNumber,
@@ -411,11 +409,9 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         if (groupItems.length === 0) {
             throw new _common.NotFoundException(`No items found for group '${group}' in this order.`);
         }
-        // 2. Perform updates
         await this.prisma.$transaction(async (tx)=>{
             for (const item of groupItems){
                 if (stageType === 'issue') {
-                    // Update Issue Stage to Required Qty if not already full
                     if (item.Issue_stage < item.Required_Qty) {
                         await tx.eRP_Material_Data.update({
                             where: {
@@ -429,17 +425,8 @@ let ErpMaterialDataService = class ErpMaterialDataService {
                         });
                     }
                 } else {
-                    // Packing Stage: Cap at min(Issue, Required). 
-                    // Usually bulk accept assumes Issue is done, so we target Required_Qty.
-                    // But technically we should respect the current Issue_stage if it's lower (though unlikely in this flow).
-                    // Assuming user clicks "Accept Group" when items are ready.
                     const cap = Math.min(item.Required_Qty, item.Issue_stage);
-                    // If we want to force full completion, we assume Issue is done. 
-                    // If the button is only enabled when Issue is complete, then Issue=Required.
                     if (item.Packing_stage < item.Required_Qty) {
-                        // Logic: Set packing to required. 
-                        // Note: If Issue stage isn't full, this might violate logic, but "Accept Group" implies force completion.
-                        // We will assume Issue stage is ALREADY handled (since Packing view comes after Issue view).
                         await tx.eRP_Material_Data.update({
                             where: {
                                 ID: item.ID
@@ -454,11 +441,8 @@ let ErpMaterialDataService = class ErpMaterialDataService {
                 }
             }
         });
-        // 3. Check for Global Completion (Standard Logic)
-        // We re-use the private check logic or duplicate it here for safety
         return this._checkOrderCompletion(salesOrder.saleOrderNumber, orderId, userName);
     }
-    // Helper to re-check order status after bulk update
     async _checkOrderCompletion(soNumber, orderId, userName) {
         const allMaterials = await this.prisma.eRP_Material_Data.findMany({
             where: {
@@ -474,7 +458,6 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         let isIssueComplete = false;
         let isPackingComplete = false;
         if (issueStageCompleted) {
-            // Check current status to avoid redundant updates
             const current = await this.prisma.salesOrder.findUnique({
                 where: {
                     id: orderId
@@ -635,7 +618,6 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             }
         });
         const userName = user ? user.name : 'System';
-        // "Delete" operation is effectively setting it to null or empty string
         const valueToSave = remarks && remarks.trim().length > 0 ? remarks : null;
         const updatedMaterial = await this.prisma.eRP_Material_Data.update({
             where: {

@@ -39,7 +39,6 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let DashboardController = class DashboardController {
-    // --- ADMIN ENDPOINTS ---
     async getAdminKpis() {
         return this.dashboardService.getAdminKpis();
     }
@@ -52,7 +51,6 @@ let DashboardController = class DashboardController {
     async getAdminOverallStatus() {
         return this.dashboardService.getAdminOverallStatus();
     }
-    // --- NEW ADMIN ENDPOINTS (ROWS 3, 4, 5) ---
     async getAdminStatusByZone() {
         return this.dashboardService.getAdminStatusByZone();
     }
@@ -65,7 +63,6 @@ let DashboardController = class DashboardController {
     async getAdminOrdersByCustomer() {
         return this.dashboardService.getAdminOrdersByCustomer();
     }
-    // --- SALES ENDPOINTS ---
     async getSalesKpis(req) {
         return this.dashboardService.getSalesKpis(req.user.userId);
     }
