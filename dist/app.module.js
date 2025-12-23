@@ -32,6 +32,7 @@ const _soarchivemodule = require("./modules/so-archive/so-archive.module");
 const _dashboardmodule = require("./modules/dashboard/dashboard.module");
 const _vehicleentrymodule = require("./modules/vehicle-entry/vehicle-entry.module");
 const _sochatmodule = require("./modules/so-chat/so-chat.module");
+const _sonotificationsmodule = require("./modules/so-notifications/so-notifications.module");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -65,7 +66,8 @@ AppModule = _ts_decorate([
             _soarchivemodule.SoArchiveModule,
             _dashboardmodule.DashboardModule,
             _vehicleentrymodule.VehicleEntryModule,
-            _sochatmodule.SoChatModule
+            _sochatmodule.SoChatModule,
+            _sonotificationsmodule.SoNotificationsModule
         ],
         controllers: [
             _appcontroller.AppController

@@ -10,6 +10,7 @@ Object.defineProperty(exports, "SoChatService", {
 });
 const _common = require("@nestjs/common");
 const _prismaservice = require("../../prisma.service");
+const _sonotificationsservice = require("../so-notifications/so-notifications.service");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -117,7 +118,7 @@ let SoChatService = class SoChatService {
         if (user.role !== 'ADMIN' && toUser.role !== 'ADMIN') {
             throw new _common.ForbiddenException('You can only message ADMIN.');
         }
-        return this.prisma.salesOrderChatMessage.create({
+        const createdMessage = await this.prisma.salesOrderChatMessage.create({
             data: {
                 salesOrderId: so.id,
                 fromUserId: user.userId,
@@ -141,16 +142,26 @@ let SoChatService = class SoChatService {
                 }
             }
         });
+        await this.soNotificationsService.createAndEmit({
+            toUserId: toUser.id,
+            salesOrderId: so.id,
+            messageId: createdMessage.id,
+            fromUsername: createdMessage.fromUser.name,
+            saleOrderNumber: so.saleOrderNumber
+        });
+        return createdMessage;
     }
-    constructor(prisma){
+    constructor(prisma, soNotificationsService){
         this.prisma = prisma;
+        this.soNotificationsService = soNotificationsService;
     }
 };
 SoChatService = _ts_decorate([
     (0, _common.Injectable)(),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        typeof _prismaservice.PrismaService === "undefined" ? Object : _prismaservice.PrismaService
+        typeof _prismaservice.PrismaService === "undefined" ? Object : _prismaservice.PrismaService,
+        typeof _sonotificationsservice.SoNotificationsService === "undefined" ? Object : _sonotificationsservice.SoNotificationsService
     ])
 ], SoChatService);
 

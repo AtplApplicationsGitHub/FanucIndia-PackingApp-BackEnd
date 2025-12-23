@@ -27,6 +27,7 @@ model User {
 
   sentSoChatMessages     SalesOrderChatMessage[] @relation("SoChatFrom")
   receivedSoChatMessages SalesOrderChatMessage[] @relation("SoChatTo")
+  soChatNotifications SoChatNotification[]
 }
 
 model Product {
@@ -116,6 +117,7 @@ model SalesOrder {
   UpdatedDate      DateTime?           @updatedAt
   statusStepper     SO_Status_Stepper[]
   chatMessages SalesOrderChatMessage[]
+  soChatNotifications SoChatNotification[]
 }
 
 model ERP_Material_Data {
@@ -398,4 +400,22 @@ model SalesOrderChatMessage {
 
   @@index([salesOrderId, createdAt])
   @@index([toUserId, createdAt])
+  notifications SoChatNotification[]
+}
+
+model SoChatNotification {
+  id           Int      @id @default(autoincrement())
+
+  userId       Int      
+  salesOrderId Int
+  messageId    Int      
+
+  createdAt    DateTime @default(now())
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  salesOrder   SalesOrder          @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  message      SalesOrderChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@unique([userId, messageId])
 }

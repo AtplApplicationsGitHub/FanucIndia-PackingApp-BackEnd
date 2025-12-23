@@ -1,9 +1,17 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { SoNotificationsService } from '../so-notifications/so-notifications.service';
 
 @Injectable()
 export class SoChatService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly soNotificationsService: SoNotificationsService,
+  ) {}
 
   private async getSalesOrderOrThrow(soNumber: string) {
     const salesOrder = await this.prisma.salesOrder.findFirst({
@@ -14,17 +22,17 @@ export class SoChatService {
     return salesOrder;
   }
 
-  private enforceSoAccess(user: { userId: number; role: string }, soOwnerUserId: number) {
+  private enforceSoAccess(
+    user: { userId: number; role: string },
+    soOwnerUserId: number,
+  ) {
     if (user.role === 'SALES' && user.userId !== soOwnerUserId) {
       throw new ForbiddenException('You are not authorized for this order.');
     }
   }
 
   async getMentionUsers(user: { userId: number; role: string }) {
-    const where =
-      user.role === 'ADMIN'
-        ? {}
-        : { role: 'ADMIN' };
+    const where = user.role === 'ADMIN' ? {} : { role: 'ADMIN' };
 
     return this.prisma.user.findMany({
       where,
@@ -65,7 +73,8 @@ export class SoChatService {
 
     const message = (body.message || '').trim();
     if (!message) throw new ForbiddenException('Message cannot be empty.');
-    if (!body.toUserId) throw new ForbiddenException('Tagged user is required.');
+    if (!body.toUserId)
+      throw new ForbiddenException('Tagged user is required.');
 
     const toUser = await this.prisma.user.findUnique({
       where: { id: Number(body.toUserId) },
@@ -77,7 +86,7 @@ export class SoChatService {
       throw new ForbiddenException('You can only message ADMIN.');
     }
 
-    return this.prisma.salesOrderChatMessage.create({
+    const createdMessage = await this.prisma.salesOrderChatMessage.create({
       data: {
         salesOrderId: so.id,
         fromUserId: user.userId,
@@ -89,5 +98,15 @@ export class SoChatService {
         toUser: { select: { id: true, name: true, role: true } },
       },
     });
+
+    await this.soNotificationsService.createAndEmit({
+      toUserId: toUser.id,
+      salesOrderId: so.id,
+      messageId: createdMessage.id,
+      fromUsername: createdMessage.fromUser.name,
+      saleOrderNumber: so.saleOrderNumber, 
+    });
+
+    return createdMessage;
   }
 }
