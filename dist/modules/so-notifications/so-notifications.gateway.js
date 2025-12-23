@@ -11,6 +11,7 @@ Object.defineProperty(exports, "SoNotificationsGateway", {
 const _websockets = require("@nestjs/websockets");
 const _socketio = require("socket.io");
 const _jwt = require("@nestjs/jwt");
+const _config = require("@nestjs/config");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -24,20 +25,32 @@ let SoNotificationsGateway = class SoNotificationsGateway {
     async handleConnection(client) {
         try {
             const token = client.handshake.auth?.token;
-            if (!token) return client.disconnect(true);
-            const payload = await this.jwtService.verifyAsync(token);
+            if (!token) {
+                console.log('Socket connection attempt without token');
+                return client.disconnect(true);
+            }
+            const payload = await this.jwtService.verifyAsync(token, {
+                secret: this.configService.get('JWT_SECRET')
+            });
             const userId = payload?.sub;
-            if (!userId) return client.disconnect(true);
+            if (!userId) {
+                console.log('Socket connection invalid token payload');
+                return client.disconnect(true);
+            }
             client.join(`user:${userId}`);
-        } catch  {
+            console.log(`Socket client connected: User ${userId}`);
+        } catch (e) {
+            console.error('Socket authentication failed:', e);
             client.disconnect(true);
         }
     }
+    handleDisconnect(client) {}
     emitToUser(userId, payload) {
         this.server.to(`user:${userId}`).emit('notification:new', payload);
     }
-    constructor(jwtService){
+    constructor(jwtService, configService){
         this.jwtService = jwtService;
+        this.configService = configService;
     }
 };
 _ts_decorate([
@@ -53,7 +66,8 @@ SoNotificationsGateway = _ts_decorate([
     }),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        typeof _jwt.JwtService === "undefined" ? Object : _jwt.JwtService
+        typeof _jwt.JwtService === "undefined" ? Object : _jwt.JwtService,
+        typeof _config.ConfigService === "undefined" ? Object : _config.ConfigService
     ])
 ], SoNotificationsGateway);
 

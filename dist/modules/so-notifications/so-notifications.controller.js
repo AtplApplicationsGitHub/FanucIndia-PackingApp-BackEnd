@@ -35,6 +35,9 @@ let SoNotificationsController = class SoNotificationsController {
     delete(id, req) {
         return this.service.delete(Number(id), req.user);
     }
+    clearForOrder(soId, req) {
+        return this.service.clearForOrder(Number(soId), req.user.userId);
+    }
     constructor(service){
         this.service = service;
     }
@@ -61,6 +64,18 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], SoNotificationsController.prototype, "delete", null);
+_ts_decorate([
+    (0, _common.Delete)('clear-so/:soId'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'SALES', 'USER'),
+    _ts_param(0, (0, _common.Param)('soId')),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], SoNotificationsController.prototype, "clearForOrder", null);
 SoNotificationsController = _ts_decorate([
     (0, _swagger.ApiTags)('SO Notifications'),
     (0, _swagger.ApiBearerAuth)(),

@@ -61,4 +61,14 @@ export class SoNotificationsService {
 
     return created;
   }
+
+  async clearForOrder(salesOrderId: number, userId: number) {
+    await this.prisma.soChatNotification.deleteMany({
+      where: {
+        salesOrderId: salesOrderId,
+        userId: userId,
+      },
+    });
+    return { ok: true };
+  }
 }

@@ -21,7 +21,7 @@ function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
 let AdminOrderService = class AdminOrderService {
-    async findAll(query) {
+    async findAll(query, user) {
         const { page = 1, limit = 20, search, date, sortBy = 'createdAt', sortOrder = 'desc', startDate, endDate, paymentClearance, salesZoneId, statusFilter } = query;
         const parsedPage = Number(page) > 0 ? Number(page) : 1;
         const parsedLimit = Number(limit) > 0 && Number(limit) <= 100 ? Number(limit) : 20;
@@ -299,7 +299,12 @@ let AdminOrderService = class AdminOrderService {
                     },
                     _count: {
                         select: {
-                            materialData: true
+                            materialData: true,
+                            soChatNotifications: {
+                                where: {
+                                    userId: user.userId
+                                }
+                            }
                         }
                     }
                 }
@@ -310,7 +315,8 @@ let AdminOrderService = class AdminOrderService {
                 limit: isFilterActive ? total : parsedLimit,
                 data: data.map(({ _count, ...order })=>({
                         ...order,
-                        hasMaterialData: _count.materialData > 0
+                        hasMaterialData: _count.materialData > 0,
+                        notificationCount: _count.soChatNotifications
                     }))
             };
         } catch (err) {

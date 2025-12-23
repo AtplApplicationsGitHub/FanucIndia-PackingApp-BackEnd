@@ -30,8 +30,8 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let AdminOrderController = class AdminOrderController {
-    findAll(query) {
-        return this.service.findAll(query);
+    findAll(query, req) {
+        return this.service.findAll(query, req.user);
     }
     update(id, dto, req) {
         return this.service.update(id, dto, req.user);
@@ -84,9 +84,11 @@ _ts_decorate([
         description: 'List of sales orders returned successfully'
     }),
     _ts_param(0, (0, _common.Query)()),
+    _ts_param(1, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        Object
+        Object,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
     ]),
     _ts_metadata("design:returntype", void 0)
 ], AdminOrderController.prototype, "findAll", null);

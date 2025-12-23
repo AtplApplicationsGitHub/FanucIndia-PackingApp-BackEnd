@@ -69,8 +69,8 @@ export class AdminOrderController {
     status: 200,
     description: 'List of sales orders returned successfully',
   })
-  findAll(@Query() query: any) {
-    return this.service.findAll(query);
+  findAll(@Query() query: any, @Req() req: AuthRequest) { 
+    return this.service.findAll(query, req.user); 
   }
 
   @Patch(':id')

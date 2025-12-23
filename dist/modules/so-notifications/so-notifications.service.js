@@ -87,6 +87,17 @@ let SoNotificationsService = class SoNotificationsService {
         });
         return created;
     }
+    async clearForOrder(salesOrderId, userId) {
+        await this.prisma.soChatNotification.deleteMany({
+            where: {
+                salesOrderId: salesOrderId,
+                userId: userId
+            }
+        });
+        return {
+            ok: true
+        };
+    }
     constructor(prisma, gateway){
         this.prisma = prisma;
         this.gateway = gateway;

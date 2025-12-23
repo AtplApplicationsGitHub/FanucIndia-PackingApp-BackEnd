@@ -12,7 +12,7 @@ import { Prisma } from '@prisma/client';
 export class AdminOrderService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(query: any) {
+  async findAll(query: any, user: { userId: number }) {
     const {
       page = 1,
       limit = 20,
@@ -177,7 +177,8 @@ export class AdminOrderService {
           packConfig: { select: { id: true, configName: true } },
           assignedUser: { select: { id: true, name: true } },
           _count: {
-            select: { materialData: true },
+            select: { materialData: true, soChatNotifications: { where: { userId: user.userId } },
+            },
           },
         },
       });
@@ -189,6 +190,7 @@ export class AdminOrderService {
         data: data.map(({ _count, ...order }) => ({
           ...order,
           hasMaterialData: _count.materialData > 0,
+          notificationCount: _count.soChatNotifications,
         })),
       };
     } catch (err) {
