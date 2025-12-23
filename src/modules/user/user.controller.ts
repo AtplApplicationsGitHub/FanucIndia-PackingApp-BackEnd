@@ -74,4 +74,11 @@ export class UserController {
   resetPassword(@Req() req: AuthRequest, @Body() dto: ResetPasswordDto) {
     return this.userService.resetPassword(req.user.userId, dto);
   }
+
+  @Get('mobile-modules')
+  @ApiOperation({ summary: 'Get mobile module access flags for the current user' })
+  @ApiResponse({ status: 200, description: 'Returns module access flags' })
+  getMobileModules(@Req() req: AuthRequest) {
+    return this.userService.getMobileModules(req.user.userId);
+  }
 }

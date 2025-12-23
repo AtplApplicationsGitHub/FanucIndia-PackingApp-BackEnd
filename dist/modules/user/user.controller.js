@@ -47,6 +47,9 @@ let UserController = class UserController {
     resetPassword(req, dto) {
         return this.userService.resetPassword(req.user.userId, dto);
     }
+    getMobileModules(req) {
+        return this.userService.getMobileModules(req.user.userId);
+    }
     constructor(userService){
         this.userService = userService;
     }
@@ -169,6 +172,22 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], UserController.prototype, "resetPassword", null);
+_ts_decorate([
+    (0, _common.Get)('mobile-modules'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get mobile module access flags for the current user'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Returns module access flags'
+    }),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UserController.prototype, "getMobileModules", null);
 UserController = _ts_decorate([
     (0, _swagger.ApiTags)('Users'),
     (0, _common.Controller)('users'),

@@ -178,6 +178,11 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        accessPickPack: user.accessPickPack,
+        accessLabelPrint: user.accessLabelPrint,
+        accessMaterialFgTransfer: user.accessMaterialFgTransfer,
+        accessMaterialDispatch: user.accessMaterialDispatch,
+        accessVehicleEntry: user.accessVehicleEntry,
       },
     };
   }

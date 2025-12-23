@@ -219,7 +219,12 @@ let AuthService = class AuthService {
                 id: user.id,
                 name: user.name,
                 email: user.email,
-                role: user.role
+                role: user.role,
+                accessPickPack: user.accessPickPack,
+                accessLabelPrint: user.accessLabelPrint,
+                accessMaterialFgTransfer: user.accessMaterialFgTransfer,
+                accessMaterialDispatch: user.accessMaterialDispatch,
+                accessVehicleEntry: user.accessVehicleEntry
             }
         };
     }

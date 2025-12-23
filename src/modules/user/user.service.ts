@@ -149,4 +149,21 @@ export class UserService {
     select: { id: true, email: true }
   });
   }
+
+  async getMobileModules(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        accessPickPack: true,
+        accessLabelPrint: true,
+        accessMaterialFgTransfer: true,
+        accessMaterialDispatch: true,
+        accessVehicleEntry: true,
+      },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    return user;
+  }
 }

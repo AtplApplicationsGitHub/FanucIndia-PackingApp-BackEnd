@@ -218,6 +218,22 @@ let UserService = class UserService {
             }
         });
     }
+    async getMobileModules(userId) {
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            },
+            select: {
+                accessPickPack: true,
+                accessLabelPrint: true,
+                accessMaterialFgTransfer: true,
+                accessMaterialDispatch: true,
+                accessVehicleEntry: true
+            }
+        });
+        if (!user) throw new _common.NotFoundException('User not found');
+        return user;
+    }
     constructor(prisma){
         this.prisma = prisma;
     }
