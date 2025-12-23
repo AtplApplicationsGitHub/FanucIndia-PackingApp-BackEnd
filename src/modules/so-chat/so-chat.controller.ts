@@ -12,10 +12,13 @@ import { SoChatService } from './so-chat.service';
 export class SoChatController {
   constructor(private readonly soChatService: SoChatService) {}
 
-  @Get('mention-users')
+  @Get(':soNumber/mention-users') 
   @Roles('ADMIN', 'SALES', 'USER')
-  getMentionUsers(@Req() req: AuthRequest) {
-    return this.soChatService.getMentionUsers(req.user);
+  getMentionUsers(
+    @Param('soNumber') soNumber: string,
+    @Req() req: AuthRequest
+  ) {
+    return this.soChatService.getMentionUsers(soNumber, req.user);
   }
 
   @Get(':soNumber/messages')

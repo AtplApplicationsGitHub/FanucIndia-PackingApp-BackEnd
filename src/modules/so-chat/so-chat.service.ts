@@ -16,7 +16,7 @@ export class SoChatService {
   private async getSalesOrderOrThrow(soNumber: string) {
     const salesOrder = await this.prisma.salesOrder.findFirst({
       where: { saleOrderNumber: { equals: soNumber, mode: 'insensitive' } },
-      select: { id: true, userId: true, saleOrderNumber: true },
+      select: { id: true, userId: true, saleOrderNumber: true, assignedUserId: true },
     });
     if (!salesOrder) throw new NotFoundException('Sales order not found.');
     return salesOrder;
@@ -24,37 +24,54 @@ export class SoChatService {
 
   private enforceSoAccess(
     user: { userId: number; role: string },
-    soOwnerUserId: number,
+    so: { userId: number; assignedUserId: number | null },
   ) {
-    if (user.role === 'SALES' && user.userId !== soOwnerUserId) {
+    if (user.role === 'SALES' && user.userId !== so.userId) {
       throw new ForbiddenException('You are not authorized for this order.');
+    }
+    if (user.role === 'USER' && user.userId !== so.assignedUserId) {
+      throw new ForbiddenException('You are not authorized for this order (Not Assigned).');
     }
   }
 
-  async getMentionUsers(user: { userId: number; role: string }) {
-    const where = user.role === 'ADMIN' ? {} : { role: 'ADMIN' };
+  async getMentionUsers(soNumber: string, user: { userId: number; role: string }) {
+    const so = await this.getSalesOrderOrThrow(soNumber);
 
-    return this.prisma.user.findMany({
-      where,
-      select: { id: true, name: true, role: true },
-      orderBy: { name: 'asc' },
-    });
+    this.enforceSoAccess(user, so);
+
+    if (user.role === 'ADMIN') {
+      const targetIds = [so.userId, so.assignedUserId].filter((id) => id !== null) as number[];
+
+      return this.prisma.user.findMany({
+        where: {
+          id: { in: targetIds }
+        },
+        select: { id: true, name: true, role: true },
+        orderBy: { name: 'asc' },
+      });
+    } else {
+      return this.prisma.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true, name: true, role: true },
+        orderBy: { name: 'asc' },
+      });
+    }
   }
 
   async listMessages(soNumber: string, user: { userId: number; role: string }) {
     const so = await this.getSalesOrderOrThrow(soNumber);
-    this.enforceSoAccess(user, so.userId);
+
+    this.enforceSoAccess(user, so);
 
     const where =
       user.role === 'ADMIN'
         ? { salesOrderId: so.id }
         : {
             salesOrderId: so.id,
-            OR: [{ fromUserId: user.userId }, { toUserId: user.userId }],
           };
 
     return this.prisma.salesOrderChatMessage.findMany({
-      where,
+      where: { salesOrderId: so.id },
       orderBy: { createdAt: 'asc' },
       include: {
         fromUser: { select: { id: true, name: true, role: true } },
@@ -69,7 +86,7 @@ export class SoChatService {
     body: { toUserId: number; message: string },
   ) {
     const so = await this.getSalesOrderOrThrow(soNumber);
-    this.enforceSoAccess(user, so.userId);
+    this.enforceSoAccess(user, so);
 
     const message = (body.message || '').trim();
     if (!message) throw new ForbiddenException('Message cannot be empty.');
@@ -104,7 +121,7 @@ export class SoChatService {
       salesOrderId: so.id,
       messageId: createdMessage.id,
       fromUsername: createdMessage.fromUser.name,
-      saleOrderNumber: so.saleOrderNumber, 
+      saleOrderNumber: so.saleOrderNumber,
     });
 
     return createdMessage;

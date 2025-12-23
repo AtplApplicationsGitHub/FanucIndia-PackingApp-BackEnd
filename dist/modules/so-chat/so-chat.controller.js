@@ -29,8 +29,8 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let SoChatController = class SoChatController {
-    getMentionUsers(req) {
-        return this.soChatService.getMentionUsers(req.user);
+    getMentionUsers(soNumber, req) {
+        return this.soChatService.getMentionUsers(soNumber, req.user);
     }
     listMessages(soNumber, req) {
         return this.soChatService.listMessages(soNumber, req.user);
@@ -43,11 +43,13 @@ let SoChatController = class SoChatController {
     }
 };
 _ts_decorate([
-    (0, _common.Get)('mention-users'),
+    (0, _common.Get)(':soNumber/mention-users'),
     (0, _rolesdecorator.Roles)('ADMIN', 'SALES', 'USER'),
-    _ts_param(0, (0, _common.Req)()),
+    _ts_param(0, (0, _common.Param)('soNumber')),
+    _ts_param(1, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        String,
         typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
     ]),
     _ts_metadata("design:returntype", void 0)

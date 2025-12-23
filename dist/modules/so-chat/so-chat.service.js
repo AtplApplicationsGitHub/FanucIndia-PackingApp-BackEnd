@@ -32,51 +32,72 @@ let SoChatService = class SoChatService {
             select: {
                 id: true,
                 userId: true,
-                saleOrderNumber: true
+                saleOrderNumber: true,
+                assignedUserId: true
             }
         });
         if (!salesOrder) throw new _common.NotFoundException('Sales order not found.');
         return salesOrder;
     }
-    enforceSoAccess(user, soOwnerUserId) {
-        if (user.role === 'SALES' && user.userId !== soOwnerUserId) {
+    enforceSoAccess(user, so) {
+        if (user.role === 'SALES' && user.userId !== so.userId) {
             throw new _common.ForbiddenException('You are not authorized for this order.');
         }
+        if (user.role === 'USER' && user.userId !== so.assignedUserId) {
+            throw new _common.ForbiddenException('You are not authorized for this order (Not Assigned).');
+        }
     }
-    async getMentionUsers(user) {
-        const where = user.role === 'ADMIN' ? {} : {
-            role: 'ADMIN'
-        };
-        return this.prisma.user.findMany({
-            where,
-            select: {
-                id: true,
-                name: true,
-                role: true
-            },
-            orderBy: {
-                name: 'asc'
-            }
-        });
+    async getMentionUsers(soNumber, user) {
+        const so = await this.getSalesOrderOrThrow(soNumber);
+        this.enforceSoAccess(user, so);
+        if (user.role === 'ADMIN') {
+            const targetIds = [
+                so.userId,
+                so.assignedUserId
+            ].filter((id)=>id !== null);
+            return this.prisma.user.findMany({
+                where: {
+                    id: {
+                        in: targetIds
+                    }
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    role: true
+                },
+                orderBy: {
+                    name: 'asc'
+                }
+            });
+        } else {
+            return this.prisma.user.findMany({
+                where: {
+                    role: 'ADMIN'
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    role: true
+                },
+                orderBy: {
+                    name: 'asc'
+                }
+            });
+        }
     }
     async listMessages(soNumber, user) {
         const so = await this.getSalesOrderOrThrow(soNumber);
-        this.enforceSoAccess(user, so.userId);
+        this.enforceSoAccess(user, so);
         const where = user.role === 'ADMIN' ? {
             salesOrderId: so.id
         } : {
-            salesOrderId: so.id,
-            OR: [
-                {
-                    fromUserId: user.userId
-                },
-                {
-                    toUserId: user.userId
-                }
-            ]
+            salesOrderId: so.id
         };
         return this.prisma.salesOrderChatMessage.findMany({
-            where,
+            where: {
+                salesOrderId: so.id
+            },
             orderBy: {
                 createdAt: 'asc'
             },
@@ -100,7 +121,7 @@ let SoChatService = class SoChatService {
     }
     async sendMessage(soNumber, user, body) {
         const so = await this.getSalesOrderOrThrow(soNumber);
-        this.enforceSoAccess(user, so.userId);
+        this.enforceSoAccess(user, so);
         const message = (body.message || '').trim();
         if (!message) throw new _common.ForbiddenException('Message cannot be empty.');
         if (!body.toUserId) throw new _common.ForbiddenException('Tagged user is required.');
