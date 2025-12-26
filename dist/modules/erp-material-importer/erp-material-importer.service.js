@@ -22,22 +22,34 @@ function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
 const columnMapping = {
-    "SO Number": "saleOrderNumber",
-    "Transfer Order": "transferOrder",
-    "FG OBD": "FG_OBD",
-    "Machine Model": "Machine_Model",
-    "CNC Serial No": "CNC_Serial_No",
-    "Material Code": "Material_Code",
-    "Material Description": "Material_Description",
-    "Batch No": "Batch_No",
-    "SO Donor Batch": "SO_Donor_Batch",
-    "Certificate No": "Cert_No",
-    "Bin No": "Bin_No",
-    "A D F": "A_D_F",
-    "Required Quantity": "Required_Qty",
-    "Issue Stage": "Issue_stage",
-    "Packing Stage": "Packing_stage",
-    "Remarks": "Remarks"
+    'SO Number': 'saleOrderNumber',
+    'Transfer Order': 'transferOrder',
+    'FG OBD': 'FG_OBD',
+    'Machine Model': 'Machine_Model',
+    'CNC Serial No': 'CNC_Serial_No',
+    'Material Code': 'Material_Code',
+    'Material Description': 'Material_Description',
+    'Batch No': 'Batch_No',
+    'SO Donor Batch': 'SO_Donor_Batch',
+    'Certificate No': 'Cert_No',
+    'Bin No': 'Bin_No',
+    'A D F': 'A_D_F',
+    'Required Quantity': 'Required_Qty',
+    'Issue Stage': 'Issue_stage',
+    'Packing Stage': 'Packing_stage',
+    Remarks: 'Remarks',
+    'MATERIAL GROUP': 'Material_Group',
+    NAME: 'NAME',
+    NAME2: 'NAME2',
+    STREET1: 'STREET1',
+    STREET2: 'STREET2',
+    STREET3: 'STREET3',
+    STREET4: 'STREET4',
+    CITY: 'CITY',
+    STATE: 'STATE',
+    COUNTRY: 'COUNTRY',
+    POSTAL: 'POSTAL',
+    STATUS: 'STATUS'
 };
 let ErpMaterialImporterService = class ErpMaterialImporterService {
     async processFile(file, expectedSaleOrderNumber) {
@@ -50,7 +62,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         }
         const renamedRecords = this.renameColumns(records);
         await this.upsertRecords(renamedRecords);
-        const soNumber = String(records[0]["SO Number"]);
+        const soNumber = String(records[0]['SO Number']);
         try {
             await this.prisma.eRPMaterialLog.create({
                 data: {
@@ -122,19 +134,25 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         if (records.length === 0) {
             return 'File is empty.';
         }
-        const expectedHeaders = Object.keys(columnMapping);
+        // Columns that are required for a valid ERP material import.
+        // Some columns are optional (e.g., STATUS is a future-use dummy column; COUNTRY is ignored).
+        const optionalHeaders = new Set([
+            'STATUS',
+            'COUNTRY'
+        ]);
+        const expectedHeaders = Object.keys(columnMapping).filter((h)=>!optionalHeaders.has(h));
         const actualHeaders = Object.keys(records[0]);
         const missingHeaders = expectedHeaders.filter((h)=>!actualHeaders.includes(h));
         if (missingHeaders.length > 0) {
             return `Header mismatch. Missing columns: ${missingHeaders.join(', ')}`;
         }
-        const matCodeHeader = "Material Code";
+        const matCodeHeader = 'Material Code';
         for (const record of records){
             if (!record[matCodeHeader]) {
                 return 'Missing Material Code in one or more rows.';
             }
         }
-        const soNumberHeader = "SO Number";
+        const soNumberHeader = 'SO Number';
         const soNumbers = new Set(records.map((r)=>r[soNumberHeader]).filter(Boolean));
         if (soNumbers.size > 1) {
             return 'Inconsistent SO Numbers found in the file. All records must belong to the same SO Number.';
@@ -179,24 +197,63 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             if (val === null || val === undefined) return defaultVal;
             return String(val).trim();
         };
-        const allMaterialCodes = records.map((r)=>safeToString(r.Material_Code, '')).filter((code)=>!!code);
-        const distinctCodes = [
-            ...new Set(allMaterialCodes)
+        const codesNeedingGroupFromMaster = records.filter((r)=>{
+            const excelGroup = safeToString(r.Material_Group);
+            return !excelGroup;
+        }).map((r)=>safeToString(r.Material_Code, '')).filter((code)=>!!code);
+        const distinctCodesToLookup = [
+            ...new Set(codesNeedingGroupFromMaster)
         ];
-        const materialBarcodes = await this.prisma.materialBarcode.findMany({
+        const materialBarcodes = distinctCodesToLookup.length > 0 ? await this.prisma.materialBarcode.findMany({
             where: {
                 erpCode: {
-                    in: distinctCodes
+                    in: distinctCodesToLookup
                 }
             }
-        });
+        }) : [];
         const barcodeMap = new Map(materialBarcodes.map((mb)=>[
                 mb.erpCode,
                 mb
             ]));
+        const buildCustomerName = (name1, name2)=>{
+            const a = safeToString(name1, '') || '';
+            const b = safeToString(name2, '') || '';
+            return [
+                a,
+                b
+            ].filter(Boolean).join(' ').trim();
+        };
+        const ensureComma = (val)=>{
+            const trimmed = val.trim();
+            if (!trimmed) return trimmed;
+            return trimmed.endsWith(',') ? trimmed : `${trimmed},`;
+        };
+        const buildCustomerAddress = (r)=>{
+            const street1 = safeToString(r.STREET1, '') || '';
+            const street2 = safeToString(r.STREET2, '') || '';
+            const street3 = safeToString(r.STREET3, '') || '';
+            const street4 = safeToString(r.STREET4, '') || '';
+            const city = safeToString(r.CITY, '') || '';
+            const state = safeToString(r.STATE, '') || '';
+            const postal = safeToString(r.POSTAL, '') || '';
+            const parts = [
+                street1 ? ensureComma(street1) : '',
+                street2 ? ensureComma(street2) : '',
+                street3 ? ensureComma(street3) : '',
+                street4 ? ensureComma(street4) : '',
+                city ? ensureComma(city) : '',
+                state ? ensureComma(state) : '',
+                postal
+            ].map((p)=>typeof p === 'string' ? p.trim() : '').filter(Boolean);
+            return parts.join(' ').trim();
+        };
+        const firstRow = records[0];
+        const computedCustomerName = buildCustomerName(firstRow.NAME, firstRow.NAME2);
+        const computedCustomerAddress = buildCustomerAddress(firstRow);
         const recordsToCreate = records.map((r)=>{
             const matCode = safeToString(r.Material_Code, '');
             const barcodeData = barcodeMap.get(matCode);
+            const excelGroup = safeToString(r.Material_Group);
             return {
                 saleOrderNumber: safeToString(r.saleOrderNumber),
                 customerId: safeParseInt(r.customerId),
@@ -216,7 +273,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
                 Packing_stage: safeParseInt(r.Packing_stage, 0),
                 Remarks: safeToString(r.Remarks),
                 Mapping_Barcode: barcodeData?.mappingBarcode ?? null,
-                Group: barcodeData?.group ?? null,
+                Group: excelGroup ? excelGroup : barcodeData?.group ?? null,
                 Accept_Bulk_Data: barcodeData?.acceptBulkData ?? null,
                 Remarks_Required: barcodeData?.remarksRequired ?? null,
                 Classification: barcodeData?.classification ?? null
@@ -224,6 +281,34 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         });
         try {
             await this.prisma.$transaction(async (tx)=>{
+                if (computedCustomerName || computedCustomerAddress) {
+                    const so = await tx.salesOrder.findUnique({
+                        where: {
+                            saleOrderNumber: soNumber
+                        },
+                        select: {
+                            id: true
+                        }
+                    });
+                    if (!so) {
+                        throw new _common.BadRequestException(`Sales Order Number '${soNumber}' does not exist in the system.`);
+                    }
+                    await tx.salesOrder.update({
+                        where: {
+                            saleOrderNumber: soNumber
+                        },
+                        data: {
+                            ...computedCustomerName ? {
+                                customerNameText: computedCustomerName
+                            } : {},
+                            ...computedCustomerAddress ? {
+                                address: computedCustomerAddress
+                            } : {},
+                            UpdatedBy: 'ERP Import',
+                            UpdatedDate: new Date()
+                        }
+                    });
+                }
                 this.logger.log(`Deleting existing records for SO: ${soNumber}`);
                 await tx.eRP_Material_Data.deleteMany({
                     where: {

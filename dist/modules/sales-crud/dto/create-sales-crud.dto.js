@@ -125,15 +125,29 @@ _ts_decorate([
     _ts_metadata("design:type", Number)
 ], CreateSalesCrudDto.prototype, "packConfigId", void 0);
 _ts_decorate([
-    (0, _swagger.ApiProperty)({
+    (0, _swagger.ApiPropertyOptional)({
         example: 1,
-        description: 'Customer ID (lookup)'
+        description: 'Customer ID (lookup). Provide either customerId OR customerName.'
     }),
+    (0, _classvalidator.ValidateIf)((o)=>!o.customerName),
     (0, _classvalidator.IsInt)({
         message: 'Customer ID must be an integer.'
     }),
+    (0, _classvalidator.IsOptional)(),
     _ts_metadata("design:type", Number)
 ], CreateSalesCrudDto.prototype, "customerId", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
+        example: 'LMW Limited',
+        description: 'Customer Name (free text). Provide either customerId OR customerName.'
+    }),
+    (0, _classvalidator.ValidateIf)((o)=>!o.customerId),
+    (0, _classvalidator.IsString)({
+        message: 'Customer Name must be a string.'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    _ts_metadata("design:type", String)
+], CreateSalesCrudDto.prototype, "customerName", void 0);
 _ts_decorate([
     (0, _swagger.ApiPropertyOptional)({
         example: 'Handle with care',

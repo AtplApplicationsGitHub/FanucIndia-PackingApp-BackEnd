@@ -63,6 +63,10 @@ let ErpMaterialDataController = class ErpMaterialDataController {
         const { userId, role } = req.user;
         return this.erpMaterialDataService.updateRemarks(orderId, materialId, body.remarks, userId, role);
     }
+    acceptAllIssueStage(orderId, req) {
+        const { userId, role } = req.user;
+        return this.erpMaterialDataService.acceptAllIssueStage(orderId, userId, role);
+    }
     constructor(erpMaterialDataService){
         this.erpMaterialDataService = erpMaterialDataService;
     }
@@ -250,6 +254,25 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], ErpMaterialDataController.prototype, "updateRemarks", null);
+_ts_decorate([
+    (0, _swagger.ApiOperation)({
+        summary: 'Accept all materials for issue stage (Admin only)'
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'orderId',
+        type: Number
+    }),
+    (0, _common.Post)('accept-all-issue-stage'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    _ts_param(0, (0, _common.Param)('orderId', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], ErpMaterialDataController.prototype, "acceptAllIssueStage", null);
 ErpMaterialDataController = _ts_decorate([
     (0, _swagger.ApiTags)('ERP Material Data'),
     (0, _swagger.ApiBearerAuth)(),

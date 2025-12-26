@@ -5,6 +5,7 @@ import {
   IsDateString,
   IsOptional,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -56,9 +57,23 @@ export class CreateSalesCrudDto {
   @IsInt({ message: 'Packing Config ID must be an integer.' })
   packConfigId: number;
 
-  @ApiProperty({ example: 1, description: 'Customer ID (lookup)' })
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Customer ID (lookup). Provide either customerId OR customerName.',
+  })
+  @ValidateIf((o) => !o.customerName)
   @IsInt({ message: 'Customer ID must be an integer.' })
-  customerId: number;
+  @IsOptional()
+  customerId?: number;
+
+  @ApiPropertyOptional({
+    example: 'LMW Limited',
+    description: 'Customer Name (free text). Provide either customerId OR customerName.',
+  })
+  @ValidateIf((o) => !o.customerId)
+  @IsString({ message: 'Customer Name must be a string.' })
+  @IsOptional()
+  customerName?: string;
 
   @ApiPropertyOptional({
     example: 'Handle with care',

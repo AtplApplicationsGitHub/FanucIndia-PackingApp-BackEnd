@@ -92,6 +92,7 @@ model SalesOrder {
   packConfigId     Int
   assignedUserId   Int?
   customerId       Int?
+  customerNameText String?             @db.VarChar(500)
   printerId        Int?
   specialRemarks   String?
   additionalRemarks String?

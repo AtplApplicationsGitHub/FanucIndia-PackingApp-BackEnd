@@ -634,6 +634,48 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             updatedMaterial
         });
     }
+    async acceptAllIssueStage(orderId, userId, userRole) {
+        if (userRole !== 'ADMIN') {
+            throw new _common.ForbiddenException('Only Admins can perform this action');
+        }
+        await verifyOrderAccess(this.prisma, orderId, userId, userRole);
+        const salesOrder = await this.prisma.salesOrder.findUnique({
+            where: {
+                id: orderId
+            },
+            select: {
+                saleOrderNumber: true
+            }
+        });
+        if (!salesOrder) throw new _common.NotFoundException('Sales Order not found');
+        const userName = await this.getUserName(userId);
+        const now = new Date();
+        const materials = await this.prisma.eRP_Material_Data.findMany({
+            where: {
+                saleOrderNumber: salesOrder.saleOrderNumber
+            }
+        });
+        if (materials.length === 0) {
+            throw new _common.NotFoundException('No materials found for this order');
+        }
+        await this.prisma.$transaction(async (tx)=>{
+            for (const item of materials){
+                if (item.Issue_stage < item.Required_Qty) {
+                    await tx.eRP_Material_Data.update({
+                        where: {
+                            ID: item.ID
+                        },
+                        data: {
+                            Issue_stage: item.Required_Qty,
+                            UpdatedBy: userName,
+                            UpdatedDate: now
+                        }
+                    });
+                }
+            }
+        });
+        return this._checkOrderCompletion(salesOrder.saleOrderNumber, orderId, userName);
+    }
     constructor(prisma){
         this.prisma = prisma;
     }

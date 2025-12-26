@@ -44,9 +44,18 @@ export class SalesCrudService {
     }
 
     try {
-      const customer = await this.prisma.customer.findUnique({
-        where: { id: dto.customerId },
-      });
+      // Customer selection behavior:
+      // - If customerId is provided (dropdown): link to master customer and (optionally) preload address.
+      // - If customerName is provided (free text): DO NOT create/update Customer master records.
+      //   Store the typed name in SalesOrder.customerNameText.
+      const resolvedCustomerId: number | null = dto.customerId ?? null;
+      const customerNameText = dto.customerName && dto.customerName.trim()
+        ? dto.customerName.trim()
+        : null;
+
+      const customer = resolvedCustomerId
+        ? await this.prisma.customer.findUnique({ where: { id: resolvedCustomerId } })
+        : null;
       const address = customer?.address || null;
 
       const deliveryDate =
@@ -54,13 +63,16 @@ export class SalesCrudService {
           ? new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString()
           : dto.deliveryDate;
 
+      const { customerName, customerId, ...rest } = dto as any;
+
       const newOrder = await this.prisma.salesOrder.create({
         data: {
-          ...dto,
+          ...rest,
           deliveryDate,
           userId,
           assignedUserId: null,
-          customerId: dto.customerId,
+          customerId: resolvedCustomerId,
+          customerNameText: customerNameText,
           printerId: null,
           address: address,
         },
@@ -107,6 +119,7 @@ export class SalesCrudService {
         },
         select: {
           saleOrderNumber: true,
+          customerNameText: true,
           address: true,
           customer: {
             select: {
@@ -123,7 +136,7 @@ export class SalesCrudService {
       return {
         valid: true,
         saleOrderNumber: order.saleOrderNumber,
-        customerName: order.customer?.name || '',
+        customerName: order.customerNameText || order.customer?.name || '',
         address: order.address || '',
       };
     } catch (err) {
@@ -153,6 +166,7 @@ export class SalesCrudService {
           ...(['true', 'false'].includes(search.toLowerCase())
             ? [{ paymentClearance: search.toLowerCase() === 'true' }]
             : []),
+          { customerNameText: s },
           { customer: { is: { name: s } } },
           { product: { is: { name: s } } },
           { transporter: { is: { name: s } } },
@@ -217,11 +231,19 @@ export class SalesCrudService {
     }
 
     try {
+      // Customer update behavior:
+      // - If customerId is provided (dropdown): link to master customer and preload address.
+      // - If customerName is provided (free text): DO NOT create/update Customer master records.
+      //   Store the typed name in SalesOrder.customerNameText and unlink customerId.
+      const resolvedCustomerId: number | undefined = dto.customerId ?? undefined;
+      const customerNameText: string | undefined =
+        (dto as any).customerName && String((dto as any).customerName).trim()
+          ? String((dto as any).customerName).trim()
+          : undefined;
+
       let address: string | undefined;
-      if (dto.customerId) {
-        const customer = await this.prisma.customer.findUnique({
-          where: { id: dto.customerId },
-        });
+      if (resolvedCustomerId) {
+        const customer = await this.prisma.customer.findUnique({ where: { id: resolvedCustomerId } });
         if (customer) address = customer.address;
       }
 
@@ -232,13 +254,21 @@ export class SalesCrudService {
 
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
+      const { customerName, customerId, ...rest } = dto as any;
+
       return await this.prisma.salesOrder.update({
         where: { id },
         data: {
-          ...dto,
+          ...rest,
           ...(deliveryDate ? { deliveryDate } : {}),
           UpdatedBy: user?.name || 'System',
           UpdatedDate: new Date(),
+          ...(resolvedCustomerId !== undefined ? { customerId: resolvedCustomerId } : {}),
+          ...(customerNameText !== undefined
+            ? { customerNameText, customerId: null }
+            : resolvedCustomerId !== undefined
+              ? { customerNameText: null }
+              : {}),
           ...(address !== undefined && { address }),
         },
         include: {
@@ -313,6 +343,7 @@ export class SalesCrudService {
           ...(['true', 'false'].includes(search.toLowerCase())
             ? [{ paymentClearance: search.toLowerCase() === 'true' }]
             : []),
+          { customerNameText: s },
           { customer: { is: { name: s } } },
           { product: { is: { name: s } } },
           { transporter: { is: { name: s } } },

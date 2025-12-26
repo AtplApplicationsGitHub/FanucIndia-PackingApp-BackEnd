@@ -178,4 +178,16 @@ export class ErpMaterialDataController {
       role,
     );
   }
+
+  @ApiOperation({ summary: 'Accept all materials for issue stage (Admin only)' })
+  @ApiParam({ name: 'orderId', type: Number })
+  @Post('accept-all-issue-stage')
+  @Roles('ADMIN')
+  acceptAllIssueStage(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Req() req: AuthRequest,
+  ) {
+    const { userId, role } = req.user;
+    return this.erpMaterialDataService.acceptAllIssueStage(orderId, userId, role);
+  }
 }

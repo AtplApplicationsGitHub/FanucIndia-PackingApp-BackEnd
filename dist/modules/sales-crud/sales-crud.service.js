@@ -49,20 +49,28 @@ let SalesCrudService = class SalesCrudService {
             }
         }
         try {
-            const customer = await this.prisma.customer.findUnique({
+            // Customer selection behavior:
+            // - If customerId is provided (dropdown): link to master customer and (optionally) preload address.
+            // - If customerName is provided (free text): DO NOT create/update Customer master records.
+            //   Store the typed name in SalesOrder.customerNameText.
+            const resolvedCustomerId = dto.customerId ?? null;
+            const customerNameText = dto.customerName && dto.customerName.trim() ? dto.customerName.trim() : null;
+            const customer = resolvedCustomerId ? await this.prisma.customer.findUnique({
                 where: {
-                    id: dto.customerId
+                    id: resolvedCustomerId
                 }
-            });
+            }) : null;
             const address = customer?.address || null;
             const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10 ? new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString() : dto.deliveryDate;
+            const { customerName, customerId, ...rest } = dto;
             const newOrder = await this.prisma.salesOrder.create({
                 data: {
-                    ...dto,
+                    ...rest,
                     deliveryDate,
                     userId,
                     assignedUserId: null,
-                    customerId: dto.customerId,
+                    customerId: resolvedCustomerId,
+                    customerNameText: customerNameText,
                     printerId: null,
                     address: address
                 },
@@ -104,6 +112,7 @@ let SalesCrudService = class SalesCrudService {
                 },
                 select: {
                     saleOrderNumber: true,
+                    customerNameText: true,
                     address: true,
                     customer: {
                         select: {
@@ -118,7 +127,7 @@ let SalesCrudService = class SalesCrudService {
             return {
                 valid: true,
                 saleOrderNumber: order.saleOrderNumber,
-                customerName: order.customer?.name || '',
+                customerName: order.customerNameText || order.customer?.name || '',
                 address: order.address || ''
             };
         } catch (err) {
@@ -163,6 +172,9 @@ let SalesCrudService = class SalesCrudService {
                             paymentClearance: search.toLowerCase() === 'true'
                         }
                     ] : [],
+                    {
+                        customerNameText: s
+                    },
                     {
                         customer: {
                             is: {
@@ -260,11 +272,17 @@ let SalesCrudService = class SalesCrudService {
             throw new _common.NotFoundException('Sales order not found or access denied.');
         }
         try {
+            // Customer update behavior:
+            // - If customerId is provided (dropdown): link to master customer and preload address.
+            // - If customerName is provided (free text): DO NOT create/update Customer master records.
+            //   Store the typed name in SalesOrder.customerNameText and unlink customerId.
+            const resolvedCustomerId = dto.customerId ?? undefined;
+            const customerNameText = dto.customerName && String(dto.customerName).trim() ? String(dto.customerName).trim() : undefined;
             let address;
-            if (dto.customerId) {
+            if (resolvedCustomerId) {
                 const customer = await this.prisma.customer.findUnique({
                     where: {
-                        id: dto.customerId
+                        id: resolvedCustomerId
                     }
                 });
                 if (customer) address = customer.address;
@@ -275,17 +293,27 @@ let SalesCrudService = class SalesCrudService {
                     id: userId
                 }
             });
+            const { customerName, customerId, ...rest } = dto;
             return await this.prisma.salesOrder.update({
                 where: {
                     id
                 },
                 data: {
-                    ...dto,
+                    ...rest,
                     ...deliveryDate ? {
                         deliveryDate
                     } : {},
                     UpdatedBy: user?.name || 'System',
                     UpdatedDate: new Date(),
+                    ...resolvedCustomerId !== undefined ? {
+                        customerId: resolvedCustomerId
+                    } : {},
+                    ...customerNameText !== undefined ? {
+                        customerNameText,
+                        customerId: null
+                    } : resolvedCustomerId !== undefined ? {
+                        customerNameText: null
+                    } : {},
                     ...address !== undefined && {
                         address
                     }
@@ -369,6 +397,9 @@ let SalesCrudService = class SalesCrudService {
                             paymentClearance: search.toLowerCase() === 'true'
                         }
                     ] : [],
+                    {
+                        customerNameText: s
+                    },
                     {
                         customer: {
                             is: {
