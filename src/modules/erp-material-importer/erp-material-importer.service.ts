@@ -167,9 +167,13 @@ export class ErpMaterialImporterService {
       return 'File is empty.';
     }
 
-    // Columns that are required for a valid ERP material import.
-    // Some columns are optional (e.g., STATUS is a future-use dummy column; COUNTRY is ignored).
-    const optionalHeaders = new Set<string>(['STATUS', 'COUNTRY']);
+    const optionalHeaders = new Set<string>([
+      'STATUS',
+      'Status',
+      'COUNTRY',
+      'Remarks',
+      'REMARKS',
+    ]);
     const expectedHeaders = Object.keys(columnMapping).filter(
       (h) => !optionalHeaders.has(h),
     );
@@ -254,15 +258,11 @@ export class ErpMaterialImporterService {
       return String(val).trim();
     };
 
-    const codesNeedingGroupFromMaster = records
-      .filter((r) => {
-        const excelGroup = safeToString(r.Material_Group);
-        return !excelGroup; 
-      })
+    const allCodes = records
       .map((r) => safeToString(r.Material_Code, ''))
       .filter((code): code is string => !!code);
 
-    const distinctCodesToLookup = [...new Set(codesNeedingGroupFromMaster)];
+    const distinctCodesToLookup = [...new Set(allCodes)];
 
     const materialBarcodes =
       distinctCodesToLookup.length > 0

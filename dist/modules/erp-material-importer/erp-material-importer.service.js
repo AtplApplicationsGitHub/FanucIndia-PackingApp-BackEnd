@@ -134,11 +134,12 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         if (records.length === 0) {
             return 'File is empty.';
         }
-        // Columns that are required for a valid ERP material import.
-        // Some columns are optional (e.g., STATUS is a future-use dummy column; COUNTRY is ignored).
         const optionalHeaders = new Set([
             'STATUS',
-            'COUNTRY'
+            'Status',
+            'COUNTRY',
+            'Remarks',
+            'REMARKS'
         ]);
         const expectedHeaders = Object.keys(columnMapping).filter((h)=>!optionalHeaders.has(h));
         const actualHeaders = Object.keys(records[0]);
@@ -197,12 +198,9 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             if (val === null || val === undefined) return defaultVal;
             return String(val).trim();
         };
-        const codesNeedingGroupFromMaster = records.filter((r)=>{
-            const excelGroup = safeToString(r.Material_Group);
-            return !excelGroup;
-        }).map((r)=>safeToString(r.Material_Code, '')).filter((code)=>!!code);
+        const allCodes = records.map((r)=>safeToString(r.Material_Code, '')).filter((code)=>!!code);
         const distinctCodesToLookup = [
-            ...new Set(codesNeedingGroupFromMaster)
+            ...new Set(allCodes)
         ];
         const materialBarcodes = distinctCodesToLookup.length > 0 ? await this.prisma.materialBarcode.findMany({
             where: {
