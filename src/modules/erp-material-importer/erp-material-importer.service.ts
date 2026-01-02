@@ -3,10 +3,13 @@ import {
   Logger,
   BadRequestException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Workbook } from 'exceljs';
 import { Prisma } from '@prisma/client';
+import { SftpService } from '../sftp/sftp.service';
+import * as path from 'path';
 
 const columnMapping = {
   'SO Number': 'saleOrderNumber',
@@ -45,7 +48,91 @@ const columnMapping = {
 export class ErpMaterialImporterService {
   private readonly logger = new Logger(ErpMaterialImporterService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private sftpService: SftpService, 
+  ) {}
+
+  async importFromDrive(saleOrderNumber: string) {
+    this.logger.log(`Initiating Drive Import for SO: ${saleOrderNumber}`);
+
+    const so = await this.prisma.salesOrder.findUnique({
+      where: { saleOrderNumber },
+      select: { outboundDelivery: true },
+    });
+
+    if (!so || !so.outboundDelivery) {
+      throw new BadRequestException(
+        `Sales Order or Outbound Delivery (OBD) not found for SO: ${saleOrderNumber}`,
+      );
+    }
+
+    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    
+    // Ensure we use POSIX paths for SFTP
+    const activeDir = path.posix.join(baseDir, 'Active');
+    const archivedDir = path.posix.join(baseDir, 'Archived');
+    const errorDir = path.posix.join(baseDir, 'Error');
+
+    const filename = `${saleOrderNumber}_${so.outboundDelivery}.xlsx`;
+    const filePath = path.posix.join(activeDir, filename);
+
+    this.logger.log(`Looking for file at SFTP path: ${filePath}`);
+
+    const exists = await this.sftpService.exists(filePath);
+    if (!exists) {
+      throw new NotFoundException(
+        `File '${filename}' not found in Active folder on SFTP server. Path: ${filePath}`,
+      );
+    }
+
+    let fileBuffer: Buffer;
+    try {
+      // [CORRECTED LINE]: Use sftpService to download the buffer
+      fileBuffer = await this.sftpService.getBuffer(filePath);
+    } catch (err) {
+      this.logger.error(`Failed to read file from SFTP: ${filePath}`, err);
+      throw new InternalServerErrorException('Failed to read the file from drive.');
+    }
+
+    const mockFile: Express.Multer.File = {
+      fieldname: 'file',
+      originalname: filename,
+      encoding: '7bit',
+      mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: fileBuffer,
+      size: fileBuffer.length,
+      destination: activeDir,
+      filename: filename,
+      path: filePath,
+      stream: null as any,
+    };
+
+    try {
+      const result = await this.processFile(mockFile, saleOrderNumber);
+
+      const archivePath = path.posix.join(archivedDir, filename);
+      await this.sftpService.rename(filePath, archivePath);
+      this.logger.log(`Moved file to SFTP Archive: ${archivePath}`);
+
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Import failed for ${filename}. Moving to SFTP Error folder.`,
+        error,
+      );
+      try {
+        const errorPath = path.posix.join(errorDir, filename);
+        await this.sftpService.rename(filePath, errorPath);
+      } catch (moveErr) {
+        this.logger.error(
+          `Failed to move file ${filename} to Error folder on SFTP`,
+          moveErr,
+        );
+      }
+      throw error;
+    }
+  }
 
   async processFile(
     file: Express.Multer.File,

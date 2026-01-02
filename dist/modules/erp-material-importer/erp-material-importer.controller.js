@@ -35,6 +35,12 @@ let ErpMaterialImporterController = class ErpMaterialImporterController {
         }
         return this.service.processFile(file, saleOrderNumber);
     }
+    async importFromDrive(saleOrderNumber) {
+        if (!saleOrderNumber) {
+            throw new _common.BadRequestException('Sale Order Number is required.');
+        }
+        return this.service.importFromDrive(saleOrderNumber);
+    }
     constructor(service){
         this.service = service;
     }
@@ -72,6 +78,33 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], ErpMaterialImporterController.prototype, "uploadFile", null);
+_ts_decorate([
+    (0, _common.Post)('import-from-drive'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Import ERP material file automatically from configured drive'
+    }),
+    (0, _swagger.ApiBody)({
+        schema: {
+            type: 'object',
+            properties: {
+                saleOrderNumber: {
+                    type: 'string',
+                    description: 'The Sale Order Number to fetch the file for.'
+                }
+            },
+            required: [
+                'saleOrderNumber'
+            ]
+        }
+    }),
+    _ts_param(0, (0, _common.Body)('saleOrderNumber')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], ErpMaterialImporterController.prototype, "importFromDrive", null);
 ErpMaterialImporterController = _ts_decorate([
     (0, _swagger.ApiTags)('ERP Material Importer'),
     (0, _swagger.ApiBearerAuth)(),

@@ -12,6 +12,7 @@ const _common = require("@nestjs/common");
 const _erpmaterialimporterservice = require("./erp-material-importer.service");
 const _erpmaterialimportercontroller = require("./erp-material-importer.controller");
 const _prismaservice = require("../../prisma.service");
+const _sftpmodule = require("../sftp/sftp.module");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -22,6 +23,9 @@ let ErpMaterialImporterModule = class ErpMaterialImporterModule {
 };
 ErpMaterialImporterModule = _ts_decorate([
     (0, _common.Module)({
+        imports: [
+            _sftpmodule.SftpModule
+        ],
         controllers: [
             _erpmaterialimportercontroller.ErpMaterialImporterController
         ],

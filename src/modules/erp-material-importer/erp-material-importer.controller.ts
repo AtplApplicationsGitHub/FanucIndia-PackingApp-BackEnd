@@ -53,4 +53,26 @@ export class ErpMaterialImporterController {
     }
     return this.service.processFile(file, saleOrderNumber);
   }
+
+  @Post('import-from-drive')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({ summary: 'Import ERP material file automatically from configured drive' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        saleOrderNumber: {
+          type: 'string',
+          description: 'The Sale Order Number to fetch the file for.',
+        },
+      },
+      required: ['saleOrderNumber'],
+    },
+  })
+  async importFromDrive(@Body('saleOrderNumber') saleOrderNumber: string) {
+    if (!saleOrderNumber) {
+      throw new BadRequestException('Sale Order Number is required.');
+    }
+    return this.service.importFromDrive(saleOrderNumber);
+  }
 }

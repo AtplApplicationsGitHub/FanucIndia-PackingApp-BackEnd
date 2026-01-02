@@ -165,6 +165,25 @@ let SftpService = class SftpService {
             }
         });
     }
+    async exists(remotePath) {
+        return this.withClient((c)=>c.exists(remotePath));
+    }
+    async rename(remoteSourcePath, remoteDestPath) {
+        return this.withClient(async (c)=>{
+            const destDir = _path.posix.dirname(remoteDestPath);
+            await this._ensureDir(c, destDir);
+            return c.rename(remoteSourcePath, remoteDestPath);
+        });
+    }
+    async getBuffer(remotePath) {
+        return this.withClient(async (c)=>{
+            const result = await c.get(remotePath);
+            if (Buffer.isBuffer(result)) {
+                return result;
+            }
+            throw new Error('SFTP get did not return a buffer');
+        });
+    }
     constructor(){
         this.logger = new _common.Logger(SftpService.name);
     }

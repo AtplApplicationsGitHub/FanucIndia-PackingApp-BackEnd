@@ -12,6 +12,49 @@ const _common = require("@nestjs/common");
 const _prismaservice = require("../../prisma.service");
 const _exceljs = require("exceljs");
 const _client = require("@prisma/client");
+const _sftpservice = require("../sftp/sftp.service");
+const _path = /*#__PURE__*/ _interop_require_wildcard(require("path"));
+function _getRequireWildcardCache(nodeInterop) {
+    if (typeof WeakMap !== "function") return null;
+    var cacheBabelInterop = new WeakMap();
+    var cacheNodeInterop = new WeakMap();
+    return (_getRequireWildcardCache = function(nodeInterop) {
+        return nodeInterop ? cacheNodeInterop : cacheBabelInterop;
+    })(nodeInterop);
+}
+function _interop_require_wildcard(obj, nodeInterop) {
+    if (!nodeInterop && obj && obj.__esModule) {
+        return obj;
+    }
+    if (obj === null || typeof obj !== "object" && typeof obj !== "function") {
+        return {
+            default: obj
+        };
+    }
+    var cache = _getRequireWildcardCache(nodeInterop);
+    if (cache && cache.has(obj)) {
+        return cache.get(obj);
+    }
+    var newObj = {
+        __proto__: null
+    };
+    var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor;
+    for(var key in obj){
+        if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) {
+            var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null;
+            if (desc && (desc.get || desc.set)) {
+                Object.defineProperty(newObj, key, desc);
+            } else {
+                newObj[key] = obj[key];
+            }
+        }
+    }
+    newObj.default = obj;
+    if (cache) {
+        cache.set(obj, newObj);
+    }
+    return newObj;
+}
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -52,6 +95,68 @@ const columnMapping = {
     STATUS: 'STATUS'
 };
 let ErpMaterialImporterService = class ErpMaterialImporterService {
+    async importFromDrive(saleOrderNumber) {
+        this.logger.log(`Initiating Drive Import for SO: ${saleOrderNumber}`);
+        const so = await this.prisma.salesOrder.findUnique({
+            where: {
+                saleOrderNumber
+            },
+            select: {
+                outboundDelivery: true
+            }
+        });
+        if (!so || !so.outboundDelivery) {
+            throw new _common.BadRequestException(`Sales Order or Outbound Delivery (OBD) not found for SO: ${saleOrderNumber}`);
+        }
+        const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+        // Ensure we use POSIX paths for SFTP
+        const activeDir = _path.posix.join(baseDir, 'Active');
+        const archivedDir = _path.posix.join(baseDir, 'Archived');
+        const errorDir = _path.posix.join(baseDir, 'Error');
+        const filename = `${saleOrderNumber}_${so.outboundDelivery}.xlsx`;
+        const filePath = _path.posix.join(activeDir, filename);
+        this.logger.log(`Looking for file at SFTP path: ${filePath}`);
+        const exists = await this.sftpService.exists(filePath);
+        if (!exists) {
+            throw new _common.NotFoundException(`File '${filename}' not found in Active folder on SFTP server. Path: ${filePath}`);
+        }
+        let fileBuffer;
+        try {
+            // [CORRECTED LINE]: Use sftpService to download the buffer
+            fileBuffer = await this.sftpService.getBuffer(filePath);
+        } catch (err) {
+            this.logger.error(`Failed to read file from SFTP: ${filePath}`, err);
+            throw new _common.InternalServerErrorException('Failed to read the file from drive.');
+        }
+        const mockFile = {
+            fieldname: 'file',
+            originalname: filename,
+            encoding: '7bit',
+            mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            buffer: fileBuffer,
+            size: fileBuffer.length,
+            destination: activeDir,
+            filename: filename,
+            path: filePath,
+            stream: null
+        };
+        try {
+            const result = await this.processFile(mockFile, saleOrderNumber);
+            const archivePath = _path.posix.join(archivedDir, filename);
+            await this.sftpService.rename(filePath, archivePath);
+            this.logger.log(`Moved file to SFTP Archive: ${archivePath}`);
+            return result;
+        } catch (error) {
+            this.logger.error(`Import failed for ${filename}. Moving to SFTP Error folder.`, error);
+            try {
+                const errorPath = _path.posix.join(errorDir, filename);
+                await this.sftpService.rename(filePath, errorPath);
+            } catch (moveErr) {
+                this.logger.error(`Failed to move file ${filename} to Error folder on SFTP`, moveErr);
+            }
+            throw error;
+        }
+    }
     async processFile(file, expectedSaleOrderNumber) {
         this.logger.log(`Starting to process file: ${file.originalname}`);
         const records = await this.readFile(file);
@@ -328,8 +433,9 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             throw new _common.InternalServerErrorException('Database transaction failed.');
         }
     }
-    constructor(prisma){
+    constructor(prisma, sftpService){
         this.prisma = prisma;
+        this.sftpService = sftpService;
         this.logger = new _common.Logger(ErpMaterialImporterService.name);
     }
 };
@@ -337,7 +443,8 @@ ErpMaterialImporterService = _ts_decorate([
     (0, _common.Injectable)(),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        typeof _prismaservice.PrismaService === "undefined" ? Object : _prismaservice.PrismaService
+        typeof _prismaservice.PrismaService === "undefined" ? Object : _prismaservice.PrismaService,
+        typeof _sftpservice.SftpService === "undefined" ? Object : _sftpservice.SftpService
     ])
 ], ErpMaterialImporterService);
 
