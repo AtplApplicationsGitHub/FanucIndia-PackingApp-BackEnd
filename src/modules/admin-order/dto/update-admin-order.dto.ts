@@ -29,6 +29,11 @@ export class UpdateAdminOrderDto {
   @IsOptional()
   customerId?: number;
 
+  @ApiPropertyOptional({ example: 'LMW Limited', description: 'Customer Name (free text)' })
+  @IsOptional()
+  @IsString() 
+  customerNameText?: string;
+
   @ApiPropertyOptional({ example: 'SO123456', description: 'Sale Order Number' })
   @IsOptional()
   @IsString()

@@ -241,12 +241,22 @@ export class AdminOrderService {
       ).toISOString();
     }
 
-    const data: Prisma.SalesOrderUpdateInput = {
-      ...dto,
+    const { customerId, customerNameText, ...rest } = dto;
+
+    const data: Prisma.SalesOrderUncheckedUpdateInput = {
+      ...rest,
       UpdatedBy: user.name,
       UpdatedDate: new Date(),
       ...(addressToSave !== undefined && { address: addressToSave }),
     };
+
+    if (customerNameText !== undefined && customerNameText !== null) {
+       data.customerNameText = customerNameText;
+       data.customerId = null;
+    } else if (customerId !== undefined && customerId !== null) {
+       data.customerId = customerId;
+       data.customerNameText = null;
+    }
 
     if (
       dto.priority !== undefined &&

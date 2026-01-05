@@ -59,6 +59,15 @@ _ts_decorate([
 ], UpdateAdminOrderDto.prototype, "customerId", void 0);
 _ts_decorate([
     (0, _swagger.ApiPropertyOptional)({
+        example: 'LMW Limited',
+        description: 'Customer Name (free text)'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "customerNameText", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
         example: 'SO123456',
         description: 'Sale Order Number'
     }),
