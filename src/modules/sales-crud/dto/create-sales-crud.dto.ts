@@ -90,4 +90,12 @@ export class CreateSalesCrudDto {
   @IsString({ message: 'Additional Remarks must be a string.' })
   @IsOptional()
   additionalRemarks?: string;
+
+  @ApiPropertyOptional({ 
+    example: 'Fragile content', 
+    description: 'Label Remarks (optional)', 
+  }) 
+  @IsString({ message: 'Label Remarks must be a string.' }) 
+  @IsOptional() 
+  labelRemarks?: string;
 }

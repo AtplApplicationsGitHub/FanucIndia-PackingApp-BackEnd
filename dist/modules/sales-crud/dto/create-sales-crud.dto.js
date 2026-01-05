@@ -170,5 +170,16 @@ _ts_decorate([
     (0, _classvalidator.IsOptional)(),
     _ts_metadata("design:type", String)
 ], CreateSalesCrudDto.prototype, "additionalRemarks", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
+        example: 'Fragile content',
+        description: 'Label Remarks (optional)'
+    }),
+    (0, _classvalidator.IsString)({
+        message: 'Label Remarks must be a string.'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    _ts_metadata("design:type", String)
+], CreateSalesCrudDto.prototype, "labelRemarks", void 0);
 
 //# sourceMappingURL=create-sales-crud.dto.js.map

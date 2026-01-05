@@ -96,6 +96,7 @@ model SalesOrder {
   printerId        Int?
   specialRemarks   String?
   additionalRemarks String?
+  labelRemarks      String?
   fgLocation       String?
   address          String?             @db.VarChar(1000)
   status           String?
@@ -237,6 +238,7 @@ model SalesOrderArchive {
   printerId           Int?
   specialRemarks      String?
   additionalRemarks   String?
+  labelRemarks        String?
   fgLocation          String?
   address             String?
   status              String?

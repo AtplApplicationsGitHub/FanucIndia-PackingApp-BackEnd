@@ -44,10 +44,6 @@ export class SalesCrudService {
     }
 
     try {
-      // Customer selection behavior:
-      // - If customerId is provided (dropdown): link to master customer and (optionally) preload address.
-      // - If customerName is provided (free text): DO NOT create/update Customer master records.
-      //   Store the typed name in SalesOrder.customerNameText.
       const resolvedCustomerId: number | null = dto.customerId ?? null;
       const customerNameText = dto.customerName && dto.customerName.trim()
         ? dto.customerName.trim()
@@ -163,6 +159,7 @@ export class SalesCrudService {
           { transferOrder: s },
           { status: s },
           { specialRemarks: s },
+          { labelRemarks: s },
           ...(['true', 'false'].includes(search.toLowerCase())
             ? [{ paymentClearance: search.toLowerCase() === 'true' }]
             : []),

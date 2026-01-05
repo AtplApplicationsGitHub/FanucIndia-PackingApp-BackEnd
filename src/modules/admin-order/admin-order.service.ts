@@ -133,6 +133,7 @@ export class AdminOrderService {
         { transferOrder: { contains: search, mode: 'insensitive' } },
         { status: { contains: search, mode: 'insensitive' } },
         { specialRemarks: { contains: search, mode: 'insensitive' } },
+        { labelRemarks: { contains: search, mode: 'insensitive' } },
 
         ...(lower === 'yes' || lower === 'no'
           ? [{ paymentClearance: { equals: lower === 'yes' } }]

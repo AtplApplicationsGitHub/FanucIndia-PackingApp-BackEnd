@@ -91,6 +91,11 @@ let SalesOrderService = class SalesOrderService {
                     header: 'Additional Remarks',
                     key: 'additionalRemarks',
                     width: 30
+                },
+                {
+                    header: 'Label Remarks',
+                    key: 'labelRemarks',
+                    width: 30
                 }
             ];
             const [products, transporters, plantCodes, salesZones, packConfigs, customers] = await Promise.all([
@@ -237,7 +242,7 @@ let SalesOrderService = class SalesOrderService {
             includeEmpty: false
         }, (row, rowNumber)=>{
             if (rowNumber === 1) return;
-            const [product, saleOrderNumber, outboundDelivery, transferOrder, deliveryDate, transporter, plantCode, paymentClearance, salesZone, packConfig, customer, specialRemarks, additionalRemarks] = row.values.slice(1);
+            const [product, saleOrderNumber, outboundDelivery, transferOrder, deliveryDate, transporter, plantCode, paymentClearance, salesZone, packConfig, customer, specialRemarks, additionalRemarks, labelRemarks] = row.values.slice(1);
             const rowErrors = [];
             const productId = maps.product.get((product || '').toString().trim());
             const transporterId = maps.transporter.get((transporter || '').toString().trim());
@@ -296,6 +301,7 @@ let SalesOrderService = class SalesOrderService {
                     customerId,
                     specialRemarks: specialRemarks?.toString(),
                     additionalRemarks: additionalRemarks?.toString(),
+                    labelRemarks: labelRemarks?.toString(),
                     address: customerAddress,
                     userId
                 });

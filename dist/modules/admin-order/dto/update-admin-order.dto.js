@@ -116,6 +116,15 @@ _ts_decorate([
 ], UpdateAdminOrderDto.prototype, "additionalRemarks", void 0);
 _ts_decorate([
     (0, _swagger.ApiPropertyOptional)({
+        example: 'Handle with care',
+        description: 'Label Remarks'
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "labelRemarks", void 0);
+_ts_decorate([
+    (0, _swagger.ApiPropertyOptional)({
         example: 1,
         description: 'Product ID'
     }),

@@ -60,6 +60,11 @@ export class UpdateAdminOrderDto {
   @IsString()
   additionalRemarks?: string;
 
+  @ApiPropertyOptional({ example: 'Handle with care', description: 'Label Remarks' })
+  @IsOptional()
+  @IsString() 
+  labelRemarks?: string;
+
   @ApiPropertyOptional({ example: 1, description: 'Product ID' })
   @IsOptional()
   @IsInt()

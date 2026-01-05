@@ -32,6 +32,7 @@ export class SalesOrderService {
         { header: 'Customer', key: 'customer', width: 25 },
         { header: 'Special Remarks', key: 'specialRemarks', width: 30 },
         { header: 'Additional Remarks', key: 'additionalRemarks', width: 30 }, 
+        { header: 'Label Remarks', key: 'labelRemarks', width: 30 },
       ];
 
       const [
@@ -176,6 +177,7 @@ export class SalesOrderService {
         customer,
         specialRemarks,
         additionalRemarks,
+        labelRemarks,
       ] = (row.values as any[]).slice(1);
 
       const rowErrors: string[] = [];
@@ -243,7 +245,8 @@ export class SalesOrderService {
           packConfigId,
           customerId,
           specialRemarks: specialRemarks?.toString(),
-          additionalRemarks: additionalRemarks?.toString(), 
+          additionalRemarks: additionalRemarks?.toString(),
+          labelRemarks: labelRemarks?.toString(), 
           address: customerAddress, 
           userId,
         });

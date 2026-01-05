@@ -204,6 +204,12 @@ let AdminOrderService = class AdminOrderService {
                         mode: 'insensitive'
                     }
                 },
+                {
+                    labelRemarks: {
+                        contains: search,
+                        mode: 'insensitive'
+                    }
+                },
                 ...lower === 'yes' || lower === 'no' ? [
                     {
                         paymentClearance: {
