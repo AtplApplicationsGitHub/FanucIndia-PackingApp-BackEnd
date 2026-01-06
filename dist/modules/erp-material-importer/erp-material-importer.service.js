@@ -359,7 +359,6 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             const excelGroup = safeToString(r.Material_Group);
             return {
                 saleOrderNumber: safeToString(r.saleOrderNumber),
-                customerId: safeParseInt(r.customerId),
                 transferOrder: safeToString(r.transferOrder),
                 FG_OBD: safeToString(r.FG_OBD),
                 Machine_Model: safeToString(r.Machine_Model),

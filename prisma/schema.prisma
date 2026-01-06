@@ -67,7 +67,6 @@ model Customer {
   id           Int                 @id @default(autoincrement())
   name         String
   address      String
-  erpMaterials ERP_Material_Data[] @relation("Customer_ERP_Material_Data")
   salesOrders  SalesOrder[]
 }
 
@@ -125,7 +124,6 @@ model SalesOrder {
 model ERP_Material_Data {
   ID                   BigInt      @id(map: "PK_ERP_Material_Data") @default(autoincrement())
   saleOrderNumber      String?     @db.VarChar(500)
-  customerId           Int?
   transferOrder        String?     @db.VarChar(500)
   FG_OBD               String?     @db.VarChar(500)
   Machine_Model        String?
@@ -151,7 +149,6 @@ model ERP_Material_Data {
 
   UpdatedDate          DateTime?   @db.Timestamp(3)
   UpdatedBy            String?     @db.VarChar(50)
-  customer             Customer?   @relation("Customer_ERP_Material_Data", fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   salesOrder           SalesOrder? @relation(fields: [saleOrderNumber], references: [saleOrderNumber], onDelete: NoAction, onUpdate: NoAction)
 }
 
@@ -235,6 +232,7 @@ model SalesOrderArchive {
   packConfigId        Int
   assignedUserId      Int?
   customerId          Int?
+  customerNameText    String?             @db.VarChar(500)
   printerId           Int?
   specialRemarks      String?
   additionalRemarks   String?
@@ -252,7 +250,6 @@ model SalesOrderArchive {
 model ERP_Material_DataArchive {
   ID                   BigInt      @id @default(autoincrement())
   saleOrderNumber      String?     @db.VarChar(500)
-  customerId           Int?
   transferOrder        String?     @db.VarChar(500)
   FG_OBD               String?     @db.VarChar(500)
   Machine_Model        String?
@@ -421,4 +418,27 @@ model SoChatNotification {
 
   @@index([userId, createdAt])
   @@unique([userId, messageId])
+}
+
+model SalesOrderChatMessageArchive {
+  id               Int      @id
+  salesOrderNumber String   @db.VarChar(500)
+  fromUserId       Int
+  toUserId         Int
+  message          String   @db.VarChar(2000)
+  createdAt        DateTime
+  archivedAt       DateTime @default(now())
+
+  @@index([salesOrderNumber, createdAt])
+}
+
+model SoChatNotificationArchive {
+  id               Int      @id
+  userId           Int
+  salesOrderNumber String   @db.VarChar(500)
+  messageId        Int
+  createdAt        DateTime
+  archivedAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

@@ -23,6 +23,8 @@ export class SoArchiveService {
         materialData: true,
         materialFilesByNumber: true,
         statusStepper: true,
+        chatMessages: true,
+        soChatNotifications: true,
         Dispatch_SO: {
           include: {
             dispatch: {
@@ -56,6 +58,8 @@ export class SoArchiveService {
         materialFilesByNumber,
         Dispatch_SO,
         statusStepper,
+        chatMessages,
+        soChatNotifications,
         ...soData
       } = so;
 
@@ -70,6 +74,33 @@ export class SoArchiveService {
       if (materialFilesByNumber.length > 0) {
         await tx.eRP_Material_FileArchive.createMany({
           data: materialFilesByNumber.map(({ ID, updatedAt, ...f }) => f),
+        });
+      }
+
+      // Archive Chat Messages
+      if (chatMessages && chatMessages.length > 0) {
+        await tx.salesOrderChatMessageArchive.createMany({
+          data: chatMessages.map((msg) => ({
+            id: msg.id, // Preserve original ID for linkage
+            salesOrderNumber: so.saleOrderNumber, // Use SO Number as FK string
+            fromUserId: msg.fromUserId,
+            toUserId: msg.toUserId,
+            message: msg.message,
+            createdAt: msg.createdAt,
+          })),
+        });
+      }
+
+      // Archive Chat Notifications
+      if (soChatNotifications && soChatNotifications.length > 0) {
+        await tx.soChatNotificationArchive.createMany({
+          data: soChatNotifications.map((notif) => ({
+            id: notif.id,
+            salesOrderNumber: so.saleOrderNumber,
+            userId: notif.userId,
+            messageId: notif.messageId,
+            createdAt: notif.createdAt,
+          })),
         });
       }
 
@@ -254,6 +285,12 @@ export class SoArchiveService {
         where: { saleOrderNumber },
       });
       await tx.sO_Status_StepperArchive.deleteMany({
+        where: { salesOrderNumber: saleOrderNumber },
+      });
+      await tx.salesOrderChatMessageArchive.deleteMany({
+        where: { salesOrderNumber: saleOrderNumber },
+      });
+      await tx.soChatNotificationArchive.deleteMany({
         where: { salesOrderNumber: saleOrderNumber },
       });
       await tx.salesOrderArchive.deleteMany({ where: { saleOrderNumber } });
