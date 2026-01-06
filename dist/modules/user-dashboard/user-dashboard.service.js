@@ -89,6 +89,15 @@ let UserDashboardService = class UserDashboardService {
                         Issue_stage: true,
                         Packing_stage: true
                     }
+                },
+                _count: {
+                    select: {
+                        soChatNotifications: {
+                            where: {
+                                userId
+                            }
+                        }
+                    }
                 }
             },
             orderBy: {
@@ -102,7 +111,10 @@ let UserDashboardService = class UserDashboardService {
             const isComplete = order.materialData.every((material)=>material.Required_Qty > 0 && material.Required_Qty === material.Issue_stage && material.Issue_stage === material.Packing_stage);
             return !isComplete;
         });
-        return incompleteOrders.map(({ materialData, ...order })=>order);
+        return incompleteOrders.map(({ materialData, _count, ...order })=>({
+                ...order,
+                notificationCount: _count ? _count.soChatNotifications : 0
+            }));
     }
     async getAssignedOrdersSummary(userId) {
         const assignedOrders = await this.prisma.salesOrder.findMany({

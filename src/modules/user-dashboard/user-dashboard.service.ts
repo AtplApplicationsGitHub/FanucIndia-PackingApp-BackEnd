@@ -44,6 +44,11 @@ export class UserDashboardService {
             Packing_stage: true,
           },
         },
+        _count: {
+          select: {
+            soChatNotifications: { where: { userId } }
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc',
@@ -62,7 +67,10 @@ export class UserDashboardService {
       );
       return !isComplete;
     });
-    return incompleteOrders.map(({ materialData, ...order }) => order);
+    return incompleteOrders.map(({ materialData, _count, ...order }) => ({
+      ...order,
+      notificationCount: _count ? _count.soChatNotifications : 0,
+    }));
   }
 
   async getAssignedOrdersSummary(userId: number) {

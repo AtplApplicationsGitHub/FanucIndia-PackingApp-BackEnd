@@ -461,7 +461,12 @@ let SalesCrudService = class SalesCrudService {
                         assignedUser: true,
                         _count: {
                             select: {
-                                materialData: true
+                                materialData: true,
+                                soChatNotifications: {
+                                    where: {
+                                        userId
+                                    }
+                                }
                             }
                         }
                     }
@@ -472,7 +477,8 @@ let SalesCrudService = class SalesCrudService {
             ]);
             const mappedOrders = orders.map((order)=>({
                     ...order,
-                    hasMaterialData: order._count.materialData > 0
+                    hasMaterialData: order._count.materialData > 0,
+                    notificationCount: order._count.soChatNotifications
                 }));
             return {
                 orders: mappedOrders,

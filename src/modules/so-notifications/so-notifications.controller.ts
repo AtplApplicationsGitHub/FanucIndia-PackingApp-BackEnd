@@ -24,9 +24,9 @@ export class SoNotificationsController {
     return this.service.delete(Number(id), req.user);
   }
 
-  @Delete('clear-so/:soId')
+  @Delete('clear-so/:soNumber')
   @Roles('ADMIN', 'SALES', 'USER')
-  clearForOrder(@Param('soId') soId: string, @Req() req: AuthRequest) {
-    return this.service.clearForOrder(Number(soId), req.user.userId);
+  clearForOrder(@Param('soNumber') soNumber: string, @Req() req: AuthRequest) {
+    return this.service.clearForOrder(soNumber, req.user.userId);
   }
 }

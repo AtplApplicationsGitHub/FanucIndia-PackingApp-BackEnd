@@ -364,7 +364,7 @@ export class SalesCrudService {
             salesZone: true,
             packConfig: true,
             assignedUser: true,
-            _count: { select: { materialData: true } },
+            _count: { select: { materialData: true, soChatNotifications: { where: { userId } } } },
           },
         }),
         this.prisma.salesOrder.count({ where: whereClause }),
@@ -373,6 +373,7 @@ export class SalesCrudService {
       const mappedOrders = orders.map((order) => ({
         ...order,
         hasMaterialData: order._count.materialData > 0,
+        notificationCount: order._count.soChatNotifications,
       }));
 
       return { orders: mappedOrders, totalCount };

@@ -48,6 +48,11 @@ let SoNotificationsGateway = class SoNotificationsGateway {
     emitToUser(userId, payload) {
         this.server.to(`user:${userId}`).emit('notification:new', payload);
     }
+    emitClearToUser(userId, soNumber) {
+        this.server.to(`user:${userId}`).emit('notification:cleared', {
+            salesOrderNumber: soNumber
+        });
+    }
     constructor(jwtService, configService){
         this.jwtService = jwtService;
         this.configService = configService;

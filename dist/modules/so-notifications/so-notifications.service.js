@@ -87,13 +87,25 @@ let SoNotificationsService = class SoNotificationsService {
         });
         return created;
     }
-    async clearForOrder(salesOrderId, userId) {
+    async clearForOrder(soNumber, userId) {
+        const so = await this.prisma.salesOrder.findFirst({
+            where: {
+                saleOrderNumber: soNumber
+            },
+            select: {
+                id: true
+            }
+        });
+        if (!so) return {
+            ok: false
+        };
         await this.prisma.soChatNotification.deleteMany({
             where: {
-                salesOrderId: salesOrderId,
+                salesOrderId: so.id,
                 userId: userId
             }
         });
+        this.gateway.emitClearToUser(userId, soNumber);
         return {
             ok: true
         };

@@ -51,4 +51,8 @@ export class SoNotificationsGateway implements OnGatewayConnection, OnGatewayDis
   emitToUser(userId: number, payload: any) {
     this.server.to(`user:${userId}`).emit('notification:new', payload);
   }
+
+  emitClearToUser(userId: number, soNumber: string) {
+    this.server.to(`user:${userId}`).emit('notification:cleared', { salesOrderNumber: soNumber });
+  }
 }
