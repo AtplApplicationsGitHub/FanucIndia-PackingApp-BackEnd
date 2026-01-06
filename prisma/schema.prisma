@@ -105,7 +105,7 @@ model SalesOrder {
   updatedAt        DateTime            @updatedAt
   materialData     ERP_Material_Data[]
   materialFilesByNumber ERP_Material_File[] @relation("SO_File_By_Number")
-  customer         Customer?           @relation(fields: [customerId], references: [id])
+  customer         Customer?           @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   packConfig       PackConfig          @relation(fields: [packConfigId], references: [id])
   plantCode        PlantCode           @relation(fields: [plantCodeId], references: [id])
   printer          Printer?            @relation(fields: [printerId], references: [id])

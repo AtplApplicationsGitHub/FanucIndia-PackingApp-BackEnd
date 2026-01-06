@@ -32,8 +32,10 @@ _ts_decorate([
 _ts_decorate([
     (0, _swagger.ApiProperty)({
         example: 'Bangalore Factory',
-        description: 'Description'
+        description: 'Description',
+        required: false
     }),
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
 ], CreatePlantCodeDto.prototype, "description", void 0);

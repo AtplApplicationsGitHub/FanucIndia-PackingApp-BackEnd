@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreatePlantCodeDto {
@@ -6,7 +6,8 @@ export class CreatePlantCodeDto {
   @IsString()
   code: string;
 
-  @ApiProperty({ example: 'Bangalore Factory', description: 'Description' })
+  @ApiProperty({ example: 'Bangalore Factory', description: 'Description', required: false })
+  @IsOptional()
   @IsString()
-  description: string;
+  description?: string;
 }
