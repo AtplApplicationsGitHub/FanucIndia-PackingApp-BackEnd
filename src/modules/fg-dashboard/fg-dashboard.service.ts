@@ -72,6 +72,7 @@ export class FgDashboardService {
         { transferOrder: { contains: search, mode: 'insensitive' } },
         { product: { name: { contains: search, mode: 'insensitive' } } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
+        { customerNameText: { contains: search, mode: 'insensitive' } },
         { salesZone: { name: { contains: search, mode: 'insensitive' } } },
         { status: { contains: search, mode: 'insensitive' } },
         { fgLocation: { contains: search, mode: 'insensitive' } },
@@ -104,6 +105,7 @@ export class FgDashboardService {
           UpdatedBy: true,
           UpdatedDate: true,
           assignedUserId: true,
+          customerNameText: true,
           statusStepper: {
             where: {
               status: { in: ['Ready for Dispatch', 'WIP Storage'] },
@@ -137,7 +139,7 @@ export class FgDashboardService {
         saleOrderNumber: order.saleOrderNumber,
         transferOrder: order.transferOrder,
         product: order.product?.name,
-        customerName: order.customer?.name,
+        customerName: order.customerNameText || order.customer?.name,
         salesZone: order.salesZone?.name,
         payment: order.paymentClearance,
         status: order.status,

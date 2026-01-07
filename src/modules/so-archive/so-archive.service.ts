@@ -50,6 +50,10 @@ export class SoArchiveService {
       );
     }
 
+    const materialLogs = await this.prisma.eRPMaterialLog.findMany({
+      where: { soNo: saleOrderNumber },
+    });
+
     return this.prisma.$transaction(async (tx) => {
       const {
         id,
@@ -64,6 +68,19 @@ export class SoArchiveService {
       } = so;
 
       await tx.salesOrderArchive.create({ data: soData });
+
+      if (materialLogs.length > 0) {
+        await tx.eRPMaterialLogArchive.createMany({
+          data: materialLogs.map((log) => ({
+            ...log,
+            archivedAt: new Date(),
+          })),
+        });
+
+        await tx.eRPMaterialLog.deleteMany({
+          where: { soNo: saleOrderNumber },
+        });
+      }
 
       if (materialData.length > 0) {
         await tx.eRP_Material_DataArchive.createMany({
@@ -276,6 +293,10 @@ export class SoArchiveService {
       for (const ve of vehicleEntriesToDelete) {
          await tx.vehicleEntryArchive.delete({ where: { id: ve.id } });
       }
+
+      await tx.eRPMaterialLogArchive.deleteMany({
+        where: { soNo: saleOrderNumber },
+      });
 
       await tx.dispatch_SOArchive.deleteMany({ where: { saleOrderNumber } });
       await tx.eRP_Material_FileArchive.deleteMany({

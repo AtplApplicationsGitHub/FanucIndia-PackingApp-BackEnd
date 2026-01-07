@@ -442,3 +442,15 @@ model SoChatNotificationArchive {
 
   @@index([userId, createdAt])
 }
+
+model ERPMaterialLogArchive {
+  id                Int      @id
+  dateTime          DateTime @map("date_time")
+  fileName          String   @map("file_name") @db.VarChar(255)
+  exceptionStatus   String?  @map("exception/status") @db.VarChar(255)
+  soNo              String   @map("SO_NO") @db.VarChar(50)
+  noOfFilesExecuted Int      @map("no_of_files_executed")
+  archivedAt        DateTime @default(now())
+
+  @@map("ERP_Material_LogArchive")
+}

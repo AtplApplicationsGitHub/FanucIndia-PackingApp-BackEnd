@@ -27,16 +27,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
           message: 'Something went wrong. Please try again later.',
         }
 
-    logger.error(
-      {
-        component: 'exception-filter',
-        status,
-        path: req.url,
-        requestId: req.headers['x-request-id'],
-        code: responsePayload.code,
-      },
-      exception instanceof Error ? exception.stack! : String(exception)
-    )
+    const logMetadata = {
+      component: 'exception-filter',
+      status,
+      path: req.url,
+      requestId: req.headers['x-request-id'],
+      code: responsePayload.code,
+    }
+
+    if (status === HttpStatus.NOT_FOUND) {
+      logger.warn(
+        logMetadata,
+        exception instanceof Error ? exception.message : String(exception)
+      )
+    } else {
+      logger.error(
+        logMetadata,
+        exception instanceof Error ? exception.stack! : String(exception)
+      )
+    }
 
     res.status(status).json({
       code: responsePayload.code,

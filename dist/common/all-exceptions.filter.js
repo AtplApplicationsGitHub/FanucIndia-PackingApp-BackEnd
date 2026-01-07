@@ -26,13 +26,18 @@ let AllExceptionsFilter = class AllExceptionsFilter {
             code: 'INTERNAL_ERROR',
             message: 'Something went wrong. Please try again later.'
         };
-        _logger.logger.error({
+        const logMetadata = {
             component: 'exception-filter',
             status,
             path: req.url,
             requestId: req.headers['x-request-id'],
             code: responsePayload.code
-        }, exception instanceof Error ? exception.stack : String(exception));
+        };
+        if (status === _common.HttpStatus.NOT_FOUND) {
+            _logger.logger.warn(logMetadata, exception instanceof Error ? exception.message : String(exception));
+        } else {
+            _logger.logger.error(logMetadata, exception instanceof Error ? exception.stack : String(exception));
+        }
         res.status(status).json({
             code: responsePayload.code,
             message: responsePayload.message,

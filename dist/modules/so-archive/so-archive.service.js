@@ -97,11 +97,29 @@ let SoArchiveService = class SoArchiveService {
         if (so.status !== 'Dispatched') {
             throw new _common.BadRequestException(`Sales Order ${saleOrderNumber} cannot be archived as its status is not 'Dispatched'.`);
         }
+        const materialLogs = await this.prisma.eRPMaterialLog.findMany({
+            where: {
+                soNo: saleOrderNumber
+            }
+        });
         return this.prisma.$transaction(async (tx)=>{
             const { id, updatedAt, materialData, materialFilesByNumber, Dispatch_SO, statusStepper, chatMessages, soChatNotifications, ...soData } = so;
             await tx.salesOrderArchive.create({
                 data: soData
             });
+            if (materialLogs.length > 0) {
+                await tx.eRPMaterialLogArchive.createMany({
+                    data: materialLogs.map((log)=>({
+                            ...log,
+                            archivedAt: new Date()
+                        }))
+                });
+                await tx.eRPMaterialLog.deleteMany({
+                    where: {
+                        soNo: saleOrderNumber
+                    }
+                });
+            }
             if (materialData.length > 0) {
                 await tx.eRP_Material_DataArchive.createMany({
                     data: materialData.map(({ ID, ...d })=>d)
@@ -341,6 +359,11 @@ let SoArchiveService = class SoArchiveService {
                     }
                 });
             }
+            await tx.eRPMaterialLogArchive.deleteMany({
+                where: {
+                    soNo: saleOrderNumber
+                }
+            });
             await tx.dispatch_SOArchive.deleteMany({
                 where: {
                     saleOrderNumber

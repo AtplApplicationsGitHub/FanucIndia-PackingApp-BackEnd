@@ -107,6 +107,12 @@ let FgDashboardService = class FgDashboardService {
                     }
                 },
                 {
+                    customerNameText: {
+                        contains: search,
+                        mode: 'insensitive'
+                    }
+                },
+                {
                     salesZone: {
                         name: {
                             contains: search,
@@ -170,6 +176,7 @@ let FgDashboardService = class FgDashboardService {
                     UpdatedBy: true,
                     UpdatedDate: true,
                     assignedUserId: true,
+                    customerNameText: true,
                     statusStepper: {
                         where: {
                             status: {
@@ -222,7 +229,7 @@ let FgDashboardService = class FgDashboardService {
                 saleOrderNumber: order.saleOrderNumber,
                 transferOrder: order.transferOrder,
                 product: order.product?.name,
-                customerName: order.customer?.name,
+                customerName: order.customerNameText || order.customer?.name,
                 salesZone: order.salesZone?.name,
                 payment: order.paymentClearance,
                 status: order.status,
