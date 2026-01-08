@@ -104,6 +104,20 @@ export class UserDashboardController {
     );
   }
 
+  @Get('stats')
+  @Roles('USER')
+  @ApiOperation({ summary: 'Get specific stats for User Dashboard (Assigned Count)' })
+  async getUserDashboardStats(@Req() req: AuthRequest) {
+    return this.userDashboardService.getDashboardStats(req.user.userId);
+  }
+
+  @Get('recent-activity')
+  @Roles('USER')
+  @ApiOperation({ summary: 'Get recent activity feed for User Dashboard' })
+  async getUserRecentActivity(@Req() req: AuthRequest) {
+    return this.userDashboardService.getRecentActivity(req.user.userId);
+  }
+
   @Post('orders/son/:soNumber/sync')
   @Roles('USER')
   @UseInterceptors(FileFieldsInterceptor([

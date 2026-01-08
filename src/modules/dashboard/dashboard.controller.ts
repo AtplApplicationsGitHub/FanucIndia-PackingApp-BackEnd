@@ -28,7 +28,7 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('admin-kpis')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: 'Get KPI counters for the ADMIN dashboard' })
   @ApiResponse({ status: 200, type: AdminKpiDto })
   async getAdminKpis(): Promise<AdminKpiDto> {
@@ -36,7 +36,7 @@ export class DashboardController {
   }
 
   @Get('admin-new-imports')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: 'Get new material import counts for the last 5 days' })
   @ApiResponse({ status: 200, type: [AdminNewImportDto] })
   async getAdminNewImports(): Promise<AdminNewImportDto[]> {
@@ -44,7 +44,7 @@ export class DashboardController {
   }
 
   @Get('admin-dispatch-summary')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: "Get today's dispatch summary" })
   @ApiResponse({ status: 200, type: AdminDispatchSummaryDto })
   async getAdminDispatchSummary(): Promise<AdminDispatchSummaryDto> {
@@ -52,7 +52,7 @@ export class DashboardController {
   }
 
   @Get('admin-overall-status')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: 'Get system-wide counts of orders by status' })
   @ApiResponse({ status: 200, type: AdminOverallStatusDto })
   async getAdminOverallStatus(): Promise<AdminOverallStatusDto> {

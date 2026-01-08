@@ -404,6 +404,73 @@ let UserDashboardService = class UserDashboardService {
             });
         }
     }
+    async getDashboardStats(userId) {
+        const assignedOrdersCount = await this.prisma.salesOrder.count({
+            where: {
+                assignedUserId: userId
+            }
+        });
+        return {
+            assignedOrdersCount
+        };
+    }
+    async getRecentActivity(userId) {
+        const assignments = await this.prisma.salesOrder.findMany({
+            where: {
+                assignedUserId: userId
+            },
+            select: {
+                saleOrderNumber: true,
+                updatedAt: true
+            },
+            orderBy: {
+                updatedAt: 'desc'
+            },
+            take: 10
+        });
+        const notifications = await this.prisma.soChatNotification.findMany({
+            where: {
+                userId: userId
+            },
+            include: {
+                message: {
+                    select: {
+                        fromUser: {
+                            select: {
+                                name: true
+                            }
+                        }
+                    }
+                },
+                salesOrder: {
+                    select: {
+                        saleOrderNumber: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            },
+            take: 10
+        });
+        const assignmentActivity = assignments.map((order)=>({
+                id: `assign-${order.saleOrderNumber}`,
+                text: `Order ${order.saleOrderNumber} assigned to you`,
+                timestamp: order.updatedAt,
+                type: 'ASSIGNMENT'
+            }));
+        const notificationActivity = notifications.map((notif)=>({
+                id: `msg-${notif.id}`,
+                text: `Message from ${notif.message.fromUser.name} for ${notif.salesOrder.saleOrderNumber}`,
+                timestamp: notif.createdAt,
+                type: 'MESSAGE'
+            }));
+        const combinedActivity = [
+            ...assignmentActivity,
+            ...notificationActivity
+        ].sort((a, b)=>b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 10);
+        return combinedActivity;
+    }
     constructor(prisma, sftpService){
         this.prisma = prisma;
         this.sftpService = sftpService;

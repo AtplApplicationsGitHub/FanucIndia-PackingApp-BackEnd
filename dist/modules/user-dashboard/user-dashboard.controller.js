@@ -100,6 +100,12 @@ let UserDashboardController = class UserDashboardController {
     async downloadOrderDetailsBySoNumber(soNumber, req) {
         return this.userDashboardService.downloadOrderDetailsBySoNumber(soNumber, req.user.userId, req.user.role);
     }
+    async getUserDashboardStats(req) {
+        return this.userDashboardService.getDashboardStats(req.user.userId);
+    }
+    async getUserRecentActivity(req) {
+        return this.userDashboardService.getRecentActivity(req.user.userId);
+    }
     async syncOrderBySoNumber(soNumber, req, files) {
         if (!files.data || !files.data[0]) {
             throw new _common.BadRequestException('Data file is required for sync.');
@@ -210,6 +216,32 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], UserDashboardController.prototype, "downloadOrderDetailsBySoNumber", null);
+_ts_decorate([
+    (0, _common.Get)('stats'),
+    (0, _rolesdecorator.Roles)('USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get specific stats for User Dashboard (Assigned Count)'
+    }),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], UserDashboardController.prototype, "getUserDashboardStats", null);
+_ts_decorate([
+    (0, _common.Get)('recent-activity'),
+    (0, _rolesdecorator.Roles)('USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Get recent activity feed for User Dashboard'
+    }),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], UserDashboardController.prototype, "getUserRecentActivity", null);
 _ts_decorate([
     (0, _common.Post)('orders/son/:soNumber/sync'),
     (0, _rolesdecorator.Roles)('USER'),

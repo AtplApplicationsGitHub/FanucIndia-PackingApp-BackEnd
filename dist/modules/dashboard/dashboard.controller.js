@@ -78,7 +78,7 @@ let DashboardController = class DashboardController {
 };
 _ts_decorate([
     (0, _common.Get)('admin-kpis'),
-    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
     (0, _swagger.ApiOperation)({
         summary: 'Get KPI counters for the ADMIN dashboard'
     }),
@@ -92,7 +92,7 @@ _ts_decorate([
 ], DashboardController.prototype, "getAdminKpis", null);
 _ts_decorate([
     (0, _common.Get)('admin-new-imports'),
-    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
     (0, _swagger.ApiOperation)({
         summary: 'Get new material import counts for the last 5 days'
     }),
@@ -108,7 +108,7 @@ _ts_decorate([
 ], DashboardController.prototype, "getAdminNewImports", null);
 _ts_decorate([
     (0, _common.Get)('admin-dispatch-summary'),
-    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
     (0, _swagger.ApiOperation)({
         summary: "Get today's dispatch summary"
     }),
@@ -122,7 +122,7 @@ _ts_decorate([
 ], DashboardController.prototype, "getAdminDispatchSummary", null);
 _ts_decorate([
     (0, _common.Get)('admin-overall-status'),
-    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
     (0, _swagger.ApiOperation)({
         summary: 'Get system-wide counts of orders by status'
     }),
