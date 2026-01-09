@@ -152,13 +152,13 @@ _ts_decorate([
 ], UpdateAdminOrderDto.prototype, "transporterId", void 0);
 _ts_decorate([
     (0, _swagger.ApiPropertyOptional)({
-        example: 3,
-        description: 'Plant Code ID'
+        example: 'P123',
+        description: 'Plant Code (text)'
     }),
     (0, _classvalidator.IsOptional)(),
-    (0, _classvalidator.IsInt)(),
-    _ts_metadata("design:type", Number)
-], UpdateAdminOrderDto.prototype, "plantCodeId", void 0);
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdateAdminOrderDto.prototype, "plantCode", void 0);
 _ts_decorate([
     (0, _swagger.ApiPropertyOptional)({
         example: true,

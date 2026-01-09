@@ -38,14 +38,14 @@ export class SalesOrderService {
       const [
         products,
         transporters,
-        plantCodes,
+        // plantCodes,
         salesZones,
         packConfigs,
         customers,
       ] = await Promise.all([
         this.prisma.product.findMany({ orderBy: { name: 'asc' } }),
         this.prisma.transporter.findMany({ orderBy: { name: 'asc' } }),
-        this.prisma.plantCode.findMany({ orderBy: { code: 'asc' } }),
+        // this.prisma.plantCode.findMany({ orderBy: { code: 'asc' } }),
         this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } }),
         this.prisma.packConfig.findMany({ orderBy: { configName: 'asc' } }),
         this.prisma.customer.findMany({ orderBy: { name: 'asc' } }),
@@ -57,7 +57,7 @@ export class SalesOrderService {
       const dropdowns: Record<string, string[]> = {
         product: products.map((p) => p.name),
         transporter: transporters.map((t) => t.name),
-        plantCode: plantCodes.map((p) => p.code),
+        // plantCode: plantCodes.map((p) => p.code),
         salesZone: salesZones.map((s) => s.name),
         packConfig: packConfigs.map((p) => p.configName),
         paymentClearance: ['Yes', 'No'],
@@ -127,13 +127,15 @@ export class SalesOrderService {
       throw new BadRequestException('Invalid template format');
     }
 
-    let products, transporters, plantCodes, salesZones, packConfigs, customers;
+    // let products, transporters, plantCodes, salesZones, packConfigs, customers;
+    let products, transporters, salesZones, packConfigs, customers;
     try {
-      [products, transporters, plantCodes, salesZones, packConfigs, customers] =
+      // [products, transporters, plantCodes, salesZones, packConfigs, customers] =
+      [products, transporters, salesZones, packConfigs, customers] =
         await Promise.all([
           this.prisma.product.findMany(),
           this.prisma.transporter.findMany(),
-          this.prisma.plantCode.findMany(),
+          // this.prisma.plantCode.findMany(),
           this.prisma.salesZone.findMany(),
           this.prisma.packConfig.findMany(),
           this.prisma.customer.findMany(),
@@ -148,7 +150,7 @@ export class SalesOrderService {
     const maps = {
       product: new Map(products.map((p) => [p.name.trim(), p.id])),
       transporter: new Map(transporters.map((t) => [t.name.trim(), t.id])),
-      plantCode: new Map(plantCodes.map((pc) => [pc.code.trim(), pc.id])),
+      // plantCode: new Map(plantCodes.map((pc) => [pc.code.trim(), pc.id])),
       salesZone: new Map(salesZones.map((sz) => [sz.name.trim(), sz.id])),
       packConfig: new Map(
         packConfigs.map((pc) => [pc.configName.trim(), pc.id]),
@@ -185,9 +187,10 @@ export class SalesOrderService {
       const transporterId = maps.transporter.get(
         (transporter || '').toString().trim(),
       );
-      const plantCodeId = maps.plantCode.get(
-        (plantCode || '').toString().trim(),
-      );
+      // const plantCodeId = maps.plantCode.get(
+      //   (plantCode || '').toString().trim(),
+      // );
+      const plantCodeString = (plantCode || '').toString().trim();
       const salesZoneId = maps.salesZone.get(
         (salesZone || '').toString().trim(),
       );
@@ -211,7 +214,8 @@ export class SalesOrderService {
       if (!transferOrder) rowErrors.push('Missing transferOrder');
       if (!deliveryDate) rowErrors.push('Missing deliveryDate');
       if (!transporterId) rowErrors.push('Invalid transporter');
-      if (!plantCodeId) rowErrors.push('Invalid plantCode');
+      // if (!plantCodeId) rowErrors.push('Invalid plantCode');
+      if (!plantCodeString) rowErrors.push('Missing Plant Code');
       if (!['Yes', 'No', true, false].includes(paymentClearance))
         rowErrors.push('Invalid paymentClearance (must be Yes or No)');
       if (!salesZoneId) rowErrors.push('Invalid salesZone');
@@ -238,7 +242,8 @@ export class SalesOrderService {
           transferOrder: transferOrder.toString(),
           deliveryDate: deliveryDateObj,
           transporterId,
-          plantCodeId,
+          // plantCodeId,
+          plantCode: plantCodeString,
           paymentClearance:
             paymentClearance === 'Yes' || paymentClearance === true,
           salesZoneId,

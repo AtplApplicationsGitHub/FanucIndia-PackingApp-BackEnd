@@ -41,9 +41,12 @@ export class CreateSalesCrudDto {
   @IsInt({ message: 'Transporter ID must be an integer.' })
   transporterId: number;
 
-  @ApiProperty({ example: 1, description: 'Plant Code ID (lookup)' })
-  @IsInt({ message: 'Plant Code ID must be an integer.' })
-  plantCodeId: number;
+  // @ApiProperty({ example: 1, description: 'Plant Code ID (lookup)' })
+  // @IsInt({ message: 'Plant Code ID must be an integer.' })
+  // plantCodeId: number;
+  @ApiProperty({ example: 'P123', description: 'Plant Code (text)' })
+  @IsString({ message: 'Plant Code must be a string.' })
+  plantCode: string;
 
   @ApiProperty({ example: true, description: 'Payment Clearance (true/false)' })
   @IsBoolean({ message: 'Payment Clearance must be a boolean.' })

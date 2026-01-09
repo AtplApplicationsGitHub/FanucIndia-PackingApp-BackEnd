@@ -98,7 +98,8 @@ let SalesOrderService = class SalesOrderService {
                     width: 30
                 }
             ];
-            const [products, transporters, plantCodes, salesZones, packConfigs, customers] = await Promise.all([
+            const [products, transporters, // plantCodes,
+            salesZones, packConfigs, customers] = await Promise.all([
                 this.prisma.product.findMany({
                     orderBy: {
                         name: 'asc'
@@ -109,11 +110,7 @@ let SalesOrderService = class SalesOrderService {
                         name: 'asc'
                     }
                 }),
-                this.prisma.plantCode.findMany({
-                    orderBy: {
-                        code: 'asc'
-                    }
-                }),
+                // this.prisma.plantCode.findMany({ orderBy: { code: 'asc' } }),
                 this.prisma.salesZone.findMany({
                     orderBy: {
                         name: 'asc'
@@ -135,7 +132,7 @@ let SalesOrderService = class SalesOrderService {
             const dropdowns = {
                 product: products.map((p)=>p.name),
                 transporter: transporters.map((t)=>t.name),
-                plantCode: plantCodes.map((p)=>p.code),
+                // plantCode: plantCodes.map((p) => p.code),
                 salesZone: salesZones.map((s)=>s.name),
                 packConfig: packConfigs.map((p)=>p.configName),
                 paymentClearance: [
@@ -194,12 +191,14 @@ let SalesOrderService = class SalesOrderService {
         if (!worksheet) {
             throw new _common.BadRequestException('Invalid template format');
         }
-        let products, transporters, plantCodes, salesZones, packConfigs, customers;
+        // let products, transporters, plantCodes, salesZones, packConfigs, customers;
+        let products, transporters, salesZones, packConfigs, customers;
         try {
-            [products, transporters, plantCodes, salesZones, packConfigs, customers] = await Promise.all([
+            // [products, transporters, plantCodes, salesZones, packConfigs, customers] =
+            [products, transporters, salesZones, packConfigs, customers] = await Promise.all([
                 this.prisma.product.findMany(),
                 this.prisma.transporter.findMany(),
-                this.prisma.plantCode.findMany(),
+                // this.prisma.plantCode.findMany(),
                 this.prisma.salesZone.findMany(),
                 this.prisma.packConfig.findMany(),
                 this.prisma.customer.findMany()
@@ -216,10 +215,7 @@ let SalesOrderService = class SalesOrderService {
                     t.name.trim(),
                     t.id
                 ])),
-            plantCode: new Map(plantCodes.map((pc)=>[
-                    pc.code.trim(),
-                    pc.id
-                ])),
+            // plantCode: new Map(plantCodes.map((pc) => [pc.code.trim(), pc.id])),
             salesZone: new Map(salesZones.map((sz)=>[
                     sz.name.trim(),
                     sz.id
@@ -246,7 +242,10 @@ let SalesOrderService = class SalesOrderService {
             const rowErrors = [];
             const productId = maps.product.get((product || '').toString().trim());
             const transporterId = maps.transporter.get((transporter || '').toString().trim());
-            const plantCodeId = maps.plantCode.get((plantCode || '').toString().trim());
+            // const plantCodeId = maps.plantCode.get(
+            //   (plantCode || '').toString().trim(),
+            // );
+            const plantCodeString = (plantCode || '').toString().trim();
             const salesZoneId = maps.salesZone.get((salesZone || '').toString().trim());
             const packConfigId = maps.packConfig.get((packConfig || '').toString().trim());
             const customerData = maps.customer.get((customer || '').toString().trim());
@@ -262,7 +261,8 @@ let SalesOrderService = class SalesOrderService {
             if (!transferOrder) rowErrors.push('Missing transferOrder');
             if (!deliveryDate) rowErrors.push('Missing deliveryDate');
             if (!transporterId) rowErrors.push('Invalid transporter');
-            if (!plantCodeId) rowErrors.push('Invalid plantCode');
+            // if (!plantCodeId) rowErrors.push('Invalid plantCode');
+            if (!plantCodeString) rowErrors.push('Missing Plant Code');
             if (![
                 'Yes',
                 'No',
@@ -294,7 +294,8 @@ let SalesOrderService = class SalesOrderService {
                     transferOrder: transferOrder.toString(),
                     deliveryDate: deliveryDateObj,
                     transporterId,
-                    plantCodeId,
+                    // plantCodeId,
+                    plantCode: plantCodeString,
                     paymentClearance: paymentClearance === 'Yes' || paymentClearance === true,
                     salesZoneId,
                     packConfigId,

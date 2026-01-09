@@ -108,11 +108,6 @@ export class AdminOrderService {
           },
         },
         {
-          plantCode: {
-            is: { code: { contains: search, mode: 'insensitive' } },
-          },
-        },
-        {
           salesZone: {
             is: { name: { contains: search, mode: 'insensitive' } },
           },
@@ -173,7 +168,7 @@ export class AdminOrderService {
           user: { select: { id: true, name: true, email: true } },
           product: { select: { id: true, name: true, code: true } },
           transporter: { select: { id: true, name: true } },
-          plantCode: { select: { id: true, code: true, description: true } },
+          // plantCode: { select: { id: true, code: true, description: true } },
           salesZone: { select: { id: true, name: true } },
           packConfig: { select: { id: true, configName: true } },
           assignedUser: { select: { id: true, name: true } },

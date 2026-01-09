@@ -135,16 +135,6 @@ let AdminOrderService = class AdminOrderService {
                     }
                 },
                 {
-                    plantCode: {
-                        is: {
-                            code: {
-                                contains: search,
-                                mode: 'insensitive'
-                            }
-                        }
-                    }
-                },
-                {
                     salesZone: {
                         is: {
                             name: {
@@ -278,13 +268,7 @@ let AdminOrderService = class AdminOrderService {
                             name: true
                         }
                     },
-                    plantCode: {
-                        select: {
-                            id: true,
-                            code: true,
-                            description: true
-                        }
-                    },
+                    // plantCode: { select: { id: true, code: true, description: true } },
                     salesZone: {
                         select: {
                             id: true,

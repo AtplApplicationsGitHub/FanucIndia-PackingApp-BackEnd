@@ -720,6 +720,8 @@ let LookupService = class LookupService {
                 results.push('Material Barcodes processed');
             }
             await Promise.all(promises);
+        }, {
+            timeout: 120000
         });
         return {
             message: 'Bulk import completed successfully',

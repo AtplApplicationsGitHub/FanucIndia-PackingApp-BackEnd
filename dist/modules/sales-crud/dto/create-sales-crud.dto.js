@@ -86,14 +86,14 @@ _ts_decorate([
 ], CreateSalesCrudDto.prototype, "transporterId", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
-        example: 1,
-        description: 'Plant Code ID (lookup)'
+        example: 'P123',
+        description: 'Plant Code (text)'
     }),
-    (0, _classvalidator.IsInt)({
-        message: 'Plant Code ID must be an integer.'
+    (0, _classvalidator.IsString)({
+        message: 'Plant Code must be a string.'
     }),
-    _ts_metadata("design:type", Number)
-], CreateSalesCrudDto.prototype, "plantCodeId", void 0);
+    _ts_metadata("design:type", String)
+], CreateSalesCrudDto.prototype, "plantCode", void 0);
 _ts_decorate([
     (0, _swagger.ApiProperty)({
         example: true,

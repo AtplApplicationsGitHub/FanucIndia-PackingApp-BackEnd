@@ -196,11 +196,7 @@ let SalesCrudService = class SalesCrudService {
                         }
                     },
                     {
-                        plantCode: {
-                            is: {
-                                code: s
-                            }
-                        }
+                        plantCode: s
                     },
                     {
                         salesZone: {
@@ -227,7 +223,7 @@ let SalesCrudService = class SalesCrudService {
                     customer: true,
                     product: true,
                     transporter: true,
-                    plantCode: true,
+                    // plantCode: true,
                     salesZone: true,
                     packConfig: true
                 }
@@ -246,7 +242,7 @@ let SalesCrudService = class SalesCrudService {
                     customer: true,
                     product: true,
                     transporter: true,
-                    plantCode: true,
+                    // plantCode: true,
                     salesZone: true,
                     packConfig: true
                 }
@@ -321,7 +317,7 @@ let SalesCrudService = class SalesCrudService {
                     customer: true,
                     product: true,
                     transporter: true,
-                    plantCode: true,
+                    // plantCode: true,
                     salesZone: true,
                     packConfig: true
                 }
@@ -421,11 +417,7 @@ let SalesCrudService = class SalesCrudService {
                         }
                     },
                     {
-                        plantCode: {
-                            is: {
-                                code: s
-                            }
-                        }
+                        plantCode: s
                     },
                     {
                         salesZone: {
@@ -455,7 +447,7 @@ let SalesCrudService = class SalesCrudService {
                         customer: true,
                         product: true,
                         transporter: true,
-                        plantCode: true,
+                        // plantCode: true,
                         salesZone: true,
                         packConfig: true,
                         assignedUser: true,

@@ -493,6 +493,8 @@ export class LookupService {
       }
 
       await Promise.all(promises);
+    }, {
+      timeout: 120000, 
     });
 
     return { message: 'Bulk import completed successfully', details: results };

@@ -48,7 +48,7 @@ model PlantCode {
   id          Int          @id @default(autoincrement())
   code        String
   description String?
-  salesOrders SalesOrder[]
+  // salesOrders SalesOrder[]
 }
 
 model SalesZone {
@@ -85,7 +85,8 @@ model SalesOrder {
   transferOrder    String              @unique @db.VarChar(500)
   deliveryDate     DateTime
   transporterId    Int
-  plantCodeId      Int
+  // plantCodeId      Int
+  plantCode        String?             @db.VarChar(100)
   paymentClearance Boolean
   salesZoneId      Int
   packConfigId     Int
@@ -106,7 +107,7 @@ model SalesOrder {
   materialFilesByNumber ERP_Material_File[] @relation("SO_File_By_Number")
   customer         Customer?           @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   packConfig       PackConfig          @relation(fields: [packConfigId], references: [id])
-  plantCode        PlantCode           @relation(fields: [plantCodeId], references: [id])
+  // plantCode        PlantCode           @relation(fields: [plantCodeId], references: [id])
   printer          Printer?            @relation(fields: [printerId], references: [id])
   product          Product             @relation(fields: [productId], references: [id])
   salesZone        SalesZone           @relation(fields: [salesZoneId], references: [id])
@@ -216,7 +217,6 @@ salesOrder      SalesOrder @relation(fields: [saleOrderNumber], references: [sal
 @@unique([dispatchId, saleOrderNumber])
 }
 
-
 model SalesOrderArchive {
   id                  Int                 @id @default(autoincrement())
   userId              Int
@@ -226,7 +226,8 @@ model SalesOrderArchive {
   transferOrder       String              @db.VarChar(500)
   deliveryDate        DateTime
   transporterId       Int
-  plantCodeId         Int
+  // plantCodeId         Int
+  plantCode           String?             @db.VarChar(100)
   paymentClearance    Boolean
   salesZoneId         Int
   packConfigId        Int

@@ -80,10 +80,14 @@ export class UpdateAdminOrderDto {
   @IsInt()
   transporterId?: number;
 
-  @ApiPropertyOptional({ example: 3, description: 'Plant Code ID' })
+  // @ApiPropertyOptional({ example: 3, description: 'Plant Code ID' })
+  // @IsOptional()
+  // @IsInt()
+  // plantCodeId?: number;
+  @ApiPropertyOptional({ example: 'P123', description: 'Plant Code (text)' })
   @IsOptional()
-  @IsInt()
-  plantCodeId?: number;
+  @IsString()
+  plantCode?: string;
 
   @ApiPropertyOptional({ example: true, description: 'Payment Clearance' })
   @IsOptional()
