@@ -135,6 +135,12 @@ let AdminOrderService = class AdminOrderService {
                     }
                 },
                 {
+                    plantCode: {
+                        contains: search,
+                        mode: 'insensitive'
+                    }
+                },
+                {
                     salesZone: {
                         is: {
                             name: {

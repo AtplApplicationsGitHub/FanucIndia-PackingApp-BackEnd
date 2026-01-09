@@ -51,7 +51,7 @@ let SoSearchService = class SoSearchService {
                 customer: true,
                 product: true,
                 transporter: true,
-                plantCode: true,
+                // plantCode: true,
                 salesZone: true,
                 packConfig: true,
                 user: {
@@ -200,7 +200,7 @@ let SoSearchService = class SoSearchService {
                     }
                 })
             ]);
-            const [product, customer, transporter, plantCode, salesZone, packConfig] = await Promise.all([
+            const [product, customer, transporter, /*plantCode,*/ salesZone, packConfig] = await Promise.all([
                 this.prisma.product.findUnique({
                     where: {
                         id: archivedSalesOrder.productId
@@ -216,11 +216,7 @@ let SoSearchService = class SoSearchService {
                         id: archivedSalesOrder.transporterId
                     }
                 }),
-                this.prisma.plantCode.findUnique({
-                    where: {
-                        id: archivedSalesOrder.plantCodeId
-                    }
-                }),
+                // this.prisma.plantCode.findUnique({ where: { id: archivedSalesOrder.plantCodeId } }),
                 this.prisma.salesZone.findUnique({
                     where: {
                         id: archivedSalesOrder.salesZoneId
@@ -237,7 +233,7 @@ let SoSearchService = class SoSearchService {
                 product,
                 customer,
                 transporter,
-                plantCode,
+                // plantCode,
                 salesZone,
                 packConfig
             };

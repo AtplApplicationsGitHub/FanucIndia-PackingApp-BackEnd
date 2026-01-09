@@ -44,7 +44,7 @@ export class SoSearchService {
         customer: true,
         product: true,
         transporter: true,
-        plantCode: true,
+        // plantCode: true,
         salesZone: true,
         packConfig: true,
         user: { select: { name: true } },
@@ -163,11 +163,11 @@ export class SoSearchService {
         this.prisma.sO_Status_StepperArchive.findMany({ where: { salesOrderNumber: canonicalSoNumber } }),
       ]);
 
-      const [product, customer, transporter, plantCode, salesZone, packConfig] = await Promise.all([
+      const [product, customer, transporter, /*plantCode,*/ salesZone, packConfig] = await Promise.all([
         this.prisma.product.findUnique({ where: { id: archivedSalesOrder.productId } }),
         archivedSalesOrder.customerId ? this.prisma.customer.findUnique({ where: { id: archivedSalesOrder.customerId } }) : null,
         this.prisma.transporter.findUnique({ where: { id: archivedSalesOrder.transporterId } }),
-        this.prisma.plantCode.findUnique({ where: { id: archivedSalesOrder.plantCodeId } }),
+        // this.prisma.plantCode.findUnique({ where: { id: archivedSalesOrder.plantCodeId } }),
         this.prisma.salesZone.findUnique({ where: { id: archivedSalesOrder.salesZoneId } }),
         this.prisma.packConfig.findUnique({ where: { id: archivedSalesOrder.packConfigId } }),
       ]);
@@ -177,7 +177,7 @@ export class SoSearchService {
         product,
         customer,
         transporter,
-        plantCode,
+        // plantCode,
         salesZone,
         packConfig,
       };
