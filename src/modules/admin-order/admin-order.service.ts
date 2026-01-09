@@ -108,6 +108,9 @@ export class AdminOrderService {
           },
         },
         {
+          plantCode: { contains: search, mode: 'insensitive' },
+        },
+        {
           salesZone: {
             is: { name: { contains: search, mode: 'insensitive' } },
           },
