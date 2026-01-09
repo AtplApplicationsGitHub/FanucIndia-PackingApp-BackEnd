@@ -475,6 +475,7 @@ export class DispatchService {
       include: {
         salesOrder: {
           select: {
+            customerNameText: true,
             customer: {
               select: { name: true }
             }
