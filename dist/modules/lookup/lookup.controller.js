@@ -147,6 +147,9 @@ let LookupController = class LookupController {
     async bulkImport(file) {
         return this.lookupService.processBulkImport(file);
     }
+    async syncMaterialBarcodes(dtos) {
+        return this.lookupService.syncMaterialBarcodes(dtos);
+    }
     constructor(lookupService){
         this.lookupService = lookupService;
     }
@@ -682,6 +685,29 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], LookupController.prototype, "bulkImport", null);
+_ts_decorate([
+    (0, _common.Post)('mobile-sync/material-barcodes'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Sync Material Barcodes from Mobile App (Upsert)'
+    }),
+    (0, _swagger.ApiBody)({
+        type: [
+            _createMaterialBarcodeDto.CreateMaterialBarcodeDto
+        ]
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 201,
+        description: 'Records synced successfully'
+    }),
+    _ts_param(0, (0, _common.Body)(new _common.ParseArrayPipe({
+        items: _createMaterialBarcodeDto.CreateMaterialBarcodeDto
+    }))),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Array
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], LookupController.prototype, "syncMaterialBarcodes", null);
 LookupController = _ts_decorate([
     (0, _swagger.ApiTags)('Lookup'),
     (0, _swagger.ApiBearerAuth)(),

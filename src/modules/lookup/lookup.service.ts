@@ -499,4 +499,48 @@ export class LookupService {
 
     return { message: 'Bulk import completed successfully', details: results };
   }
+
+  async syncMaterialBarcodes(dtos: CreateMaterialBarcodeDto[]) {
+    const results: any[] = [];
+        
+    await this.prisma.$transaction(async (tx) => {
+      for (const dto of dtos) {
+        const data = {
+          erpCode: dto.erpCode,
+          mappingBarcode: dto.mappingBarcode,
+          group: dto.group,
+          acceptBulkData: dto.acceptBulkData ?? false,
+          remarksRequired: dto.remarksRequired ?? false,
+          classification: dto.classification,
+        };
+
+        const result = await tx.materialBarcode.upsert({
+          where: { erpCode: dto.erpCode },
+          update: {
+            mappingBarcode: data.mappingBarcode,
+            group: data.group,
+            acceptBulkData: data.acceptBulkData,
+            remarksRequired: data.remarksRequired,
+            classification: data.classification,
+          },
+          create: {
+            erpCode: data.erpCode,
+            mappingBarcode: data.mappingBarcode,
+            group: data.group,
+            acceptBulkData: data.acceptBulkData,
+            remarksRequired: data.remarksRequired,
+            classification: data.classification,
+          },
+        });
+        
+        results.push(result);
+      }
+    });
+
+    return { 
+      message: 'Mobile sync completed successfully', 
+      processedCount: results.length,
+      data: results 
+    };
+  }
 }

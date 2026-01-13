@@ -17,6 +17,7 @@ const _updatepackingstagedto = require("./dto/update-packing-stage.dto");
 const _incrementpackingstagedto = require("./dto/increment-packing-stage.dto");
 const _bulkacceptgroupdto = require("./dto/bulk-accept-group.dto");
 const _updateremarksdto = require("./dto/update-remarks.dto");
+const _updatemappingdto = require("./dto/update-mapping.dto");
 const _jwtauthguard = require("../auth/jwt-auth.guard");
 const _rolesdecorator = require("../auth/roles.decorator");
 const _authrequesttype = require("../auth/types/auth-request.type");
@@ -66,6 +67,10 @@ let ErpMaterialDataController = class ErpMaterialDataController {
     acceptAllIssueStage(orderId, req) {
         const { userId, role } = req.user;
         return this.erpMaterialDataService.acceptAllIssueStage(orderId, userId, role);
+    }
+    updateMapping(orderId, body, req) {
+        const { userId, role } = req.user;
+        return this.erpMaterialDataService.updateMapping(orderId, body, userId, role);
     }
     constructor(erpMaterialDataService){
         this.erpMaterialDataService = erpMaterialDataService;
@@ -273,6 +278,31 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], ErpMaterialDataController.prototype, "acceptAllIssueStage", null);
+_ts_decorate([
+    (0, _swagger.ApiOperation)({
+        summary: 'Update Mapping Barcode and Group'
+    }),
+    (0, _swagger.ApiParam)({
+        name: 'orderId',
+        type: Number,
+        description: 'Sales Order ID'
+    }),
+    (0, _swagger.ApiBody)({
+        type: _updatemappingdto.UpdateMappingDto
+    }),
+    (0, _common.Patch)('update-mapping'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    _ts_param(0, (0, _common.Param)('orderId', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_param(2, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        typeof _updatemappingdto.UpdateMappingDto === "undefined" ? Object : _updatemappingdto.UpdateMappingDto,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], ErpMaterialDataController.prototype, "updateMapping", null);
 ErpMaterialDataController = _ts_decorate([
     (0, _swagger.ApiTags)('ERP Material Data'),
     (0, _swagger.ApiBearerAuth)(),

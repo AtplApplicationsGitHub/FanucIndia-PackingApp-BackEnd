@@ -10,7 +10,8 @@ import {
   ParseIntPipe,
   UploadedFile, 
   UseInterceptors, 
-  Res
+  Res,
+  ParseArrayPipe,
 } from '@nestjs/common';
 import { LookupService } from './lookup.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -295,5 +296,16 @@ export class LookupController {
   })
   async bulkImport(@UploadedFile() file: Express.Multer.File) {
     return this.lookupService.processBulkImport(file);
+  }
+
+  @Post('mobile-sync/material-barcodes')
+  @ApiOperation({ summary: 'Sync Material Barcodes from Mobile App (Upsert)' })
+  @ApiBody({ type: [CreateMaterialBarcodeDto] })
+  @ApiResponse({ status: 201, description: 'Records synced successfully' })
+  async syncMaterialBarcodes(
+    @Body(new ParseArrayPipe({ items: CreateMaterialBarcodeDto })) 
+    dtos: CreateMaterialBarcodeDto[]
+  ) {
+    return this.lookupService.syncMaterialBarcodes(dtos);
   }
 }

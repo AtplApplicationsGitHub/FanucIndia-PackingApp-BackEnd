@@ -24,6 +24,7 @@ import { UpdatePackingStageDto } from './dto/update-packing-stage.dto';
 import { IncrementPackingStageDto } from './dto/increment-packing-stage.dto';
 import { BulkAcceptGroupDto } from './dto/bulk-accept-group.dto';
 import { UpdateRemarksDto } from './dto/update-remarks.dto';
+import { UpdateMappingDto } from './dto/update-mapping.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthRequest } from '../auth/types/auth-request.type';
@@ -189,5 +190,24 @@ export class ErpMaterialDataController {
   ) {
     const { userId, role } = req.user;
     return this.erpMaterialDataService.acceptAllIssueStage(orderId, userId, role);
+  }
+
+  @ApiOperation({ summary: 'Update Mapping Barcode and Group' })
+  @ApiParam({ name: 'orderId', type: Number, description: 'Sales Order ID' })
+  @ApiBody({ type: UpdateMappingDto })
+  @Patch('update-mapping')
+  @Roles('ADMIN', 'USER')
+  updateMapping(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body() body: UpdateMappingDto,
+    @Req() req: AuthRequest,
+  ) {
+    const { userId, role } = req.user;
+    return this.erpMaterialDataService.updateMapping(
+      orderId,
+      body,
+      userId,
+      role,
+    );
   }
 }

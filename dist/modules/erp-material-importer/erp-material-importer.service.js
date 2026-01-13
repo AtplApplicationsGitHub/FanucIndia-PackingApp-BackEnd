@@ -110,9 +110,9 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         }
         const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
         // Ensure we use POSIX paths for SFTP
-        const activeDir = _path.posix.join(baseDir, 'Active');
-        const archivedDir = _path.posix.join(baseDir, 'Archived');
-        const errorDir = _path.posix.join(baseDir, 'Error');
+        const activeDir = _path.posix.join(baseDir, 'active');
+        const archivedDir = _path.posix.join(baseDir, 'archive');
+        const errorDir = _path.posix.join(baseDir, 'error');
         const filename = `${saleOrderNumber}_${so.outboundDelivery}.xlsx`;
         const filePath = _path.posix.join(activeDir, filename);
         this.logger.log(`Looking for file at SFTP path: ${filePath}`);

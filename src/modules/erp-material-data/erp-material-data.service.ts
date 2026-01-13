@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
+import { UpdateMappingDto } from './dto/update-mapping.dto';
 
 function convertBigInts(obj: any): any {
   if (obj === null || obj === undefined) {
@@ -621,5 +622,69 @@ export class ErpMaterialDataService {
     });
 
     return this._checkOrderCompletion(salesOrder.saleOrderNumber, orderId, userName);
+  }
+
+  async updateMapping(
+    orderId: number,
+    dto: UpdateMappingDto,
+    userId: number,
+    userRole: string,
+  ) {
+    await verifyOrderAccess(this.prisma, orderId, userId, userRole);
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const userName = user ? user.name : 'System';
+
+    // 1. Fetch the current ERP Material record to get the Material Code
+    const currentMaterial = await this.prisma.eRP_Material_Data.findUnique({
+      where: { ID: dto.materialId },
+    });
+
+    if (!currentMaterial) {
+      throw new NotFoundException('Material not found');
+    }
+
+    // 2. Update ERP_Material_Data table (Both Mapping Barcode and Group are updated)
+    const updatedMaterial = await this.prisma.eRP_Material_Data.update({
+      where: { ID: dto.materialId },
+      data: {
+        Mapping_Barcode: dto.mappingBarcode || null,
+        Group: dto.group || null,
+        UpdatedBy: userName,
+        UpdatedDate: new Date(),
+      },
+    });
+
+    // 3. Handle Master Table (MaterialBarcode) Logic
+    const materialCode = currentMaterial.Material_Code;
+    const existingMaster = await this.prisma.materialBarcode.findUnique({
+      where: { erpCode: materialCode },
+    });
+
+    if (existingMaster) {
+      // Case 1: Exists in Master - Update ONLY Mapping Barcode (ignore Group)
+      await this.prisma.materialBarcode.update({
+        where: { id: existingMaster.id },
+        data: {
+          mappingBarcode: dto.mappingBarcode || null,
+        },
+      });
+    } else {
+      // Case 2: Does not exist in Master - Create new record with Mapping Barcode AND Group
+      await this.prisma.materialBarcode.create({
+        data: {
+          erpCode: materialCode,
+          mappingBarcode: dto.mappingBarcode || null,
+          group: dto.group || null,
+          acceptBulkData: false, // Default
+          remarksRequired: false, // Default
+        },
+      });
+    }
+
+    return convertBigInts({
+      message: 'Mapping details updated successfully',
+      updatedMaterial,
+    });
   }
 }
