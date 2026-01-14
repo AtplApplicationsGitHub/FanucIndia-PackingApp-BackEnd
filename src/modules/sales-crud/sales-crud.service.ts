@@ -238,7 +238,7 @@ export class SalesCrudService {
           ? String((dto as any).customerName).trim()
           : undefined;
 
-      let address: string | undefined;
+      let address: string | null | undefined;
       if (resolvedCustomerId) {
         const customer = await this.prisma.customer.findUnique({ where: { id: resolvedCustomerId } });
         if (customer) address = customer.address;
@@ -389,7 +389,6 @@ export class SalesCrudService {
     const { saleOrderNumbers } = dto;
     const statusToSet = 'Ready for Dispatch'; 
 
-    
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user?.name || 'System';
     const now = new Date();
@@ -397,6 +396,7 @@ export class SalesCrudService {
     try {
       await this.prisma.$transaction(async (tx) => {
         
+        // 1. Existing Logic: Update SalesOrder Status
         await tx.salesOrder.updateMany({
           where: {
             saleOrderNumber: { in: saleOrderNumbers },
@@ -408,6 +408,7 @@ export class SalesCrudService {
           },
         });
 
+        // 2. Existing Logic: Update Status Stepper
         await tx.sO_Status_Stepper.updateMany({
           where: {
             salesOrderNumber: { in: saleOrderNumbers },
@@ -418,10 +419,25 @@ export class SalesCrudService {
             updatedBy: userName,
           },
         });
+
+        // 3. NEW LOGIC: Create CustomerLabelPrint entries
+        await tx.customerLabelPrint.create({
+          data: {
+            userId: userId,
+            userName: userName,
+            createdAt: now,
+            entries: {
+              create: saleOrderNumbers.map((soNumber) => ({
+                saleOrderNumber: soNumber,
+              })),
+            },
+          },
+        });
+
       });
 
       return {
-        message: 'Labels printed and status updated to Ready for Dispatch.',
+        message: 'Labels printed, status updated, and print history saved.',
         count: saleOrderNumbers.length,
       };
     } catch (err: any) {

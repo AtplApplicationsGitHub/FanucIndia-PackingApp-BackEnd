@@ -27,7 +27,8 @@ model User {
 
   sentSoChatMessages     SalesOrderChatMessage[] @relation("SoChatFrom")
   receivedSoChatMessages SalesOrderChatMessage[] @relation("SoChatTo")
-  soChatNotifications SoChatNotification[]
+  soChatNotifications    SoChatNotification[]
+  customerLabelPrints    CustomerLabelPrint[]
 }
 
 model Product {
@@ -454,4 +455,22 @@ model ERPMaterialLogArchive {
   archivedAt        DateTime @default(now())
 
   @@map("ERP_Material_LogArchive")
+}
+
+model CustomerLabelPrint {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  userId    Int
+  userName  String? 
+  
+  user      User     @relation(fields: [userId], references: [id])
+  entries   CustomerLabelPrintEntry[]
+}
+
+model CustomerLabelPrintEntry {
+  id                   Int                @id @default(autoincrement())
+  customerLabelPrintId Int
+  saleOrderNumber      String             @db.VarChar(500)
+  
+  customerLabelPrint   CustomerLabelPrint @relation(fields: [customerLabelPrintId], references: [id], onDelete: Cascade)
 }

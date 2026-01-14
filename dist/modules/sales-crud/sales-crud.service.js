@@ -492,6 +492,7 @@ let SalesCrudService = class SalesCrudService {
         const now = new Date();
         try {
             await this.prisma.$transaction(async (tx)=>{
+                // 1. Existing Logic: Update SalesOrder Status
                 await tx.salesOrder.updateMany({
                     where: {
                         saleOrderNumber: {
@@ -506,6 +507,7 @@ let SalesCrudService = class SalesCrudService {
                         UpdatedDate: now
                     }
                 });
+                // 2. Existing Logic: Update Status Stepper
                 await tx.sO_Status_Stepper.updateMany({
                     where: {
                         salesOrderNumber: {
@@ -518,9 +520,22 @@ let SalesCrudService = class SalesCrudService {
                         updatedBy: userName
                     }
                 });
+                // 3. NEW LOGIC: Create CustomerLabelPrint entries
+                await tx.customerLabelPrint.create({
+                    data: {
+                        userId: userId,
+                        userName: userName,
+                        createdAt: now,
+                        entries: {
+                            create: saleOrderNumbers.map((soNumber)=>({
+                                    saleOrderNumber: soNumber
+                                }))
+                        }
+                    }
+                });
             });
             return {
-                message: 'Labels printed and status updated to Ready for Dispatch.',
+                message: 'Labels printed, status updated, and print history saved.',
                 count: saleOrderNumbers.length
             };
         } catch (err) {
