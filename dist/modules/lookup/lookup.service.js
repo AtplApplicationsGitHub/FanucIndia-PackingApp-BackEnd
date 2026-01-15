@@ -324,11 +324,6 @@ let LookupService = class LookupService {
                         header: 'Name',
                         key: 'name',
                         width: 30
-                    },
-                    {
-                        header: 'Code',
-                        key: 'code',
-                        width: 20
                     }
                 ]
             },
@@ -520,15 +515,13 @@ let LookupService = class LookupService {
                                     id
                                 },
                                 data: {
-                                    name,
-                                    code
+                                    name
                                 }
                             }).catch(()=>{}));
                         } else {
                             promises.push(tx.product.create({
                                 data: {
-                                    name,
-                                    code
+                                    name
                                 }
                             }).catch(()=>{}));
                         }

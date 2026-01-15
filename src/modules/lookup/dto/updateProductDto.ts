@@ -5,8 +5,4 @@ export class UpdateProductDto {
   @ApiProperty({ example: 'Updated Fanuc Arm', description: 'Updated name' })
   @IsString()
   name: string;
-
-  @ApiProperty({ example: 'F-ARM-002', description: 'Updated code' })
-  @IsString()
-  code: string;
 }

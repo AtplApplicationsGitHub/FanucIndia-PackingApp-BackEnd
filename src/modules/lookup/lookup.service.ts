@@ -251,7 +251,6 @@ export class LookupService {
         columns: [
           { header: 'ID (Do not edit)', key: 'id', width: 10 },
           { header: 'Name', key: 'name', width: 30 },
-          { header: 'Code', key: 'code', width: 20 }
         ]
       },
       { 
@@ -369,9 +368,9 @@ export class LookupService {
 
           if (name) { 
             if (id) {
-              promises.push(tx.product.update({ where: { id }, data: { name, code } }).catch(() => {}));
+              promises.push(tx.product.update({ where: { id }, data: { name } }).catch(() => {}));
             } else {
-              promises.push(tx.product.create({ data: { name, code } }).catch(() => {}));
+              promises.push(tx.product.create({ data: { name } }).catch(() => {}));
             }
           }
         });

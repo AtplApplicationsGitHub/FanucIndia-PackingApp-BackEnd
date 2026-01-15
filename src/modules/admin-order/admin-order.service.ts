@@ -169,7 +169,8 @@ export class AdminOrderService {
         take,
         include: {
           user: { select: { id: true, name: true, email: true } },
-          product: { select: { id: true, name: true, code: true } },
+          // UPDATED: Removed "code: true"
+          product: { select: { id: true, name: true } },
           transporter: { select: { id: true, name: true } },
           // plantCode: { select: { id: true, code: true, description: true } },
           salesZone: { select: { id: true, name: true } },
@@ -224,7 +225,7 @@ export class AdminOrderService {
       }
     }
 
-    let addressToSave = dto.address;
+    let addressToSave: string | null | undefined = dto.address;
 
     if (addressToSave === undefined && dto.customerId) {
       const customer = await this.prisma.customer.findUnique({

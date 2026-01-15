@@ -29,13 +29,5 @@ _ts_decorate([
     (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
 ], UpdateProductDto.prototype, "name", void 0);
-_ts_decorate([
-    (0, _swagger.ApiProperty)({
-        example: 'F-ARM-002',
-        description: 'Updated code'
-    }),
-    (0, _classvalidator.IsString)(),
-    _ts_metadata("design:type", String)
-], UpdateProductDto.prototype, "code", void 0);
 
 //# sourceMappingURL=updateProductDto.js.map

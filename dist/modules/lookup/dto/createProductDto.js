@@ -29,13 +29,5 @@ _ts_decorate([
     (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
 ], CreateProductDto.prototype, "name", void 0);
-_ts_decorate([
-    (0, _swagger.ApiProperty)({
-        example: 'F-ARM-001',
-        description: 'Unique code for the product'
-    }),
-    (0, _classvalidator.IsString)(),
-    _ts_metadata("design:type", String)
-], CreateProductDto.prototype, "code", void 0);
 
 //# sourceMappingURL=createProductDto.js.map

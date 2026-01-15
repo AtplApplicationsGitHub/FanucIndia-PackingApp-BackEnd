@@ -684,7 +684,7 @@ let ErpMaterialDataService = class ErpMaterialDataService {
             }
         });
         const userName = user ? user.name : 'System';
-        // 1. Fetch the current ERP Material record to get the Material Code
+        // 1. Fetch the current ERP Material record
         const currentMaterial = await this.prisma.eRP_Material_Data.findUnique({
             where: {
                 ID: dto.materialId
@@ -693,6 +693,63 @@ let ErpMaterialDataService = class ErpMaterialDataService {
         if (!currentMaterial) {
             throw new _common.NotFoundException('Material not found');
         }
+        // --- NEW VALIDATION START ---
+        // If we are adding/updating a Mapping Barcode, check for duplicates
+        if (dto.mappingBarcode) {
+            const barcodeToCheck = dto.mappingBarcode;
+            // Check 1: Master Table (MaterialBarcode)
+            // The new barcode should not match any existing Material Code (erpCode) or Mapping Barcode
+            const existsInMaster = await this.prisma.materialBarcode.findFirst({
+                where: {
+                    OR: [
+                        {
+                            erpCode: {
+                                equals: barcodeToCheck,
+                                mode: 'insensitive'
+                            }
+                        },
+                        {
+                            mappingBarcode: {
+                                equals: barcodeToCheck,
+                                mode: 'insensitive'
+                            }
+                        }
+                    ]
+                }
+            });
+            if (existsInMaster) {
+                throw new _common.BadRequestException(`The barcode '${barcodeToCheck}' already exists in the Master Data (MaterialBarcode).`);
+            }
+            // Check 2: Transaction Table (ERP_Material_Data) for the SAME Sales Order
+            // The new barcode should not match any Material Code or Mapping Barcode in this SO
+            // Exclude the current row (ID) we are updating
+            const existsInCurrentSO = await this.prisma.eRP_Material_Data.findFirst({
+                where: {
+                    saleOrderNumber: currentMaterial.saleOrderNumber,
+                    ID: {
+                        not: dto.materialId
+                    },
+                    OR: [
+                        {
+                            Material_Code: {
+                                equals: barcodeToCheck,
+                                mode: 'insensitive'
+                            }
+                        },
+                        {
+                            Mapping_Barcode: {
+                                equals: barcodeToCheck,
+                                mode: 'insensitive'
+                            }
+                        }
+                    ]
+                }
+            });
+            if (existsInCurrentSO) {
+                throw new _common.BadRequestException(`The barcode '${barcodeToCheck}' is already used as a Material Code or Mapping Barcode in this Sales Order.`);
+            }
+        }
+        // --- NEW VALIDATION END ---
         // 2. Update ERP_Material_Data table (Both Mapping Barcode and Group are updated)
         const updatedMaterial = await this.prisma.eRP_Material_Data.update({
             where: {

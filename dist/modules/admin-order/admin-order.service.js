@@ -261,11 +261,11 @@ let AdminOrderService = class AdminOrderService {
                             email: true
                         }
                     },
+                    // UPDATED: Removed "code: true"
                     product: {
                         select: {
                             id: true,
-                            name: true,
-                            code: true
+                            name: true
                         }
                     },
                     transporter: {
