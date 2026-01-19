@@ -288,18 +288,21 @@ export class UserDashboardService {
     }
 
     for (const material of materials) {
+      const updateData: Prisma.ERP_Material_DataUpdateInput = {
+        Issue_stage: material.Issue_stage,
+        Packing_stage: material.Packing_stage,
+        Remarks: material.Remarks,
+        Group: material.Group, 
+        Mapping_Barcode: material.Mapping_Barcode,
+        UpdatedBy: userName,
+        UpdatedDate: material.UpdatedDate
+          ? new Date(material.UpdatedDate)
+          : new Date(),
+      };
       if (material.ID) {
         await prismaClient.eRP_Material_Data.update({
           where: { ID: BigInt(material.ID) },
-          data: {
-            Issue_stage: material.Issue_stage,
-            Packing_stage: material.Packing_stage,
-            Remarks: material.Remarks,
-            UpdatedBy: userName,
-            UpdatedDate: material.UpdatedDate
-              ? new Date(material.UpdatedDate)
-              : new Date(),
-          },
+          data: updateData, 
         });
       } else {
         await prismaClient.eRP_Material_Data.updateMany({
@@ -307,15 +310,7 @@ export class UserDashboardService {
             saleOrderNumber: saleOrderNumber,
             Material_Code: material.Material_Code,
           },
-          data: {
-            Issue_stage: material.Issue_stage,
-            Packing_stage: material.Packing_stage,
-            Remarks: material.Remarks,
-            UpdatedBy: userName,
-            UpdatedDate: material.UpdatedDate
-              ? new Date(material.UpdatedDate)
-              : new Date(),
-          },
+          data: updateData, 
         });
       }
     }
