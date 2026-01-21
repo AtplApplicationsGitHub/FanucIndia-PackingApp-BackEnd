@@ -264,18 +264,21 @@ let UserDashboardService = class UserDashboardService {
             throw new _common.BadRequestException('No materials data provided.');
         }
         for (const material of materials){
+            const updateData = {
+                Issue_stage: material.Issue_stage,
+                Packing_stage: material.Packing_stage,
+                Remarks: material.Remarks,
+                Group: material.Group,
+                Mapping_Barcode: material.Mapping_Barcode,
+                UpdatedBy: userName,
+                UpdatedDate: material.UpdatedDate ? new Date(material.UpdatedDate) : new Date()
+            };
             if (material.ID) {
                 await prismaClient.eRP_Material_Data.update({
                     where: {
                         ID: BigInt(material.ID)
                     },
-                    data: {
-                        Issue_stage: material.Issue_stage,
-                        Packing_stage: material.Packing_stage,
-                        Remarks: material.Remarks,
-                        UpdatedBy: userName,
-                        UpdatedDate: material.UpdatedDate ? new Date(material.UpdatedDate) : new Date()
-                    }
+                    data: updateData
                 });
             } else {
                 await prismaClient.eRP_Material_Data.updateMany({
@@ -283,13 +286,7 @@ let UserDashboardService = class UserDashboardService {
                         saleOrderNumber: saleOrderNumber,
                         Material_Code: material.Material_Code
                     },
-                    data: {
-                        Issue_stage: material.Issue_stage,
-                        Packing_stage: material.Packing_stage,
-                        Remarks: material.Remarks,
-                        UpdatedBy: userName,
-                        UpdatedDate: material.UpdatedDate ? new Date(material.UpdatedDate) : new Date()
-                    }
+                    data: updateData
                 });
             }
         }

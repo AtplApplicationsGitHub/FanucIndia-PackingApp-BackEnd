@@ -19,6 +19,13 @@ let AppService = class AppService {
     getHello() {
         return 'Hello World!';
     }
+    getDummy() {
+        return {
+            message: 'This is a dummy API response',
+            status: 'success',
+            timestamp: new Date().toISOString()
+        };
+    }
 };
 AppService = _ts_decorate([
     (0, _common.Injectable)()
