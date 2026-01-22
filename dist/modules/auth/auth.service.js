@@ -66,9 +66,12 @@ function _ts_metadata(k, v) {
 let AuthService = class AuthService {
     async signup(dto, req) {
         const email = dto.email.replace(/\s+/g, '');
-        const existing = await this.prisma.user.findUnique({
+        const existing = await this.prisma.user.findFirst({
             where: {
-                email
+                email: {
+                    equals: email,
+                    mode: 'insensitive'
+                }
             }
         });
         if (existing) {
@@ -87,7 +90,7 @@ let AuthService = class AuthService {
         const user = await this.prisma.user.create({
             data: {
                 name: dto.name,
-                email,
+                email: email,
                 password: hash,
                 role: dto.role ?? 'SALES'
             }
@@ -102,9 +105,12 @@ let AuthService = class AuthService {
     }
     async login(dto, req) {
         const email = dto.email.replace(/\s+/g, '');
-        const user = await this.prisma.user.findUnique({
+        const user = await this.prisma.user.findFirst({
             where: {
-                email
+                email: {
+                    equals: email,
+                    mode: 'insensitive'
+                }
             }
         });
         if (!user) {
@@ -151,9 +157,12 @@ let AuthService = class AuthService {
     }
     async checkEmailExists(email) {
         if (!email) return false;
-        const user = await this.prisma.user.findUnique({
+        const user = await this.prisma.user.findFirst({
             where: {
-                email: email.replace(/\s+/g, '')
+                email: {
+                    equals: email.replace(/\s+/g, ''),
+                    mode: 'insensitive'
+                }
             },
             select: {
                 id: true
@@ -163,9 +172,12 @@ let AuthService = class AuthService {
     }
     async mobileLogin(dto, req) {
         const email = dto.email.replace(/\s+/g, '');
-        const user = await this.prisma.user.findUnique({
+        const user = await this.prisma.user.findFirst({
             where: {
-                email
+                email: {
+                    equals: email,
+                    mode: 'insensitive'
+                }
             }
         });
         if (!user) {

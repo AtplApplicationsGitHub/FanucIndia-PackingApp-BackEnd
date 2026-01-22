@@ -20,8 +20,10 @@ export class AuthService {
 
   async signup(dto: SignupDto, req: Request) {
     const email = dto.email.replace(/\s+/g, '');
-    const existing = await this.prisma.user.findUnique({
-      where: { email },
+    const existing = await this.prisma.user.findFirst({
+      where: { 
+        email: { equals: email, mode: 'insensitive' } 
+      },
     })
     if (existing) {
       logAuthFailure({
@@ -40,7 +42,7 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         name: dto.name,
-        email,
+        email: email,
         password: hash,
         role: dto.role ?? 'SALES',
       },
@@ -57,8 +59,10 @@ export class AuthService {
 
   async login(dto: LoginDto, req: Request) {
     const email = dto.email.replace(/\s+/g, '')
-    const user = await this.prisma.user.findUnique({
-      where: { email },
+    const user = await this.prisma.user.findFirst({
+      where: { 
+        email: { equals: email, mode: 'insensitive' } 
+      },
     })
 
     if (!user) {
@@ -109,8 +113,10 @@ export class AuthService {
 
   async checkEmailExists(email: string): Promise<boolean> {
     if (!email) return false
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.replace(/\s+/g, '') },
+    const user = await this.prisma.user.findFirst({
+      where: { 
+        email: { equals: email.replace(/\s+/g, ''), mode: 'insensitive' } 
+      },
       select: { id: true },
     })
     return !!user
@@ -118,8 +124,10 @@ export class AuthService {
 
   async mobileLogin(dto: LoginDto, req: Request) {
     const email = dto.email.replace(/\s+/g, '');
-    const user = await this.prisma.user.findUnique({
-      where: { email },
+    const user = await this.prisma.user.findFirst({
+      where: { 
+        email: { equals: email, mode: 'insensitive' } 
+      },
     });
 
     if (!user) {

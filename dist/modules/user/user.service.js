@@ -64,9 +64,12 @@ function _ts_metadata(k, v) {
 let UserService = class UserService {
     async create(dto) {
         const email = dto.email.replace(/\s+/g, '');
-        const existing = await this.prisma.user.findUnique({
+        const existing = await this.prisma.user.findFirst({
             where: {
-                email
+                email: {
+                    equals: email,
+                    mode: 'insensitive'
+                }
             }
         });
         if (existing) throw new _common.BadRequestException('Email already registered');
@@ -135,12 +138,18 @@ let UserService = class UserService {
         };
         if (dto.email) {
             const email = dto.email.replace(/\s+/g, '');
-            const duplicate = await this.prisma.user.findUnique({
+            const duplicate = await this.prisma.user.findFirst({
                 where: {
-                    email
+                    email: {
+                        equals: email,
+                        mode: 'insensitive'
+                    },
+                    id: {
+                        not: id
+                    }
                 }
             });
-            if (duplicate && duplicate.id !== id) {
+            if (duplicate) {
                 throw new _common.BadRequestException('Email or Username already in use');
             }
             updateData.email = email;

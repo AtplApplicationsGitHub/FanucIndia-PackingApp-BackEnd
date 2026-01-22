@@ -16,9 +16,12 @@ export class UserService {
   async create(dto: CreateUserDto) {
     const email = dto.email.replace(/\s+/g, '');
 
-    const existing = await this.prisma.user.findUnique({
-      where: { email },
+    const existing = await this.prisma.user.findFirst({
+      where: { 
+        email: { equals: email, mode: 'insensitive' } 
+      },
     });
+
     if (existing) throw new BadRequestException('Email already registered');
     const hashedPassword = await bcrypt.hash(dto.password.replace(/\s+/g, ''), 10);
 
@@ -83,11 +86,14 @@ export class UserService {
     if (dto.email) {
       const email = dto.email.replace(/\s+/g, '');
 
-      const duplicate = await this.prisma.user.findUnique({
-        where: { email },
+      const duplicate = await this.prisma.user.findFirst({
+        where: { 
+          email: { equals: email, mode: 'insensitive' },
+          id: { not: id }
+        },
       });
 
-      if (duplicate && duplicate.id !== id) {
+      if (duplicate) {
         throw new BadRequestException('Email or Username already in use');
       }
 
