@@ -14,16 +14,18 @@ export class UserService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateUserDto) {
+    const email = dto.email.replace(/\s+/g, '');
+
     const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
     });
     if (existing) throw new BadRequestException('Email already registered');
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const hashedPassword = await bcrypt.hash(dto.password.replace(/\s+/g, ''), 10);
 
     return this.prisma.user.create({
       data: {
         name: dto.name,
-        email: dto.email,
+        email: email,
         password: hashedPassword,
         role: dto.role,
         accessPickPack: dto.accessPickPack || false,
@@ -78,8 +80,21 @@ export class UserService {
     if (!user) throw new NotFoundException('User not found');
 
     const updateData: any = { ...dto };
+    if (dto.email) {
+      const email = dto.email.replace(/\s+/g, '');
+
+      const duplicate = await this.prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (duplicate && duplicate.id !== id) {
+        throw new BadRequestException('Email or Username already in use');
+      }
+
+      updateData.email = email;
+    }
     if (dto.password) {
-      updateData.password = await bcrypt.hash(dto.password, 10);
+      updateData.password = await bcrypt.hash(dto.password.replace(/\s+/g, ''), 10);
     } else {
       delete updateData.password;
     }
@@ -132,22 +147,22 @@ export class UserService {
   }
 
   async resetPassword(userId: number, dto: ResetPasswordDto) {
-  const user = await this.prisma.user.findUnique({ where: { id: userId } });
-  if (!user) {
-    throw new NotFoundException('User not found');
-  }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
 
-  const isMatch = await bcrypt.compare(dto.oldPassword, user.password);
-  if (!isMatch) {
-    throw new BadRequestException('Incorrect old password');
-  }
+    const isMatch = await bcrypt.compare(dto.oldPassword.replace(/\s+/g, ''), user.password);
+    if (!isMatch) {
+      throw new BadRequestException('Incorrect old password');
+    }
 
-  const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
-  return this.prisma.user.update({
-    where: { id: userId },
-    data: { password: hashedPassword },
-    select: { id: true, email: true }
-  });
+    const hashedPassword = await bcrypt.hash(dto.newPassword.replace(/\s+/g, ''), 10);
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+      select: { id: true, email: true },
+    });
   }
 
   async getMobileModules(userId: number) {

@@ -63,17 +63,18 @@ function _ts_metadata(k, v) {
 }
 let UserService = class UserService {
     async create(dto) {
+        const email = dto.email.replace(/\s+/g, '');
         const existing = await this.prisma.user.findUnique({
             where: {
-                email: dto.email
+                email
             }
         });
         if (existing) throw new _common.BadRequestException('Email already registered');
-        const hashedPassword = await _bcryptjs.hash(dto.password, 10);
+        const hashedPassword = await _bcryptjs.hash(dto.password.replace(/\s+/g, ''), 10);
         return this.prisma.user.create({
             data: {
                 name: dto.name,
-                email: dto.email,
+                email: email,
                 password: hashedPassword,
                 role: dto.role,
                 accessPickPack: dto.accessPickPack || false,
@@ -132,8 +133,20 @@ let UserService = class UserService {
         const updateData = {
             ...dto
         };
+        if (dto.email) {
+            const email = dto.email.replace(/\s+/g, '');
+            const duplicate = await this.prisma.user.findUnique({
+                where: {
+                    email
+                }
+            });
+            if (duplicate && duplicate.id !== id) {
+                throw new _common.BadRequestException('Email or Username already in use');
+            }
+            updateData.email = email;
+        }
         if (dto.password) {
-            updateData.password = await _bcryptjs.hash(dto.password, 10);
+            updateData.password = await _bcryptjs.hash(dto.password.replace(/\s+/g, ''), 10);
         } else {
             delete updateData.password;
         }
@@ -200,11 +213,11 @@ let UserService = class UserService {
         if (!user) {
             throw new _common.NotFoundException('User not found');
         }
-        const isMatch = await _bcryptjs.compare(dto.oldPassword, user.password);
+        const isMatch = await _bcryptjs.compare(dto.oldPassword.replace(/\s+/g, ''), user.password);
         if (!isMatch) {
             throw new _common.BadRequestException('Incorrect old password');
         }
-        const hashedPassword = await _bcryptjs.hash(dto.newPassword, 10);
+        const hashedPassword = await _bcryptjs.hash(dto.newPassword.replace(/\s+/g, ''), 10);
         return this.prisma.user.update({
             where: {
                 id: userId

@@ -65,7 +65,7 @@ function _ts_metadata(k, v) {
 }
 let AuthService = class AuthService {
     async signup(dto, req) {
-        const email = dto.email.toLowerCase();
+        const email = dto.email.replace(/\s+/g, '');
         const existing = await this.prisma.user.findUnique({
             where: {
                 email
@@ -83,7 +83,7 @@ let AuthService = class AuthService {
                 message: 'Email already in use'
             });
         }
-        const hash = await _bcryptjs.hash(dto.password, 10);
+        const hash = await _bcryptjs.hash(dto.password.replace(/\s+/g, ''), 10);
         const user = await this.prisma.user.create({
             data: {
                 name: dto.name,
@@ -101,7 +101,7 @@ let AuthService = class AuthService {
         };
     }
     async login(dto, req) {
-        const email = dto.email.toLowerCase();
+        const email = dto.email.replace(/\s+/g, '');
         const user = await this.prisma.user.findUnique({
             where: {
                 email
@@ -119,7 +119,7 @@ let AuthService = class AuthService {
                 message: 'Invalid credentials'
             });
         }
-        const valid = await _bcryptjs.compare(dto.password, user.password);
+        const valid = await _bcryptjs.compare(dto.password.replace(/\s+/g, ''), user.password);
         if (!valid) {
             (0, _logger.logAuthFailure)({
                 code: 'INVALID_CREDENTIALS',
@@ -153,7 +153,7 @@ let AuthService = class AuthService {
         if (!email) return false;
         const user = await this.prisma.user.findUnique({
             where: {
-                email: email.toLowerCase()
+                email: email.replace(/\s+/g, '')
             },
             select: {
                 id: true
@@ -162,7 +162,7 @@ let AuthService = class AuthService {
         return !!user;
     }
     async mobileLogin(dto, req) {
-        const email = dto.email.toLowerCase();
+        const email = dto.email.replace(/\s+/g, '');
         const user = await this.prisma.user.findUnique({
             where: {
                 email
@@ -193,7 +193,7 @@ let AuthService = class AuthService {
                 message: 'Invalid credentials'
             });
         }
-        const valid = await _bcryptjs.compare(dto.password, user.password);
+        const valid = await _bcryptjs.compare(dto.password.replace(/\s+/g, ''), user.password);
         if (!valid) {
             (0, _logger.logAuthFailure)({
                 code: 'INVALID_CREDENTIALS',

@@ -1,5 +1,4 @@
 import {
-  IsEmail,
   IsString,
   MinLength,
   IsIn,
@@ -14,7 +13,7 @@ export class SignupDto {
   name: string;
 
   @ApiProperty({ example: 'test@mail.com', description: 'User email address' })
-  @IsEmail()
+  @IsString()
   email: string;
 
   @ApiProperty({

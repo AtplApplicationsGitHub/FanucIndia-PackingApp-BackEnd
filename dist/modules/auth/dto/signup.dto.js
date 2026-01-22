@@ -34,7 +34,7 @@ _ts_decorate([
         example: 'test@mail.com',
         description: 'User email address'
     }),
-    (0, _classvalidator.IsEmail)(),
+    (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
 ], SignupDto.prototype, "email", void 0);
 _ts_decorate([

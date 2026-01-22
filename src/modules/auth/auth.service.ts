@@ -19,7 +19,7 @@ export class AuthService {
   ) {}
 
   async signup(dto: SignupDto, req: Request) {
-    const email = dto.email.toLowerCase()
+    const email = dto.email.replace(/\s+/g, '');
     const existing = await this.prisma.user.findUnique({
       where: { email },
     })
@@ -36,7 +36,7 @@ export class AuthService {
       })
     }
 
-    const hash = await bcrypt.hash(dto.password, 10)
+    const hash = await bcrypt.hash(dto.password.replace(/\s+/g, ''), 10);
     const user = await this.prisma.user.create({
       data: {
         name: dto.name,
@@ -56,7 +56,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, req: Request) {
-    const email = dto.email.toLowerCase()
+    const email = dto.email.replace(/\s+/g, '')
     const user = await this.prisma.user.findUnique({
       where: { email },
     })
@@ -74,7 +74,7 @@ export class AuthService {
       })
     }
 
-    const valid = await bcrypt.compare(dto.password, user.password)
+    const valid = await bcrypt.compare(dto.password.replace(/\s+/g, ''), user.password)
     if (!valid) {
       logAuthFailure({
         code: 'INVALID_CREDENTIALS',
@@ -110,14 +110,14 @@ export class AuthService {
   async checkEmailExists(email: string): Promise<boolean> {
     if (!email) return false
     const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: email.replace(/\s+/g, '') },
       select: { id: true },
     })
     return !!user
   }
 
   async mobileLogin(dto: LoginDto, req: Request) {
-    const email = dto.email.toLowerCase();
+    const email = dto.email.replace(/\s+/g, '');
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
@@ -149,7 +149,7 @@ export class AuthService {
       });
     }
 
-    const valid = await bcrypt.compare(dto.password, user.password);
+    const valid = await bcrypt.compare(dto.password.replace(/\s+/g, ''), user.password);
     if (!valid) {
       logAuthFailure({
         code: 'INVALID_CREDENTIALS',
