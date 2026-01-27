@@ -82,14 +82,14 @@ model SalesOrder {
   productId        Int
   saleOrderNumber  String              @unique @db.VarChar(500)
   outboundDelivery String              @unique @db.VarChar(500)
-  transferOrder    String              @unique @db.VarChar(500)
+  transferOrder    String?              @unique @db.VarChar(500)
   deliveryDate     DateTime
   transporterId    Int
   // plantCodeId      Int
   plantCode        String?             @db.VarChar(100)
   paymentClearance Boolean
   salesZoneId      Int
-  packConfigId     Int
+  packConfigId     Int?
   assignedUserId   Int?
   customerId       Int?
   customerNameText String?             @db.VarChar(500)
@@ -106,7 +106,7 @@ model SalesOrder {
   materialData     ERP_Material_Data[]
   materialFilesByNumber ERP_Material_File[] @relation("SO_File_By_Number")
   customer         Customer?           @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  packConfig       PackConfig          @relation(fields: [packConfigId], references: [id])
+  packConfig       PackConfig?          @relation(fields: [packConfigId], references: [id])
   // plantCode        PlantCode           @relation(fields: [plantCodeId], references: [id])
   printer          Printer?            @relation(fields: [printerId], references: [id])
   product          Product             @relation(fields: [productId], references: [id])

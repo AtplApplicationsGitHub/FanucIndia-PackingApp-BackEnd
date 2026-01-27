@@ -55,10 +55,11 @@ _ts_decorate([
     _ts_metadata("design:type", String)
 ], CreateSalesCrudDto.prototype, "outboundDelivery", void 0);
 _ts_decorate([
-    (0, _swagger.ApiProperty)({
+    (0, _swagger.ApiPropertyOptional)({
         example: 'TRF456',
         description: 'Transfer Order'
     }),
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)({
         message: 'Transfer Order must be a string.'
     }),
@@ -85,10 +86,11 @@ _ts_decorate([
     _ts_metadata("design:type", Number)
 ], CreateSalesCrudDto.prototype, "transporterId", void 0);
 _ts_decorate([
-    (0, _swagger.ApiProperty)({
+    (0, _swagger.ApiPropertyOptional)({
         example: 'P123',
         description: 'Plant Code (text)'
     }),
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)({
         message: 'Plant Code must be a string.'
     }),
@@ -115,10 +117,11 @@ _ts_decorate([
     _ts_metadata("design:type", Number)
 ], CreateSalesCrudDto.prototype, "salesZoneId", void 0);
 _ts_decorate([
-    (0, _swagger.ApiProperty)({
+    (0, _swagger.ApiPropertyOptional)({
         example: 1,
         description: 'Packing Config ID (lookup)'
     }),
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsInt)({
         message: 'Packing Config ID must be an integer.'
     }),

@@ -23,9 +23,10 @@ export class CreateSalesCrudDto {
   @IsString({ message: 'Outbound Delivery must be a string.' })
   outboundDelivery: string;
 
-  @ApiProperty({ example: 'TRF456', description: 'Transfer Order' })
+  @ApiPropertyOptional({ example: 'TRF456', description: 'Transfer Order' })
+  @IsOptional()
   @IsString({ message: 'Transfer Order must be a string.' })
-  transferOrder: string;
+  transferOrder?: string;
 
   @ApiProperty({
     example: '2025-07-02',
@@ -41,12 +42,10 @@ export class CreateSalesCrudDto {
   @IsInt({ message: 'Transporter ID must be an integer.' })
   transporterId: number;
 
-  // @ApiProperty({ example: 1, description: 'Plant Code ID (lookup)' })
-  // @IsInt({ message: 'Plant Code ID must be an integer.' })
-  // plantCodeId: number;
-  @ApiProperty({ example: 'P123', description: 'Plant Code (text)' })
+  @ApiPropertyOptional({ example: 'P123', description: 'Plant Code (text)' })
+  @IsOptional()
   @IsString({ message: 'Plant Code must be a string.' })
-  plantCode: string;
+  plantCode?: string;
 
   @ApiProperty({ example: true, description: 'Payment Clearance (true/false)' })
   @IsBoolean({ message: 'Payment Clearance must be a boolean.' })
@@ -56,9 +55,10 @@ export class CreateSalesCrudDto {
   @IsInt({ message: 'Sales Zone ID must be an integer.' })
   salesZoneId: number;
 
-  @ApiProperty({ example: 1, description: 'Packing Config ID (lookup)' })
+  @ApiPropertyOptional({ example: 1, description: 'Packing Config ID (lookup)' })
+  @IsOptional()
   @IsInt({ message: 'Packing Config ID must be an integer.' })
-  packConfigId: number;
+  packConfigId?: number;
 
   @ApiPropertyOptional({
     example: 1,
@@ -77,7 +77,6 @@ export class CreateSalesCrudDto {
   @IsString({ message: 'Customer Name must be a string.' })
   @IsOptional()
   customerName?: string;
-
   @ApiPropertyOptional({
     example: 'Handle with care',
     description: 'Special Remarks (optional)',
