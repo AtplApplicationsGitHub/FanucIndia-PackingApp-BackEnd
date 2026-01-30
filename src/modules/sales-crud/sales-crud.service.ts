@@ -15,28 +15,39 @@ export class SalesCrudService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateSalesCrudDto, userId: number) {
-    const existingOrder = await this.prisma.salesOrder.findFirst({
-      where: {
-        OR: [
-          { saleOrderNumber: dto.saleOrderNumber },
-          { outboundDelivery: dto.outboundDelivery },
-          { transferOrder: dto.transferOrder },
-        ],
-      },
-    });
+    const saleOrderNumber = dto.saleOrderNumber?.trim();
+    const outboundDelivery = dto.outboundDelivery?.trim();
+    const transferOrder = dto.transferOrder?.trim();
+
+    const or: any[] = [];
+    if (saleOrderNumber) or.push({ saleOrderNumber });
+    if (outboundDelivery) or.push({ outboundDelivery });
+    if (transferOrder) or.push({ transferOrder }); // only if non-empty
+
+    const existingOrder = or.length
+      ? await this.prisma.salesOrder.findFirst({ where: { OR: or } })
+      : null;
 
     if (existingOrder) {
-      if (existingOrder.saleOrderNumber === dto.saleOrderNumber) {
+      if (
+        saleOrderNumber &&
+        existingOrder.saleOrderNumber === saleOrderNumber
+      ) {
         throw new ConflictException(
           'An order with this Sale Order Number already exists.',
         );
       }
-      if (existingOrder.outboundDelivery === dto.outboundDelivery) {
+
+      if (
+        outboundDelivery &&
+        existingOrder.outboundDelivery === outboundDelivery
+      ) {
         throw new ConflictException(
           'An order with this Outbound Delivery number already exists.',
         );
       }
-      if (existingOrder.transferOrder === dto.transferOrder) {
+
+      if (transferOrder && existingOrder.transferOrder === transferOrder) {
         throw new ConflictException(
           'An order with this Transfer Order number already exists.',
         );
@@ -45,12 +56,15 @@ export class SalesCrudService {
 
     try {
       const resolvedCustomerId: number | null = dto.customerId ?? null;
-      const customerNameText = dto.customerName && dto.customerName.trim()
-        ? dto.customerName.trim()
-        : null;
+      const customerNameText =
+        dto.customerName && dto.customerName.trim()
+          ? dto.customerName.trim()
+          : null;
 
       const customer = resolvedCustomerId
-        ? await this.prisma.customer.findUnique({ where: { id: resolvedCustomerId } })
+        ? await this.prisma.customer.findUnique({
+            where: { id: resolvedCustomerId },
+          })
         : null;
       const address = customer?.address || null;
 
@@ -61,9 +75,19 @@ export class SalesCrudService {
 
       const { customerName, customerId, ...rest } = dto as any;
 
+      const cleanedRest = Object.fromEntries(
+        Object.entries(rest).map(([k, v]) => {
+          if (typeof v === 'string') {
+            const t = v.trim();
+            return [k, t === '' ? null : t];
+          }
+          return [k, v];
+        }),
+      ) as typeof rest;
+
       const newOrder = await this.prisma.salesOrder.create({
         data: {
-          ...rest,
+          ...cleanedRest,
           deliveryDate,
           userId,
           assignedUserId: null,
@@ -76,26 +100,26 @@ export class SalesCrudService {
       });
 
       const statuses = [
-        "To be Issued",
-        "Under Issue",
-        "Issued",
-        "Under Packing",
-        "Packed",
-        "WIP Storage",
-        "Ready for Dispatch", 
-        "Dispatched"
+        'To be Issued',
+        'Under Issue',
+        'Issued',
+        'Under Packing',
+        'Packed',
+        'WIP Storage',
+        'Ready for Dispatch',
+        'Dispatched',
       ];
       await this.prisma.sO_Status_Stepper.createMany({
-        data: statuses.map(status => ({
+        data: statuses.map((status) => ({
           salesOrderNumber: newOrder.saleOrderNumber,
           status: status,
-          createdDateTime: status === 'To be Issued' ? newOrder.createdAt : null,
+          createdDateTime:
+            status === 'To be Issued' ? newOrder.createdAt : null,
           updatedBy: null,
         })),
       });
 
       return newOrder;
-
     } catch (err: any) {
       throw new InternalServerErrorException(
         'Failed to create sales order.',
@@ -232,7 +256,8 @@ export class SalesCrudService {
       // - If customerId is provided (dropdown): link to master customer and preload address.
       // - If customerName is provided (free text): DO NOT create/update Customer master records.
       //   Store the typed name in SalesOrder.customerNameText and unlink customerId.
-      const resolvedCustomerId: number | undefined = dto.customerId ?? undefined;
+      const resolvedCustomerId: number | undefined =
+        dto.customerId ?? undefined;
       const customerNameText: string | undefined =
         (dto as any).customerName && String((dto as any).customerName).trim()
           ? String((dto as any).customerName).trim()
@@ -240,7 +265,9 @@ export class SalesCrudService {
 
       let address: string | null | undefined;
       if (resolvedCustomerId) {
-        const customer = await this.prisma.customer.findUnique({ where: { id: resolvedCustomerId } });
+        const customer = await this.prisma.customer.findUnique({
+          where: { id: resolvedCustomerId },
+        });
         if (customer) address = customer.address;
       }
 
@@ -260,7 +287,9 @@ export class SalesCrudService {
           ...(deliveryDate ? { deliveryDate } : {}),
           UpdatedBy: user?.name || 'System',
           UpdatedDate: new Date(),
-          ...(resolvedCustomerId !== undefined ? { customerId: resolvedCustomerId } : {}),
+          ...(resolvedCustomerId !== undefined
+            ? { customerId: resolvedCustomerId }
+            : {}),
           ...(customerNameText !== undefined
             ? { customerNameText, customerId: null }
             : resolvedCustomerId !== undefined
@@ -364,7 +393,12 @@ export class SalesCrudService {
             salesZone: true,
             packConfig: true,
             assignedUser: true,
-            _count: { select: { materialData: true, soChatNotifications: { where: { userId } } } },
+            _count: {
+              select: {
+                materialData: true,
+                soChatNotifications: { where: { userId } },
+              },
+            },
           },
         }),
         this.prisma.salesOrder.count({ where: whereClause }),
@@ -387,7 +421,7 @@ export class SalesCrudService {
 
   async processLabelPrint(dto: LabelPrintDto, userId: number) {
     const { saleOrderNumbers } = dto;
-    const statusToSet = 'Ready for Dispatch'; 
+    const statusToSet = 'Ready for Dispatch';
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user?.name || 'System';
@@ -395,12 +429,11 @@ export class SalesCrudService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        
         // 1. Existing Logic: Update SalesOrder Status
         await tx.salesOrder.updateMany({
           where: {
             saleOrderNumber: { in: saleOrderNumbers },
-            status: { not: 'Dispatched' }, 
+            status: { not: 'Dispatched' },
           },
           data: {
             UpdatedBy: userName,
@@ -433,7 +466,6 @@ export class SalesCrudService {
             },
           },
         });
-
       });
 
       return {

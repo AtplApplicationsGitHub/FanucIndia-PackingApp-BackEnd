@@ -215,7 +215,7 @@ let SalesOrderService = class SalesOrderService {
                     t.name.trim(),
                     t.id
                 ])),
-            // plantCode: new Map(plantCodes.map((pc) => [pc.code.trim(), pc.id])),
+            // plantCode: new Map(plantCodes.map((pc: any) => [pc.code.trim(), pc.id])),
             salesZone: new Map(salesZones.map((sz)=>[
                     sz.name.trim(),
                     sz.id
@@ -240,29 +240,39 @@ let SalesOrderService = class SalesOrderService {
             if (rowNumber === 1) return;
             const [product, saleOrderNumber, outboundDelivery, transferOrder, deliveryDate, transporter, plantCode, paymentClearance, salesZone, packConfig, customer, specialRemarks, additionalRemarks, labelRemarks] = row.values.slice(1);
             const rowErrors = [];
-            const productId = maps.product.get((product || '').toString().trim());
+            let productName = (product || '').toString().trim();
+            if (!productName) {
+                productName = 'FA';
+            }
+            const productId = maps.product.get(productName);
             const transporterId = maps.transporter.get((transporter || '').toString().trim());
-            // const plantCodeId = maps.plantCode.get(
-            //   (plantCode || '').toString().trim(),
-            // );
-            const plantCodeString = (plantCode || '').toString().trim();
+            const rawPlantCode = (plantCode || '').toString().trim();
+            const plantCodeString = rawPlantCode === '' ? null : rawPlantCode;
             const salesZoneId = maps.salesZone.get((salesZone || '').toString().trim());
-            const packConfigId = maps.packConfig.get((packConfig || '').toString().trim());
+            const packConfigName = (packConfig || '').toString().trim();
+            let packConfigId = null;
+            if (packConfigName) {
+                const foundId = maps.packConfig.get(packConfigName);
+                if (foundId) {
+                    packConfigId = foundId;
+                } else {
+                    rowErrors.push(`Invalid packConfig: ${packConfigName}`);
+                }
+            }
             const customerData = maps.customer.get((customer || '').toString().trim());
             const customerId = customerData?.id;
             const customerAddress = customerData?.address;
-            if (!productId) rowErrors.push('Invalid product');
+            if (!productId) {
+                rowErrors.push(`Invalid product (Defaults to 'FA', but 'FA' not found in system)`);
+            }
             if (!saleOrderNumber) {
                 rowErrors.push('Missing saleOrderNumber');
             } else if (saleOrderNumber.toString().trim().length < 10) {
                 rowErrors.push('Sale Order Number must be at least 10 characters');
             }
             if (!outboundDelivery) rowErrors.push('Missing outboundDelivery');
-            if (!transferOrder) rowErrors.push('Missing transferOrder');
             if (!deliveryDate) rowErrors.push('Missing deliveryDate');
             if (!transporterId) rowErrors.push('Invalid transporter');
-            // if (!plantCodeId) rowErrors.push('Invalid plantCode');
-            if (!plantCodeString) rowErrors.push('Missing Plant Code');
             if (![
                 'Yes',
                 'No',
@@ -270,7 +280,6 @@ let SalesOrderService = class SalesOrderService {
                 false
             ].includes(paymentClearance)) rowErrors.push('Invalid paymentClearance (must be Yes or No)');
             if (!salesZoneId) rowErrors.push('Invalid salesZone');
-            if (!packConfigId) rowErrors.push('Invalid packConfig');
             if (!customerId) rowErrors.push('Invalid customer');
             let deliveryDateObj = null;
             if (deliveryDate) {
@@ -291,18 +300,17 @@ let SalesOrderService = class SalesOrderService {
                     productId,
                     saleOrderNumber: saleOrderNumber.toString(),
                     outboundDelivery: outboundDelivery.toString(),
-                    transferOrder: transferOrder.toString(),
+                    transferOrder: transferOrder ? transferOrder.toString() : null,
+                    plantCode: plantCodeString,
+                    packConfigId: packConfigId,
                     deliveryDate: deliveryDateObj,
                     transporterId,
-                    // plantCodeId,
-                    plantCode: plantCodeString,
                     paymentClearance: paymentClearance === 'Yes' || paymentClearance === true,
                     salesZoneId,
-                    packConfigId,
                     customerId,
-                    specialRemarks: specialRemarks?.toString(),
-                    additionalRemarks: additionalRemarks?.toString(),
-                    labelRemarks: labelRemarks?.toString(),
+                    specialRemarks: specialRemarks?.toString() || null,
+                    additionalRemarks: additionalRemarks?.toString() || null,
+                    labelRemarks: labelRemarks?.toString() || null,
                     address: customerAddress,
                     userId
                 });
@@ -322,7 +330,7 @@ let SalesOrderService = class SalesOrderService {
         }
         const saleOrderNumbers = ordersToInsert.map((o)=>o.saleOrderNumber);
         const outboundDeliveries = ordersToInsert.map((o)=>o.outboundDelivery);
-        const transferOrders = ordersToInsert.map((o)=>o.transferOrder);
+        const transferOrders = ordersToInsert.map((o)=>o.transferOrder).filter((t)=>!!t);
         const hasDuplicates = (arr)=>new Set(arr).size !== arr.length;
         if (hasDuplicates(saleOrderNumbers)) {
             throw new _common.BadRequestException('The import file contains duplicate Sale Order Numbers.');
@@ -363,7 +371,7 @@ let SalesOrderService = class SalesOrderService {
             if (existingOBD) {
                 throw new _common.ConflictException(`An order with Outbound Delivery '${existingOBD.outboundDelivery}' already exists.`);
             }
-            const existingTO = existingOrders.find((e)=>transferOrders.includes(e.transferOrder));
+            const existingTO = existingOrders.find((e)=>e.transferOrder && transferOrders.includes(e.transferOrder));
             if (existingTO) {
                 throw new _common.ConflictException(`An order with Transfer Order '${existingTO.transferOrder}' already exists.`);
             }

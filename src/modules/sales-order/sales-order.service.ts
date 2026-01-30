@@ -148,15 +148,21 @@ export class SalesOrderService {
     }
 
     const maps = {
-      product: new Map(products.map((p) => [p.name.trim(), p.id])),
-      transporter: new Map(transporters.map((t) => [t.name.trim(), t.id])),
-      // plantCode: new Map(plantCodes.map((pc) => [pc.code.trim(), pc.id])),
-      salesZone: new Map(salesZones.map((sz) => [sz.name.trim(), sz.id])),
-      packConfig: new Map(
-        packConfigs.map((pc) => [pc.configName.trim(), pc.id]),
+      product: new Map<string, number>(
+        products.map((p: any) => [p.name.trim(), p.id])
+      ),
+      transporter: new Map<string, number>(
+        transporters.map((t: any) => [t.name.trim(), t.id])
+      ),
+      // plantCode: new Map(plantCodes.map((pc: any) => [pc.code.trim(), pc.id])),
+      salesZone: new Map<string, number>(
+        salesZones.map((sz: any) => [sz.name.trim(), sz.id])
+      ),
+      packConfig: new Map<string, number>(
+        packConfigs.map((pc: any) => [pc.configName.trim(), pc.id]),
       ),
       customer: new Map<string, { id: number; address: string }>(
-        customers.map((c) => [c.name.trim(), { id: c.id, address: c.address }]),
+        customers.map((c: any) => [c.name.trim(), { id: c.id, address: c.address }]),
       ),
     };
 
@@ -165,6 +171,7 @@ export class SalesOrderService {
 
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       if (rowNumber === 1) return;
+
       const [
         product,
         saleOrderNumber,
@@ -183,20 +190,34 @@ export class SalesOrderService {
       ] = (row.values as any[]).slice(1);
 
       const rowErrors: string[] = [];
-      const productId = maps.product.get((product || '').toString().trim());
+
+      let productName = (product || '').toString().trim();
+      if (!productName) {
+        productName = 'FA'; 
+      }
+      const productId = maps.product.get(productName);
+
       const transporterId = maps.transporter.get(
         (transporter || '').toString().trim(),
       );
-      // const plantCodeId = maps.plantCode.get(
-      //   (plantCode || '').toString().trim(),
-      // );
-      const plantCodeString = (plantCode || '').toString().trim();
+
+      const rawPlantCode = (plantCode || '').toString().trim();
+      const plantCodeString = rawPlantCode === '' ? null : rawPlantCode;
+
       const salesZoneId = maps.salesZone.get(
         (salesZone || '').toString().trim(),
       );
-      const packConfigId = maps.packConfig.get(
-        (packConfig || '').toString().trim(),
-      );
+
+      const packConfigName = (packConfig || '').toString().trim();
+      let packConfigId: number | null = null;
+      if (packConfigName) {
+        const foundId = maps.packConfig.get(packConfigName);
+        if (foundId) {
+          packConfigId = foundId;
+        } else {
+          rowErrors.push(`Invalid packConfig: ${packConfigName}`);
+        }
+      }
 
       const customerData = maps.customer.get(
         (customer || '').toString().trim(),
@@ -204,22 +225,27 @@ export class SalesOrderService {
       const customerId = customerData?.id;
       const customerAddress = customerData?.address;
 
-      if (!productId) rowErrors.push('Invalid product');
+      if (!productId) {
+         rowErrors.push(`Invalid product (Defaults to 'FA', but 'FA' not found in system)`);
+      }
+
       if (!saleOrderNumber) {
         rowErrors.push('Missing saleOrderNumber');
       } else if (saleOrderNumber.toString().trim().length < 10) {
         rowErrors.push('Sale Order Number must be at least 10 characters');
       }
+
       if (!outboundDelivery) rowErrors.push('Missing outboundDelivery');
-      if (!transferOrder) rowErrors.push('Missing transferOrder');
+      
       if (!deliveryDate) rowErrors.push('Missing deliveryDate');
+
       if (!transporterId) rowErrors.push('Invalid transporter');
-      // if (!plantCodeId) rowErrors.push('Invalid plantCode');
-      if (!plantCodeString) rowErrors.push('Missing Plant Code');
+
       if (!['Yes', 'No', true, false].includes(paymentClearance))
         rowErrors.push('Invalid paymentClearance (must be Yes or No)');
+
       if (!salesZoneId) rowErrors.push('Invalid salesZone');
-      if (!packConfigId) rowErrors.push('Invalid packConfig');
+
       if (!customerId) rowErrors.push('Invalid customer');
 
       let deliveryDateObj: Date | null = null;
@@ -239,20 +265,23 @@ export class SalesOrderService {
           productId,
           saleOrderNumber: saleOrderNumber.toString(),
           outboundDelivery: outboundDelivery.toString(),
-          transferOrder: transferOrder.toString(),
+          
+          transferOrder: transferOrder ? transferOrder.toString() : null,
+          plantCode: plantCodeString,
+          packConfigId: packConfigId,
+          
           deliveryDate: deliveryDateObj,
           transporterId,
-          // plantCodeId,
-          plantCode: plantCodeString,
           paymentClearance:
             paymentClearance === 'Yes' || paymentClearance === true,
           salesZoneId,
-          packConfigId,
           customerId,
-          specialRemarks: specialRemarks?.toString(),
-          additionalRemarks: additionalRemarks?.toString(),
-          labelRemarks: labelRemarks?.toString(), 
-          address: customerAddress, 
+          
+          specialRemarks: specialRemarks?.toString() || null,
+          additionalRemarks: additionalRemarks?.toString() || null,
+          labelRemarks: labelRemarks?.toString() || null,
+          
+          address: customerAddress,
           userId,
         });
       }
@@ -275,7 +304,9 @@ export class SalesOrderService {
 
     const saleOrderNumbers = ordersToInsert.map((o) => o.saleOrderNumber);
     const outboundDeliveries = ordersToInsert.map((o) => o.outboundDelivery);
-    const transferOrders = ordersToInsert.map((o) => o.transferOrder);
+    const transferOrders = ordersToInsert
+      .map((o) => o.transferOrder)
+      .filter((t): t is string => !!t);
 
     const hasDuplicates = (arr: string[]) => new Set(arr).size !== arr.length;
     if (hasDuplicates(saleOrderNumbers)) {
@@ -322,7 +353,7 @@ export class SalesOrderService {
         );
       }
       const existingTO = existingOrders.find((e) =>
-        transferOrders.includes(e.transferOrder),
+        e.transferOrder && transferOrders.includes(e.transferOrder)
       );
       if (existingTO) {
         throw new ConflictException(

@@ -22,29 +22,32 @@ function _ts_metadata(k, v) {
 }
 let SalesCrudService = class SalesCrudService {
     async create(dto, userId) {
-        const existingOrder = await this.prisma.salesOrder.findFirst({
-            where: {
-                OR: [
-                    {
-                        saleOrderNumber: dto.saleOrderNumber
-                    },
-                    {
-                        outboundDelivery: dto.outboundDelivery
-                    },
-                    {
-                        transferOrder: dto.transferOrder
-                    }
-                ]
-            }
+        const saleOrderNumber = dto.saleOrderNumber?.trim();
+        const outboundDelivery = dto.outboundDelivery?.trim();
+        const transferOrder = dto.transferOrder?.trim();
+        const or = [];
+        if (saleOrderNumber) or.push({
+            saleOrderNumber
         });
+        if (outboundDelivery) or.push({
+            outboundDelivery
+        });
+        if (transferOrder) or.push({
+            transferOrder
+        }); // only if non-empty
+        const existingOrder = or.length ? await this.prisma.salesOrder.findFirst({
+            where: {
+                OR: or
+            }
+        }) : null;
         if (existingOrder) {
-            if (existingOrder.saleOrderNumber === dto.saleOrderNumber) {
+            if (saleOrderNumber && existingOrder.saleOrderNumber === saleOrderNumber) {
                 throw new _common.ConflictException('An order with this Sale Order Number already exists.');
             }
-            if (existingOrder.outboundDelivery === dto.outboundDelivery) {
+            if (outboundDelivery && existingOrder.outboundDelivery === outboundDelivery) {
                 throw new _common.ConflictException('An order with this Outbound Delivery number already exists.');
             }
-            if (existingOrder.transferOrder === dto.transferOrder) {
+            if (transferOrder && existingOrder.transferOrder === transferOrder) {
                 throw new _common.ConflictException('An order with this Transfer Order number already exists.');
             }
         }
@@ -59,9 +62,22 @@ let SalesCrudService = class SalesCrudService {
             const address = customer?.address || null;
             const deliveryDate = dto.deliveryDate && dto.deliveryDate.length === 10 ? new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString() : dto.deliveryDate;
             const { customerName, customerId, ...rest } = dto;
+            const cleanedRest = Object.fromEntries(Object.entries(rest).map(([k, v])=>{
+                if (typeof v === 'string') {
+                    const t = v.trim();
+                    return [
+                        k,
+                        t === '' ? null : t
+                    ];
+                }
+                return [
+                    k,
+                    v
+                ];
+            }));
             const newOrder = await this.prisma.salesOrder.create({
                 data: {
-                    ...rest,
+                    ...cleanedRest,
                     deliveryDate,
                     userId,
                     assignedUserId: null,
@@ -75,14 +91,14 @@ let SalesCrudService = class SalesCrudService {
                 }
             });
             const statuses = [
-                "To be Issued",
-                "Under Issue",
-                "Issued",
-                "Under Packing",
-                "Packed",
-                "WIP Storage",
-                "Ready for Dispatch",
-                "Dispatched"
+                'To be Issued',
+                'Under Issue',
+                'Issued',
+                'Under Packing',
+                'Packed',
+                'WIP Storage',
+                'Ready for Dispatch',
+                'Dispatched'
             ];
             await this.prisma.sO_Status_Stepper.createMany({
                 data: statuses.map((status)=>({
