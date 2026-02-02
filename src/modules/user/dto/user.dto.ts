@@ -63,6 +63,26 @@ export class CreateUserDto {
   @IsOptional()
   @IsBoolean()
   accessVehicleEntry?: boolean;
+
+  @ApiProperty({ description: 'Access to Location Accuracy module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessLocationAccuracy?: boolean;
+
+  @ApiProperty({ description: 'Access to Content Accuracy module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessContentAccuracy?: boolean;
+
+  @ApiProperty({ description: 'Access to Put Away module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessPutAway?: boolean;
+
+  @ApiProperty({ description: 'Access to ERP Barcode module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessErpBarcode?: boolean;
 }
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {

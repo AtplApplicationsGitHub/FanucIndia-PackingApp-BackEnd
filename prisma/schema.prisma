@@ -24,6 +24,10 @@ model User {
   accessMaterialFgTransfer Boolean @default(false)
   accessMaterialDispatch   Boolean @default(false)
   accessVehicleEntry       Boolean @default(false)
+  accessLocationAccuracy   Boolean @default(false)
+  accessContentAccuracy    Boolean @default(false)
+  accessPutAway            Boolean @default(false)
+  accessErpBarcode         Boolean @default(false)
 
   sentSoChatMessages     SalesOrderChatMessage[] @relation("SoChatFrom")
   receivedSoChatMessages SalesOrderChatMessage[] @relation("SoChatTo")
