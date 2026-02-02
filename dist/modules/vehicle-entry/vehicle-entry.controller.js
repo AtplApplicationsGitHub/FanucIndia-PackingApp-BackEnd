@@ -90,7 +90,11 @@ _ts_decorate([
             }
         }
     }),
-    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('files', 10)),
+    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('files', 10, {
+        limits: {
+            fileSize: 200 * 1024 * 1024
+        }
+    })),
     _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
     _ts_param(1, (0, _common.UploadedFiles)()),
     _ts_param(2, (0, _common.Req)()),

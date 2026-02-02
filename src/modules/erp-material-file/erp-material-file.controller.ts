@@ -39,7 +39,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UploadErpMaterialFileDto } from './dto/upload-erp-material-file.dto';
 
 const MAX_UPLOAD_BYTES = Number(
-  process.env.MAX_UPLOAD_BYTES || 50 * 1024 * 1024,
+  process.env.MAX_UPLOAD_BYTES || 200 * 1024 * 1024,
 );
 
 function splitExt(name: string) {

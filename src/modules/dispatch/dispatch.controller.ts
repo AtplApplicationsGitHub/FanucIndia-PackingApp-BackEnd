@@ -36,7 +36,9 @@ export class DispatchController {
 
   @Post()
   @Roles('ADMIN', 'USER')
-  @UseInterceptors(FilesInterceptor('attachments', 10))
+  @UseInterceptors(FilesInterceptor('attachments', 10, {
+    limits: { fileSize: 200 * 1024 * 1024 }
+  }))
     create(
     @Body() createDispatchDto: CreateDispatchDto,
     @UploadedFiles() files: Express.Multer.File[],
@@ -65,7 +67,9 @@ export class DispatchController {
 
   @Post('mobile/:id/attachments')
   @Roles('ADMIN', 'USER')
-  @UseInterceptors(FilesInterceptor('attachments', 10))
+  @UseInterceptors(FilesInterceptor('attachments', 10, {
+    limits: { fileSize: 200 * 1024 * 1024 }
+  }))
   @ApiOperation({ summary: 'Step 2 (Mobile): Upload attachments for a dispatch record.' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -189,7 +193,9 @@ export class DispatchController {
 
   @Post(':id/attachments')
   @Roles('ADMIN', 'USER')
-  @UseInterceptors(FilesInterceptor('attachments', 10))
+  @UseInterceptors(FilesInterceptor('attachments', 10, {
+    limits: { fileSize: 200 * 1024 * 1024 }
+  }))
   addAttachments(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],

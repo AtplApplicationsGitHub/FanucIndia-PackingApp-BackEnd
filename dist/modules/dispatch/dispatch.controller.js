@@ -111,7 +111,11 @@ let DispatchController = class DispatchController {
 _ts_decorate([
     (0, _common.Post)(),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
-    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10)),
+    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10, {
+        limits: {
+            fileSize: 200 * 1024 * 1024
+        }
+    })),
     _ts_param(0, (0, _common.Body)()),
     _ts_param(1, (0, _common.UploadedFiles)()),
     _ts_param(2, (0, _common.Req)()),
@@ -145,7 +149,11 @@ _ts_decorate([
 _ts_decorate([
     (0, _common.Post)('mobile/:id/attachments'),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
-    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10)),
+    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10, {
+        limits: {
+            fileSize: 200 * 1024 * 1024
+        }
+    })),
     (0, _swagger.ApiOperation)({
         summary: 'Step 2 (Mobile): Upload attachments for a dispatch record.'
     }),
@@ -329,7 +337,11 @@ _ts_decorate([
 _ts_decorate([
     (0, _common.Post)(':id/attachments'),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
-    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10)),
+    (0, _common.UseInterceptors)((0, _platformexpress.FilesInterceptor)('attachments', 10, {
+        limits: {
+            fileSize: 200 * 1024 * 1024
+        }
+    })),
     _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
     _ts_param(1, (0, _common.UploadedFiles)()),
     _ts_metadata("design:type", Function),

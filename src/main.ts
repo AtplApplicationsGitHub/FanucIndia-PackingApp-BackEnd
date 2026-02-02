@@ -4,9 +4,13 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { PinoLogger } from './common/pino-logger.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { logger: false });
+
+  app.use(json({ limit: '200mb' }));
+  app.use(urlencoded({ extended: true, limit: '200mb' }));
 
   const pinoAdapter = new PinoLogger();
   app.useLogger(pinoAdapter);
@@ -36,7 +40,8 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT || 3011;
-  await app.listen(port, '0.0.0.0');
+  const server = await app.listen(port, '0.0.0.0');
+  server.setTimeout(600000);
   pinoAdapter.log(`Application is listening on port ${port}`, 'bootstrap');
   pinoAdapter.log('Application started', 'bootstrap');
 }

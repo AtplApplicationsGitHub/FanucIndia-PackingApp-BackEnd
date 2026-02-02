@@ -50,7 +50,9 @@ export class VehicleEntryController {
       },
     },
   })
-  @UseInterceptors(FilesInterceptor('files', 10))
+  @UseInterceptors(FilesInterceptor('files', 10, {
+    limits: { fileSize: 200 * 1024 * 1024 }
+  }))
   uploadAttachments(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],

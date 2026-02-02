@@ -8,10 +8,18 @@ const _allexceptionsfilter = require("./common/all-exceptions.filter");
 const _pinologgerservice = require("./common/pino-logger.service");
 const _swagger = require("@nestjs/swagger");
 const _common = require("@nestjs/common");
+const _express = require("express");
 async function bootstrap() {
     const app = await _core.NestFactory.create(_appmodule.AppModule, {
         logger: false
     });
+    app.use((0, _express.json)({
+        limit: '200mb'
+    }));
+    app.use((0, _express.urlencoded)({
+        extended: true,
+        limit: '200mb'
+    }));
     const pinoAdapter = new _pinologgerservice.PinoLogger();
     app.useLogger(pinoAdapter);
     app.useGlobalPipes(new _common.ValidationPipe({
@@ -28,7 +36,8 @@ async function bootstrap() {
         credentials: true
     });
     const port = process.env.PORT || 3011;
-    await app.listen(port, '0.0.0.0');
+    const server = await app.listen(port, '0.0.0.0');
+    server.setTimeout(600000);
     pinoAdapter.log(`Application is listening on port ${port}`, 'bootstrap');
     pinoAdapter.log('Application started', 'bootstrap');
 }
