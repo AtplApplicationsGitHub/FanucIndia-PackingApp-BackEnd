@@ -84,7 +84,11 @@ let UserService = class UserService {
                 accessLabelPrint: dto.accessLabelPrint || false,
                 accessMaterialFgTransfer: dto.accessMaterialFgTransfer || false,
                 accessMaterialDispatch: dto.accessMaterialDispatch || false,
-                accessVehicleEntry: dto.accessVehicleEntry || false
+                accessVehicleEntry: dto.accessVehicleEntry || false,
+                accessLocationAccuracy: dto.accessLocationAccuracy || false,
+                accessContentAccuracy: dto.accessContentAccuracy || false,
+                accessPutAway: dto.accessPutAway || false,
+                accessErpBarcode: dto.accessErpBarcode || false
             },
             select: {
                 id: true,
@@ -97,7 +101,11 @@ let UserService = class UserService {
                 accessLabelPrint: true,
                 accessMaterialFgTransfer: true,
                 accessMaterialDispatch: true,
-                accessVehicleEntry: true
+                accessVehicleEntry: true,
+                accessLocationAccuracy: true,
+                accessContentAccuracy: true,
+                accessPutAway: true,
+                accessErpBarcode: true
             }
         });
     }
@@ -119,7 +127,11 @@ let UserService = class UserService {
                 accessLabelPrint: true,
                 accessMaterialFgTransfer: true,
                 accessMaterialDispatch: true,
-                accessVehicleEntry: true
+                accessVehicleEntry: true,
+                accessLocationAccuracy: true,
+                accessContentAccuracy: true,
+                accessPutAway: true,
+                accessErpBarcode: true
             },
             orderBy: {
                 createdAt: 'desc'
@@ -175,7 +187,11 @@ let UserService = class UserService {
                 accessLabelPrint: true,
                 accessMaterialFgTransfer: true,
                 accessMaterialDispatch: true,
-                accessVehicleEntry: true
+                accessVehicleEntry: true,
+                accessLocationAccuracy: true,
+                accessContentAccuracy: true,
+                accessPutAway: true,
+                accessErpBarcode: true
             }
         });
     }
@@ -250,7 +266,11 @@ let UserService = class UserService {
                 accessLabelPrint: true,
                 accessMaterialFgTransfer: true,
                 accessMaterialDispatch: true,
-                accessVehicleEntry: true
+                accessVehicleEntry: true,
+                accessLocationAccuracy: true,
+                accessContentAccuracy: true,
+                accessPutAway: true,
+                accessErpBarcode: true
             }
         });
         if (!user) throw new _common.NotFoundException('User not found');

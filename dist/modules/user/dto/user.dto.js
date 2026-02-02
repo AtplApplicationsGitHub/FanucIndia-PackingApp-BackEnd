@@ -123,6 +123,42 @@ _ts_decorate([
     (0, _classvalidator.IsBoolean)(),
     _ts_metadata("design:type", Boolean)
 ], CreateUserDto.prototype, "accessVehicleEntry", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'Access to Location Accuracy module',
+        required: false
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], CreateUserDto.prototype, "accessLocationAccuracy", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'Access to Content Accuracy module',
+        required: false
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], CreateUserDto.prototype, "accessContentAccuracy", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'Access to Put Away module',
+        required: false
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], CreateUserDto.prototype, "accessPutAway", void 0);
+_ts_decorate([
+    (0, _swagger.ApiProperty)({
+        description: 'Access to ERP Barcode module',
+        required: false
+    }),
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], CreateUserDto.prototype, "accessErpBarcode", void 0);
 let UpdateUserDto = class UpdateUserDto extends (0, _swagger.PartialType)(CreateUserDto) {
 };
 _ts_decorate([

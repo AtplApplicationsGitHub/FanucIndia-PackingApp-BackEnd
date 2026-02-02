@@ -36,6 +36,10 @@ export class UserService {
         accessMaterialFgTransfer: dto.accessMaterialFgTransfer || false,
         accessMaterialDispatch: dto.accessMaterialDispatch || false,
         accessVehicleEntry: dto.accessVehicleEntry || false,
+        accessLocationAccuracy: dto.accessLocationAccuracy || false,
+        accessContentAccuracy: dto.accessContentAccuracy || false,
+        accessPutAway: dto.accessPutAway || false,
+        accessErpBarcode: dto.accessErpBarcode || false,
       },
       select: {
         id: true,
@@ -49,6 +53,10 @@ export class UserService {
         accessMaterialFgTransfer: true,
         accessMaterialDispatch: true,
         accessVehicleEntry: true,
+        accessLocationAccuracy: true,
+        accessContentAccuracy: true,
+        accessPutAway: true,
+        accessErpBarcode: true,
       },
     });
   }
@@ -73,6 +81,10 @@ export class UserService {
         accessMaterialFgTransfer: true,
         accessMaterialDispatch: true,
         accessVehicleEntry: true,
+        accessLocationAccuracy: true,
+        accessContentAccuracy: true,
+        accessPutAway: true,
+        accessErpBarcode: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -120,6 +132,10 @@ export class UserService {
         accessMaterialFgTransfer: true,
         accessMaterialDispatch: true,
         accessVehicleEntry: true,
+        accessLocationAccuracy: true,
+        accessContentAccuracy: true,
+        accessPutAway: true,
+        accessErpBarcode: true,
       },
     });
   }
@@ -180,6 +196,10 @@ export class UserService {
         accessMaterialFgTransfer: true,
         accessMaterialDispatch: true,
         accessVehicleEntry: true,
+        accessLocationAccuracy: true,
+        accessContentAccuracy: true,
+        accessPutAway: true,
+        accessErpBarcode: true,
       },
     });
 
