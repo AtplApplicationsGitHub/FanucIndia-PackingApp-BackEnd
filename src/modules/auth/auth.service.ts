@@ -191,6 +191,10 @@ export class AuthService {
         accessMaterialFgTransfer: user.accessMaterialFgTransfer,
         accessMaterialDispatch: user.accessMaterialDispatch,
         accessVehicleEntry: user.accessVehicleEntry,
+        accessLocationAccuracy: user.accessLocationAccuracy,
+        accessContentAccuracy: user.accessContentAccuracy,
+        accessPutAway: user.accessPutAway,
+        accessErpBarcode: user.accessErpBarcode,
       },
     };
   }
