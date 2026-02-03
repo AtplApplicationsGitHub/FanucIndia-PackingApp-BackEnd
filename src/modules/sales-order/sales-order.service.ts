@@ -31,7 +31,7 @@ export class SalesOrderService {
         { header: 'Packing Config', key: 'packConfig', width: 20 },
         { header: 'Customer', key: 'customer', width: 25 },
         { header: 'Special Remarks', key: 'specialRemarks', width: 30 },
-        { header: 'Additional Remarks', key: 'additionalRemarks', width: 30 }, 
+        { header: 'Additional Remarks', key: 'additionalRemarks', width: 30 },
         { header: 'Label Remarks', key: 'labelRemarks', width: 30 },
       ];
 
@@ -81,7 +81,7 @@ export class SalesOrderService {
         if (values.length === 0) return;
 
         const colLetter = refSheet.getColumn(idx + 1).letter;
-        const lastRow = values.length + 1; 
+        const lastRow = values.length + 1;
         const formula = `ReferenceData!$${colLetter}$2:$${colLetter}$${lastRow}`;
 
         const targetCol = worksheet.getColumn(key);
@@ -96,11 +96,11 @@ export class SalesOrderService {
 
       res.setHeader(
         'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
       res.setHeader(
         'Content-Disposition',
-        'attachment; filename="bulk_import_excel.xlsx"'
+        'attachment; filename="bulk_import_excel.xlsx"',
       );
       return workbook.xlsx.write(res).then(() => {
         res.end();
@@ -149,20 +149,23 @@ export class SalesOrderService {
 
     const maps = {
       product: new Map<string, number>(
-        products.map((p: any) => [p.name.trim(), p.id])
+        products.map((p: any) => [p.name.trim(), p.id]),
       ),
       transporter: new Map<string, number>(
-        transporters.map((t: any) => [t.name.trim(), t.id])
+        transporters.map((t: any) => [t.name.trim(), t.id]),
       ),
       // plantCode: new Map(plantCodes.map((pc: any) => [pc.code.trim(), pc.id])),
       salesZone: new Map<string, number>(
-        salesZones.map((sz: any) => [sz.name.trim(), sz.id])
+        salesZones.map((sz: any) => [sz.name.trim(), sz.id]),
       ),
       packConfig: new Map<string, number>(
         packConfigs.map((pc: any) => [pc.configName.trim(), pc.id]),
       ),
       customer: new Map<string, { id: number; address: string }>(
-        customers.map((c: any) => [c.name.trim(), { id: c.id, address: c.address }]),
+        customers.map((c: any) => [
+          c.name.trim(),
+          { id: c.id, address: c.address },
+        ]),
       ),
     };
 
@@ -193,13 +196,12 @@ export class SalesOrderService {
 
       let productName = (product || '').toString().trim();
       if (!productName) {
-        productName = 'FA'; 
+        productName = 'FA';
       }
       const productId = maps.product.get(productName);
 
-      const transporterId = maps.transporter.get(
-        (transporter || '').toString().trim(),
-      );
+      const transporterNameRaw = (transporter || '').toString().trim();
+      const transporterId = maps.transporter.get(transporterNameRaw);
 
       const rawPlantCode = (plantCode || '').toString().trim();
       const plantCodeString = rawPlantCode === '' ? null : rawPlantCode;
@@ -219,14 +221,15 @@ export class SalesOrderService {
         }
       }
 
-      const customerData = maps.customer.get(
-        (customer || '').toString().trim(),
-      );
+      const customerNameRaw = (customer || '').toString().trim();
+      const customerData = maps.customer.get(customerNameRaw);
       const customerId = customerData?.id;
       const customerAddress = customerData?.address;
 
       if (!productId) {
-         rowErrors.push(`Invalid product (Defaults to 'FA', but 'FA' not found in system)`);
+        rowErrors.push(
+          `Invalid product (Defaults to 'FA', but 'FA' not found in system)`,
+        );
       }
 
       if (!saleOrderNumber) {
@@ -236,17 +239,24 @@ export class SalesOrderService {
       }
 
       if (!outboundDelivery) rowErrors.push('Missing outboundDelivery');
-      
+
       if (!deliveryDate) rowErrors.push('Missing deliveryDate');
 
-      if (!transporterId) rowErrors.push('Invalid transporter');
+      // if (!transporterId) rowErrors.push('Invalid transporter');
+      if (!transporterNameRaw) {
+         rowErrors.push('Missing transporter');
+      }
 
       if (!['Yes', 'No', true, false].includes(paymentClearance))
         rowErrors.push('Invalid paymentClearance (must be Yes or No)');
 
       if (!salesZoneId) rowErrors.push('Invalid salesZone');
 
-      if (!customerId) rowErrors.push('Invalid customer');
+      // if (!customerId) rowErrors.push('Invalid customer');
+
+      if (!customerNameRaw) {
+        rowErrors.push('Missing customer Name');
+      }
 
       let deliveryDateObj: Date | null = null;
       if (deliveryDate) {
@@ -265,22 +275,25 @@ export class SalesOrderService {
           productId,
           saleOrderNumber: saleOrderNumber.toString(),
           outboundDelivery: outboundDelivery.toString(),
-          
+
           transferOrder: transferOrder ? transferOrder.toString() : null,
           plantCode: plantCodeString,
           packConfigId: packConfigId,
-          
+
           deliveryDate: deliveryDateObj,
           transporterId,
+          transporterName: transporterNameRaw,
+
           paymentClearance:
             paymentClearance === 'Yes' || paymentClearance === true,
           salesZoneId,
           customerId,
-          
+          customerName: customerNameRaw,
+
           specialRemarks: specialRemarks?.toString() || null,
           additionalRemarks: additionalRemarks?.toString() || null,
           labelRemarks: labelRemarks?.toString() || null,
-          
+
           address: customerAddress,
           userId,
         });
@@ -352,8 +365,8 @@ export class SalesOrderService {
           `An order with Outbound Delivery '${existingOBD.outboundDelivery}' already exists.`,
         );
       }
-      const existingTO = existingOrders.find((e) =>
-        e.transferOrder && transferOrders.includes(e.transferOrder)
+      const existingTO = existingOrders.find(
+        (e) => e.transferOrder && transferOrders.includes(e.transferOrder),
       );
       if (existingTO) {
         throw new ConflictException(
@@ -368,26 +381,77 @@ export class SalesOrderService {
       const insertedCount = await this.prisma.$transaction(async (tx) => {
         let count = 0;
         for (const orderData of ordersToInsert) {
+          let finalCustomerId = orderData.customerId;
+          let finalCustomerAddress = orderData.address;
+
+          if (!finalCustomerId && orderData.customerName) {
+            let found = maps.customer.get(orderData.customerName);
+
+            if (!found) {
+              const newCustomer = await tx.customer.create({
+                data: { name: orderData.customerName },
+              });
+
+              found = {
+                id: newCustomer.id,
+                address: newCustomer.address || '',
+              };
+
+              maps.customer.set(orderData.customerName, found);
+            }
+
+            finalCustomerId = found.id;
+            finalCustomerAddress = found.address;
+          }
+
+          let finalTransporterId = orderData.transporterId;
+
+          if (!finalTransporterId && orderData.transporterName) {
+            
+            let foundId = maps.transporter.get(orderData.transporterName);
+
+            if (!foundId) {
+              const newTransporter = await tx.transporter.create({
+                data: { name: orderData.transporterName },
+              });
+              
+              foundId = newTransporter.id;
+              
+              maps.transporter.set(orderData.transporterName, foundId);
+            }
+
+            finalTransporterId = foundId;
+          }
+
+          const { customerName, transporterName, ...dataToSave } = orderData;
+
           const newOrder = await tx.salesOrder.create({
-            data: orderData,
+            data: {
+              ...dataToSave,
+              customerId: finalCustomerId,
+              transporterId: finalTransporterId,
+              address: finalCustomerAddress,
+            },
           });
+
           count++;
 
           const statuses = [
-            "To be Issued",
-            "Under Issue",
-            "Issued",
-            "Under Packing",
-            "Packed",
-            "WIP Storage",
-            "Ready for Dispatch", 
-            "Dispatched"
+            'To be Issued',
+            'Under Issue',
+            'Issued',
+            'Under Packing',
+            'Packed',
+            'WIP Storage',
+            'Ready for Dispatch',
+            'Dispatched',
           ];
           await tx.sO_Status_Stepper.createMany({
             data: statuses.map((status) => ({
               salesOrderNumber: newOrder.saleOrderNumber,
               status: status,
-              createdDateTime: status === 'To be Issued' ? newOrder.createdAt : null,
+              createdDateTime:
+                status === 'To be Issued' ? newOrder.createdAt : null,
               updatedBy: null,
             })),
           });

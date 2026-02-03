@@ -236,7 +236,11 @@ let AuthService = class AuthService {
                 accessLabelPrint: user.accessLabelPrint,
                 accessMaterialFgTransfer: user.accessMaterialFgTransfer,
                 accessMaterialDispatch: user.accessMaterialDispatch,
-                accessVehicleEntry: user.accessVehicleEntry
+                accessVehicleEntry: user.accessVehicleEntry,
+                accessLocationAccuracy: user.accessLocationAccuracy,
+                accessContentAccuracy: user.accessContentAccuracy,
+                accessPutAway: user.accessPutAway,
+                accessErpBarcode: user.accessErpBarcode
             }
         };
     }

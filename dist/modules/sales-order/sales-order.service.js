@@ -245,7 +245,8 @@ let SalesOrderService = class SalesOrderService {
                 productName = 'FA';
             }
             const productId = maps.product.get(productName);
-            const transporterId = maps.transporter.get((transporter || '').toString().trim());
+            const transporterNameRaw = (transporter || '').toString().trim();
+            const transporterId = maps.transporter.get(transporterNameRaw);
             const rawPlantCode = (plantCode || '').toString().trim();
             const plantCodeString = rawPlantCode === '' ? null : rawPlantCode;
             const salesZoneId = maps.salesZone.get((salesZone || '').toString().trim());
@@ -259,7 +260,8 @@ let SalesOrderService = class SalesOrderService {
                     rowErrors.push(`Invalid packConfig: ${packConfigName}`);
                 }
             }
-            const customerData = maps.customer.get((customer || '').toString().trim());
+            const customerNameRaw = (customer || '').toString().trim();
+            const customerData = maps.customer.get(customerNameRaw);
             const customerId = customerData?.id;
             const customerAddress = customerData?.address;
             if (!productId) {
@@ -272,7 +274,10 @@ let SalesOrderService = class SalesOrderService {
             }
             if (!outboundDelivery) rowErrors.push('Missing outboundDelivery');
             if (!deliveryDate) rowErrors.push('Missing deliveryDate');
-            if (!transporterId) rowErrors.push('Invalid transporter');
+            // if (!transporterId) rowErrors.push('Invalid transporter');
+            if (!transporterNameRaw) {
+                rowErrors.push('Missing transporter');
+            }
             if (![
                 'Yes',
                 'No',
@@ -280,7 +285,10 @@ let SalesOrderService = class SalesOrderService {
                 false
             ].includes(paymentClearance)) rowErrors.push('Invalid paymentClearance (must be Yes or No)');
             if (!salesZoneId) rowErrors.push('Invalid salesZone');
-            if (!customerId) rowErrors.push('Invalid customer');
+            // if (!customerId) rowErrors.push('Invalid customer');
+            if (!customerNameRaw) {
+                rowErrors.push('Missing customer Name');
+            }
             let deliveryDateObj = null;
             if (deliveryDate) {
                 const dt = new Date(deliveryDate);
@@ -305,9 +313,11 @@ let SalesOrderService = class SalesOrderService {
                     packConfigId: packConfigId,
                     deliveryDate: deliveryDateObj,
                     transporterId,
+                    transporterName: transporterNameRaw,
                     paymentClearance: paymentClearance === 'Yes' || paymentClearance === true,
                     salesZoneId,
                     customerId,
+                    customerName: customerNameRaw,
                     specialRemarks: specialRemarks?.toString() || null,
                     additionalRemarks: additionalRemarks?.toString() || null,
                     labelRemarks: labelRemarks?.toString() || null,
@@ -381,19 +391,58 @@ let SalesOrderService = class SalesOrderService {
             const insertedCount = await this.prisma.$transaction(async (tx)=>{
                 let count = 0;
                 for (const orderData of ordersToInsert){
+                    let finalCustomerId = orderData.customerId;
+                    let finalCustomerAddress = orderData.address;
+                    if (!finalCustomerId && orderData.customerName) {
+                        let found = maps.customer.get(orderData.customerName);
+                        if (!found) {
+                            const newCustomer = await tx.customer.create({
+                                data: {
+                                    name: orderData.customerName
+                                }
+                            });
+                            found = {
+                                id: newCustomer.id,
+                                address: newCustomer.address || ''
+                            };
+                            maps.customer.set(orderData.customerName, found);
+                        }
+                        finalCustomerId = found.id;
+                        finalCustomerAddress = found.address;
+                    }
+                    let finalTransporterId = orderData.transporterId;
+                    if (!finalTransporterId && orderData.transporterName) {
+                        let foundId = maps.transporter.get(orderData.transporterName);
+                        if (!foundId) {
+                            const newTransporter = await tx.transporter.create({
+                                data: {
+                                    name: orderData.transporterName
+                                }
+                            });
+                            foundId = newTransporter.id;
+                            maps.transporter.set(orderData.transporterName, foundId);
+                        }
+                        finalTransporterId = foundId;
+                    }
+                    const { customerName, transporterName, ...dataToSave } = orderData;
                     const newOrder = await tx.salesOrder.create({
-                        data: orderData
+                        data: {
+                            ...dataToSave,
+                            customerId: finalCustomerId,
+                            transporterId: finalTransporterId,
+                            address: finalCustomerAddress
+                        }
                     });
                     count++;
                     const statuses = [
-                        "To be Issued",
-                        "Under Issue",
-                        "Issued",
-                        "Under Packing",
-                        "Packed",
-                        "WIP Storage",
-                        "Ready for Dispatch",
-                        "Dispatched"
+                        'To be Issued',
+                        'Under Issue',
+                        'Issued',
+                        'Under Packing',
+                        'Packed',
+                        'WIP Storage',
+                        'Ready for Dispatch',
+                        'Dispatched'
                     ];
                     await tx.sO_Status_Stepper.createMany({
                         data: statuses.map((status)=>({
