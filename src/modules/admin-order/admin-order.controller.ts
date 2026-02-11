@@ -13,6 +13,7 @@ import { AdminOrderService } from './admin-order.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UpdateAdminOrderDto } from './dto/update-admin-order.dto';
+import { BulkAssignOrderDto } from './dto/bulk-assign-order.dto';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -71,6 +72,15 @@ export class AdminOrderController {
   })
   findAll(@Query() query: any, @Req() req: AuthRequest) { 
     return this.service.findAll(query, req.user); 
+  }
+
+  @Patch('bulk-assign')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Bulk assign users to multiple sales orders' })
+  @ApiBody({ type: BulkAssignOrderDto })
+  @ApiResponse({ status: 200, description: 'Orders assigned successfully' })
+  async bulkAssign(@Body() dto: BulkAssignOrderDto, @Req() req: AuthRequest) {
+    return this.service.bulkAssign(dto, req.user);
   }
 
   @Patch(':id')

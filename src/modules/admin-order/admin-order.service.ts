@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { UpdateAdminOrderDto } from './dto/update-admin-order.dto';
+import { BulkAssignOrderDto } from './dto/bulk-assign-order.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -332,5 +333,57 @@ export class AdminOrderService {
 
     await this.prisma.salesOrder.delete({ where: { id } });
     return { message: 'Sales order deleted successfully' };
+  }
+
+  async bulkAssign(dto: BulkAssignOrderDto, user: { userId: number; name: string }) {
+    const { salesOrderIds, assignedUserId } = dto;
+    const now = new Date();
+
+    const orders = await this.prisma.salesOrder.findMany({
+      where: { id: { in: salesOrderIds } },
+      select: { id: true, status: true, saleOrderNumber: true, assignedUserId: true }
+    });
+
+    if (orders.length === 0) {
+      throw new NotFoundException('No valid orders found for the provided IDs');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const order of orders) {
+        if (order.assignedUserId === assignedUserId) continue;
+
+        let targetStatus = '';
+        if (order.status === 'R105' || !order.status) {
+          targetStatus = 'Under Issue';
+        } else if (order.status === 'W105') {
+          targetStatus = 'Under Packing';
+        }
+
+        if (targetStatus) {
+          await tx.sO_Status_Stepper.updateMany({
+            where: {
+              salesOrderNumber: order.saleOrderNumber,
+              status: targetStatus,
+              createdDateTime: null,
+            },
+            data: {
+              createdDateTime: now,
+              updatedBy: user.name,
+            },
+          });
+        }
+
+        await tx.salesOrder.update({
+          where: { id: order.id },
+          data: {
+            assignedUserId: assignedUserId,
+            UpdatedBy: user.name,
+            UpdatedDate: now,
+          },
+        });
+      }
+    });
+
+    return { message: 'Bulk assignment successful', count: orders.length };
   }
 }

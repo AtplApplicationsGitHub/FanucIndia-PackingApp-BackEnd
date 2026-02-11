@@ -13,6 +13,7 @@ const _adminorderservice = require("./admin-order.service");
 const _jwtauthguard = require("../auth/jwt-auth.guard");
 const _rolesdecorator = require("../auth/roles.decorator");
 const _updateadminorderdto = require("./dto/update-admin-order.dto");
+const _bulkassignorderdto = require("./dto/bulk-assign-order.dto");
 const _swagger = require("@nestjs/swagger");
 const _authrequesttype = require("../auth/types/auth-request.type");
 function _ts_decorate(decorators, target, key, desc) {
@@ -32,6 +33,9 @@ function _ts_param(paramIndex, decorator) {
 let AdminOrderController = class AdminOrderController {
     findAll(query, req) {
         return this.service.findAll(query, req.user);
+    }
+    async bulkAssign(dto, req) {
+        return this.service.bulkAssign(dto, req.user);
     }
     update(id, dto, req) {
         return this.service.update(id, dto, req.user);
@@ -92,6 +96,28 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], AdminOrderController.prototype, "findAll", null);
+_ts_decorate([
+    (0, _common.Patch)('bulk-assign'),
+    (0, _rolesdecorator.Roles)('ADMIN'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Bulk assign users to multiple sales orders'
+    }),
+    (0, _swagger.ApiBody)({
+        type: _bulkassignorderdto.BulkAssignOrderDto
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Orders assigned successfully'
+    }),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _bulkassignorderdto.BulkAssignOrderDto === "undefined" ? Object : _bulkassignorderdto.BulkAssignOrderDto,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], AdminOrderController.prototype, "bulkAssign", null);
 _ts_decorate([
     (0, _common.Patch)(':id'),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
