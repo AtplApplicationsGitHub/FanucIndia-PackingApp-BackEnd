@@ -172,6 +172,7 @@ export class UserDashboardService {
         Mapping_Barcode: true,
         Remarks_Required: true,
         Remarks: true,
+        skipIssueStage: true,
       },
     });
     return materials.map((material) => ({

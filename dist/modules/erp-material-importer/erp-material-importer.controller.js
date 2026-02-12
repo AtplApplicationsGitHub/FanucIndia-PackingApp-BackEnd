@@ -13,6 +13,8 @@ const _platformexpress = require("@nestjs/platform-express");
 const _erpmaterialimporterservice = require("./erp-material-importer.service");
 const _jwtauthguard = require("../auth/jwt-auth.guard");
 const _rolesdecorator = require("../auth/roles.decorator");
+const _bulkimportdrivedto = require("./dto/bulk-import-drive.dto");
+const _authrequesttype = require("../auth/types/auth-request.type");
 const _swagger = require("@nestjs/swagger");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
@@ -29,17 +31,23 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let ErpMaterialImporterController = class ErpMaterialImporterController {
-    async uploadFile(file, saleOrderNumber) {
+    async uploadFile(file, req, saleOrderNumber) {
         if (!file) {
             throw new _common.BadRequestException('No file uploaded.');
         }
-        return this.service.processFile(file, saleOrderNumber);
+        return this.service.processFile(file, saleOrderNumber, req.user.name);
     }
-    async importFromDrive(saleOrderNumber) {
+    async bulkImportFromDrive(dto, req) {
+        if (!dto.saleOrderNumbers || dto.saleOrderNumbers.length === 0) {
+            throw new _common.BadRequestException('Sale Order Numbers list is required.');
+        }
+        return this.service.bulkImportFromDrive(dto.saleOrderNumbers, req.user.name);
+    }
+    async importFromDrive(saleOrderNumber, req) {
         if (!saleOrderNumber) {
             throw new _common.BadRequestException('Sale Order Number is required.');
         }
-        return this.service.importFromDrive(saleOrderNumber);
+        return this.service.importFromDrive(saleOrderNumber, req.user.name);
     }
     constructor(service){
         this.service = service;
@@ -70,14 +78,34 @@ _ts_decorate([
         }
     }),
     _ts_param(0, (0, _common.UploadedFile)()),
-    _ts_param(1, (0, _common.Body)('saleOrderNumber')),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_param(2, (0, _common.Body)('saleOrderNumber')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         typeof Express === "undefined" || typeof Express.Multer === "undefined" || typeof Express.Multer.File === "undefined" ? Object : Express.Multer.File,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest,
         String
     ]),
     _ts_metadata("design:returntype", Promise)
 ], ErpMaterialImporterController.prototype, "uploadFile", null);
+_ts_decorate([
+    (0, _common.Post)('bulk-import-from-drive'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Bulk import ERP material files from drive for multiple SOs'
+    }),
+    (0, _swagger.ApiBody)({
+        type: _bulkimportdrivedto.BulkImportDriveDto
+    }),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _bulkimportdrivedto.BulkImportDriveDto === "undefined" ? Object : _bulkimportdrivedto.BulkImportDriveDto,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], ErpMaterialImporterController.prototype, "bulkImportFromDrive", null);
 _ts_decorate([
     (0, _common.Post)('import-from-drive'),
     (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
@@ -99,9 +127,11 @@ _ts_decorate([
         }
     }),
     _ts_param(0, (0, _common.Body)('saleOrderNumber')),
+    _ts_param(1, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        String
+        String,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
     ]),
     _ts_metadata("design:returntype", Promise)
 ], ErpMaterialImporterController.prototype, "importFromDrive", null);

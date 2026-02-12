@@ -95,7 +95,7 @@ const columnMapping = {
     STATUS: 'STATUS'
 };
 let ErpMaterialImporterService = class ErpMaterialImporterService {
-    async importFromDrive(saleOrderNumber) {
+    async importFromDrive(saleOrderNumber, username) {
         this.logger.log(`Initiating Drive Import for SO: ${saleOrderNumber}`);
         const so = await this.prisma.salesOrder.findUnique({
             where: {
@@ -141,7 +141,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             stream: null
         };
         try {
-            const result = await this.processFile(mockFile, saleOrderNumber);
+            const result = await this.processFile(mockFile, saleOrderNumber, username);
             const archivePath = _path.posix.join(archivedDir, filename);
             await this.sftpService.rename(filePath, archivePath);
             this.logger.log(`Moved file to SFTP Archive: ${archivePath}`);
@@ -157,7 +157,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             throw error;
         }
     }
-    async processFile(file, expectedSaleOrderNumber) {
+    async processFile(file, expectedSaleOrderNumber, username = 'ERP Import') {
         this.logger.log(`Starting to process file: ${file.originalname}`);
         const records = await this.readFile(file);
         const validationError = await this.validateRecords(records, expectedSaleOrderNumber);
@@ -166,7 +166,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             throw new _common.BadRequestException(validationError);
         }
         const renamedRecords = this.renameColumns(records);
-        await this.upsertRecords(renamedRecords);
+        await this.upsertRecords(renamedRecords, username);
         const soNumber = String(records[0]['SO Number']);
         try {
             await this.prisma.eRPMaterialLog.create({
@@ -185,6 +185,124 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         this.logger.log(`Successfully processed file: ${file.originalname}`);
         return {
             message: `File processed successfully. ${renamedRecords.length} records upserted.`
+        };
+    }
+    async bulkImportFromDrive(saleOrderNumbers, username) {
+        this.logger.log(`Initiating Bulk Drive Import for ${saleOrderNumbers.length} SOs`);
+        const results = [];
+        const baseDir = process.env.SFTP_BASE_DIR_DRIVE || '';
+        const activeDir = _path.posix.join(baseDir, 'active');
+        const archivedDir = _path.posix.join(baseDir, 'archive');
+        const errorDir = _path.posix.join(baseDir, 'error');
+        const salesOrders = await this.prisma.salesOrder.findMany({
+            where: {
+                saleOrderNumber: {
+                    in: saleOrderNumbers
+                }
+            },
+            select: {
+                saleOrderNumber: true,
+                outboundDelivery: true,
+                isErpImported: true,
+                _count: {
+                    select: {
+                        materialData: true
+                    }
+                }
+            }
+        });
+        const soMap = new Map(salesOrders.map((so)=>[
+                so.saleOrderNumber,
+                so
+            ]));
+        for (const soNumber of saleOrderNumbers){
+            const so = soMap.get(soNumber);
+            if (!so) {
+                results.push({
+                    soNumber,
+                    status: 'Failed',
+                    reason: 'Sales Order not found in system'
+                });
+                continue;
+            }
+            if (so.isErpImported === 1) {
+                results.push({
+                    soNumber,
+                    status: 'Skipped',
+                    reason: 'Data already imported'
+                });
+                continue;
+            }
+            if (so._count.materialData > 0) {
+                results.push({
+                    soNumber,
+                    status: 'Skipped',
+                    reason: 'Data already imported'
+                });
+                continue;
+            }
+            if (!so.outboundDelivery) {
+                results.push({
+                    soNumber,
+                    status: 'Skipped',
+                    reason: 'Outbound Delivery (OBD) missing'
+                });
+                continue;
+            }
+            const filename = `${soNumber}_${so.outboundDelivery}.xlsx`;
+            const filePath = _path.posix.join(activeDir, filename);
+            try {
+                const exists = await this.sftpService.exists(filePath);
+                if (!exists) {
+                    results.push({
+                        soNumber,
+                        status: 'Skipped',
+                        reason: `File not found: ${filename}`
+                    });
+                    continue;
+                }
+                const fileBuffer = await this.sftpService.getBuffer(filePath);
+                const mockFile = {
+                    fieldname: 'file',
+                    originalname: filename,
+                    encoding: '7bit',
+                    mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    buffer: fileBuffer,
+                    size: fileBuffer.length,
+                    destination: activeDir,
+                    filename: filename,
+                    path: filePath,
+                    stream: null
+                };
+                await this.processFile(mockFile, soNumber, username);
+                const archivePath = _path.posix.join(archivedDir, filename);
+                await this.sftpService.rename(filePath, archivePath);
+                results.push({
+                    soNumber,
+                    status: 'Success',
+                    reason: 'Imported successfully'
+                });
+            } catch (error) {
+                this.logger.error(`Bulk import error for ${soNumber}`, error);
+                try {
+                    const exists = await this.sftpService.exists(filePath);
+                    if (exists) {
+                        const errorPath = _path.posix.join(errorDir, filename);
+                        await this.sftpService.rename(filePath, errorPath);
+                    }
+                } catch (moveErr) {
+                    this.logger.error(`Failed to move file ${filename} to Error folder`, moveErr);
+                }
+                results.push({
+                    soNumber,
+                    status: 'Failed',
+                    reason: error.message || 'Processing failed'
+                });
+            }
+        }
+        return {
+            message: 'Bulk import process completed',
+            summary: results
         };
     }
     async readFile(file) {
@@ -290,7 +408,7 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
             return newRecord;
         });
     }
-    async upsertRecords(records) {
+    async upsertRecords(records, username) {
         if (records.length === 0) return;
         const soNumber = String(records[0].saleOrderNumber);
         this.logger.log(`Upserting ${records.length} records for SO Number: ${soNumber}`);
@@ -383,34 +501,34 @@ let ErpMaterialImporterService = class ErpMaterialImporterService {
         });
         try {
             await this.prisma.$transaction(async (tx)=>{
-                if (computedCustomerName || computedCustomerAddress) {
-                    const so = await tx.salesOrder.findUnique({
-                        where: {
-                            saleOrderNumber: soNumber
-                        },
-                        select: {
-                            id: true
-                        }
-                    });
-                    if (!so) {
-                        throw new _common.BadRequestException(`Sales Order Number '${soNumber}' does not exist in the system.`);
+                const so = await tx.salesOrder.findUnique({
+                    where: {
+                        saleOrderNumber: soNumber
+                    },
+                    select: {
+                        id: true
                     }
-                    await tx.salesOrder.update({
-                        where: {
-                            saleOrderNumber: soNumber
-                        },
-                        data: {
-                            ...computedCustomerName ? {
-                                customerNameText: computedCustomerName
-                            } : {},
-                            ...computedCustomerAddress ? {
-                                address: computedCustomerAddress
-                            } : {},
-                            UpdatedBy: 'ERP Import',
-                            UpdatedDate: new Date()
-                        }
-                    });
+                });
+                if (!so) {
+                    throw new _common.BadRequestException(`Sales Order Number '${soNumber}' does not exist in the system.`);
                 }
+                const updateData = {
+                    UpdatedBy: username,
+                    UpdatedDate: new Date(),
+                    isErpImported: 1
+                };
+                if (computedCustomerName) {
+                    updateData.customerNameText = computedCustomerName;
+                }
+                if (computedCustomerAddress) {
+                    updateData.address = computedCustomerAddress;
+                }
+                await tx.salesOrder.update({
+                    where: {
+                        saleOrderNumber: soNumber
+                    },
+                    data: updateData
+                });
                 this.logger.log(`Deleting existing records for SO: ${soNumber}`);
                 await tx.eRP_Material_Data.deleteMany({
                     where: {

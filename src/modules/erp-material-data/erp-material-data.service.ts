@@ -731,4 +731,18 @@ export class ErpMaterialDataService {
       updatedMaterial,
     });
   }
+
+  async updateSkipIssueStage(id: number, skipIssueStage: boolean) {
+    const record = await this.prisma.eRP_Material_Data.findUnique({
+      where: { ID: id },
+    });
+
+    if (!record) {
+      throw new NotFoundException(`Material Data with ID ${id} not found`);
+    }
+    return this.prisma.eRP_Material_Data.update({
+      where: { ID: id },
+      data: { skipIssueStage },
+    });
+  }
 }

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { UpdateFgLocationDto } from './dto/update-fg-location.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class FgStorageService {
@@ -16,16 +17,31 @@ export class FgStorageService {
           mode: 'insensitive',
         },
       },
+      select: { id: true, saleOrderNumber: true, fgLocation: true },
     });
 
     if (!salesOrder) {
       throw new NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
     }
 
+    let currentLocations: string[] = [];
+
+    if (salesOrder.fgLocation) {
+      if (Array.isArray(salesOrder.fgLocation)) {
+        currentLocations = salesOrder.fgLocation as string[];
+      } else if (typeof salesOrder.fgLocation === 'string') {
+        currentLocations = [salesOrder.fgLocation];
+      }
+    }
+
+    if (fgLocation && !currentLocations.includes(fgLocation)) {
+      currentLocations.push(fgLocation);
+    }
+
     const updatedOrder = await this.prisma.salesOrder.update({
       where: { id: salesOrder.id },
       data: {
-        fgLocation: fgLocation,
+        fgLocation: currentLocations as Prisma.JsonArray,
         UpdatedBy: user.name, 
         UpdatedDate: new Date(),
       },
@@ -45,7 +61,7 @@ export class FgStorageService {
     return {
       message: 'FG Location updated successfully.',
       saleOrderNumber: updatedOrder.saleOrderNumber,
-      fgLocation: updatedOrder.fgLocation,
+      fgLocation: currentLocations,
     };
   }
 }

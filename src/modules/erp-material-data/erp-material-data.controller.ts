@@ -28,6 +28,7 @@ import { UpdateMappingDto } from './dto/update-mapping.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthRequest } from '../auth/types/auth-request.type';
+import { UpdateSkipIssueDto } from './dto/update-skip-issue.dto';
 
 @ApiTags('ERP Material Data')
 @ApiBearerAuth()
@@ -209,5 +210,15 @@ export class ErpMaterialDataController {
       userId,
       role,
     );
+  }
+
+  @Patch(':id/skip-issue')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Update Skip Issue Stage flag for a material' })
+  async updateSkipIssueStage(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSkipIssueDto,
+  ) {
+    return this.erpMaterialDataService.updateSkipIssueStage(id, dto.skipIssueStage);
   }
 }

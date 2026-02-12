@@ -10,6 +10,9 @@ import {
   HttpException,
   HttpStatus,
   BadRequestException,
+  Delete,
+  Param,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { SalesOrderService } from './sales-order.service';
@@ -38,13 +41,18 @@ export class SalesOrderController {
   @Roles('SALES')
   @ApiOperation({ summary: 'Download sales order Excel template' })
   @ApiResponse({ status: 200, description: 'Excel file downloaded' })
-  @ApiResponse({ status: 500, description: 'Failed to generate or send template' })
+  @ApiResponse({
+    status: 500,
+    description: 'Failed to generate or send template',
+  })
   async downloadTemplate(@Res() res: Response) {
     try {
       await this.salesOrderService.generateBulkTemplate(res);
     } catch (err: any) {
       const status =
-        err instanceof HttpException ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+        err instanceof HttpException
+          ? err.getStatus()
+          : HttpStatus.INTERNAL_SERVER_ERROR;
       throw new HttpException(
         err.message || 'Failed to download template',
         status,
@@ -65,8 +73,14 @@ export class SalesOrderController {
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'Sales orders imported successfully' })
-  @ApiResponse({ status: 400, description: 'No file uploaded or invalid format' })
+  @ApiResponse({
+    status: 201,
+    description: 'Sales orders imported successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'No file uploaded or invalid format',
+  })
   @ApiResponse({ status: 409, description: 'Duplicate orders detected' })
   @ApiResponse({ status: 500, description: 'Failed to import sales orders' })
   async bulkImport(
@@ -95,5 +109,18 @@ export class SalesOrderController {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  @Delete(':id/reset')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({
+    summary: 'Reset SO: Delete ERP Data and clear Status/Priority/Assignment',
+  })
+  @ApiResponse({ status: 200, description: 'Sales Order reset successfully' })
+  async resetSalesOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthRequest,
+  ) {
+    return this.salesOrderService.resetSalesOrder(id, req.user.name);
   }
 }

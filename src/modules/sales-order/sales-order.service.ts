@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { Workbook } from 'exceljs';
 import { Response } from 'express';
@@ -244,7 +245,7 @@ export class SalesOrderService {
 
       // if (!transporterId) rowErrors.push('Invalid transporter');
       if (!transporterNameRaw) {
-         rowErrors.push('Missing transporter');
+        rowErrors.push('Missing transporter');
       }
 
       if (!['Yes', 'No', true, false].includes(paymentClearance))
@@ -407,16 +408,15 @@ export class SalesOrderService {
           let finalTransporterId = orderData.transporterId;
 
           if (!finalTransporterId && orderData.transporterName) {
-            
             let foundId = maps.transporter.get(orderData.transporterName);
 
             if (!foundId) {
               const newTransporter = await tx.transporter.create({
                 data: { name: orderData.transporterName },
               });
-              
+
               foundId = newTransporter.id;
-              
+
               maps.transporter.set(orderData.transporterName, foundId);
             }
 
@@ -481,5 +481,39 @@ export class SalesOrderService {
         err.message,
       );
     }
+  }
+
+  async resetSalesOrder(id: number, username: string) {
+    const so = await this.prisma.salesOrder.findUnique({
+      where: { id },
+      select: { saleOrderNumber: true },
+    });
+
+    if (!so) {
+      throw new NotFoundException(`Sales Order with ID ${id} not found`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.eRP_Material_Data.deleteMany({
+        where: { saleOrderNumber: so.saleOrderNumber },
+      });
+
+      const updatedSo = await tx.salesOrder.update({
+        where: { id },
+        data: {
+          status: null,
+          priority: null,
+          assignedUserId: null,
+          isErpImported: 0,
+          UpdatedBy: username,
+          UpdatedDate: new Date(),
+        },
+      });
+
+      return {
+        message: 'Sales Order has been reset successfully.',
+        data: updatedSo,
+      };
+    });
   }
 }

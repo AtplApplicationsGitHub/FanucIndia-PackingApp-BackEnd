@@ -311,7 +311,7 @@ let AdminOrderService = class AdminOrderService {
                 limit: isFilterActive ? total : parsedLimit,
                 data: data.map(({ _count, ...order })=>({
                         ...order,
-                        hasMaterialData: _count.materialData > 0,
+                        hasMaterialData: order.isErpImported === 1,
                         notificationCount: _count.soChatNotifications
                     }))
             };

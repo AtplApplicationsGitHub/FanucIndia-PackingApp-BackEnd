@@ -115,4 +115,11 @@ export class AdminOrderController {
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
   }
+
+  @Get('active-export-list')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({ summary: 'Fetch specific columns for Active Orders (NULL, R105, W105)' })
+  async fetchActiveOrders() {
+    return this.service.fetchActiveOrders();
+  }
 }

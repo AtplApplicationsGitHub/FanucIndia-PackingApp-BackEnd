@@ -190,7 +190,7 @@ export class AdminOrderService {
         limit: isFilterActive ? total : parsedLimit,
         data: data.map(({ _count, ...order }) => ({
           ...order,
-          hasMaterialData: _count.materialData > 0,
+          hasMaterialData: order.isErpImported === 1,
           notificationCount: _count.soChatNotifications,
         })),
       };
@@ -385,5 +385,61 @@ export class AdminOrderService {
     });
 
     return { message: 'Bulk assignment successful', count: orders.length };
+  }
+
+  async fetchActiveOrders() {
+    const data = await this.prisma.salesOrder.findMany({
+      where: {
+        OR: [
+          { status: null },
+          { status: 'R105' },
+          { status: 'W105' },
+        ],
+      },
+      select: {
+        saleOrderNumber: true,
+        outboundDelivery: true,
+        transferOrder: true,
+        deliveryDate: true, 
+        paymentClearance: true, 
+        status: true,
+        priority: true,
+        
+        user: { 
+          select: { name: true } 
+        },
+        product: { 
+          select: { name: true } 
+        },
+        salesZone: { 
+          select: { name: true } 
+        },
+        assignedUser: { 
+          select: { name: true } 
+        },
+        customer: { 
+          select: { name: true } 
+        },
+        customerNameText: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return data.map(order => ({
+      userName: order.user?.name,
+      product: order.product?.name,
+      saleOrderNumber: order.saleOrderNumber,
+      outboundDelivery: order.outboundDelivery,
+      transferOrder: order.transferOrder,
+      requiredDate: order.deliveryDate,
+      payment: order.paymentClearance,
+      salesZone: order.salesZone?.name,
+      customer: order.customer?.name || order.customerNameText,
+      status: order.status,
+      priority: order.priority,
+      assignedUser: order.assignedUser?.name,
+    }));
   }
 }

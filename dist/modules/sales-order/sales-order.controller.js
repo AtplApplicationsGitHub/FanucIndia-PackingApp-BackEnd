@@ -54,6 +54,9 @@ let SalesOrderController = class SalesOrderController {
             throw new _common.HttpException(err.message || 'Failed to import sales orders', _common.HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+    async resetSalesOrder(id, req) {
+        return this.salesOrderService.resetSalesOrder(id, req.user.name);
+    }
     constructor(salesOrderService){
         this.salesOrderService = salesOrderService;
     }
@@ -123,6 +126,25 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], SalesOrderController.prototype, "bulkImport", null);
+_ts_decorate([
+    (0, _common.Delete)(':id/reset'),
+    (0, _rolesdecorator.Roles)('ADMIN', 'USER'),
+    (0, _swagger.ApiOperation)({
+        summary: 'Reset SO: Delete ERP Data and clear Status/Priority/Assignment'
+    }),
+    (0, _swagger.ApiResponse)({
+        status: 200,
+        description: 'Sales Order reset successfully'
+    }),
+    _ts_param(0, (0, _common.Param)('id', _common.ParseIntPipe)),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Number,
+        typeof _authrequesttype.AuthRequest === "undefined" ? Object : _authrequesttype.AuthRequest
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], SalesOrderController.prototype, "resetSalesOrder", null);
 SalesOrderController = _ts_decorate([
     (0, _swagger.ApiTags)('Sales Order Bulk Import'),
     (0, _swagger.ApiBearerAuth)(),

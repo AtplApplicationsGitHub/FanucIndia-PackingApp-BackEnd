@@ -469,6 +469,43 @@ let SalesOrderService = class SalesOrderService {
             throw new _common.InternalServerErrorException('Database insertion failed', err.message);
         }
     }
+    async resetSalesOrder(id, username) {
+        const so = await this.prisma.salesOrder.findUnique({
+            where: {
+                id
+            },
+            select: {
+                saleOrderNumber: true
+            }
+        });
+        if (!so) {
+            throw new _common.NotFoundException(`Sales Order with ID ${id} not found`);
+        }
+        return this.prisma.$transaction(async (tx)=>{
+            await tx.eRP_Material_Data.deleteMany({
+                where: {
+                    saleOrderNumber: so.saleOrderNumber
+                }
+            });
+            const updatedSo = await tx.salesOrder.update({
+                where: {
+                    id
+                },
+                data: {
+                    status: null,
+                    priority: null,
+                    assignedUserId: null,
+                    isErpImported: 0,
+                    UpdatedBy: username,
+                    UpdatedDate: new Date()
+                }
+            });
+            return {
+                message: 'Sales Order has been reset successfully.',
+                data: updatedSo
+            };
+        });
+    }
     constructor(prisma){
         this.prisma = prisma;
     }
