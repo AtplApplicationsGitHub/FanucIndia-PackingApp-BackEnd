@@ -465,6 +465,8 @@ export class LookupService {
 
       const matSheet = workbook.getWorksheet('Material Barcodes');
       if (matSheet) {
+        const newBarcodesData: any[] = [];
+
         matSheet.eachRow((row, rowNumber) => {
           if (rowNumber === 1) return;
           const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
@@ -484,10 +486,28 @@ export class LookupService {
               remarksRequired,
               classification
             };
-            if (id) promises.push(tx.materialBarcode.update({ where: { id }, data }).catch(() => {}));
-            else promises.push(tx.materialBarcode.create({ data }).catch(() => {}));
+            if (id) {
+              promises.push(tx.materialBarcode.update({ where: { id }, data }).catch((err) => {
+                console.error(`Failed to update MaterialBarcode ID ${id}:`, err.message);
+              }));
+            } else {
+              newBarcodesData.push(data);
+            }
           }
         });
+
+        if (newBarcodesData.length > 0) {
+          promises.push(
+            tx.materialBarcode.createMany({
+              data: newBarcodesData,
+              skipDuplicates: true
+            }).catch((err) => {
+               console.error('Failed to bulk insert Material Barcodes:', err);
+               throw new BadRequestException('Bulk import failed for new Material Barcodes. Check logs for details.');
+            })
+          );
+        }
+
         results.push('Material Barcodes processed');
       }
 
