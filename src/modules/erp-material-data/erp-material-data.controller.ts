@@ -212,13 +212,13 @@ export class ErpMaterialDataController {
     );
   }
 
-  @Patch(':id/skip-issue')
+  @Patch('skip-issue') 
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Update Skip Issue Stage flag for a material' })
+  @ApiOperation({ summary: 'Update Skip Issue Stage flag for an order' })
   async updateSkipIssueStage(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('orderId', ParseIntPipe) orderId: number,
     @Body() dto: UpdateSkipIssueDto,
   ) {
-    return this.erpMaterialDataService.updateSkipIssueStage(id, dto.skipIssueStage);
+    return this.erpMaterialDataService.updateSkipIssueStage(orderId, dto.skipIssueStage);
   }
 }
