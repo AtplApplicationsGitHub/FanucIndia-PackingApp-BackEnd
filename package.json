@@ -27,8 +27,10 @@
     "glob": "^10.4.5",
     "cross-spawn": "^7.0.5",
     "express": "^5.2.0",
-    "qs": "6.14.1",
-    "lodash": "4.17.23"
+    "qs": "6.14.2",
+    "lodash": "4.17.23",
+    "minimatch": "10.2.1",
+    "ajv": "8.18.0"
   },
   "dependencies": {
     "@mui/icons-material": "^7.2.0",
