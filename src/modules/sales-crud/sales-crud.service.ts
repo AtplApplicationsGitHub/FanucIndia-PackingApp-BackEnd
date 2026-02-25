@@ -9,6 +9,9 @@ import { CreateSalesCrudDto } from './dto/create-sales-crud.dto';
 import { UpdateSalesCrudDto } from './dto/update-sales-crud.dto';
 import { Prisma } from '@prisma/client';
 import { LabelPrintDto } from './dto/label-print.dto';
+import * as net from 'net';
+// import * as fs from 'fs';
+import { PrintLabelDto } from './dto/print-label.dto';
 
 @Injectable()
 export class SalesCrudService {
@@ -478,5 +481,98 @@ export class SalesCrudService {
         err.message,
       );
     }
+  }
+
+  async printOrderLabel(orderId: number, dto: PrintLabelDto) {
+    const order = await this.prisma.salesOrder.findUnique({
+      where: { id: orderId },
+      include: { customer: true, salesZone: true, printer: true },
+    });
+
+    if (!order) throw new NotFoundException('Sales Order not found');
+
+    const printerId = dto.printerId ?? order.printerId;
+
+    if (!printerId) {
+      throw new InternalServerErrorException(
+        'No printer provided and no printer assigned to this order.',
+      );
+    }
+
+    const printer = await this.prisma.printer.findUnique({
+      where: { id: printerId },
+    });
+
+    if (!printer || !printer.name) {
+      throw new InternalServerErrorException(
+        'Printer name not configured.',
+      );
+    }
+
+    const qty = dto.quantity || 1;
+
+    let prnTemplate = `SIZE 61.5 mm, 40 mm
+GAP 3 mm, 0 mm
+SET RIBBON ON
+DIRECTION 0,0
+REFERENCE 0,0
+OFFSET 0 mm
+SET PEEL OFF
+SET CUTTER OFF
+SET PARTIAL_CUTTER OFF
+SET TEAR ON
+CLS
+CODEPAGE 1252
+TEXT 460,283,"0",180,11,16,"@@CustomerName@@"
+TEXT 460,208,"0",180,24,26,"@@SONumber@@"
+TEXT 368,79,"0",180,12,14,"@@LabelRemarks@@"
+TEXT 460,79,"0",180,12,14,"@@SalesZone@@"
+QRCODE 111,127,L,4,A,180,M2,S7,"@@SONumber@@"
+PRINT @@Quantity@@,1`;
+
+    const customerName = order.customerNameText || order.customer?.name || '';
+    const labelRemarks = order.labelRemarks || '';
+    const salesZone = order.salesZone?.name || '';
+
+    const finalPrn = prnTemplate
+      .replace('@@CustomerName@@', customerName)
+      .replace(/@@SONumber@@/g, order.saleOrderNumber)
+      .replace('@@LabelRemarks@@', labelRemarks)
+      .replace('@@SalesZone@@', salesZone)
+      .replace('@@Quantity@@', qty.toString());
+    
+    // return {
+    //   success: true,
+    //   message: 'Dry-run successful. Here is the payload:',
+    //   payload: finalPrn
+    // };
+
+    return new Promise((resolve, reject) => {
+      const client = new net.Socket();
+      client.setTimeout(5000);
+
+      client.connect(9100, printer.name, () => {
+        client.write(finalPrn, () => {
+          client.end();
+          resolve({ success: true, message: 'Print job sent successfully' });
+        });
+      });
+
+      client.on('error', (err) => {
+        client.destroy();
+        reject(
+          new InternalServerErrorException(`Printer error: ${err.message}`),
+        );
+      });
+
+      client.on('timeout', () => {
+        client.destroy();
+        reject(
+          new InternalServerErrorException(
+            `Printer error: Connection to ${printer.name}:9100 timed out after 5000ms. Verify the printer is online.`
+          ),
+        );
+      });
+    });
   }
 }

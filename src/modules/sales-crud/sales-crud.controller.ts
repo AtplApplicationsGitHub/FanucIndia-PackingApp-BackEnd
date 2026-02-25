@@ -14,6 +14,7 @@ import {
 import { SalesCrudService } from './sales-crud.service';
 import { CreateSalesCrudDto } from './dto/create-sales-crud.dto';
 import { UpdateSalesCrudDto } from './dto/update-sales-crud.dto';
+import { PrintLabelDto } from './dto/print-label.dto';
 import { LabelPrintDto } from './dto/label-print.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -141,7 +142,7 @@ export class SalesCrudController {
   }
 
   @Post('label-print')
-  @Roles('USER', 'ADMIN', 'SALES') 
+  @Roles('USER', 'ADMIN', 'SALES')
   @ApiOperation({
     summary: 'Update status to Ready for Dispatch on Label Print',
   })
@@ -150,5 +151,15 @@ export class SalesCrudController {
   @ApiResponse({ status: 500, description: 'Internal server error.' })
   printLabels(@Body() dto: LabelPrintDto, @Req() req) {
     return this.service.processLabelPrint(dto, req.user.userId);
+  }
+
+  @Post(':id/print')
+  @Roles('USER', 'ADMIN')
+  @ApiOperation({ summary: 'Print Order Label' })
+  async printLabel(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: PrintLabelDto,
+  ) {
+    return this.service.printOrderLabel(id, dto);
   }
 }
