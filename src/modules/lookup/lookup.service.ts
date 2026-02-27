@@ -43,7 +43,7 @@ export class LookupService {
       console.error('Delete error:', error);
       if (error.code === 'P2003') {
         throw new BadRequestException(
-          'Cannot delete product: One or more orders depend on this product.'
+          'Cannot delete product: One or more orders depend on this product.',
         );
       }
       throw error;
@@ -68,7 +68,7 @@ export class LookupService {
     } catch (error) {
       if (error.code === 'P2003') {
         throw new BadRequestException(
-          'Cannot delete transporter: One or more orders depend on this transporter.'
+          'Cannot delete transporter: One or more orders depend on this transporter.',
         );
       }
       throw error;
@@ -93,7 +93,7 @@ export class LookupService {
     } catch (error) {
       if (error.code === 'P2003') {
         throw new BadRequestException(
-          'Cannot delete plant code: One or more orders depend on this plant code.'
+          'Cannot delete plant code: One or more orders depend on this plant code.',
         );
       }
       throw error;
@@ -118,7 +118,7 @@ export class LookupService {
     } catch (error) {
       if (error.code === 'P2003') {
         throw new BadRequestException(
-          'Cannot delete sales zone: One or more orders depend on this sales zone.'
+          'Cannot delete sales zone: One or more orders depend on this sales zone.',
         );
       }
       throw error;
@@ -143,7 +143,7 @@ export class LookupService {
     } catch (error) {
       if (error.code === 'P2003') {
         throw new BadRequestException(
-          'Cannot delete packing configuration: One or more orders depend on this value.'
+          'Cannot delete packing configuration: One or more orders depend on this value.',
         );
       }
       throw error;
@@ -168,7 +168,7 @@ export class LookupService {
     } catch (error) {
       if (error.code === 'P2003') {
         throw new BadRequestException(
-          'Cannot delete customer: One or more orders depend on this customer.'
+          'Cannot delete customer: One or more orders depend on this customer.',
         );
       }
       throw error;
@@ -193,7 +193,7 @@ export class LookupService {
     } catch (error) {
       if (error.code === 'P2003') {
         throw new BadRequestException(
-          'Cannot delete printer: One or more entities depend on this printer.'
+          'Cannot delete printer: One or more entities depend on this printer.',
         );
       }
       throw error;
@@ -211,7 +211,7 @@ export class LookupService {
 
     if (existing) {
       throw new BadRequestException(
-        `Material Barcode with ERP Code "${dto.erpCode}" already exists.`
+        `Material Barcode with ERP Code "${dto.erpCode}" already exists.`,
       );
     }
 
@@ -221,15 +221,15 @@ export class LookupService {
   async updateMaterialBarcode(id: number, dto: UpdateMaterialBarcodeDto) {
     if (dto.erpCode) {
       const existing = await this.prisma.materialBarcode.findFirst({
-        where: { 
+        where: {
           erpCode: dto.erpCode,
-          id: { not: id } 
+          id: { not: id },
         },
       });
 
       if (existing) {
         throw new BadRequestException(
-          `Material Barcode with ERP Code "${dto.erpCode}" already exists.`
+          `Material Barcode with ERP Code "${dto.erpCode}" already exists.`,
         );
       }
     }
@@ -245,76 +245,85 @@ export class LookupService {
     const workbook = new Workbook();
 
     const sheets = [
-      { 
-        name: 'Products', 
-        data: await this.getProducts(), 
+      {
+        name: 'Products',
+        data: await this.getProducts(),
         columns: [
           { header: 'ID (Do not edit)', key: 'id', width: 10 },
           { header: 'Name', key: 'name', width: 30 },
-        ]
+        ],
       },
-      { 
-        name: 'Transporters', 
-        data: await this.getTransporters(), 
+      {
+        name: 'Transporters',
+        data: await this.getTransporters(),
         columns: [
           { header: 'ID (Do not edit)', key: 'id', width: 10 },
-          { header: 'Name', key: 'name', width: 30 }
-        ]
+          { header: 'Name', key: 'name', width: 30 },
+        ],
       },
-      { 
-        name: 'Plant Codes', 
-        data: await this.getPlantCodes(), 
+      {
+        name: 'Plant Codes',
+        data: await this.getPlantCodes(),
         columns: [
           { header: 'ID (Do not edit)', key: 'id', width: 10 },
           { header: 'Code', key: 'code', width: 15 },
-          { header: 'Description', key: 'description', width: 30 }
-        ]
+          { header: 'Description', key: 'description', width: 30 },
+        ],
       },
-      { 
-        name: 'Sales Zones', 
-        data: await this.getSalesZones(), 
-        columns: [
-          { header: 'ID (Do not edit)', key: 'id', width: 10 },
-          { header: 'Name', key: 'name', width: 30 }
-        ]
-      },
-      { 
-        name: 'Packing Configs', 
-        data: await this.getPackConfigs(), 
-        columns: [
-          { header: 'ID (Do not edit)', key: 'id', width: 10 },
-          { header: 'Config Name', key: 'configName', width: 30 }
-        ]
-      },
-      { 
-        name: 'Customers', 
-        data: await this.getCustomers(), 
+      {
+        name: 'Sales Zones',
+        data: await this.getSalesZones(),
         columns: [
           { header: 'ID (Do not edit)', key: 'id', width: 10 },
           { header: 'Name', key: 'name', width: 30 },
-          { header: 'Address', key: 'address', width: 40 }
-        ]
+        ],
       },
-      { 
-        name: 'Printers', 
-        data: await this.getPrinters(), 
+      {
+        name: 'Packing Configs',
+        data: await this.getPackConfigs(),
         columns: [
           { header: 'ID (Do not edit)', key: 'id', width: 10 },
-          { header: 'Name', key: 'name', width: 30 }
-        ]
+          { header: 'Config Name', key: 'configName', width: 30 },
+        ],
       },
-      { 
-        name: 'Material Barcodes', 
-        data: await this.getMaterialBarcodes(), 
+      {
+        name: 'Customers',
+        data: await this.getCustomers(),
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'Name', key: 'name', width: 30 },
+          { header: 'Address', key: 'address', width: 40 },
+          { header: 'Contact Number', key: 'contactNumber', width: 20 },
+        ],
+      },
+      {
+        name: 'Printers',
+        data: await this.getPrinters(),
+        columns: [
+          { header: 'ID (Do not edit)', key: 'id', width: 10 },
+          { header: 'Name', key: 'name', width: 30 },
+        ],
+      },
+      {
+        name: 'Material Barcodes',
+        data: await this.getMaterialBarcodes(),
         columns: [
           { header: 'ID (Do not edit)', key: 'id', width: 10 },
           { header: 'ERP Code', key: 'erpCode', width: 20 },
           { header: 'Mapping Barcode', key: 'mappingBarcode', width: 20 },
           { header: 'Group', key: 'group', width: 15 },
-          { header: 'Accept Bulk Data (True/False)', key: 'acceptBulkData', width: 25 },
-          { header: 'Remarks Required (True/False)', key: 'remarksRequired', width: 25 },
-          { header: 'Classification', key: 'classification', width: 20 }
-        ]
+          {
+            header: 'Accept Bulk Data (True/False)',
+            key: 'acceptBulkData',
+            width: 25,
+          },
+          {
+            header: 'Remarks Required (True/False)',
+            key: 'remarksRequired',
+            width: 25,
+          },
+          { header: 'Classification', key: 'classification', width: 20 },
+        ],
       },
     ];
 
@@ -326,11 +335,11 @@ export class LookupService {
 
     res.setHeader(
       'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename="master_data_bulk.xlsx"'
+      'attachment; filename="master_data_bulk.xlsx"',
     );
 
     await workbook.xlsx.write(res);
@@ -347,7 +356,7 @@ export class LookupService {
       const val = row.getCell(colIdx).value;
       return val ? String(val).trim() : null;
     };
-    
+
     const getBool = (row, colIdx) => {
       const val = row.getCell(colIdx).value;
       if (typeof val === 'boolean') return val;
@@ -355,173 +364,261 @@ export class LookupService {
       return s === 'true' || s === 'yes' || s === '1';
     };
 
-    await this.prisma.$transaction(async (tx) => {
-      const promises: Promise<any>[] = []; 
+    await this.prisma.$transaction(
+      async (tx) => {
+        const promises: Promise<any>[] = [];
 
-      const productSheet = workbook.getWorksheet('Products');
-      if (productSheet) {
-        productSheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return; 
-          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
-          const name = getVal(row, 2);
-          const code = getVal(row, 3);
+        const productSheet = workbook.getWorksheet('Products');
+        if (productSheet) {
+          productSheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
+            const name = getVal(row, 2);
+            const code = getVal(row, 3);
 
-          if (name) { 
-            if (id) {
-              promises.push(tx.product.update({ where: { id }, data: { name } }).catch(() => {}));
-            } else {
-              promises.push(tx.product.create({ data: { name } }).catch(() => {}));
+            if (name) {
+              if (id) {
+                promises.push(
+                  tx.product
+                    .update({ where: { id }, data: { name } })
+                    .catch(() => {}),
+                );
+              } else {
+                promises.push(
+                  tx.product.create({ data: { name } }).catch(() => {}),
+                );
+              }
             }
-          }
-        });
-        results.push('Products processed');
-      }
-
-      const transpSheet = workbook.getWorksheet('Transporters');
-      if (transpSheet) {
-        transpSheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return;
-          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
-          const name = getVal(row, 2);
-          if (name) {
-            if (id) promises.push(tx.transporter.update({ where: { id }, data: { name } }).catch(() => {}));
-            else promises.push(tx.transporter.create({ data: { name } }).catch(() => {}));
-          }
-        });
-        results.push('Transporters processed');
-      }
-
-      const plantSheet = workbook.getWorksheet('Plant Codes');
-      if (plantSheet) {
-        plantSheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return;
-          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
-          const code = getVal(row, 2);
-          const description = getVal(row, 3) || '';
-          if (code) {
-            if (id) promises.push(tx.plantCode.update({ where: { id }, data: { code, description } }).catch(() => {}));
-            else promises.push(tx.plantCode.create({ data: { code, description } }).catch(() => {}));
-          }
-        });
-        results.push('Plant Codes processed');
-      }
-
-      const zoneSheet = workbook.getWorksheet('Sales Zones');
-      if (zoneSheet) {
-        zoneSheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return;
-          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
-          const name = getVal(row, 2);
-          if (name) {
-            if (id) promises.push(tx.salesZone.update({ where: { id }, data: { name } }).catch(() => {}));
-            else promises.push(tx.salesZone.create({ data: { name } }).catch(() => {}));
-          }
-        });
-        results.push('Sales Zones processed');
-      }
-
-      const packSheet = workbook.getWorksheet('Packing Configs');
-      if (packSheet) {
-        packSheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return;
-          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
-          const configName = getVal(row, 2);
-          if (configName) {
-            if (id) promises.push(tx.packConfig.update({ where: { id }, data: { configName } }).catch(() => {}));
-            else promises.push(tx.packConfig.create({ data: { configName } }).catch(() => {}));
-          }
-        });
-        results.push('Packing Configs processed');
-      }
-
-      const custSheet = workbook.getWorksheet('Customers');
-      if (custSheet) {
-        custSheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return;
-          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
-          const name = getVal(row, 2);
-          const address = getVal(row, 3) || '';
-          if (name) {
-            if (id) promises.push(tx.customer.update({ where: { id }, data: { name, address } }).catch(() => {}));
-            else promises.push(tx.customer.create({ data: { name, address } }).catch(() => {}));
-          }
-        });
-        results.push('Customers processed');
-      }
-
-      const printSheet = workbook.getWorksheet('Printers');
-      if (printSheet) {
-        printSheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return;
-          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
-          const name = getVal(row, 2);
-          if (name) {
-            if (id) promises.push(tx.printer.update({ where: { id }, data: { name } }).catch(() => {}));
-            else promises.push(tx.printer.create({ data: { name } }).catch(() => {}));
-          }
-        });
-        results.push('Printers processed');
-      }
-
-      const matSheet = workbook.getWorksheet('Material Barcodes');
-      if (matSheet) {
-        const newBarcodesData: any[] = [];
-
-        matSheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return;
-          const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
-          const erpCode = getVal(row, 2);
-          const mappingBarcode = getVal(row, 3);
-          const group = getVal(row, 4);
-          const acceptBulkData = getBool(row, 5);
-          const remarksRequired = getBool(row, 6);
-          const classification = getVal(row, 7);
-
-          if (erpCode) {
-            const data = {
-              erpCode,
-              mappingBarcode,
-              group,
-              acceptBulkData,
-              remarksRequired,
-              classification
-            };
-            if (id) {
-              promises.push(tx.materialBarcode.update({ where: { id }, data }).catch((err) => {
-                console.error(`Failed to update MaterialBarcode ID ${id}:`, err.message);
-              }));
-            } else {
-              newBarcodesData.push(data);
-            }
-          }
-        });
-
-        if (newBarcodesData.length > 0) {
-          promises.push(
-            tx.materialBarcode.createMany({
-              data: newBarcodesData,
-              skipDuplicates: true
-            }).catch((err) => {
-               console.error('Failed to bulk insert Material Barcodes:', err);
-               throw new BadRequestException('Bulk import failed for new Material Barcodes. Check logs for details.');
-            })
-          );
+          });
+          results.push('Products processed');
         }
 
-        results.push('Material Barcodes processed');
-      }
+        const transpSheet = workbook.getWorksheet('Transporters');
+        if (transpSheet) {
+          transpSheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
+            const name = getVal(row, 2);
+            if (name) {
+              if (id)
+                promises.push(
+                  tx.transporter
+                    .update({ where: { id }, data: { name } })
+                    .catch(() => {}),
+                );
+              else
+                promises.push(
+                  tx.transporter.create({ data: { name } }).catch(() => {}),
+                );
+            }
+          });
+          results.push('Transporters processed');
+        }
 
-      await Promise.all(promises);
-    }, {
-      timeout: 120000, 
-    });
+        const plantSheet = workbook.getWorksheet('Plant Codes');
+        if (plantSheet) {
+          plantSheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
+            const code = getVal(row, 2);
+            const description = getVal(row, 3) || '';
+            if (code) {
+              if (id)
+                promises.push(
+                  tx.plantCode
+                    .update({ where: { id }, data: { code, description } })
+                    .catch(() => {}),
+                );
+              else
+                promises.push(
+                  tx.plantCode
+                    .create({ data: { code, description } })
+                    .catch(() => {}),
+                );
+            }
+          });
+          results.push('Plant Codes processed');
+        }
+
+        const zoneSheet = workbook.getWorksheet('Sales Zones');
+        if (zoneSheet) {
+          zoneSheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
+            const name = getVal(row, 2);
+            if (name) {
+              if (id)
+                promises.push(
+                  tx.salesZone
+                    .update({ where: { id }, data: { name } })
+                    .catch(() => {}),
+                );
+              else
+                promises.push(
+                  tx.salesZone.create({ data: { name } }).catch(() => {}),
+                );
+            }
+          });
+          results.push('Sales Zones processed');
+        }
+
+        const packSheet = workbook.getWorksheet('Packing Configs');
+        if (packSheet) {
+          packSheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
+            const configName = getVal(row, 2);
+            if (configName) {
+              if (id)
+                promises.push(
+                  tx.packConfig
+                    .update({ where: { id }, data: { configName } })
+                    .catch(() => {}),
+                );
+              else
+                promises.push(
+                  tx.packConfig
+                    .create({ data: { configName } })
+                    .catch(() => {}),
+                );
+            }
+          });
+          results.push('Packing Configs processed');
+        }
+
+        const custSheet = workbook.getWorksheet('Customers');
+        if (custSheet) {
+          custSheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
+            const name = getVal(row, 2);
+            const address = getVal(row, 3) || '';
+            const contactNumber = getVal(row, 4);
+            if (name) {
+              const data = { name, address, contactNumber };
+              if (id)
+                promises.push(
+                  tx.customer.update({ where: { id }, data }).catch(() => {}),
+                );
+              else promises.push(tx.customer.create({ data }).catch(() => {}));
+            }
+          });
+          results.push('Customers processed');
+        }
+
+        const printSheet = workbook.getWorksheet('Printers');
+        if (printSheet) {
+          printSheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
+            const name = getVal(row, 2);
+            if (name) {
+              if (id)
+                promises.push(
+                  tx.printer
+                    .update({ where: { id }, data: { name } })
+                    .catch(() => {}),
+                );
+              else
+                promises.push(
+                  tx.printer.create({ data: { name } }).catch(() => {}),
+                );
+            }
+          });
+          results.push('Printers processed');
+        }
+
+        const matSheet = workbook.getWorksheet('Material Barcodes');
+        if (matSheet) {
+          const newBarcodesData: any[] = [];
+
+          matSheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
+            const erpCode = getVal(row, 2);
+            const mappingBarcode = getVal(row, 3);
+            const group = getVal(row, 4);
+            const acceptBulkData = getBool(row, 5);
+            const remarksRequired = getBool(row, 6);
+            const classification = getVal(row, 7);
+
+            if (erpCode) {
+              const data = {
+                erpCode,
+                mappingBarcode,
+                group,
+                acceptBulkData,
+                remarksRequired,
+                classification,
+              };
+              if (id) {
+                promises.push(
+                  tx.materialBarcode
+                    .update({ where: { id }, data })
+                    .catch((err) => {
+                      console.error(
+                        `Failed to update MaterialBarcode ID ${id}:`,
+                        err.message,
+                      );
+                    }),
+                );
+              } else {
+                newBarcodesData.push(data);
+              }
+            }
+          });
+
+          if (newBarcodesData.length > 0) {
+            promises.push(
+              tx.materialBarcode
+                .createMany({
+                  data: newBarcodesData,
+                  skipDuplicates: true,
+                })
+                .catch((err) => {
+                  console.error(
+                    'Failed to bulk insert Material Barcodes:',
+                    err,
+                  );
+                  throw new BadRequestException(
+                    'Bulk import failed for new Material Barcodes. Check logs for details.',
+                  );
+                }),
+            );
+          }
+
+          results.push('Material Barcodes processed');
+        }
+
+        await Promise.all(promises);
+      },
+      {
+        timeout: 120000,
+      },
+    );
 
     return { message: 'Bulk import completed successfully', details: results };
   }
 
   async syncMaterialBarcodes(dtos: CreateMaterialBarcodeDto[]) {
     const results: any[] = [];
-        
+
     await this.prisma.$transaction(async (tx) => {
       for (const dto of dtos) {
         const data = {
@@ -551,15 +648,15 @@ export class LookupService {
             classification: data.classification,
           },
         });
-        
+
         results.push(result);
       }
     });
 
-    return { 
-      message: 'Mobile sync completed successfully', 
+    return {
+      message: 'Mobile sync completed successfully',
       processedCount: results.length,
-      data: results 
+      data: results,
     };
   }
 }

@@ -85,6 +85,7 @@ export class UserDashboardService {
         saleOrderNumber: true,
         priority: true,
         status: true,
+        skipIssueStage: true,
         materialData: {
           select: {
             Required_Qty: true,
@@ -106,6 +107,7 @@ export class UserDashboardService {
         saleOrderNumber: order.saleOrderNumber,
         priority: order.priority,
         status: order.status,
+        skipIssueStage: order.skipIssueStage,
         totalMaterials,
         totalItems,
       };
@@ -138,19 +140,64 @@ export class UserDashboardService {
     if (!order) {
       throw new NotFoundException('Sales order not found or access denied.');
     }
-    return this.getMaterialDetails(order.saleOrderNumber);
+    return this.getMaterialDetails(order.saleOrderNumber, order.skipIssueStage);
   }
 
   async downloadOrderDetailsBySoNumber(
-    saleOrderNumber: string,
-    userId: number,
-    userRole: string,
-  ) {
-    await this.authorizeOrderAccess(saleOrderNumber, userId, userRole);
-    return this.getMaterialDetails(saleOrderNumber);
-  }
+  saleOrderNumber: string,
+  userId: number,
+  userRole: string,
+) {
+  await this.authorizeOrderAccess(saleOrderNumber, userId, userRole);
 
-  private async getMaterialDetails(saleOrderNumber: string) {
+  const order = await this.prisma.salesOrder.findUnique({
+    where: { saleOrderNumber },
+    select: {
+      labelRemarks: true,
+      customerNameText: true,
+      customer: { select: { name: true } },
+      salesZone: { select: { name: true } },
+    },
+  });
+
+  const materials = await this.prisma.eRP_Material_Data.findMany({
+    where: { saleOrderNumber },
+    select: {
+      ID: true,
+      Material_Code: true,
+      Material_Description: true,
+      Batch_No: true,
+      SO_Donor_Batch: true,
+      Cert_No: true,
+      Bin_No: true,
+      A_D_F: true,
+      Required_Qty: true,
+      Issue_stage: true,
+      Packing_stage: true,
+      UpdatedDate: true,
+      Accept_Bulk_Data: true,
+      Classification: true,
+      Group: true,
+      Mapping_Barcode: true,
+      Remarks_Required: true,
+      Remarks: true,
+    },
+  });
+
+  const salesZone = order?.salesZone?.name ?? null;
+  const labelRemarks = order?.labelRemarks ?? null;
+  const customerName = order?.customer?.name ?? order?.customerNameText ?? null;
+
+  return materials.map((material) => ({
+    ...material,
+    ID: material.ID.toString(),
+    salesZone,
+    labelRemarks,
+    customerName,
+  }));
+}
+
+  private async getMaterialDetails(saleOrderNumber: string, skipIssueStage?: boolean) {
     const materials = await this.prisma.eRP_Material_Data.findMany({
       where: { saleOrderNumber },
       select: {
@@ -172,12 +219,12 @@ export class UserDashboardService {
         Mapping_Barcode: true,
         Remarks_Required: true,
         Remarks: true,
-        skipIssueStage: true,
       },
     });
     return materials.map((material) => ({
       ...material,
       ID: material.ID.toString(),
+      skipIssueStage: !!skipIssueStage,
     }));
   }
 

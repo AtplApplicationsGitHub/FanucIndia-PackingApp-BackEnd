@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UpdateAdminOrderDto } from './dto/update-admin-order.dto';
 import { BulkAssignOrderDto } from './dto/bulk-assign-order.dto';
+import { BulkSkipIssueDto } from './dto/bulk-skip-issue.dto';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -81,6 +82,15 @@ export class AdminOrderController {
   @ApiResponse({ status: 200, description: 'Orders assigned successfully' })
   async bulkAssign(@Body() dto: BulkAssignOrderDto, @Req() req: AuthRequest) {
     return this.service.bulkAssign(dto, req.user);
+  }
+
+  @Patch('bulk-skip-issue')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Bulk update Skip Issue Stage for multiple sales orders' })
+  @ApiBody({ type: BulkSkipIssueDto })
+  @ApiResponse({ status: 200, description: 'Orders updated successfully with info about skipped orders' })
+  async bulkUpdateSkipIssue(@Body() dto: BulkSkipIssueDto) {
+    return this.service.bulkUpdateSkipIssue(dto);
   }
 
   @Patch(':id')

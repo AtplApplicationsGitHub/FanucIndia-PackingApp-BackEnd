@@ -442,4 +442,48 @@ export class AdminOrderService {
       assignedUser: order.assignedUser?.name,
     }));
   }
+
+  async bulkUpdateSkipIssue(dto: { salesOrderIds: number[]; skipIssueStage: boolean }) {
+    const { salesOrderIds, skipIssueStage } = dto;
+
+    const orders = await this.prisma.salesOrder.findMany({
+      where: { id: { in: salesOrderIds } },
+      select: { id: true, saleOrderNumber: true, isErpImported: true },
+    });
+
+    if (orders.length === 0) {
+      throw new NotFoundException('No valid orders found for the provided IDs');
+    }
+
+    const validOrderIds: number[] = [];
+    const invalidOrderNumbers: string[] = [];
+
+    for (const order of orders) {
+      if (order.isErpImported === 1) {
+        validOrderIds.push(order.id);
+      } else {
+        invalidOrderNumbers.push(order.saleOrderNumber);
+      }
+    }
+
+    if (validOrderIds.length > 0) {
+      await this.prisma.salesOrder.updateMany({
+        where: { id: { in: validOrderIds } },
+        data: { skipIssueStage },
+      });
+    }
+
+    let message = `Successfully updated skip issue stage for ${validOrderIds.length} order(s).`;
+    
+    if (invalidOrderNumbers.length > 0) {
+      message += ` Could not update the following orders because ERP Material Data has not been imported yet: ${invalidOrderNumbers.join(', ')}.`;
+    }
+
+    return {
+      message,
+      updatedCount: validOrderIds.length,
+      skippedCount: invalidOrderNumbers.length,
+      skippedOrders: invalidOrderNumbers, 
+    };
+  }
 }

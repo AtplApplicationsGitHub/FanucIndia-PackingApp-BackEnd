@@ -52,7 +52,6 @@ model PlantCode {
   id          Int     @id @default(autoincrement())
   code        String
   description String?
-  // salesOrders SalesOrder[]
 }
 
 model SalesZone {
@@ -71,6 +70,7 @@ model Customer {
   id          Int          @id @default(autoincrement())
   name        String
   address     String?
+  contactNumber String?
   salesOrders SalesOrder[]
 }
 
@@ -89,7 +89,6 @@ model SalesOrder {
   transferOrder         String?                 @unique @db.VarChar(500)
   deliveryDate          DateTime
   transporterId         Int
-  // plantCodeId      Int
   plantCode             String?                 @db.VarChar(100)
   paymentClearance      Boolean
   salesZoneId           Int
@@ -105,6 +104,7 @@ model SalesOrder {
   address               String?                 @db.VarChar(1000)
   status                String?
   priority              Int?
+  skipIssueStage        Boolean                 @default(false)
   isErpImported         Int                     @default(0)
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
@@ -112,7 +112,6 @@ model SalesOrder {
   materialFilesByNumber ERP_Material_File[]     @relation("SO_File_By_Number")
   customer              Customer?               @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   packConfig            PackConfig?             @relation(fields: [packConfigId], references: [id])
-  // plantCode        PlantCode           @relation(fields: [plantCodeId], references: [id])
   printer               Printer?                @relation(fields: [printerId], references: [id])
   product               Product                 @relation(fields: [productId], references: [id])
   salesZone             SalesZone               @relation(fields: [salesZoneId], references: [id])
@@ -145,7 +144,6 @@ model ERP_Material_Data {
   Issue_stage          Int      @default(0)
   Packing_stage        Int      @default(0)
   Remarks              String?  @db.VarChar(500)
-  skipIssueStage       Boolean  @default(false)
   Mapping_Barcode      String?  @db.VarChar(100)
   Group                String?  @db.VarChar(100)
   Accept_Bulk_Data     Boolean?
@@ -230,7 +228,6 @@ model SalesOrderArchive {
   transferOrder     String    @db.VarChar(500)
   deliveryDate      DateTime
   transporterId     Int
-  // plantCodeId         Int
   plantCode         String?   @db.VarChar(100)
   paymentClearance  Boolean
   salesZoneId       Int
@@ -246,6 +243,7 @@ model SalesOrderArchive {
   address           String?
   status            String?
   priority          Int?
+  skipIssueStage    Boolean?
   isErpImported     Int?
   createdAt         DateTime
   UpdatedBy         String?
@@ -271,7 +269,6 @@ model ERP_Material_DataArchive {
   Issue_stage          Int
   Packing_stage        Int
   Remarks              String?  @db.VarChar(500)
-  skipIssueStage       Boolean  @default(false)
   Mapping_Barcode      String?  @db.VarChar(100)
   Group                String?  @db.VarChar(100)
   Accept_Bulk_Data     Boolean?

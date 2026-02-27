@@ -731,25 +731,4 @@ export class ErpMaterialDataService {
       updatedMaterial,
     });
   }
-
-  async updateSkipIssueStage(orderId: number, skipIssueStage: boolean) {
-    const salesOrder = await this.prisma.salesOrder.findUnique({
-      where: { id: orderId },
-      select: { saleOrderNumber: true },
-    });
-
-    if (!salesOrder) {
-      throw new NotFoundException(`Sales Order with ID ${orderId} not found`);
-    }
-
-    const updatedMaterials = await this.prisma.eRP_Material_Data.updateMany({
-      where: { saleOrderNumber: salesOrder.saleOrderNumber },
-      data: { skipIssueStage },
-    });
-
-    return {
-      message: `Successfully updated ${updatedMaterials.count} materials.`,
-      count: updatedMaterials.count,
-    };
-  }
 }

@@ -113,4 +113,9 @@ export class UpdateAdminOrderDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @ApiPropertyOptional({ example: true, description: 'Skip Issue Stage' })
+  @IsOptional()
+  @IsBoolean()
+  skipIssueStage?: boolean;
 }
