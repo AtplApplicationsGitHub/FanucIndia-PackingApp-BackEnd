@@ -8,6 +8,11 @@ import {
   UseGuards,
   ParseIntPipe,
   Req,
+  UseInterceptors,
+  UploadedFile,
+  Post,
+  Delete,
+  BadRequestException
 } from '@nestjs/common';
 import { AdminOrderService } from './admin-order.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -24,8 +29,8 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { Delete } from '@nestjs/common';
 import { AuthRequest } from '../auth/types/auth-request.type';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Admin Orders')
 @ApiBearerAuth()
@@ -71,8 +76,8 @@ export class AdminOrderController {
     status: 200,
     description: 'List of sales orders returned successfully',
   })
-  findAll(@Query() query: any, @Req() req: AuthRequest) { 
-    return this.service.findAll(query, req.user); 
+  findAll(@Query() query: any, @Req() req: AuthRequest) {
+    return this.service.findAll(query, req.user);
   }
 
   @Patch('bulk-assign')
@@ -86,16 +91,23 @@ export class AdminOrderController {
 
   @Patch('bulk-skip-issue')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Bulk update Skip Issue Stage for multiple sales orders' })
+  @ApiOperation({
+    summary: 'Bulk update Skip Issue Stage for multiple sales orders',
+  })
   @ApiBody({ type: BulkSkipIssueDto })
-  @ApiResponse({ status: 200, description: 'Orders updated successfully with info about skipped orders' })
+  @ApiResponse({
+    status: 200,
+    description: 'Orders updated successfully with info about skipped orders',
+  })
   async bulkUpdateSkipIssue(@Body() dto: BulkSkipIssueDto) {
     return this.service.bulkUpdateSkipIssue(dto);
   }
 
   @Patch(':id')
-  @Roles('ADMIN','USER')
-  @ApiOperation({ summary: 'Update a specific sales order (admin and user roles)' })
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({
+    summary: 'Update a specific sales order (admin and user roles)',
+  })
   @ApiParam({
     name: 'id',
     type: Number,
@@ -128,8 +140,24 @@ export class AdminOrderController {
 
   @Get('active-export-list')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Fetch specific columns for Active Orders (NULL, R105, W105)' })
+  @ApiOperation({
+    summary: 'Fetch specific columns for Active Orders (NULL, R105, W105)',
+  })
   async fetchActiveOrders() {
     return this.service.fetchActiveOrders();
+  }
+
+  @Post('excel-import')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Update sales orders via Excel Import' })
+  @UseInterceptors(FileInterceptor('file'))
+  async importExcelUpdates(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: AuthRequest,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+    return this.service.processExcelImport(file.buffer, req.user);
   }
 }

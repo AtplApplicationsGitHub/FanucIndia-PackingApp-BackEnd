@@ -9,10 +9,306 @@ import { Workbook } from 'exceljs';
 import { Response } from 'express';
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
+import * as ExcelJS from 'exceljs';
 
 @Injectable()
 export class SalesOrderService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async exportSalesExcel(userId: number, filters: any): Promise<Buffer> {
+    const where: any = { userId };
+
+    if (filters.search) {
+      const searchStr = filters.search.trim();
+      const s = { contains: searchStr, mode: 'insensitive' };
+      
+      where.OR = [
+        { saleOrderNumber: s },
+        { outboundDelivery: s },
+        { transferOrder: s },
+        { plantCode: s },
+        { specialRemarks: s },
+        { status: s },
+        { customerNameText: s },
+        { product: { is: { name: s } } },
+        { transporter: { is: { name: s } } },
+        { salesZone: { is: { name: s } } },
+        { packConfig: { is: { configName: s } } },
+        { customer: { is: { name: s } } },
+      ];
+
+      const lowerSearch = searchStr.toLowerCase();
+      if (['yes', 'true'].includes(lowerSearch)) {
+        where.OR.push({ paymentClearance: true });
+      } else if (['no', 'false'].includes(lowerSearch)) {
+        where.OR.push({ paymentClearance: false });
+      }
+    }
+    if (filters.paymentClearance !== undefined) where.paymentClearance = filters.paymentClearance === 'true';
+    if (filters.salesZoneId) where.salesZoneId = parseInt(filters.salesZoneId, 10);
+    if (filters.status) where.status = filters.status;
+    const parseYMD = (s: string) => {
+      const datePart = s.includes('T') ? s.split('T')[0] : s;
+      const [y, m, d] = datePart.split('-').map(Number);
+      return { y, m, d };
+    };
+
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+    if (filters.startDate || filters.endDate) {
+      const range: { gte?: Date; lt?: Date } = {};
+
+      if (filters.startDate) {
+        const { y, m, d } = parseYMD(filters.startDate);
+        const s = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
+        range.gte = s;
+      }
+
+      if (filters.endDate) {
+        const { y, m, d } = parseYMD(filters.endDate);
+        const e = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
+        range.lt = e;
+      }
+
+      where.deliveryDate = { ...(where.deliveryDate as object), ...range };
+    }
+
+    // 2. Fetch Data
+    const orders = await this.prisma.salesOrder.findMany({
+      where,
+      include: {
+        product: true,
+        salesZone: true,
+        packConfig: true,
+        transporter: true,
+        customer: true,
+      }
+    });
+
+    const packConfigs = await this.prisma.packConfig.findMany();
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Sales Orders');
+
+    // 3. Define Columns
+    worksheet.columns = [
+      { header: 'PRODUCT', key: 'product', width: 20 },
+      { header: 'SALE ORDER NUMBER', key: 'saleOrderNumber', width: 25 },
+      { header: 'OUT BOUND DELIVERY', key: 'outboundDelivery', width: 25 },
+      { header: 'TRANSFER ORDER', key: 'transferOrder', width: 20 },
+      { header: 'DELIVERY DATE', key: 'deliveryDate', width: 15 },
+      { header: 'TRANSPORTER', key: 'transporter', width: 20 },
+      { header: 'PLANT CODE', key: 'plantCode', width: 15 },
+      { header: 'PAYMENT CLEARANCE', key: 'paymentClearance', width: 20 },
+      { header: 'SALES ZONE', key: 'salesZone', width: 15 },
+      { header: 'PACKING CONFIG', key: 'packConfig', width: 20 },
+      { header: 'CUSTOMER', key: 'customer', width: 25 },
+      { header: 'SPECIAL REMARKS', key: 'specialRemarks', width: 30 },
+      { header: 'ADDITIONAL REMARKS', key: 'additionalRemarks', width: 30 },
+      { header: 'LABEL REMARKS', key: 'labelRemarks', width: 30 },
+    ];
+
+    // 4. Populate Rows
+    orders.forEach((order) => {
+      worksheet.addRow({
+        product: order.product?.name || '',
+        saleOrderNumber: order.saleOrderNumber,
+        outboundDelivery: order.outboundDelivery || '',
+        transferOrder: order.transferOrder || '',
+        deliveryDate: order.deliveryDate ? order.deliveryDate.toISOString().split('T')[0] : '',
+        transporter: order.transporter?.name || '',
+        plantCode: order.plantCode || '',
+        paymentClearance: order.paymentClearance ? 'Yes' : 'No',
+        salesZone: order.salesZone?.name || '',
+        packConfig: order.packConfig?.configName || '',
+        customer: order.customerNameText || order.customer?.name || '',
+        specialRemarks: order.specialRemarks || '',
+        additionalRemarks: order.additionalRemarks || '',
+        labelRemarks: order.labelRemarks || '',
+      });
+    });
+
+    // 5. Apply Data Validations & Cell Locking
+    const editableColumns = [
+      'DELIVERY DATE', 'TRANSPORTER', 'PLANT CODE', 
+      'PAYMENT CLEARANCE', 'PACKING CONFIG', 
+      'SPECIAL REMARKS', 'ADDITIONAL REMARKS', 'LABEL REMARKS'
+    ];
+
+    // Protect the entire sheet first
+    await worksheet.protect('password123', {
+      selectLockedCells: true,
+      selectUnlockedCells: true,
+    });
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Skip Header
+
+      // Dropdown for PAYMENT CLEARANCE (Col H / 8)
+      row.getCell(8).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"Yes,No"']
+      };
+
+      // Dropdown for PACKING CONFIG (Col J / 10)
+      if (packConfigs.length > 0) {
+        const configNames = packConfigs.map(p => p.configName).join(',');
+        row.getCell(10).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`"${configNames}"`]
+        };
+      }
+
+      // Unlock editable columns
+      worksheet.columns.forEach((col, index) => {
+        if (editableColumns.includes(col.header as string)) {
+          row.getCell(index + 1).protection = { locked: false };
+        }
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer as ArrayBuffer);
+  }
+
+  async importSalesExcel(buffer: Buffer, userId: number) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as any);
+    const worksheet = workbook.getWorksheet(1);
+    
+    if (!worksheet) throw new BadRequestException('Worksheet not found in Excel file');
+
+    let updatedCount = 0;
+    const errors: { row: number; errors: string[] }[] = [];
+
+    // Pre-fetch masters for validation
+    const packConfigs = await this.prisma.packConfig.findMany();
+
+    for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
+      const row = worksheet.getRow(rowNumber);
+      if (!row.hasValues) continue;
+
+      const rowErrors: string[] = [];
+
+      // Extract cells based on the export order
+      const productStr = row.getCell(1).value?.toString()?.trim() || '';
+      const saleOrderNumber = row.getCell(2).value?.toString()?.trim();
+      const outboundDelivery = row.getCell(3).value?.toString()?.trim() || '';
+      const transferOrder = row.getCell(4).value?.toString()?.trim() || '';
+      const deliveryDateStr = row.getCell(5).value?.toString()?.trim();
+      const transporterName = row.getCell(6).value?.toString()?.trim() || '';
+      const plantCode = row.getCell(7).value?.toString()?.trim() || '';
+      const paymentClearanceStr = row.getCell(8).value?.toString()?.trim();
+      const salesZoneStr = row.getCell(9).value?.toString()?.trim() || '';
+      const packConfigName = row.getCell(10).value?.toString()?.trim() || '';
+      const customerStr = row.getCell(11).value?.toString()?.trim() || '';
+      const specialRemarks = row.getCell(12).value?.toString()?.trim() || null;
+      const additionalRemarks = row.getCell(13).value?.toString()?.trim() || null;
+      const labelRemarks = row.getCell(14).value?.toString()?.trim() || null;
+
+      if (!saleOrderNumber) {
+        errors.push({ row: rowNumber, errors: ['Sale Order Number is missing'] });
+        continue;
+      }
+
+      // 1. Fetch the original order to apply Strict Validation checks
+      const originalOrder = await this.prisma.salesOrder.findUnique({
+        where: { saleOrderNumber },
+        include: { product: true, salesZone: true, customer: true }
+      });
+
+      if (!originalOrder) {
+        rowErrors.push(`Order ${saleOrderNumber} not found.`);
+        errors.push({ row: rowNumber, errors: rowErrors });
+        continue;
+      }
+
+      if (originalOrder.userId !== userId) {
+        rowErrors.push(`You do not have permission to update order ${saleOrderNumber}.`);
+      }
+
+      const restrictedStatuses = ['Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'];
+      if (originalOrder.status && restrictedStatuses.includes(originalOrder.status)) {
+        rowErrors.push(`Cannot modify order. The packing stage is already completed (Current Status: ${originalOrder.status}).`);
+      }
+
+      // 2. Strict Validation Check for NON-EDITABLE columns
+      if (productStr !== (originalOrder.product?.name || '')) rowErrors.push('Product cannot be modified.');
+      if (outboundDelivery !== (originalOrder.outboundDelivery || '')) rowErrors.push('Outbound Delivery cannot be modified.');
+      if (transferOrder !== (originalOrder.transferOrder || '')) rowErrors.push('Transfer Order cannot be modified.');
+      if (salesZoneStr !== (originalOrder.salesZone?.name || '')) rowErrors.push('Sales Zone cannot be modified.');
+      if (customerStr !== (originalOrder.customerNameText || originalOrder.customer?.name || '')) rowErrors.push('Customer cannot be modified.');
+
+      if (rowErrors.length > 0) {
+        errors.push({ row: rowNumber, errors: rowErrors });
+        continue;
+      }
+
+      // 3. Prepare Editable Update Data
+      const updateData: any = {};
+
+      if (deliveryDateStr) updateData.deliveryDate = new Date(deliveryDateStr);
+      updateData.plantCode = plantCode;
+      
+      if (paymentClearanceStr) {
+        updateData.paymentClearance = paymentClearanceStr.toLowerCase() === 'yes';
+      }
+
+      if (packConfigName) {
+        const foundConfig = packConfigs.find(p => p.configName.toLowerCase() === packConfigName.toLowerCase());
+        if (foundConfig) updateData.packConfigId = foundConfig.id;
+        else rowErrors.push(`Invalid Pack Config: ${packConfigName}`);
+      }
+
+      // 4. Dynamic Transporter Creation
+      if (transporterName) {
+        const transporter = await this.prisma.transporter.findFirst({
+          where: { name: { equals: transporterName, mode: 'insensitive' } }
+        });
+        
+        if (transporter) {
+          updateData.transporterId = transporter.id;
+        } else {
+          // Create a new transporter
+          const newTransporter = await this.prisma.transporter.create({
+            data: { name: transporterName }
+          });
+          updateData.transporterId = newTransporter.id;
+        }
+      }
+
+      updateData.specialRemarks = specialRemarks;
+      updateData.additionalRemarks = additionalRemarks;
+      updateData.labelRemarks = labelRemarks;
+
+      if (rowErrors.length > 0) {
+        errors.push({ row: rowNumber, errors: rowErrors });
+        continue;
+      }
+
+      // 5. Update the Database
+      try {
+        await this.prisma.salesOrder.update({
+          where: { saleOrderNumber },
+          data: updateData,
+        });
+        updatedCount++;
+      } catch (e) {
+         errors.push({ row: rowNumber, errors: ['Failed to update order in database.'] });
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new BadRequestException({
+        message: `Import partially failed. Updated ${updatedCount} orders, but found errors in ${errors.length} rows.`,
+        errors,
+      });
+    }
+
+    return { message: `Successfully updated ${updatedCount} orders from Excel.` };
+  }
 
   async generateBulkTemplate(res: Response) {
     try {
@@ -504,8 +800,8 @@ export class SalesOrderService {
           status: null,
           priority: null,
           assignedUserId: null,
-          isErpImported: 0,           
-          skipIssueStage: false,      
+          isErpImported: 0,
+          skipIssueStage: false,
           UpdatedBy: username,
           UpdatedDate: new Date(),
         },

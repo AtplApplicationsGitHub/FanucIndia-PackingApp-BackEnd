@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   InternalServerErrorException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateSalesCrudDto } from './dto/create-sales-crud.dto';
@@ -58,11 +59,33 @@ export class SalesCrudService {
     }
 
     try {
-      const resolvedCustomerId: number | null = dto.customerId ?? null;
-      const customerNameText =
+      let resolvedCustomerId: number | null = dto.customerId ?? null;
+      let finalCustomerNameText: string | null =
         dto.customerName && dto.customerName.trim()
           ? dto.customerName.trim()
           : null;
+
+      if (!resolvedCustomerId && finalCustomerNameText) {
+        let existingCustomer = await this.prisma.customer.findFirst({
+          where: { name: { equals: finalCustomerNameText, mode: 'insensitive' } },
+        });
+
+        if (!existingCustomer) {
+          existingCustomer = await this.prisma.customer.create({
+            data: { name: finalCustomerNameText },
+          });
+        }
+        resolvedCustomerId = existingCustomer.id;
+        finalCustomerNameText = existingCustomer.name; 
+      } 
+      else if (resolvedCustomerId) {
+        const existingCustomer = await this.prisma.customer.findUnique({
+          where: { id: resolvedCustomerId },
+        });
+        if (existingCustomer) {
+          finalCustomerNameText = existingCustomer.name;
+        }
+      }
 
       const customer = resolvedCustomerId
         ? await this.prisma.customer.findUnique({
@@ -95,7 +118,7 @@ export class SalesCrudService {
           userId,
           assignedUserId: null,
           customerId: resolvedCustomerId,
-          customerNameText: customerNameText,
+          customerNameText: finalCustomerNameText,
           printerId: null,
           address: address,
         },
@@ -254,17 +277,40 @@ export class SalesCrudService {
       throw new NotFoundException('Sales order not found or access denied.');
     }
 
+    const restrictedStatuses = ['Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'];
+    if (existing.status && restrictedStatuses.includes(existing.status)) {
+      throw new ForbiddenException(`Cannot modify order. The packing stage is already completed (Current Status: ${existing.status}).`);
+    }
+
     try {
-      // Customer update behavior:
-      // - If customerId is provided (dropdown): link to master customer and preload address.
-      // - If customerName is provided (free text): DO NOT create/update Customer master records.
-      //   Store the typed name in SalesOrder.customerNameText and unlink customerId.
-      const resolvedCustomerId: number | undefined =
+      let resolvedCustomerId: number | undefined =
         dto.customerId ?? undefined;
-      const customerNameText: string | undefined =
+      let finalCustomerNameText: string | undefined =
         (dto as any).customerName && String((dto as any).customerName).trim()
           ? String((dto as any).customerName).trim()
           : undefined;
+
+      if (!resolvedCustomerId && finalCustomerNameText) {
+        let existingCustomer = await this.prisma.customer.findFirst({
+          where: { name: { equals: finalCustomerNameText, mode: 'insensitive' } },
+        });
+
+        if (!existingCustomer) {
+          existingCustomer = await this.prisma.customer.create({
+            data: { name: finalCustomerNameText },
+          });
+        }
+        resolvedCustomerId = existingCustomer.id;
+        finalCustomerNameText = existingCustomer.name;
+      } 
+      else if (resolvedCustomerId) {
+        const existingCustomer = await this.prisma.customer.findUnique({
+          where: { id: resolvedCustomerId },
+        });
+        if (existingCustomer) {
+          finalCustomerNameText = existingCustomer.name;
+        }
+      }
 
       let address: string | null | undefined;
       if (resolvedCustomerId) {
@@ -293,18 +339,15 @@ export class SalesCrudService {
           ...(resolvedCustomerId !== undefined
             ? { customerId: resolvedCustomerId }
             : {}),
-          ...(customerNameText !== undefined
-            ? { customerNameText, customerId: null }
-            : resolvedCustomerId !== undefined
-              ? { customerNameText: null }
-              : {}),
+          ...(finalCustomerNameText !== undefined
+            ? { customerNameText: finalCustomerNameText }
+            : {}),
           ...(address !== undefined && { address }),
         },
         include: {
           customer: true,
           product: true,
           transporter: true,
-          // plantCode: true,
           salesZone: true,
           packConfig: true,
         },
@@ -355,33 +398,85 @@ export class SalesCrudService {
     page: number,
     limit: number,
     userId: number,
-    search?: string,
+    filters: {
+      search?: string;
+      paymentClearance?: string;
+      salesZoneId?: string;
+      status?: string;
+      startDate?: string;
+      endDate?: string;
+    },
   ) {
     try {
       const skip = (page - 1) * limit;
       const whereClause: any = { userId };
 
-      if (search) {
-        const s = { contains: search, mode: 'insensitive' };
+      // 1. APPLY INDIVIDUAL FILTERS
+      if (filters.paymentClearance !== undefined) {
+        whereClause.paymentClearance = filters.paymentClearance === 'true';
+      }
+      if (filters.salesZoneId) {
+        whereClause.salesZoneId = parseInt(filters.salesZoneId, 10);
+      }
+      if (filters.status) {
+        whereClause.status = filters.status;
+      }
+      const parseYMD = (s: string) => {
+        const datePart = s.includes('T') ? s.split('T')[0] : s;
+        const [y, m, d] = datePart.split('-').map(Number);
+        return { y, m, d };
+      };
+
+      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+      if (filters.startDate || filters.endDate) {
+        const range: { gte?: Date; lt?: Date } = {};
+
+        if (filters.startDate) {
+          const { y, m, d } = parseYMD(filters.startDate);
+          const s = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
+          range.gte = s;
+        }
+
+        if (filters.endDate) {
+          const { y, m, d } = parseYMD(filters.endDate);
+          const e = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
+          range.lt = e;
+        }
+
+        whereClause.deliveryDate = { ...(whereClause.deliveryDate as object), ...range };
+      }
+
+      // 2. APPLY SEARCH ACROSS ALL SPECIFIED COLUMNS
+      if (filters.search) {
+        const searchStr = filters.search.trim();
+        const s = { contains: searchStr, mode: 'insensitive' };
+        
         whereClause.OR = [
           { saleOrderNumber: s },
           { outboundDelivery: s },
           { transferOrder: s },
-          { status: s },
+          { plantCode: s },
           { specialRemarks: s },
-          ...(['true', 'false'].includes(search.toLowerCase())
-            ? [{ paymentClearance: search.toLowerCase() === 'true' }]
-            : []),
+          { status: s },
           { customerNameText: s },
-          { customer: { is: { name: s } } },
           { product: { is: { name: s } } },
           { transporter: { is: { name: s } } },
-          { plantCode: s },
           { salesZone: { is: { name: s } } },
           { packConfig: { is: { configName: s } } },
+          { customer: { is: { name: s } } },
         ];
+
+        // Handle Payment Clearance Search (Boolean mapping)
+        const lowerSearch = searchStr.toLowerCase();
+        if (['yes', 'true'].includes(lowerSearch)) {
+          whereClause.OR.push({ paymentClearance: true });
+        } else if (['no', 'false'].includes(lowerSearch)) {
+          whereClause.OR.push({ paymentClearance: false });
+        }
       }
 
+      // 3. FETCH PAGINATED RESULTS AND COUNT
       const [orders, totalCount] = await this.prisma.$transaction([
         this.prisma.salesOrder.findMany({
           where: whereClause,
@@ -392,7 +487,6 @@ export class SalesCrudService {
             customer: true,
             product: true,
             transporter: true,
-            // plantCode: true,
             salesZone: true,
             packConfig: true,
             assignedUser: true,
@@ -432,7 +526,6 @@ export class SalesCrudService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        // 1. Existing Logic: Update SalesOrder Status
         await tx.salesOrder.updateMany({
           where: {
             saleOrderNumber: { in: saleOrderNumbers },
@@ -444,7 +537,6 @@ export class SalesCrudService {
           },
         });
 
-        // 2. Existing Logic: Update Status Stepper
         await tx.sO_Status_Stepper.updateMany({
           where: {
             salesOrderNumber: { in: saleOrderNumbers },
@@ -456,7 +548,6 @@ export class SalesCrudService {
           },
         });
 
-        // 3. NEW LOGIC: Create CustomerLabelPrint entries
         await tx.customerLabelPrint.create({
           data: {
             userId: userId,

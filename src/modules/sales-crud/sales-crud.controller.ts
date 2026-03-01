@@ -84,14 +84,20 @@ export class SalesCrudController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
     @Query('search') search?: string,
+    @Query('paymentClearance') paymentClearance?: string,
+    @Query('salesZoneId') salesZoneId?: string,
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     const pageNumber = Number(page) || 1;
     const pageSize = Number(limit) || 10;
+    
     return this.service.getPaginatedOrders(
       pageNumber,
       pageSize,
       req.user.userId,
-      search,
+      { search, paymentClearance, salesZoneId, status, startDate, endDate }
     );
   }
 

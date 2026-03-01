@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma.service';
 import { UpdateAdminOrderDto } from './dto/update-admin-order.dto';
 import { BulkAssignOrderDto } from './dto/bulk-assign-order.dto';
 import { Prisma } from '@prisma/client';
+import * as ExcelJS from 'exceljs';
 
 @Injectable()
 export class AdminOrderService {
@@ -178,7 +179,9 @@ export class AdminOrderService {
           packConfig: { select: { id: true, configName: true } },
           assignedUser: { select: { id: true, name: true } },
           _count: {
-            select: { materialData: true, soChatNotifications: { where: { userId: user.userId } },
+            select: {
+              materialData: true,
+              soChatNotifications: { where: { userId: user.userId } },
             },
           },
         },
@@ -243,6 +246,10 @@ export class AdminOrderService {
 
     const { customerId, customerNameText, ...rest } = dto;
 
+    if (rest.priority === null) {
+      delete rest.priority;
+    }
+
     const data: Prisma.SalesOrderUncheckedUpdateInput = {
       ...rest,
       UpdatedBy: user.name,
@@ -251,11 +258,11 @@ export class AdminOrderService {
     };
 
     if (customerNameText !== undefined && customerNameText !== null) {
-       data.customerNameText = customerNameText;
-       data.customerId = null;
+      data.customerNameText = customerNameText;
+      data.customerId = null;
     } else if (customerId !== undefined && customerId !== null) {
-       data.customerId = customerId;
-       data.customerNameText = null;
+      data.customerId = customerId;
+      data.customerNameText = null;
     }
 
     if (
@@ -335,13 +342,21 @@ export class AdminOrderService {
     return { message: 'Sales order deleted successfully' };
   }
 
-  async bulkAssign(dto: BulkAssignOrderDto, user: { userId: number; name: string }) {
+  async bulkAssign(
+    dto: BulkAssignOrderDto,
+    user: { userId: number; name: string },
+  ) {
     const { salesOrderIds, assignedUserId } = dto;
     const now = new Date();
 
     const orders = await this.prisma.salesOrder.findMany({
       where: { id: { in: salesOrderIds } },
-      select: { id: true, status: true, saleOrderNumber: true, assignedUserId: true }
+      select: {
+        id: true,
+        status: true,
+        saleOrderNumber: true,
+        assignedUserId: true,
+      },
     });
 
     if (orders.length === 0) {
@@ -390,35 +405,31 @@ export class AdminOrderService {
   async fetchActiveOrders() {
     const data = await this.prisma.salesOrder.findMany({
       where: {
-        OR: [
-          { status: null },
-          { status: 'R105' },
-          { status: 'W105' },
-        ],
+        OR: [{ status: null }, { status: 'R105' }, { status: 'W105' }],
       },
       select: {
         saleOrderNumber: true,
         outboundDelivery: true,
         transferOrder: true,
-        deliveryDate: true, 
-        paymentClearance: true, 
+        deliveryDate: true,
+        paymentClearance: true,
         status: true,
         priority: true,
-        
-        user: { 
-          select: { name: true } 
+
+        user: {
+          select: { name: true },
         },
-        product: { 
-          select: { name: true } 
+        product: {
+          select: { name: true },
         },
-        salesZone: { 
-          select: { name: true } 
+        salesZone: {
+          select: { name: true },
         },
-        assignedUser: { 
-          select: { name: true } 
+        assignedUser: {
+          select: { name: true },
         },
-        customer: { 
-          select: { name: true } 
+        customer: {
+          select: { name: true },
         },
         customerNameText: true,
       },
@@ -427,7 +438,7 @@ export class AdminOrderService {
       },
     });
 
-    return data.map(order => ({
+    return data.map((order) => ({
       userName: order.user?.name,
       product: order.product?.name,
       saleOrderNumber: order.saleOrderNumber,
@@ -443,7 +454,10 @@ export class AdminOrderService {
     }));
   }
 
-  async bulkUpdateSkipIssue(dto: { salesOrderIds: number[]; skipIssueStage: boolean }) {
+  async bulkUpdateSkipIssue(dto: {
+    salesOrderIds: number[];
+    skipIssueStage: boolean;
+  }) {
     const { salesOrderIds, skipIssueStage } = dto;
 
     const orders = await this.prisma.salesOrder.findMany({
@@ -474,7 +488,7 @@ export class AdminOrderService {
     }
 
     let message = `Successfully updated skip issue stage for ${validOrderIds.length} order(s).`;
-    
+
     if (invalidOrderNumbers.length > 0) {
       message += ` Could not update the following orders because ERP Material Data has not been imported yet: ${invalidOrderNumbers.join(', ')}.`;
     }
@@ -483,7 +497,230 @@ export class AdminOrderService {
       message,
       updatedCount: validOrderIds.length,
       skippedCount: invalidOrderNumbers.length,
-      skippedOrders: invalidOrderNumbers, 
+      skippedOrders: invalidOrderNumbers,
     };
+  }
+
+  async processExcelImport(fileBuffer: Buffer, user: any) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(fileBuffer as any);
+    const worksheet = workbook.worksheets[0];
+
+    if (!worksheet) throw new BadRequestException('Invalid Excel file');
+
+    // Safely map headers to their column indexes (ExcelJS columns are 1-based)
+    const headerRow = worksheet.getRow(1);
+    const colMap: Record<string, number> = {};
+
+    headerRow.eachCell((cell, colNumber) => {
+      if (cell.value) {
+        colMap[cell.value.toString().trim().toUpperCase()] = colNumber;
+      }
+    });
+
+    if (!colMap['SALE ORDER NUMBER']) {
+      throw new BadRequestException(
+        'Invalid File Format. Missing "SALE ORDER NUMBER" column.',
+      );
+    }
+
+    // Start transaction for atomic updates
+    return this.prisma.$transaction(async (tx) => {
+      for (let i = 2; i <= worksheet.rowCount; i++) {
+        const row = worksheet.getRow(i);
+
+        const saleOrderNumberCell = row.getCell(colMap['SALE ORDER NUMBER']);
+        const saleOrderNumber = saleOrderNumberCell.value?.toString().trim();
+
+        if (!saleOrderNumber) continue;
+
+        const dbOrder = await tx.salesOrder.findUnique({
+          where: { saleOrderNumber },
+          include: {
+            product: true,
+            transporter: true,
+            packConfig: true,
+            customer: true,
+            salesZone: true,
+          },
+        });
+
+        if (!dbOrder) {
+          throw new BadRequestException(
+            `Row ${i}: Sale Order Number '${saleOrderNumber}' not found in the system. Modifying the Sale Order Number is not allowed.`
+          );
+        }
+
+        // Helper function to safely get string values from row
+        const getCellString = (colName: string) => {
+          if (!colMap[colName]) return undefined;
+          const val = row.getCell(colMap[colName]).value;
+          return val ? val.toString().trim() : undefined;
+        };
+
+        // ----------------------------------------------------
+        // 1. VALIDATE READ-ONLY COLUMNS (Ensure no tampering)
+        // ----------------------------------------------------
+        const rowProduct = getCellString('PRODUCT');
+        if (rowProduct && rowProduct !== (dbOrder.product?.name || '')) {
+          throw new BadRequestException(
+            `Row ${i}: Modifying read-only column 'PRODUCT' is not allowed.`,
+          );
+        }
+
+        const rowOBD = getCellString('OUT BOUND DELIVERY');
+        if (rowOBD && rowOBD !== (dbOrder.outboundDelivery || '')) {
+          throw new BadRequestException(
+            `Row ${i}: Modifying read-only column 'OUT BOUND DELIVERY' is not allowed.`,
+          );
+        }
+
+        const rowTO = getCellString('TRANSFER ORDER');
+        if (rowTO && rowTO !== (dbOrder.transferOrder || '')) {
+          throw new BadRequestException(
+            `Row ${i}: Modifying read-only column 'TRANSFER ORDER' is not allowed.`,
+          );
+        }
+
+        const rowSalesZone = getCellString('SALES ZONE');
+        if (rowSalesZone && rowSalesZone !== (dbOrder.salesZone?.name || '')) {
+          throw new BadRequestException(
+            `Row ${i}: Modifying read-only column 'SALES ZONE' is not allowed.`,
+          );
+        }
+
+        const dbCustomerName =
+          dbOrder.customer?.name || dbOrder.customerNameText || '';
+        const rowCustomer = getCellString('CUSTOMER');
+        if (rowCustomer && rowCustomer !== dbCustomerName) {
+          throw new BadRequestException(
+            `Row ${i}: Modifying read-only column 'CUSTOMER' is not allowed.`,
+          );
+        }
+
+        // ----------------------------------------------------
+        // 2. RESOLVE MASTER TABLE ADDITIONS / DROPDOWNS
+        // ----------------------------------------------------
+
+        // Transporter
+        let transporterId = dbOrder.transporterId;
+        const rowTransporter = getCellString('TRANSPORTER');
+        if (
+          rowTransporter &&
+          rowTransporter !== '' &&
+          rowTransporter !== (dbOrder.transporter?.name || '')
+        ) {
+          let t = await tx.transporter.findFirst({
+            where: { name: rowTransporter },
+          });
+          if (!t) {
+            t = await tx.transporter.create({ data: { name: rowTransporter } });
+          }
+          transporterId = t.id;
+        }
+
+        // Pack Config
+        let packConfigId = dbOrder.packConfigId;
+        const rowPackConfig = getCellString('PACKING CONFIG');
+        if (
+          rowPackConfig &&
+          rowPackConfig !== '' &&
+          rowPackConfig !== (dbOrder.packConfig?.configName || '')
+        ) {
+          let p = await tx.packConfig.findFirst({
+            where: { configName: rowPackConfig },
+          });
+          if (!p) {
+            p = await tx.packConfig.create({
+              data: { configName: rowPackConfig },
+            });
+          }
+          packConfigId = p.id;
+        }
+
+        // Assigned User
+        let assignedUserId = dbOrder.assignedUserId;
+        const rowAssignedUser = getCellString('ASSIGNED USER');
+        if (
+          rowAssignedUser &&
+          rowAssignedUser !== '' &&
+          rowAssignedUser !== 'Unassigned'
+        ) {
+          const u = await tx.user.findFirst({
+            where: { name: rowAssignedUser, role: 'USER' },
+          });
+          if (u) assignedUserId = u.id;
+        }
+
+        // ----------------------------------------------------
+        // 3. PARSE FORMATTED DATA (Date, Boolean, Number)
+        // ----------------------------------------------------
+
+        // Payment Clearance
+        const rowPayment = getCellString('PAYMENT CLEARANCE');
+        let paymentClearance = dbOrder.paymentClearance;
+        if (rowPayment) paymentClearance = rowPayment.toLowerCase() === 'yes';
+
+        // Priority
+        let priority = dbOrder.priority;
+        const rowPriority = getCellString('PRIORITY');
+        if (rowPriority && rowPriority !== '') {
+          const p = parseInt(rowPriority, 10);
+          if (!isNaN(p)) priority = p;
+        }
+
+        // Delivery Date
+        let deliveryDate = dbOrder.deliveryDate;
+        const deliveryDateCell = colMap['DELIVERY DATE']
+          ? row.getCell(colMap['DELIVERY DATE']).value
+          : undefined;
+        if (deliveryDateCell) {
+          if (deliveryDateCell instanceof Date) {
+            deliveryDate = deliveryDateCell;
+          } else {
+            // If it's a string from excel, parse it safely
+            const parsedDate = new Date(deliveryDateCell.toString());
+            if (!isNaN(parsedDate.getTime())) {
+              deliveryDate = parsedDate;
+            }
+          }
+        }
+
+        const safeString = (val: string | undefined, fallback: any) =>
+          (val !== undefined && val !== "") ? val : fallback;
+
+        await tx.salesOrder.update({
+          where: { id: dbOrder.id },
+          data: {
+            transporterId,
+            packConfigId,
+            assignedUserId,
+            paymentClearance,
+            priority,
+            deliveryDate,
+            plantCode: safeString(
+              getCellString('PLANT CODE'),
+              dbOrder.plantCode,
+            ),
+            specialRemarks: safeString(
+              getCellString('SPECIAL REMARKS'),
+              dbOrder.specialRemarks,
+            ),
+            additionalRemarks: safeString(
+              getCellString('ADDITIONAL REMARKS'),
+              (dbOrder as any).additionalRemarks,
+            ),
+            labelRemarks: safeString(
+              getCellString('LABEL REMARKS'),
+              dbOrder.labelRemarks,
+            ),
+            UpdatedBy: user.name,
+            UpdatedDate: new Date(),
+          },
+        });
+      }
+
+      return { message: 'Excel import processed successfully' };
+    });
   }
 }

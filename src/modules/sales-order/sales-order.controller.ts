@@ -13,6 +13,7 @@ import {
   Delete,
   Param,
   ParseIntPipe,
+  Query,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { SalesOrderService } from './sales-order.service';
@@ -36,6 +37,26 @@ import { Buffer } from 'buffer';
 @Controller('sales-orders')
 export class SalesOrderController {
   constructor(private readonly salesOrderService: SalesOrderService) {}
+
+  @Get('excel-export')
+  async exportExcel(
+    @Req() req,
+    @Query() filters: any,
+    @Res() res: Response
+  ) {
+    const userId = req.user.id;
+    const buffer = await this.salesOrderService.exportSalesExcel(userId, filters);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="sales_orders_export.xlsx"');
+    res.send(buffer);
+  }
+
+  @Post('excel-import')
+  @UseInterceptors(FileInterceptor('file'))
+  async importExcel(@Req() req, @UploadedFile() file: Express.Multer.File) {
+    const userId = req.user.id;
+    return this.salesOrderService.importSalesExcel(file.buffer, userId);
+  }
 
   @Get('template')
   @Roles('SALES')
