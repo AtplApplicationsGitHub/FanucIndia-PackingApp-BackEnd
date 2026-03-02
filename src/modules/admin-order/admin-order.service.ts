@@ -415,6 +415,7 @@ export class AdminOrderService {
         paymentClearance: true,
         status: true,
         priority: true,
+        skipIssueStage: true,
 
         user: {
           select: { name: true },
@@ -451,6 +452,7 @@ export class AdminOrderService {
       status: order.status,
       priority: order.priority,
       assignedUser: order.assignedUser?.name,
+      skipIssueStage: order.skipIssueStage,
     }));
   }
 
@@ -569,10 +571,12 @@ export class AdminOrderService {
         }
 
         const rowOBD = getCellString('OUT BOUND DELIVERY');
-        if (rowOBD && rowOBD !== (dbOrder.outboundDelivery || '')) {
-          throw new BadRequestException(
-            `Row ${i}: Modifying read-only column 'OUT BOUND DELIVERY' is not allowed.`,
-          );
+        if (rowOBD !== undefined && rowOBD !== (dbOrder.outboundDelivery || '')) {
+          if (dbOrder.isErpImported === 1) {
+            throw new BadRequestException(
+              `Row ${i}: Modifying 'OUT BOUND DELIVERY' is not allowed because ERP Material Data has already been imported.`
+            );
+          }
         }
 
         const rowTO = getCellString('TRANSFER ORDER');
@@ -694,6 +698,7 @@ export class AdminOrderService {
         await tx.salesOrder.update({
           where: { id: dbOrder.id },
           data: {
+            outboundDelivery: safeString(getCellString('OUT BOUND DELIVERY'), dbOrder.outboundDelivery),
             transporterId,
             packConfigId,
             assignedUserId,
