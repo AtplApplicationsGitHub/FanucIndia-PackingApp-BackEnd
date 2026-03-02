@@ -590,9 +590,11 @@ export class AdminOrderService {
         }
 
         const dbCustomerName =
-          dbOrder.customer?.name || dbOrder.customerNameText || '';
+          dbOrder.customerNameText || dbOrder.customer?.name || '';
+          
         const rowCustomer = getCellString('CUSTOMER');
-        if (rowCustomer && rowCustomer !== dbCustomerName) {
+        
+        if (rowCustomer && rowCustomer !== dbCustomerName.trim()) {
           throw new BadRequestException(
             `Row ${i}: Modifying read-only column 'CUSTOMER' is not allowed.`,
           );
