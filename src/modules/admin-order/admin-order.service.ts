@@ -464,7 +464,7 @@ export class AdminOrderService {
 
     const orders = await this.prisma.salesOrder.findMany({
       where: { id: { in: salesOrderIds } },
-      select: { id: true, saleOrderNumber: true, isErpImported: true },
+      select: { id: true, saleOrderNumber: true, isErpImported: true, status: true },
     });
 
     if (orders.length === 0) {
@@ -473,9 +473,12 @@ export class AdminOrderService {
 
     const validOrderIds: number[] = [];
     const invalidOrderNumbers: string[] = [];
+    const issueCompletedOrders: string[] = [];
 
     for (const order of orders) {
-      if (order.isErpImported === 1) {
+      if (skipIssueStage && order.status === 'W105') {
+        issueCompletedOrders.push(order.saleOrderNumber);
+      } else if (order.isErpImported === 1) {
         validOrderIds.push(order.id);
       } else {
         invalidOrderNumbers.push(order.saleOrderNumber);
@@ -492,7 +495,11 @@ export class AdminOrderService {
     let message = `Successfully updated skip issue stage for ${validOrderIds.length} order(s).`;
 
     if (invalidOrderNumbers.length > 0) {
-      message += ` Could not update the following orders because ERP Material Data has not been imported yet: ${invalidOrderNumbers.join(', ')}.`;
+      message += ` Could not update because ERP Material Data has not been imported yet: ${invalidOrderNumbers.join(', ')}.`;
+    }
+
+    if (issueCompletedOrders.length > 0) {
+      message += ` Issue stage completed for: ${issueCompletedOrders.join(', ')}.`;
     }
 
     return {
@@ -500,6 +507,7 @@ export class AdminOrderService {
       updatedCount: validOrderIds.length,
       skippedCount: invalidOrderNumbers.length,
       skippedOrders: invalidOrderNumbers,
+      issueCompletedOrders,
     };
   }
 

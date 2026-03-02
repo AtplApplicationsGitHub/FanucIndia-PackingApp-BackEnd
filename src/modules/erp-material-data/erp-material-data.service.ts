@@ -59,7 +59,7 @@ export class ErpMaterialDataService {
 
   private async getUserName(userId: number): Promise<string> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    return user?.name || 'System'; 
+    return user?.name || 'System';
   }
 
   async getMaterialsByOrderId(
@@ -102,7 +102,7 @@ export class ErpMaterialDataService {
         OR: [
           { Material_Code: { equals: materialCode, mode: 'insensitive' } },
           { Mapping_Barcode: { equals: materialCode, mode: 'insensitive' } },
-        ]
+        ],
       },
       orderBy: { ID: 'asc' },
     });
@@ -112,10 +112,14 @@ export class ErpMaterialDataService {
         'Material with specified code not found for this order.',
       );
 
-    const materialToUpdate = materials.find(m => m.Issue_stage < m.Required_Qty);
+    const materialToUpdate = materials.find(
+      (m) => m.Issue_stage < m.Required_Qty,
+    );
 
     if (!materialToUpdate) {
-      throw new BadRequestException('Cannot exceed the Required_Qty value (all records full)');
+      throw new BadRequestException(
+        'Cannot exceed the Required_Qty value (all records full)',
+      );
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -143,18 +147,24 @@ export class ErpMaterialDataService {
     if (allCompleted) {
       const updatedOrder = await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { status: 'W105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
+        data: {
+          status: 'W105',
+          skipIssueStage: false,
+          assignedUserId: null,
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
+        },
       });
       issueStageCompleted = true;
       await this.prisma.sO_Status_Stepper.updateMany({
         where: {
           salesOrderNumber: updatedOrder.saleOrderNumber,
-          status: "Issued"
+          status: 'Issued',
         },
         data: {
           createdDateTime: new Date(),
-          updatedBy: userName
-        }
+          updatedBy: userName,
+        },
       });
     }
 
@@ -239,18 +249,24 @@ export class ErpMaterialDataService {
     if (allCompleted) {
       const updatedOrder = await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { status: 'W105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
+        data: {
+          status: 'W105',
+          skipIssueStage: false,
+          assignedUserId: null,
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
+        },
       });
       issueStageCompleted = true;
       await this.prisma.sO_Status_Stepper.updateMany({
         where: {
           salesOrderNumber: updatedOrder.saleOrderNumber,
-          status: "Issued"
+          status: 'Issued',
         },
         data: {
           createdDateTime: new Date(),
-          updatedBy: userName
-        }
+          updatedBy: userName,
+        },
       });
     }
 
@@ -280,7 +296,7 @@ export class ErpMaterialDataService {
         OR: [
           { Material_Code: { equals: materialCode, mode: 'insensitive' } },
           { Mapping_Barcode: { equals: materialCode, mode: 'insensitive' } },
-        ]
+        ],
       },
       orderBy: { ID: 'asc' },
     });
@@ -290,9 +306,9 @@ export class ErpMaterialDataService {
         'Material with specified code not found for this order.',
       );
 
-    const materialToUpdate = materials.find(m => {
-        const cap = Math.min(m.Required_Qty, m.Issue_stage);
-        return m.Packing_stage < cap;
+    const materialToUpdate = materials.find((m) => {
+      const cap = Math.min(m.Required_Qty, m.Issue_stage);
+      return m.Packing_stage < cap;
     });
 
     if (!materialToUpdate) {
@@ -325,18 +341,23 @@ export class ErpMaterialDataService {
     if (allPacked) {
       const updatedOrder = await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(), },
+        data: {
+          status: 'F105',
+          assignedUserId: null,
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
+        },
       });
       packingStageCompleted = true;
       await this.prisma.sO_Status_Stepper.updateMany({
         where: {
           salesOrderNumber: updatedOrder.saleOrderNumber,
-          status: "Packed"
+          status: 'Packed',
         },
         data: {
           createdDateTime: new Date(),
-          updatedBy: userName
-        }
+          updatedBy: userName,
+        },
       });
     }
 
@@ -372,7 +393,9 @@ export class ErpMaterialDataService {
     });
 
     if (groupItems.length === 0) {
-      throw new NotFoundException(`No items found for group '${group}' in this order.`);
+      throw new NotFoundException(
+        `No items found for group '${group}' in this order.`,
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -390,12 +413,12 @@ export class ErpMaterialDataService {
           }
         } else {
           const cap = Math.min(item.Required_Qty, item.Issue_stage);
-          
+
           if (item.Packing_stage < item.Required_Qty) {
-             await tx.eRP_Material_Data.update({
+            await tx.eRP_Material_Data.update({
               where: { ID: item.ID },
               data: {
-                Packing_stage: item.Required_Qty, 
+                Packing_stage: item.Required_Qty,
                 UpdatedBy: userName,
                 UpdatedDate: now,
               },
@@ -405,57 +428,83 @@ export class ErpMaterialDataService {
       }
     });
 
-    return this._checkOrderCompletion(salesOrder.saleOrderNumber, orderId, userName);
+    return this._checkOrderCompletion(
+      salesOrder.saleOrderNumber,
+      orderId,
+      userName,
+    );
   }
 
-  private async _checkOrderCompletion(soNumber: string, orderId: number, userName: string) {
+  private async _checkOrderCompletion(
+    soNumber: string,
+    orderId: number,
+    userName: string,
+  ) {
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
       where: { saleOrderNumber: soNumber },
       select: { Issue_stage: true, Packing_stage: true, Required_Qty: true },
     });
 
     const issueStageCompleted = allMaterials.every(
-      (m) => m.Issue_stage >= m.Required_Qty
+      (m) => m.Issue_stage >= m.Required_Qty,
     );
 
     let isIssueComplete = false;
     let isPackingComplete = false;
 
     if (issueStageCompleted) {
-      const current = await this.prisma.salesOrder.findUnique({ where: { id: orderId } });
-      if (current && current.status !== 'W105' && current.status !== 'F105' && current.status !== 'Dispatched') {
-         await this.prisma.salesOrder.update({
+      const current = await this.prisma.salesOrder.findUnique({
+        where: { id: orderId },
+      });
+      if (
+        current &&
+        current.status !== 'W105' &&
+        current.status !== 'F105' &&
+        current.status !== 'Dispatched'
+      ) {
+        await this.prisma.salesOrder.update({
           where: { id: orderId },
-          data: { status: 'W105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date() },
+          data: {
+            status: 'W105',
+            skipIssueStage: false,
+            assignedUserId: null,
+            UpdatedBy: userName,
+            UpdatedDate: new Date(),
+          },
         });
         await this.prisma.sO_Status_Stepper.updateMany({
-          where: { salesOrderNumber: soNumber, status: "Issued" },
-          data: { createdDateTime: new Date(), updatedBy: userName }
+          where: { salesOrderNumber: soNumber, status: 'Issued' },
+          data: { createdDateTime: new Date(), updatedBy: userName },
         });
         isIssueComplete = true;
       }
     }
 
     const packingStageCompleted = allMaterials.every(
-      (m) => m.Packing_stage >= m.Required_Qty
+      (m) => m.Packing_stage >= m.Required_Qty,
     );
 
     if (packingStageCompleted) {
-        await this.prisma.salesOrder.update({
-          where: { id: orderId },
-          data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date() },
-        });
-        await this.prisma.sO_Status_Stepper.updateMany({
-          where: { salesOrderNumber: soNumber, status: "Packed" },
-          data: { createdDateTime: new Date(), updatedBy: userName }
-        });
-        isPackingComplete = true;
+      await this.prisma.salesOrder.update({
+        where: { id: orderId },
+        data: {
+          status: 'F105',
+          assignedUserId: null,
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
+        },
+      });
+      await this.prisma.sO_Status_Stepper.updateMany({
+        where: { salesOrderNumber: soNumber, status: 'Packed' },
+        data: { createdDateTime: new Date(), updatedBy: userName },
+      });
+      isPackingComplete = true;
     }
 
     return {
       message: 'Group updated successfully',
       issueStageCompleted: isIssueComplete,
-      packingStageCompleted: isPackingComplete
+      packingStageCompleted: isPackingComplete,
     };
   }
 
@@ -528,18 +577,23 @@ export class ErpMaterialDataService {
     if (allPacked) {
       const updatedOrder = await this.prisma.salesOrder.update({
         where: { id: orderId },
-        data: { status: 'F105', assignedUserId: null, UpdatedBy: userName, UpdatedDate: new Date(),},
+        data: {
+          status: 'F105',
+          assignedUserId: null,
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
+        },
       });
       packingStageCompleted = true;
       await this.prisma.sO_Status_Stepper.updateMany({
         where: {
           salesOrderNumber: updatedOrder.saleOrderNumber,
-          status: "Packed"
+          status: 'Packed',
         },
         data: {
           createdDateTime: new Date(),
-          updatedBy: userName
-        }
+          updatedBy: userName,
+        },
       });
     }
 
@@ -579,15 +633,11 @@ export class ErpMaterialDataService {
     });
   }
 
-  async acceptAllIssueStage(
-    orderId: number,
-    userId: number,
-    userRole: string,
-  ) {
+  async acceptAllIssueStage(orderId: number, userId: number, userRole: string) {
     if (userRole !== 'ADMIN') {
-        throw new ForbiddenException('Only Admins can perform this action');
+      throw new ForbiddenException('Only Admins can perform this action');
     }
-    
+
     await verifyOrderAccess(this.prisma, orderId, userId, userRole);
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
@@ -603,7 +653,7 @@ export class ErpMaterialDataService {
     });
 
     if (materials.length === 0) {
-       throw new NotFoundException('No materials found for this order');
+      throw new NotFoundException('No materials found for this order');
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -621,7 +671,11 @@ export class ErpMaterialDataService {
       }
     });
 
-    return this._checkOrderCompletion(salesOrder.saleOrderNumber, orderId, userName);
+    return this._checkOrderCompletion(
+      salesOrder.saleOrderNumber,
+      orderId,
+      userName,
+    );
   }
 
   async updateMapping(
@@ -662,7 +716,7 @@ export class ErpMaterialDataService {
 
       if (existsInMaster) {
         throw new BadRequestException(
-          `The barcode '${barcodeToCheck}' already exists in the Master Data (MaterialBarcode).`
+          `The barcode '${barcodeToCheck}' already exists in the Master Data (MaterialBarcode).`,
         );
       }
 
@@ -675,14 +729,16 @@ export class ErpMaterialDataService {
           ID: { not: dto.materialId }, // Exclude self
           OR: [
             { Material_Code: { equals: barcodeToCheck, mode: 'insensitive' } },
-            { Mapping_Barcode: { equals: barcodeToCheck, mode: 'insensitive' } },
+            {
+              Mapping_Barcode: { equals: barcodeToCheck, mode: 'insensitive' },
+            },
           ],
         },
       });
 
       if (existsInCurrentSO) {
         throw new BadRequestException(
-          `The barcode '${barcodeToCheck}' is already used as a Material Code or Mapping Barcode in this Sales Order.`
+          `The barcode '${barcodeToCheck}' is already used as a Material Code or Mapping Barcode in this Sales Order.`,
         );
       }
     }
