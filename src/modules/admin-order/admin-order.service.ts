@@ -547,7 +547,7 @@ export class AdminOrderService {
 
         if (!dbOrder) {
           throw new BadRequestException(
-            `Row ${i}: Sale Order Number '${saleOrderNumber}' not found in the system. Modifying the Sale Order Number is not allowed.`
+            `Row ${i}: Invalid SO. Sale Order Number '${saleOrderNumber}' does not exist in the database. Adding new Orders via Excel upload is not allowed.`
           );
         }
 
