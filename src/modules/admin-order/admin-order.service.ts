@@ -408,6 +408,7 @@ export class AdminOrderService {
         OR: [{ status: null }, { status: 'R105' }, { status: 'W105' }],
       },
       select: {
+        id: true,
         saleOrderNumber: true,
         outboundDelivery: true,
         transferOrder: true,
@@ -416,6 +417,13 @@ export class AdminOrderService {
         status: true,
         priority: true,
         skipIssueStage: true,
+
+        plantCode: true,
+        specialRemarks: true,
+        additionalRemarks: true,
+        labelRemarks: true,
+        transporter: { select: { name: true } },
+        packConfig: { select: { configName: true } },
 
         user: {
           select: { name: true },
@@ -440,6 +448,7 @@ export class AdminOrderService {
     });
 
     return data.map((order) => ({
+      id: order.id,
       userName: order.user?.name,
       product: order.product?.name,
       saleOrderNumber: order.saleOrderNumber,
@@ -453,6 +462,12 @@ export class AdminOrderService {
       priority: order.priority,
       assignedUser: order.assignedUser?.name,
       skipIssueStage: order.skipIssueStage,
+      plantCode: order.plantCode,
+      specialRemarks: order.specialRemarks,
+      additionalRemarks: order.additionalRemarks,
+      labelRemarks: order.labelRemarks,
+      transporter: order.transporter,
+      packConfig: order.packConfig,
     }));
   }
 
@@ -591,24 +606,6 @@ export class AdminOrderService {
         if (rowTO && rowTO !== (dbOrder.transferOrder || '')) {
           throw new BadRequestException(
             `Row ${i}: Modifying read-only column 'TRANSFER ORDER' is not allowed.`,
-          );
-        }
-
-        const rowSalesZone = getCellString('SALES ZONE');
-        if (rowSalesZone && rowSalesZone !== (dbOrder.salesZone?.name || '')) {
-          throw new BadRequestException(
-            `Row ${i}: Modifying read-only column 'SALES ZONE' is not allowed.`,
-          );
-        }
-
-        const dbCustomerName =
-          dbOrder.customerNameText || dbOrder.customer?.name || '';
-          
-        const rowCustomer = getCellString('CUSTOMER');
-        
-        if (rowCustomer && rowCustomer !== dbCustomerName.trim()) {
-          throw new BadRequestException(
-            `Row ${i}: Modifying read-only column 'CUSTOMER' is not allowed.`,
           );
         }
 

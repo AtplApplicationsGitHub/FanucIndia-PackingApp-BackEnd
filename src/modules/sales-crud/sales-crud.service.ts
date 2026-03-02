@@ -419,7 +419,14 @@ export class SalesCrudService {
         whereClause.salesZoneId = parseInt(filters.salesZoneId, 10);
       }
       if (filters.status) {
-        whereClause.status = filters.status;
+        if (filters.status === 'None') {
+          whereClause.AND = [
+            ...(Array.isArray(whereClause.AND) ? whereClause.AND : []),
+            { OR: [{ status: null }, { status: '' }] },
+          ];
+        } else {
+          whereClause.status = filters.status;
+        }
       }
       const parseYMD = (s: string) => {
         const datePart = s.includes('T') ? s.split('T')[0] : s;

@@ -52,7 +52,16 @@ export class SalesOrderService {
       where.paymentClearance = filters.paymentClearance === 'true';
     if (filters.salesZoneId)
       where.salesZoneId = parseInt(filters.salesZoneId, 10);
-    if (filters.status) where.status = filters.status;
+    if (filters.status) {
+      if (filters.status === 'None') {
+        where.AND = [
+          ...(Array.isArray(where.AND) ? where.AND : []),
+          { OR: [{ status: null }, { status: '' }] },
+        ];
+      } else {
+        where.status = filters.status;
+      }
+    }
     const parseYMD = (s: string) => {
       const datePart = s.includes('T') ? s.split('T')[0] : s;
       const [y, m, d] = datePart.split('-').map(Number);
@@ -106,9 +115,7 @@ export class SalesOrderService {
       { header: 'TRANSPORTER', key: 'transporter', width: 20 },
       { header: 'PLANT CODE', key: 'plantCode', width: 15 },
       { header: 'PAYMENT CLEARANCE', key: 'paymentClearance', width: 20 },
-      { header: 'SALES ZONE', key: 'salesZone', width: 15 },
       { header: 'PACKING CONFIG', key: 'packConfig', width: 20 },
-      { header: 'CUSTOMER', key: 'customer', width: 25 },
       { header: 'SPECIAL REMARKS', key: 'specialRemarks', width: 30 },
       { header: 'ADDITIONAL REMARKS', key: 'additionalRemarks', width: 30 },
       { header: 'LABEL REMARKS', key: 'labelRemarks', width: 30 },
@@ -127,9 +134,7 @@ export class SalesOrderService {
         transporter: order.transporter?.name || '',
         plantCode: order.plantCode || '',
         paymentClearance: order.paymentClearance ? 'Yes' : 'No',
-        salesZone: order.salesZone?.name || '',
         packConfig: order.packConfig?.configName || '',
-        customer: order.customerNameText || order.customer?.name || '',
         specialRemarks: order.specialRemarks || '',
         additionalRemarks: order.additionalRemarks || '',
         labelRemarks: order.labelRemarks || '',
@@ -149,7 +154,7 @@ export class SalesOrderService {
     ];
 
     // Protect the entire sheet first
-    await worksheet.protect('password123', {
+    await worksheet.protect('admin_dims_2026', {
       selectLockedCells: true,
       selectUnlockedCells: true,
     });
@@ -167,7 +172,7 @@ export class SalesOrderService {
       // Dropdown for PACKING CONFIG (Col J / 10)
       if (packConfigs.length > 0) {
         const configNames = packConfigs.map((p) => p.configName).join(',');
-        row.getCell(10).dataValidation = {
+        row.getCell(9).dataValidation = {
           type: 'list',
           allowBlank: true,
           formulae: [`"${configNames}"`],
@@ -223,13 +228,10 @@ export class SalesOrderService {
       const transporterName = row.getCell(6).value?.toString()?.trim() || '';
       const plantCode = row.getCell(7).value?.toString()?.trim() || '';
       const paymentClearanceStr = row.getCell(8).value?.toString()?.trim();
-      const salesZoneStr = row.getCell(9).value?.toString()?.trim() || '';
-      const packConfigName = row.getCell(10).value?.toString()?.trim() || '';
-      const customerStr = row.getCell(11).value?.toString()?.trim() || '';
-      const specialRemarks = row.getCell(12).value?.toString()?.trim() || null;
-      const additionalRemarks =
-        row.getCell(13).value?.toString()?.trim() || null;
-      const labelRemarks = row.getCell(14).value?.toString()?.trim() || null;
+      const packConfigName = row.getCell(9).value?.toString()?.trim() || '';
+      const specialRemarks = row.getCell(10).value?.toString()?.trim() || null;
+      const additionalRemarks = row.getCell(11).value?.toString()?.trim() || null;
+      const labelRemarks = row.getCell(12).value?.toString()?.trim() || null;
 
       if (!saleOrderNumber) {
         errors.push({
@@ -278,13 +280,6 @@ export class SalesOrderService {
         rowErrors.push('Outbound Delivery cannot be modified.');
       if (norm(transferOrder) !== norm(originalOrder.transferOrder))
         rowErrors.push('Transfer Order cannot be modified.');
-      if (norm(salesZoneStr) !== norm(originalOrder.salesZone?.name))
-        rowErrors.push('Sales Zone cannot be modified.');
-      if (
-        norm(customerStr) !==
-        norm(originalOrder.customerNameText || originalOrder.customer?.name)
-      )
-        rowErrors.push('Customer cannot be modified.');
       if (rowErrors.length > 0) {
         errors.push({ row: rowNumber, errors: rowErrors });
         continue;
@@ -329,9 +324,6 @@ export class SalesOrderService {
     // --- PHASE 2: ABORT IF ANY ERRORS EXIST ---
     // If there is even a single error, reject the entire file without writing to DB
     if (errors.length > 0) {
-      console.error('================ EXCEL IMPORT ERRORS ================');
-      console.dir(errors, { depth: null });
-      console.error('=====================================================');
       throw new BadRequestException({
         message: `Import failed. No orders were updated due to errors in ${errors.length} rows. Please fix the file and try again.`,
         errors, // Sending the errors back so the frontend can display exactly what went wrong
