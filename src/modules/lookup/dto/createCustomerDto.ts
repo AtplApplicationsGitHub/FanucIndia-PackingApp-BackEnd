@@ -6,11 +6,19 @@ export class CreateCustomerDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ example: 'Pune, India', description: 'Customer address' })
+  @ApiProperty({
+    example: 'Pune, India',
+    description: 'Customer address',
+    required: false,
+  })
+  @IsOptional()
   @IsString()
-  address: string;
+  address?: string;
 
-  @ApiProperty({ example: '9876543210', description: 'Customer contact number'})
+  @ApiProperty({
+    example: '9876543210',
+    description: 'Customer contact number',
+  })
   @IsOptional()
   @IsString()
   contactNumber?: string;

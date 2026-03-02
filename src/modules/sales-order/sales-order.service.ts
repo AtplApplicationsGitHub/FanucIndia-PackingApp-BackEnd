@@ -16,12 +16,16 @@ export class SalesOrderService {
   constructor(private readonly prisma: PrismaService) {}
 
   async exportSalesExcel(userId: number, filters: any): Promise<Buffer> {
-    const where: any = { userId };
+    const authUserId = Number(userId);
+    if (!Number.isFinite(authUserId)) {
+      throw new BadRequestException('Invalid userId in request context');
+    }
+    const where: any = { userId: authUserId };
 
     if (filters.search) {
       const searchStr = filters.search.trim();
       const s = { contains: searchStr, mode: 'insensitive' };
-      
+
       where.OR = [
         { saleOrderNumber: s },
         { outboundDelivery: s },
@@ -44,8 +48,10 @@ export class SalesOrderService {
         where.OR.push({ paymentClearance: false });
       }
     }
-    if (filters.paymentClearance !== undefined) where.paymentClearance = filters.paymentClearance === 'true';
-    if (filters.salesZoneId) where.salesZoneId = parseInt(filters.salesZoneId, 10);
+    if (filters.paymentClearance !== undefined)
+      where.paymentClearance = filters.paymentClearance === 'true';
+    if (filters.salesZoneId)
+      where.salesZoneId = parseInt(filters.salesZoneId, 10);
     if (filters.status) where.status = filters.status;
     const parseYMD = (s: string) => {
       const datePart = s.includes('T') ? s.split('T')[0] : s;
@@ -82,7 +88,7 @@ export class SalesOrderService {
         packConfig: true,
         transporter: true,
         customer: true,
-      }
+      },
     });
 
     const packConfigs = await this.prisma.packConfig.findMany();
@@ -115,7 +121,9 @@ export class SalesOrderService {
         saleOrderNumber: order.saleOrderNumber,
         outboundDelivery: order.outboundDelivery || '',
         transferOrder: order.transferOrder || '',
-        deliveryDate: order.deliveryDate ? order.deliveryDate.toISOString().split('T')[0] : '',
+        deliveryDate: order.deliveryDate
+          ? order.deliveryDate.toISOString().split('T')[0]
+          : '',
         transporter: order.transporter?.name || '',
         plantCode: order.plantCode || '',
         paymentClearance: order.paymentClearance ? 'Yes' : 'No',
@@ -130,9 +138,14 @@ export class SalesOrderService {
 
     // 5. Apply Data Validations & Cell Locking
     const editableColumns = [
-      'DELIVERY DATE', 'TRANSPORTER', 'PLANT CODE', 
-      'PAYMENT CLEARANCE', 'PACKING CONFIG', 
-      'SPECIAL REMARKS', 'ADDITIONAL REMARKS', 'LABEL REMARKS'
+      'DELIVERY DATE',
+      'TRANSPORTER',
+      'PLANT CODE',
+      'PAYMENT CLEARANCE',
+      'PACKING CONFIG',
+      'SPECIAL REMARKS',
+      'ADDITIONAL REMARKS',
+      'LABEL REMARKS',
     ];
 
     // Protect the entire sheet first
@@ -148,16 +161,16 @@ export class SalesOrderService {
       row.getCell(8).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['"Yes,No"']
+        formulae: ['"Yes,No"'],
       };
 
       // Dropdown for PACKING CONFIG (Col J / 10)
       if (packConfigs.length > 0) {
-        const configNames = packConfigs.map(p => p.configName).join(',');
+        const configNames = packConfigs.map((p) => p.configName).join(',');
         row.getCell(10).dataValidation = {
           type: 'list',
           allowBlank: true,
-          formulae: [`"${configNames}"`]
+          formulae: [`"${configNames}"`],
         };
       }
 
@@ -177,15 +190,24 @@ export class SalesOrderService {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer as any);
     const worksheet = workbook.getWorksheet(1);
-    
-    if (!worksheet) throw new BadRequestException('Worksheet not found in Excel file');
 
-    let updatedCount = 0;
+    const authUserId = Number(userId);
+    if (!Number.isFinite(authUserId)) {
+      throw new BadRequestException('Invalid userId in request context');
+    }
+
+    const norm = (v: any) => (v ?? '').toString().trim().toLowerCase();
+
+    if (!worksheet)
+      throw new BadRequestException('Worksheet not found in Excel file');
+
     const errors: { row: number; errors: string[] }[] = [];
-
-    // Pre-fetch masters for validation
     const packConfigs = await this.prisma.packConfig.findMany();
 
+    // Array to hold the validated updates so we can run them all at once at the end
+    const pendingUpdates: any[] = [];
+
+    // --- PHASE 1: VALIDATE ALL ROWS ---
     for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
       const row = worksheet.getRow(rowNumber);
       if (!row.hasValues) continue;
@@ -205,18 +227,22 @@ export class SalesOrderService {
       const packConfigName = row.getCell(10).value?.toString()?.trim() || '';
       const customerStr = row.getCell(11).value?.toString()?.trim() || '';
       const specialRemarks = row.getCell(12).value?.toString()?.trim() || null;
-      const additionalRemarks = row.getCell(13).value?.toString()?.trim() || null;
+      const additionalRemarks =
+        row.getCell(13).value?.toString()?.trim() || null;
       const labelRemarks = row.getCell(14).value?.toString()?.trim() || null;
 
       if (!saleOrderNumber) {
-        errors.push({ row: rowNumber, errors: ['Sale Order Number is missing'] });
+        errors.push({
+          row: rowNumber,
+          errors: ['Sale Order Number is missing'],
+        });
         continue;
       }
 
-      // 1. Fetch the original order to apply Strict Validation checks
+      // Fetch the original order to apply Strict Validation checks
       const originalOrder = await this.prisma.salesOrder.findUnique({
         where: { saleOrderNumber },
-        include: { product: true, salesZone: true, customer: true }
+        include: { product: true, salesZone: true, customer: true },
       });
 
       if (!originalOrder) {
@@ -225,58 +251,62 @@ export class SalesOrderService {
         continue;
       }
 
-      if (originalOrder.userId !== userId) {
-        rowErrors.push(`You do not have permission to update order ${saleOrderNumber}.`);
+      if (originalOrder.userId !== authUserId) {
+        rowErrors.push(
+          `You do not have permission to update order ${saleOrderNumber}.`,
+        );
       }
 
-      const restrictedStatuses = ['Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'];
-      if (originalOrder.status && restrictedStatuses.includes(originalOrder.status)) {
-        rowErrors.push(`Cannot modify order. The packing stage is already completed (Current Status: ${originalOrder.status}).`);
+      const restrictedStatuses = [
+        'Packed',
+        'WIP Storage',
+        'Ready for Dispatch',
+        'Dispatched',
+      ];
+      if (
+        originalOrder.status &&
+        restrictedStatuses.includes(originalOrder.status)
+      ) {
+        rowErrors.push(
+          `Cannot modify order. The packing stage is already completed (Current Status: ${originalOrder.status}).`,
+        );
       }
 
-      // 2. Strict Validation Check for NON-EDITABLE columns
-      if (productStr !== (originalOrder.product?.name || '')) rowErrors.push('Product cannot be modified.');
-      if (outboundDelivery !== (originalOrder.outboundDelivery || '')) rowErrors.push('Outbound Delivery cannot be modified.');
-      if (transferOrder !== (originalOrder.transferOrder || '')) rowErrors.push('Transfer Order cannot be modified.');
-      if (salesZoneStr !== (originalOrder.salesZone?.name || '')) rowErrors.push('Sales Zone cannot be modified.');
-      if (customerStr !== (originalOrder.customerNameText || originalOrder.customer?.name || '')) rowErrors.push('Customer cannot be modified.');
-
+      if (norm(productStr) !== norm(originalOrder.product?.name))
+        rowErrors.push('Product cannot be modified.');
+      if (norm(outboundDelivery) !== norm(originalOrder.outboundDelivery))
+        rowErrors.push('Outbound Delivery cannot be modified.');
+      if (norm(transferOrder) !== norm(originalOrder.transferOrder))
+        rowErrors.push('Transfer Order cannot be modified.');
+      if (norm(salesZoneStr) !== norm(originalOrder.salesZone?.name))
+        rowErrors.push('Sales Zone cannot be modified.');
+      if (
+        norm(customerStr) !==
+        norm(originalOrder.customerNameText || originalOrder.customer?.name)
+      )
+        rowErrors.push('Customer cannot be modified.');
       if (rowErrors.length > 0) {
         errors.push({ row: rowNumber, errors: rowErrors });
         continue;
       }
 
-      // 3. Prepare Editable Update Data
+      // Prepare Editable Update Data
       const updateData: any = {};
 
       if (deliveryDateStr) updateData.deliveryDate = new Date(deliveryDateStr);
       updateData.plantCode = plantCode;
-      
+
       if (paymentClearanceStr) {
-        updateData.paymentClearance = paymentClearanceStr.toLowerCase() === 'yes';
+        updateData.paymentClearance =
+          paymentClearanceStr.toLowerCase() === 'yes';
       }
 
       if (packConfigName) {
-        const foundConfig = packConfigs.find(p => p.configName.toLowerCase() === packConfigName.toLowerCase());
+        const foundConfig = packConfigs.find(
+          (p) => norm(p.configName) === norm(packConfigName),
+        );
         if (foundConfig) updateData.packConfigId = foundConfig.id;
         else rowErrors.push(`Invalid Pack Config: ${packConfigName}`);
-      }
-
-      // 4. Dynamic Transporter Creation
-      if (transporterName) {
-        const transporter = await this.prisma.transporter.findFirst({
-          where: { name: { equals: transporterName, mode: 'insensitive' } }
-        });
-        
-        if (transporter) {
-          updateData.transporterId = transporter.id;
-        } else {
-          // Create a new transporter
-          const newTransporter = await this.prisma.transporter.create({
-            data: { name: transporterName }
-          });
-          updateData.transporterId = newTransporter.id;
-        }
       }
 
       updateData.specialRemarks = specialRemarks;
@@ -288,26 +318,60 @@ export class SalesOrderService {
         continue;
       }
 
-      // 5. Update the Database
-      try {
-        await this.prisma.salesOrder.update({
-          where: { saleOrderNumber },
-          data: updateData,
-        });
-        updatedCount++;
-      } catch (e) {
-         errors.push({ row: rowNumber, errors: ['Failed to update order in database.'] });
-      }
-    }
-
-    if (errors.length > 0) {
-      throw new BadRequestException({
-        message: `Import partially failed. Updated ${updatedCount} orders, but found errors in ${errors.length} rows.`,
-        errors,
+      // If the row passed all validations, stage it in memory
+      pendingUpdates.push({
+        saleOrderNumber,
+        transporterName, // Keep this to dynamically resolve in Phase 2
+        updateData,
       });
     }
 
-    return { message: `Successfully updated ${updatedCount} orders from Excel.` };
+    // --- PHASE 2: ABORT IF ANY ERRORS EXIST ---
+    // If there is even a single error, reject the entire file without writing to DB
+    if (errors.length > 0) {
+      console.error('================ EXCEL IMPORT ERRORS ================');
+      console.dir(errors, { depth: null });
+      console.error('=====================================================');
+      throw new BadRequestException({
+        message: `Import failed. No orders were updated due to errors in ${errors.length} rows. Please fix the file and try again.`,
+        errors, // Sending the errors back so the frontend can display exactly what went wrong
+      });
+    }
+
+    // --- PHASE 3: EXECUTE ALL UPDATES ---
+    // At this point, we guarantee the file has 0 errors
+    let updatedCount = 0;
+    for (const update of pendingUpdates) {
+      // Resolve dynamic transporter creation
+      if (update.transporterName) {
+        const transporter = await this.prisma.transporter.findFirst({
+          where: {
+            name: { equals: update.transporterName, mode: 'insensitive' },
+          },
+        });
+
+        if (transporter) {
+          update.updateData.transporterId = transporter.id;
+        } else {
+          // Create a new transporter
+          const newTransporter = await this.prisma.transporter.create({
+            data: { name: update.transporterName },
+          });
+          update.updateData.transporterId = newTransporter.id;
+        }
+      }
+
+      // Perform the Database Update
+      await this.prisma.salesOrder.update({
+        where: { saleOrderNumber: update.saleOrderNumber },
+        data: update.updateData,
+      });
+      updatedCount++;
+    }
+
+    return {
+      message: `Successfully updated ${updatedCount} orders from Excel.`,
+    };
   }
 
   async generateBulkTemplate(res: Response) {
@@ -596,7 +660,6 @@ export class SalesOrderService {
         });
       }
     });
-
     if (errors.length > 0) {
       throw new BadRequestException({
         message:

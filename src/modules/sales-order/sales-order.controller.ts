@@ -39,22 +39,39 @@ export class SalesOrderController {
   constructor(private readonly salesOrderService: SalesOrderService) {}
 
   @Get('excel-export')
-  async exportExcel(
-    @Req() req,
-    @Query() filters: any,
-    @Res() res: Response
-  ) {
-    const userId = req.user.id;
-    const buffer = await this.salesOrderService.exportSalesExcel(userId, filters);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="sales_orders_export.xlsx"');
+  async exportExcel(@Req() req, @Query() filters: any, @Res() res: Response) {
+    const userId = Number((req as AuthRequest).user.userId);
+    if (!Number.isFinite(userId)) {
+      throw new BadRequestException('Invalid userId in auth context');
+    }
+    const buffer = await this.salesOrderService.exportSalesExcel(
+      userId,
+      filters,
+    );
+
+    const date = new Date();
+    const timestamp = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}${String(date.getMinutes()).padStart(2, '0')}`;
+    const filename = `Sales_Orders_Export_${timestamp}.xlsx`;
+
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
   }
 
   @Post('excel-import')
   @UseInterceptors(FileInterceptor('file'))
-  async importExcel(@Req() req, @UploadedFile() file: Express.Multer.File) {
-    const userId = req.user.id;
+  async importExcel(
+    @Req() req: AuthRequest,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const userId = Number(req.user.userId);
+    if (!Number.isFinite(userId)) {
+      throw new BadRequestException('Invalid userId in auth context');
+    }
     return this.salesOrderService.importSalesExcel(file.buffer, userId);
   }
 

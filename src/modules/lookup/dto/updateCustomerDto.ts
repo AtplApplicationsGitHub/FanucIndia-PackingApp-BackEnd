@@ -6,11 +6,16 @@ export class UpdateCustomerDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ example: 'Chennai, India', description: 'Updated address' })
+  @ApiProperty({
+    example: 'Chennai, India',
+    description: 'Updated address',
+    required: false,
+  })
+  @IsOptional()
   @IsString()
-  address: string;
+  address?: string;
 
-  @ApiProperty({ example: '9123456780', description: 'Updated contact number'})
+  @ApiProperty({ example: '9123456780', description: 'Updated contact number' })
   @IsOptional()
   @IsString()
   contactNumber?: string;
