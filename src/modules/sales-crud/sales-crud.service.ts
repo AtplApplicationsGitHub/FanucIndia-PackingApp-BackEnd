@@ -612,11 +612,9 @@ export class SalesCrudService {
     const labelRemarks = order.labelRemarks || '';
     const salesZone = order.salesZone?.name || '';
 
-    // Use an array to explicitly manage lines and ensure \r\n formatting
     const prnCommands = [
       'SIZE 60 mm, 30 mm',
       'GAP 3 mm, 0 mm',
-      'SET RIBBON ON',
       'DIRECTION 0,0',
       'REFERENCE 0,0',
       'OFFSET 0 mm',
@@ -632,7 +630,7 @@ export class SalesCrudService {
       `TEXT 460,79,"0",180,12,14,"${salesZone}"`,
       `QRCODE 111,127,L,4,A,180,M2,S7,"${order.saleOrderNumber}"`,
       `PRINT ${qty},1`,
-      '' // IMPORTANT: This empty string ensures the payload ends with \r\n
+      ''
     ];
 
     const finalPrn = prnCommands.join('\r\n');
