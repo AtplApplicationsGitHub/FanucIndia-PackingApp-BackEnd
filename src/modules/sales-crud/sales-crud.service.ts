@@ -608,36 +608,34 @@ export class SalesCrudService {
     }
 
     const qty = dto.quantity || 1;
-
-    let prnTemplate = `SIZE 60 mm, 30 mm
-GAP 3 mm, 0 mm
-SET RIBBON ON
-DIRECTION 0,0
-REFERENCE 0,0
-OFFSET 0 mm
-SET PEEL OFF
-SET CUTTER OFF
-SET PARTIAL_CUTTER OFF
-SET TEAR ON
-CLS
-CODEPAGE 1252
-TEXT 460,265,"0",180,11,16,"@@CustomerName@@"
-TEXT 460,208,"0",180,24,26,"@@SONumber@@"
-TEXT 368,79,"0",180,12,14,"@@LabelRemarks@@"
-TEXT 460,79,"0",180,12,14,"@@SalesZone@@"
-QRCODE 111,127,L,4,A,180,M2,S7,"@@SONumber@@"
-PRINT @@Quantity@@,1`;
-
     const customerName = order.customerNameText || order.customer?.name || '';
     const labelRemarks = order.labelRemarks || '';
     const salesZone = order.salesZone?.name || '';
 
-    const finalPrn = prnTemplate
-      .replace('@@CustomerName@@', customerName)
-      .replace(/@@SONumber@@/g, order.saleOrderNumber)
-      .replace('@@LabelRemarks@@', labelRemarks)
-      .replace('@@SalesZone@@', salesZone)
-      .replace('@@Quantity@@', qty.toString());
+    // Use an array to explicitly manage lines and ensure \r\n formatting
+    const prnCommands = [
+      'SIZE 60 mm, 30 mm',
+      'GAP 3 mm, 0 mm',
+      'SET RIBBON ON',
+      'DIRECTION 0,0',
+      'REFERENCE 0,0',
+      'OFFSET 0 mm',
+      'SET PEEL OFF',
+      'SET CUTTER OFF',
+      'SET PARTIAL_CUTTER OFF',
+      'SET TEAR ON',
+      'CLS',
+      'CODEPAGE 1252',
+      `TEXT 460,265,"0",180,11,16,"${customerName}"`,
+      `TEXT 460,208,"0",180,24,26,"${order.saleOrderNumber}"`,
+      `TEXT 368,79,"0",180,12,14,"${labelRemarks}"`,
+      `TEXT 460,79,"0",180,12,14,"${salesZone}"`,
+      `QRCODE 111,127,L,4,A,180,M2,S7,"${order.saleOrderNumber}"`,
+      `PRINT ${qty},1`,
+      '' // IMPORTANT: This empty string ensures the payload ends with \r\n
+    ];
+
+    const finalPrn = prnCommands.join('\r\n');
     
     // return {
     //   success: true,
