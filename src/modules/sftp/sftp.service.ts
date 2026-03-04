@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import Client from 'ssh2-sftp-client';
 import * as path from 'path';
 
+
 type ConnectOptions = {
   host: string;
   port: number;
@@ -148,6 +149,10 @@ export class SftpService {
 
   async exists(remotePath: string) {
     return this.withClient((c) => c.exists(remotePath));
+  }
+
+  async list(remoteDir: string) {
+    return this.withClient((c) => c.list(remoteDir));
   }
 
   async rename(remoteSourcePath: string, remoteDestPath: string) {

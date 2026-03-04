@@ -10,6 +10,7 @@ import { Workbook } from 'exceljs';
 import { Prisma } from '@prisma/client';
 import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
+import { Interval } from '@nestjs/schedule';
 
 const columnMapping = {
   'SO Number': 'saleOrderNumber',
@@ -52,6 +53,74 @@ export class ErpMaterialImporterService {
     private prisma: PrismaService,
     private sftpService: SftpService, 
   ) {}
+
+  @Interval(parseInt(process.env.SFTP_SCAN_INTERVAL_MS || '300000'))
+  async autoProcessActiveFolder() {
+    this.logger.log('Running automated scheduled scan of SFTP active folder...');
+
+    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    const activeDir = path.posix.join(baseDir, 'active');
+    const archivedDir = path.posix.join(baseDir, 'archive');
+    const errorDir = path.posix.join(baseDir, 'error');
+
+    try {
+      const files = (await this.sftpService.list(activeDir)) as Array<{ type: string; name: string }>;
+
+      for (const file of files) {
+        if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
+          continue; 
+        }
+
+        const baseName = file.name.replace('.xlsx', '');
+        const nameParts = baseName.split('_');
+
+        if (nameParts.length !== 2) {
+          continue; 
+        }
+
+        const [soNumber, obdNumber] = nameParts;
+
+        const matchingOrder = await this.prisma.salesOrder.findFirst({
+          where: {
+            saleOrderNumber: soNumber,
+            outboundDelivery: obdNumber,
+            isErpImported: 0, 
+          },
+        });
+
+        if (matchingOrder) {
+          this.logger.log(`Match found in DB for ${file.name}. Updating status and moving to archive...`);
+          const filePath = path.posix.join(activeDir, file.name);
+
+          try {
+            await this.prisma.salesOrder.update({
+              where: { id: matchingOrder.id },
+              data: { 
+                isErpImported: 1,
+                UpdatedDate: new Date(),
+                UpdatedBy: 'System Auto Job' 
+              },
+            });
+
+            const archivePath = path.posix.join(archivedDir, file.name);
+            await this.sftpService.rename(filePath, archivePath);
+            this.logger.log(`Successfully archived ${file.name}`);
+            
+          } catch (processError) {
+            this.logger.error(`Failed to process ${file.name} during auto-scan. Moving to error folder.`, processError);
+            try {
+              const errorPath = path.posix.join(errorDir, file.name);
+              await this.sftpService.rename(filePath, errorPath);
+            } catch (moveErr) {
+              this.logger.error(`Failed to move file ${file.name} to Error folder`, moveErr);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to execute automated SFTP folder scan.', error);
+    }
+  }
 
   async importFromDrive(saleOrderNumber: string, username: string) {
     this.logger.log(`Initiating Drive Import for SO: ${saleOrderNumber}`);
