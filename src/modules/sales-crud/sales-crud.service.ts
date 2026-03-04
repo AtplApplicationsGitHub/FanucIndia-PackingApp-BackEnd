@@ -609,7 +609,7 @@ export class SalesCrudService {
 
     const qty = dto.quantity || 1;
 
-    let prnTemplate = `SIZE 61.5 mm, 40 mm
+    let prnTemplate = `SIZE 60 mm, 30 mm
 GAP 3 mm, 0 mm
 SET RIBBON ON
 DIRECTION 0,0
@@ -621,7 +621,7 @@ SET PARTIAL_CUTTER OFF
 SET TEAR ON
 CLS
 CODEPAGE 1252
-TEXT 460,283,"0",180,11,16,"@@CustomerName@@"
+TEXT 460,265,"0",180,11,16,"@@CustomerName@@"
 TEXT 460,208,"0",180,24,26,"@@SONumber@@"
 TEXT 368,79,"0",180,12,14,"@@LabelRemarks@@"
 TEXT 460,79,"0",180,12,14,"@@SalesZone@@"

@@ -296,6 +296,8 @@ export class ErpMaterialImporterService {
         headerLookup.set(key.toLowerCase(), key);
       });
 
+      const skipRows = parseInt(process.env.ERP_IMPORT_SKIP_ROWS || '1', 10);
+
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) {
           row.eachCell((cell, colNumber) => {
@@ -306,6 +308,8 @@ export class ErpMaterialImporterService {
 
             headers[colNumber] = canonicalHeader;
           });
+        } else if (rowNumber <= skipRows) {
+          return;
         } else {
           const rowData: any = {};
           let hasData = false;
