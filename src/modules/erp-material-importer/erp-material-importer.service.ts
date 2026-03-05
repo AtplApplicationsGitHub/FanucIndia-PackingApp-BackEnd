@@ -60,11 +60,10 @@ export class ErpMaterialImporterService {
 
     const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
     const activeDir = path.posix.join(baseDir, 'active');
-    const archivedDir = path.posix.join(baseDir, 'archive');
-    const errorDir = path.posix.join(baseDir, 'error');
 
     try {
       const files = (await this.sftpService.list(activeDir)) as Array<{ type: string; name: string }>;
+      const soNumbersToImport: string[] = [];
 
       for (const file of files) {
         if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
@@ -78,44 +77,17 @@ export class ErpMaterialImporterService {
           continue; 
         }
 
-        const [soNumber, obdNumber] = nameParts;
+        // Add the SO Number to the batch array
+        soNumbersToImport.push(nameParts[0]);
+      }
 
-        const matchingOrder = await this.prisma.salesOrder.findFirst({
-          where: {
-            saleOrderNumber: soNumber,
-            outboundDelivery: obdNumber,
-            isErpImported: 0, 
-          },
-        });
-
-        if (matchingOrder) {
-          this.logger.log(`Match found in DB for ${file.name}. Updating status and moving to archive...`);
-          const filePath = path.posix.join(activeDir, file.name);
-
-          try {
-            await this.prisma.salesOrder.update({
-              where: { id: matchingOrder.id },
-              data: { 
-                isErpImported: 1,
-                UpdatedDate: new Date(),
-                UpdatedBy: 'System Auto Job' 
-              },
-            });
-
-            const archivePath = path.posix.join(archivedDir, file.name);
-            await this.sftpService.rename(filePath, archivePath);
-            this.logger.log(`Successfully archived ${file.name}`);
-            
-          } catch (processError) {
-            this.logger.error(`Failed to process ${file.name} during auto-scan. Moving to error folder.`, processError);
-            try {
-              const errorPath = path.posix.join(errorDir, file.name);
-              await this.sftpService.rename(filePath, errorPath);
-            } catch (moveErr) {
-              this.logger.error(`Failed to move file ${file.name} to Error folder`, moveErr);
-            }
-          }
-        }
+      if (soNumbersToImport.length > 0) {
+        this.logger.log(`Auto-scan found ${soNumbersToImport.length} potential files. Delegating to existing bulk import logic...`);
+        
+        // This directly calls the exact same function the UI button uses
+        const result = await this.bulkImportFromDrive(soNumbersToImport, 'System Auto Job');
+        
+        this.logger.log(`Auto-scan bulk import completed. Summary: ${JSON.stringify(result.summary)}`);
       }
     } catch (error) {
       this.logger.error('Failed to execute automated SFTP folder scan.', error);
