@@ -416,7 +416,7 @@ export class AdminOrderService {
         paymentClearance: true,
         status: true,
         priority: true,
-        skipIssueStage: true,
+        skipStage: true,
         isErpImported: true,
         plantCode: true,
         specialRemarks: true,
@@ -461,7 +461,7 @@ export class AdminOrderService {
       status: order.status,
       priority: order.priority,
       assignedUser: order.assignedUser?.name,
-      skipIssueStage: order.skipIssueStage,
+      skipStage: order.skipStage,
       hasMaterialData: order.isErpImported === 1,
       plantCode: order.plantCode,
       specialRemarks: order.specialRemarks,
@@ -472,11 +472,11 @@ export class AdminOrderService {
     }));
   }
 
-  async bulkUpdateSkipIssue(dto: {
+  async bulkUpdateSkipStage(dto: {
     salesOrderIds: number[];
-    skipIssueStage: boolean;
+    skipStage: boolean | null;
   }) {
-    const { salesOrderIds, skipIssueStage } = dto;
+    const { salesOrderIds, skipStage } = dto;
 
     const orders = await this.prisma.salesOrder.findMany({
       where: { id: { in: salesOrderIds } },
@@ -489,33 +489,39 @@ export class AdminOrderService {
 
     const validOrderIds: number[] = [];
     const invalidOrderNumbers: string[] = [];
-    const issueCompletedOrders: string[] = [];
 
     for (const order of orders) {
-      if (skipIssueStage && order.status === 'W105') {
-        issueCompletedOrders.push(order.saleOrderNumber);
-      } else if (order.isErpImported === 1) {
-        validOrderIds.push(order.id);
+      if (skipStage === true) {
+        if (order.status === 'W105') {
+          // Allow W105 to skip packing stage directly
+          validOrderIds.push(order.id);
+        } else if (!order.status || order.status === 'R105') {
+          // For Issue stage, ERP data must be imported
+          if (order.isErpImported === 1) {
+            validOrderIds.push(order.id);
+          } else {
+            invalidOrderNumbers.push(order.saleOrderNumber);
+          }
+        }
       } else {
-        invalidOrderNumbers.push(order.saleOrderNumber);
+         // If un-skipping (false or null), allow it for all selected
+         validOrderIds.push(order.id);
       }
     }
 
     if (validOrderIds.length > 0) {
       await this.prisma.salesOrder.updateMany({
         where: { id: { in: validOrderIds } },
-        data: { skipIssueStage },
+        data: { skipStage },
       });
     }
 
-    let message = `Successfully updated skip issue stage for ${validOrderIds.length} order(s).`;
+    let message = skipStage
+       ? `Successfully updated skip stage for ${validOrderIds.length} order(s).`
+       : `Canceled skip stage for ${validOrderIds.length} order(s).`;
 
     if (invalidOrderNumbers.length > 0) {
-      message += ` Could not update because ERP Material Data has not been imported yet: ${invalidOrderNumbers.join(', ')}.`;
-    }
-
-    if (issueCompletedOrders.length > 0) {
-      message += ` Issue stage completed for: ${issueCompletedOrders.join(', ')}.`;
+      message += ` Material Data Pending: ${invalidOrderNumbers.join(', ')}.`;
     }
 
     return {
@@ -523,7 +529,6 @@ export class AdminOrderService {
       updatedCount: validOrderIds.length,
       skippedCount: invalidOrderNumbers.length,
       skippedOrders: invalidOrderNumbers,
-      issueCompletedOrders,
     };
   }
 

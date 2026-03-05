@@ -85,7 +85,7 @@ export class UserDashboardService {
         saleOrderNumber: true,
         priority: true,
         status: true,
-        skipIssueStage: true,
+        skipStage: true,
         materialData: {
           select: {
             Required_Qty: true,
@@ -107,7 +107,7 @@ export class UserDashboardService {
         saleOrderNumber: order.saleOrderNumber,
         priority: order.priority,
         status: order.status,
-        skipIssueStage: order.skipIssueStage,
+        skipStage: order.skipStage,
         totalMaterials,
         totalItems,
       };
@@ -140,7 +140,7 @@ export class UserDashboardService {
     if (!order) {
       throw new NotFoundException('Sales order not found or access denied.');
     }
-    return this.getMaterialDetails(order.saleOrderNumber, order.skipIssueStage);
+    return this.getMaterialDetails(order.saleOrderNumber, order.skipStage);
   }
 
   async downloadOrderDetailsBySoNumber(
@@ -197,7 +197,7 @@ export class UserDashboardService {
   }));
 }
 
-  private async getMaterialDetails(saleOrderNumber: string, skipIssueStage?: boolean) {
+  private async getMaterialDetails(saleOrderNumber: string, skipStage?: boolean) {
     const materials = await this.prisma.eRP_Material_Data.findMany({
       where: { saleOrderNumber },
       select: {
@@ -224,7 +224,7 @@ export class UserDashboardService {
     return materials.map((material) => ({
       ...material,
       ID: material.ID.toString(),
-      skipIssueStage: !!skipIssueStage,
+      skipStage: !!skipStage,
     }));
   }
 

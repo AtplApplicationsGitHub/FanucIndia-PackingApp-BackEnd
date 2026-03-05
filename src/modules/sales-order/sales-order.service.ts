@@ -856,7 +856,7 @@ export class SalesOrderService {
           priority: null,
           assignedUserId: null,
           isErpImported: 0,
-          skipIssueStage: false,
+          skipStage: false,
           UpdatedBy: username,
           UpdatedDate: new Date(),
         },

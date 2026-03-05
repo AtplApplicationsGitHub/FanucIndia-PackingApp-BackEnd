@@ -149,7 +149,7 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'W105',
-          skipIssueStage: false,
+          skipStage: null,
           assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
@@ -251,7 +251,7 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'W105',
-          skipIssueStage: false,
+          skipStage: null,
           assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
@@ -343,6 +343,7 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'F105',
+          skipStage: null,
           assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
@@ -466,7 +467,7 @@ export class ErpMaterialDataService {
           where: { id: orderId },
           data: {
             status: 'W105',
-            skipIssueStage: false,
+            skipStage: null,
             assignedUserId: null,
             UpdatedBy: userName,
             UpdatedDate: new Date(),
@@ -489,6 +490,7 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'F105',
+          skipStage: null,
           assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
@@ -579,6 +581,7 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'F105',
+          skipStage: null,
           assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),

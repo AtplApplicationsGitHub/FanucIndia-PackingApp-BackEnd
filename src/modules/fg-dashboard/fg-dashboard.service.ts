@@ -20,7 +20,9 @@ export class FgDashboardService {
   ) {
     const { search, date, payment, zone, status, page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
-    const where: Prisma.SalesOrderWhereInput = {};
+    const where: Prisma.SalesOrderWhereInput = {
+      status: { not: 'Dispatched' }
+    };
 
     if (date) {
       const parseYMD = (s: string) => {
@@ -75,7 +77,7 @@ export class FgDashboardService {
         { customerNameText: { contains: search, mode: 'insensitive' } },
         { salesZone: { name: { contains: search, mode: 'insensitive' } } },
         { status: { contains: search, mode: 'insensitive' } },
-        { fgLocation: { contains: search, mode: 'insensitive' } },
+        { fgLocation: { array_contains: search } },
         { specialRemarks: { contains: search, mode: 'insensitive' } },
         { UpdatedBy: { contains: search, mode: 'insensitive' } },
       ];
@@ -119,6 +121,7 @@ export class FgDashboardService {
           product: { select: { name: true } },
           customer: { select: { name: true } },
           salesZone: { select: { name: true } },
+          transporter: { select: { name: true } },
         },
         orderBy: {
           id: 'desc',
@@ -141,6 +144,7 @@ export class FgDashboardService {
         product: order.product?.name,
         customerName: order.customerNameText || order.customer?.name,
         salesZone: order.salesZone?.name,
+        transporter: order.transporter?.name,
         payment: order.paymentClearance,
         status: order.status,
         fgLocation: order.fgLocation,

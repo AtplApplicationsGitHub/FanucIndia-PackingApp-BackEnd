@@ -104,7 +104,7 @@ model SalesOrder {
   address               String?                 @db.VarChar(1000)
   status                String?
   priority              Int?
-  skipIssueStage        Boolean                 @default(false)
+  skipStage             Boolean?                 @default(false)
   isErpImported         Int                     @default(0)
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
@@ -243,7 +243,7 @@ model SalesOrderArchive {
   address           String?
   status            String?
   priority          Int?
-  skipIssueStage    Boolean?
+  skipStage         Boolean?
   isErpImported     Int?
   createdAt         DateTime
   UpdatedBy         String?
