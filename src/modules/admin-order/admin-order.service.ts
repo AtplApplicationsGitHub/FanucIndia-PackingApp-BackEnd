@@ -417,7 +417,7 @@ export class AdminOrderService {
         status: true,
         priority: true,
         skipIssueStage: true,
-
+        isErpImported: true,
         plantCode: true,
         specialRemarks: true,
         additionalRemarks: true,
@@ -462,6 +462,7 @@ export class AdminOrderService {
       priority: order.priority,
       assignedUser: order.assignedUser?.name,
       skipIssueStage: order.skipIssueStage,
+      hasMaterialData: order.isErpImported === 1,
       plantCode: order.plantCode,
       specialRemarks: order.specialRemarks,
       additionalRemarks: order.additionalRemarks,
