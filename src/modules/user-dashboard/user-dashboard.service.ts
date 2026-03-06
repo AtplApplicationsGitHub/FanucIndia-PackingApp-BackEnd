@@ -46,9 +46,9 @@ export class UserDashboardService {
         },
         _count: {
           select: {
-            soChatNotifications: { where: { userId } }
-          }
-        }
+            soChatNotifications: { where: { userId } },
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -135,69 +135,80 @@ export class UserDashboardService {
     return order;
   }
 
-  async downloadOrderDetails(orderId: number, userId: number, userRole: string) {
+  async downloadOrderDetails(
+    orderId: number,
+    userId: number,
+    userRole: string,
+  ) {
     const order = await this.findOrderById(orderId, userId, userRole);
     if (!order) {
       throw new NotFoundException('Sales order not found or access denied.');
     }
-    return this.getMaterialDetails(order.saleOrderNumber, order.skipStage);
+    return this.getMaterialDetails(
+      order.saleOrderNumber,
+      order.skipStage ?? undefined,
+    );
   }
 
   async downloadOrderDetailsBySoNumber(
-  saleOrderNumber: string,
-  userId: number,
-  userRole: string,
-) {
-  await this.authorizeOrderAccess(saleOrderNumber, userId, userRole);
+    saleOrderNumber: string,
+    userId: number,
+    userRole: string,
+  ) {
+    await this.authorizeOrderAccess(saleOrderNumber, userId, userRole);
 
-  const order = await this.prisma.salesOrder.findUnique({
-    where: { saleOrderNumber },
-    select: {
-      labelRemarks: true,
-      customerNameText: true,
-      customer: { select: { name: true } },
-      salesZone: { select: { name: true } },
-    },
-  });
+    const order = await this.prisma.salesOrder.findUnique({
+      where: { saleOrderNumber },
+      select: {
+        labelRemarks: true,
+        customerNameText: true,
+        customer: { select: { name: true } },
+        salesZone: { select: { name: true } },
+      },
+    });
 
-  const materials = await this.prisma.eRP_Material_Data.findMany({
-    where: { saleOrderNumber },
-    select: {
-      ID: true,
-      Material_Code: true,
-      Material_Description: true,
-      Batch_No: true,
-      SO_Donor_Batch: true,
-      Cert_No: true,
-      Bin_No: true,
-      A_D_F: true,
-      Required_Qty: true,
-      Issue_stage: true,
-      Packing_stage: true,
-      UpdatedDate: true,
-      Accept_Bulk_Data: true,
-      Classification: true,
-      Group: true,
-      Mapping_Barcode: true,
-      Remarks_Required: true,
-      Remarks: true,
-    },
-  });
+    const materials = await this.prisma.eRP_Material_Data.findMany({
+      where: { saleOrderNumber },
+      select: {
+        ID: true,
+        Material_Code: true,
+        Material_Description: true,
+        Batch_No: true,
+        SO_Donor_Batch: true,
+        Cert_No: true,
+        Bin_No: true,
+        A_D_F: true,
+        Required_Qty: true,
+        Issue_stage: true,
+        Packing_stage: true,
+        UpdatedDate: true,
+        Accept_Bulk_Data: true,
+        Classification: true,
+        Group: true,
+        Mapping_Barcode: true,
+        Remarks_Required: true,
+        Remarks: true,
+      },
+    });
 
-  const salesZone = order?.salesZone?.name ?? null;
-  const labelRemarks = order?.labelRemarks ?? null;
-  const customerName = order?.customer?.name ?? order?.customerNameText ?? null;
+    const salesZone = order?.salesZone?.name ?? null;
+    const labelRemarks = order?.labelRemarks ?? null;
+    const customerName =
+      order?.customer?.name ?? order?.customerNameText ?? null;
 
-  return materials.map((material) => ({
-    ...material,
-    ID: material.ID.toString(),
-    salesZone,
-    labelRemarks,
-    customerName,
-  }));
-}
+    return materials.map((material) => ({
+      ...material,
+      ID: material.ID.toString(),
+      salesZone,
+      labelRemarks,
+      customerName,
+    }));
+  }
 
-  private async getMaterialDetails(saleOrderNumber: string, skipStage?: boolean) {
+  private async getMaterialDetails(
+    saleOrderNumber: string,
+    skipStage?: boolean,
+  ) {
     const materials = await this.prisma.eRP_Material_Data.findMany({
       where: { saleOrderNumber },
       select: {
@@ -340,7 +351,7 @@ export class UserDashboardService {
         Issue_stage: material.Issue_stage,
         Packing_stage: material.Packing_stage,
         Remarks: material.Remarks,
-        Group: material.Group, 
+        Group: material.Group,
         Mapping_Barcode: material.Mapping_Barcode,
         UpdatedBy: userName,
         UpdatedDate: material.UpdatedDate
@@ -350,7 +361,7 @@ export class UserDashboardService {
       if (material.ID) {
         await prismaClient.eRP_Material_Data.update({
           where: { ID: BigInt(material.ID) },
-          data: updateData, 
+          data: updateData,
         });
       } else {
         await prismaClient.eRP_Material_Data.updateMany({
@@ -358,12 +369,16 @@ export class UserDashboardService {
             saleOrderNumber: saleOrderNumber,
             Material_Code: material.Material_Code,
           },
-          data: updateData, 
+          data: updateData,
         });
       }
     }
 
-    await this._checkAndUpdateOrderStatus(saleOrderNumber, prismaClient, userName);
+    await this._checkAndUpdateOrderStatus(
+      saleOrderNumber,
+      prismaClient,
+      userName,
+    );
 
     return { message: 'Data updated successfully.' };
   }
@@ -443,10 +458,18 @@ export class UserDashboardService {
       (m) => m.Required_Qty > 0 && m.Issue_stage >= m.Required_Qty,
     );
 
-    if (issueStageCompleted && order.status !== 'W105' && order.status !== 'F105') {
+    if (
+      issueStageCompleted &&
+      order.status !== 'W105' &&
+      order.status !== 'F105'
+    ) {
       await prismaClient.salesOrder.update({
         where: { id: order.id },
-        data: { status: 'W105', assignedUserId: null },
+        data: {
+          status: 'W105',
+          skipStage: null,
+          assignedUserId: null,
+        },
       });
 
       await prismaClient.sO_Status_Stepper.updateMany({
@@ -468,7 +491,11 @@ export class UserDashboardService {
     if (packingStageCompleted) {
       await prismaClient.salesOrder.update({
         where: { id: order.id },
-        data: { status: 'F105', assignedUserId: null },
+        data: {
+          status: 'F105',
+          skipStage: null,
+          assignedUserId: null,
+        },
       });
 
       await prismaClient.sO_Status_Stepper.updateMany({
