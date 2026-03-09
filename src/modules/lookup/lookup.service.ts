@@ -441,193 +441,181 @@ export class LookupService {
       return s === 'true' || s === 'yes' || s === '1';
     };
 
+    // Helper to extract rows to avoid async issues inside .eachRow
+    const extractRows = (sheet) => {
+      const rows: any[] = [];
+      if (sheet) {
+        sheet.eachRow((row, rowNumber) => {
+          if (rowNumber > 1) rows.push(row);
+        });
+      }
+      return rows;
+    };
+
     await this.prisma.$transaction(
       async (tx) => {
         const promises: Promise<any>[] = [];
 
+        // 1. Products
         const productSheet = workbook.getWorksheet('Products');
         if (productSheet) {
-          productSheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
-            const id = row.getCell(1).value
-              ? Number(row.getCell(1).value)
-              : null;
+          const rows = extractRows(productSheet);
+          for (const row of rows) {
+            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
-            const code = getVal(row, 3);
 
             if (name) {
               if (id) {
-                promises.push(
-                  tx.product
-                    .update({ where: { id }, data: { name } })
-                    .catch(() => {}),
-                );
+                promises.push(tx.product.update({ where: { id }, data: { name } }).catch(() => {}));
               } else {
-                promises.push(
-                  tx.product.create({ data: { name } }).catch(() => {}),
-                );
+                promises.push((async () => {
+                  const existing = await tx.product.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                  if (!existing) await tx.product.create({ data: { name } });
+                })().catch(() => {}));
               }
             }
-          });
+          }
           results.push('Products processed');
         }
 
+        // 2. Transporters
         const transpSheet = workbook.getWorksheet('Transporters');
         if (transpSheet) {
-          transpSheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
-            const id = row.getCell(1).value
-              ? Number(row.getCell(1).value)
-              : null;
+          const rows = extractRows(transpSheet);
+          for (const row of rows) {
+            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
             if (name) {
-              if (id)
-                promises.push(
-                  tx.transporter
-                    .update({ where: { id }, data: { name } })
-                    .catch(() => {}),
-                );
-              else
-                promises.push(
-                  tx.transporter.create({ data: { name } }).catch(() => {}),
-                );
+              if (id) {
+                promises.push(tx.transporter.update({ where: { id }, data: { name } }).catch(() => {}));
+              } else {
+                promises.push((async () => {
+                  const existing = await tx.transporter.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                  if (!existing) await tx.transporter.create({ data: { name } });
+                })().catch(() => {}));
+              }
             }
-          });
+          }
           results.push('Transporters processed');
         }
 
+        // 3. Plant Codes
         const plantSheet = workbook.getWorksheet('Plant Codes');
         if (plantSheet) {
-          plantSheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
-            const id = row.getCell(1).value
-              ? Number(row.getCell(1).value)
-              : null;
+          const rows = extractRows(plantSheet);
+          for (const row of rows) {
+            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const code = getVal(row, 2);
             const description = getVal(row, 3) || '';
             if (code) {
-              if (id)
-                promises.push(
-                  tx.plantCode
-                    .update({ where: { id }, data: { code, description } })
-                    .catch(() => {}),
-                );
-              else
-                promises.push(
-                  tx.plantCode
-                    .create({ data: { code, description } })
-                    .catch(() => {}),
-                );
+              if (id) {
+                promises.push(tx.plantCode.update({ where: { id }, data: { code, description } }).catch(() => {}));
+              } else {
+                promises.push((async () => {
+                  const existing = await tx.plantCode.findFirst({ where: { code: { equals: code, mode: 'insensitive' } } });
+                  if (!existing) await tx.plantCode.create({ data: { code, description } });
+                })().catch(() => {}));
+              }
             }
-          });
+          }
           results.push('Plant Codes processed');
         }
 
+        // 4. Sales Zones
         const zoneSheet = workbook.getWorksheet('Sales Zones');
         if (zoneSheet) {
-          zoneSheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
-            const id = row.getCell(1).value
-              ? Number(row.getCell(1).value)
-              : null;
+          const rows = extractRows(zoneSheet);
+          for (const row of rows) {
+            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
             if (name) {
-              if (id)
-                promises.push(
-                  tx.salesZone
-                    .update({ where: { id }, data: { name } })
-                    .catch(() => {}),
-                );
-              else
-                promises.push(
-                  tx.salesZone.create({ data: { name } }).catch(() => {}),
-                );
+              if (id) {
+                promises.push(tx.salesZone.update({ where: { id }, data: { name } }).catch(() => {}));
+              } else {
+                promises.push((async () => {
+                  const existing = await tx.salesZone.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                  if (!existing) await tx.salesZone.create({ data: { name } });
+                })().catch(() => {}));
+              }
             }
-          });
+          }
           results.push('Sales Zones processed');
         }
 
+        // 5. Packing Configs
         const packSheet = workbook.getWorksheet('Packing Configs');
         if (packSheet) {
-          packSheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
-            const id = row.getCell(1).value
-              ? Number(row.getCell(1).value)
-              : null;
+          const rows = extractRows(packSheet);
+          for (const row of rows) {
+            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const configName = getVal(row, 2);
             if (configName) {
-              if (id)
-                promises.push(
-                  tx.packConfig
-                    .update({ where: { id }, data: { configName } })
-                    .catch(() => {}),
-                );
-              else
-                promises.push(
-                  tx.packConfig
-                    .create({ data: { configName } })
-                    .catch(() => {}),
-                );
+              if (id) {
+                promises.push(tx.packConfig.update({ where: { id }, data: { configName } }).catch(() => {}));
+              } else {
+                promises.push((async () => {
+                  const existing = await tx.packConfig.findFirst({ where: { configName: { equals: configName, mode: 'insensitive' } } });
+                  if (!existing) await tx.packConfig.create({ data: { configName } });
+                })().catch(() => {}));
+              }
             }
-          });
+          }
           results.push('Packing Configs processed');
         }
 
+        // 6. Customers
         const custSheet = workbook.getWorksheet('Customers');
         if (custSheet) {
-          custSheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
-            const id = row.getCell(1).value
-              ? Number(row.getCell(1).value)
-              : null;
+          const rows = extractRows(custSheet);
+          for (const row of rows) {
+            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
             const address = getVal(row, 3) || '';
             const contactNumber = getVal(row, 4);
             if (name) {
               const data = { name, address, contactNumber };
-              if (id)
-                promises.push(
-                  tx.customer.update({ where: { id }, data }).catch(() => {}),
-                );
-              else promises.push(tx.customer.create({ data }).catch(() => {}));
+              if (id) {
+                promises.push(tx.customer.update({ where: { id }, data }).catch(() => {}));
+              } else {
+                promises.push((async () => {
+                  const existing = await tx.customer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                  if (!existing) await tx.customer.create({ data });
+                })().catch(() => {}));
+              }
             }
-          });
+          }
           results.push('Customers processed');
         }
 
+        // 7. Printers
         const printSheet = workbook.getWorksheet('Printers');
         if (printSheet) {
-          printSheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
-            const id = row.getCell(1).value
-              ? Number(row.getCell(1).value)
-              : null;
+          const rows = extractRows(printSheet);
+          for (const row of rows) {
+            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
             if (name) {
-              if (id)
-                promises.push(
-                  tx.printer
-                    .update({ where: { id }, data: { name } })
-                    .catch(() => {}),
-                );
-              else
-                promises.push(
-                  tx.printer.create({ data: { name } }).catch(() => {}),
-                );
+              if (id) {
+                promises.push(tx.printer.update({ where: { id }, data: { name } }).catch(() => {}));
+              } else {
+                promises.push((async () => {
+                  const existing = await tx.printer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                  if (!existing) await tx.printer.create({ data: { name } });
+                })().catch(() => {}));
+              }
             }
-          });
+          }
           results.push('Printers processed');
         }
 
+        // 8. Material Barcodes
         const matSheet = workbook.getWorksheet('Material Barcodes');
         if (matSheet) {
           const newBarcodesData: any[] = [];
+          const rows = extractRows(matSheet);
 
-          matSheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
-            const id = row.getCell(1).value
-              ? Number(row.getCell(1).value)
-              : null;
+          for (const row of rows) {
+            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const erpCode = getVal(row, 2);
             const mappingBarcode = getVal(row, 3);
             const group = getVal(row, 4);
@@ -649,30 +637,24 @@ export class LookupService {
                   tx.materialBarcode
                     .update({ where: { id }, data })
                     .catch((err) => {
-                      console.error(
-                        `Failed to update MaterialBarcode ID ${id}:`,
-                        err.message,
-                      );
+                      console.error(`Failed to update MaterialBarcode ID ${id}:`, err.message);
                     }),
                 );
               } else {
                 newBarcodesData.push(data);
               }
             }
-          });
+          }
 
           if (newBarcodesData.length > 0) {
             promises.push(
               tx.materialBarcode
                 .createMany({
                   data: newBarcodesData,
-                  skipDuplicates: true,
+                  skipDuplicates: true, // Prisma handles exact duplicates natively here
                 })
                 .catch((err) => {
-                  console.error(
-                    'Failed to bulk insert Material Barcodes:',
-                    err,
-                  );
+                  console.error('Failed to bulk insert Material Barcodes:', err);
                   throw new BadRequestException(
                     'Bulk import failed for new Material Barcodes. Check logs for details.',
                   );
