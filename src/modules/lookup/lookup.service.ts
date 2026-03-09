@@ -28,11 +28,22 @@ export class LookupService {
     return this.prisma.product.findMany({ orderBy: { id: 'asc' } });
   }
 
-  createProduct(dto: CreateProductDto) {
+  async createProduct(dto: CreateProductDto) {
+    const existing = await this.prisma.product.findFirst({
+      where: { name: { equals: dto.name, mode: 'insensitive' } },
+    });
+    if (existing) throw new BadRequestException(`Product "${dto.name}" already exists.`);
+    
     return this.prisma.product.create({ data: dto });
   }
 
-  updateProduct(id: number, dto: UpdateProductDto) {
+  async updateProduct(id: number, dto: UpdateProductDto) {
+    if (dto.name) {
+      const existing = await this.prisma.product.findFirst({
+        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+      });
+      if (existing) throw new BadRequestException(`Product "${dto.name}" already exists.`);
+    }
     return this.prisma.product.update({ where: { id }, data: dto });
   }
 
@@ -54,11 +65,22 @@ export class LookupService {
     return this.prisma.transporter.findMany({ orderBy: { id: 'asc' } });
   }
 
-  createTransporter(dto: CreateTransporterDto) {
+  async createTransporter(dto: CreateTransporterDto) {
+    const existing = await this.prisma.transporter.findFirst({
+      where: { name: { equals: dto.name, mode: 'insensitive' } },
+    });
+    if (existing) throw new BadRequestException(`Transporter "${dto.name}" already exists.`);
+
     return this.prisma.transporter.create({ data: dto });
   }
 
-  updateTransporter(id: number, dto: UpdateTransporterDto) {
+  async updateTransporter(id: number, dto: UpdateTransporterDto) {
+    if (dto.name) {
+      const existing = await this.prisma.transporter.findFirst({
+        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+      });
+      if (existing) throw new BadRequestException(`Transporter "${dto.name}" already exists.`);
+    }
     return this.prisma.transporter.update({ where: { id }, data: dto });
   }
 
@@ -79,11 +101,22 @@ export class LookupService {
     return this.prisma.plantCode.findMany({ orderBy: { id: 'asc' } });
   }
 
-  createPlantCode(dto: CreatePlantCodeDto) {
+  async createPlantCode(dto: CreatePlantCodeDto) {
+    const existing = await this.prisma.plantCode.findFirst({
+      where: { code: { equals: dto.code, mode: 'insensitive' } },
+    });
+    if (existing) throw new BadRequestException(`Plant Code "${dto.code}" already exists.`);
+
     return this.prisma.plantCode.create({ data: dto });
   }
 
-  updatePlantCode(id: number, dto: UpdatePlantCodeDto) {
+  async updatePlantCode(id: number, dto: UpdatePlantCodeDto) {
+    if (dto.code) {
+      const existing = await this.prisma.plantCode.findFirst({
+        where: { code: { equals: dto.code, mode: 'insensitive' }, id: { not: id } },
+      });
+      if (existing) throw new BadRequestException(`Plant Code "${dto.code}" already exists.`);
+    }
     return this.prisma.plantCode.update({ where: { id }, data: dto });
   }
 
@@ -104,11 +137,22 @@ export class LookupService {
     return this.prisma.salesZone.findMany({ orderBy: { id: 'asc' } });
   }
 
-  createSalesZone(dto: CreateSalesZoneDto) {
+  async createSalesZone(dto: CreateSalesZoneDto) {
+    const existing = await this.prisma.salesZone.findFirst({
+      where: { name: { equals: dto.name, mode: 'insensitive' } },
+    });
+    if (existing) throw new BadRequestException(`Sales Zone "${dto.name}" already exists.`);
+
     return this.prisma.salesZone.create({ data: dto });
   }
 
-  updateSalesZone(id: number, dto: UpdateSalesZoneDto) {
+  async updateSalesZone(id: number, dto: UpdateSalesZoneDto) {
+    if (dto.name) {
+      const existing = await this.prisma.salesZone.findFirst({
+        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+      });
+      if (existing) throw new BadRequestException(`Sales Zone "${dto.name}" already exists.`);
+    }
     return this.prisma.salesZone.update({ where: { id }, data: dto });
   }
 
@@ -129,11 +173,22 @@ export class LookupService {
     return this.prisma.packConfig.findMany({ orderBy: { id: 'asc' } });
   }
 
-  createPackConfig(dto: CreatePackConfigDto) {
+  async createPackConfig(dto: CreatePackConfigDto) {
+    const existing = await this.prisma.packConfig.findFirst({
+      where: { configName: { equals: dto.configName, mode: 'insensitive' } },
+    });
+    if (existing) throw new BadRequestException(`Pack Config "${dto.configName}" already exists.`);
+
     return this.prisma.packConfig.create({ data: dto });
   }
 
-  updatePackConfig(id: number, dto: UpdatePackConfigDto) {
+  async updatePackConfig(id: number, dto: UpdatePackConfigDto) {
+    if (dto.configName) {
+      const existing = await this.prisma.packConfig.findFirst({
+        where: { configName: { equals: dto.configName, mode: 'insensitive' }, id: { not: id } },
+      });
+      if (existing) throw new BadRequestException(`Pack Config "${dto.configName}" already exists.`);
+    }
     return this.prisma.packConfig.update({ where: { id }, data: dto });
   }
 
@@ -154,11 +209,22 @@ export class LookupService {
     return this.prisma.customer.findMany({ orderBy: { id: 'asc' } });
   }
 
-  createCustomer(dto: CreateCustomerDto) {
+  async createCustomer(dto: CreateCustomerDto) {
+    const existing = await this.prisma.customer.findFirst({
+      where: { name: { equals: dto.name, mode: 'insensitive' } },
+    });
+    if (existing) throw new BadRequestException(`Customer "${dto.name}" already exists.`);
+
     return this.prisma.customer.create({ data: dto });
   }
 
-  updateCustomer(id: number, dto: UpdateCustomerDto) {
+  async updateCustomer(id: number, dto: UpdateCustomerDto) {
+    if (dto.name) {
+      const existing = await this.prisma.customer.findFirst({
+        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+      });
+      if (existing) throw new BadRequestException(`Customer "${dto.name}" already exists.`);
+    }
     return this.prisma.customer.update({ where: { id }, data: dto });
   }
 
@@ -179,11 +245,22 @@ export class LookupService {
     return this.prisma.printer.findMany({ orderBy: { id: 'asc' } });
   }
 
-  createPrinter(dto: CreatePrinterDto) {
+  async createPrinter(dto: CreatePrinterDto) {
+    const existing = await this.prisma.printer.findFirst({
+      where: { name: { equals: dto.name, mode: 'insensitive' } },
+    });
+    if (existing) throw new BadRequestException(`Printer "${dto.name}" already exists.`);
+
     return this.prisma.printer.create({ data: dto });
   }
 
-  updatePrinter(id: number, dto: UpdatePrinterDto) {
+  async updatePrinter(id: number, dto: UpdatePrinterDto) {
+    if (dto.name) {
+      const existing = await this.prisma.printer.findFirst({
+        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+      });
+      if (existing) throw new BadRequestException(`Printer "${dto.name}" already exists.`);
+    }
     return this.prisma.printer.update({ where: { id }, data: dto });
   }
 
