@@ -11,7 +11,6 @@ import { UpdateSalesCrudDto } from './dto/update-sales-crud.dto';
 import { Prisma } from '@prisma/client';
 import { LabelPrintDto } from './dto/label-print.dto';
 import * as net from 'net';
-// import * as fs from 'fs';
 import { PrintLabelDto } from './dto/print-label.dto';
 
 @Injectable()
@@ -118,7 +117,6 @@ export class SalesCrudService {
           userId,
           assignedUserId: null,
           customerId: resolvedCustomerId,
-          customerNameText: finalCustomerNameText,
           printerId: null,
           address: address,
         },
@@ -170,6 +168,7 @@ export class SalesCrudService {
           customer: {
             select: {
               name: true,
+              contactNumber: true,
             },
           },
         },
@@ -182,7 +181,8 @@ export class SalesCrudService {
       return {
         valid: true,
         saleOrderNumber: order.saleOrderNumber,
-        customerName: order.customerNameText || order.customer?.name || '',
+        customerName: order.customer?.name || order.customerNameText || '',
+        contactNumber: order.customer?.contactNumber || null,
         address: order.address || '',
       };
     } catch (err) {
@@ -338,9 +338,6 @@ export class SalesCrudService {
           UpdatedDate: new Date(),
           ...(resolvedCustomerId !== undefined
             ? { customerId: resolvedCustomerId }
-            : {}),
-          ...(finalCustomerNameText !== undefined
-            ? { customerNameText: finalCustomerNameText }
             : {}),
           ...(address !== undefined && { address }),
         },
@@ -524,7 +521,7 @@ export class SalesCrudService {
   }
 
   async processLabelPrint(dto: LabelPrintDto, userId: number) {
-    const { saleOrderNumbers } = dto;
+    const { saleOrderNumbers, cncText, boxNN } = dto;
     const statusToSet = 'Ready for Dispatch';
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -559,6 +556,8 @@ export class SalesCrudService {
           data: {
             userId: userId,
             userName: userName,
+            cncText: cncText || 'CNC Package',
+            boxNN: boxNN || '1/1',
             createdAt: now,
             entries: {
               create: saleOrderNumbers.map((soNumber) => ({

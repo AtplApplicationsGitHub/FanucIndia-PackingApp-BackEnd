@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class LabelPrintDto {
   @ApiProperty({
@@ -10,4 +10,14 @@ export class LabelPrintDto {
   @IsString({ each: true })
   @IsNotEmpty()
   saleOrderNumbers: string[];
+
+  @ApiPropertyOptional({ example: 'CNC Package' })
+  @IsOptional()
+  @IsString()
+  cncText?: string;
+
+  @ApiPropertyOptional({ example: '1/1' })
+  @IsOptional()
+  @IsString()
+  boxNN?: string;
 }

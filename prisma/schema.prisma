@@ -346,7 +346,7 @@ model VehicleEntry {
   customerName    String
   vehicleNumber   String
   transporterName String
-  driverNumber    String
+  driverNumber    String?
 
   attachments Json?
 
@@ -364,7 +364,7 @@ model VehicleEntryArchive {
   customerName    String
   vehicleNumber   String
   transporterName String
-  driverNumber    String
+  driverNumber    String?
 
   attachments Json?
 
@@ -463,7 +463,8 @@ model CustomerLabelPrint {
   createdAt DateTime @default(now())
   userId    Int
   userName  String?
-
+  cncText   String?  @default("CNC Package") @db.VarChar(255) // <-- ADDED
+  boxNN     String?  @default("1/1") @db.VarChar(50)
   user    User                      @relation(fields: [userId], references: [id])
   entries CustomerLabelPrintEntry[]
 }

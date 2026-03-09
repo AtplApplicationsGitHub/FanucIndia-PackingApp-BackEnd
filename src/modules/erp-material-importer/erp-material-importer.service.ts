@@ -559,8 +559,23 @@ export class ErpMaterialImporterService {
         };
 
         if (computedCustomerName) {
-            updateData.customerNameText = computedCustomerName;
+            let existingCustomer = await tx.customer.findFirst({
+                where: { name: { equals: computedCustomerName, mode: 'insensitive' } },
+            });
+
+            if (!existingCustomer) {
+                existingCustomer = await tx.customer.create({
+                    data: { 
+                        name: computedCustomerName,
+                        address: computedCustomerAddress || null
+                    },
+                });
+            }
+
+            updateData.customer = { connect: { id: existingCustomer.id } };
+            updateData.customerNameText = null;
         }
+
         if (computedCustomerAddress) {
             updateData.address = computedCustomerAddress;
         }

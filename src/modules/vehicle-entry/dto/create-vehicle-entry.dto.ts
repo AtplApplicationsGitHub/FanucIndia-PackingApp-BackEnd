@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
 
 export class CreateVehicleEntryDto {
   @ApiProperty({ example: 'Tata Motors', description: 'Name of the customer (from dropdown)' })
@@ -19,6 +19,6 @@ export class CreateVehicleEntryDto {
 
   @ApiProperty({ example: '9876543210', description: 'Driver contact number' })
   @IsString()
-  @IsNotEmpty()
-  driverNumber: string;
+  @IsOptional()
+  driverNumber?: string;
 }
