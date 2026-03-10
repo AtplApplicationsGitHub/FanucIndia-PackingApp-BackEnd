@@ -188,6 +188,7 @@ export class UserDashboardService {
         Mapping_Barcode: true,
         Remarks_Required: true,
         Remarks: true,
+        CNC_Serial_No: true,
       },
     });
 
@@ -230,6 +231,7 @@ export class UserDashboardService {
         Mapping_Barcode: true,
         Remarks_Required: true,
         Remarks: true,
+        CNC_Serial_No: true,
       },
     });
     return materials.map((material) => ({
