@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import Client from 'ssh2-sftp-client';
+import Client, { FileInfo } from 'ssh2-sftp-client';
 import * as path from 'path';
 
 type ConnectOptions = {
@@ -101,7 +101,9 @@ export class SftpService {
 
   async uploadBatch(uploads: { localPath: string; remotePath: string }[]) {
     return this.withClient(async (c) => {
-      const dirs = new Set(uploads.map((u) => path.posix.dirname(u.remotePath)));
+      const dirs = new Set(
+        uploads.map((u) => path.posix.dirname(u.remotePath)),
+      );
       for (const dir of dirs) {
         await this._ensureDir(c, dir);
       }
@@ -126,24 +128,24 @@ export class SftpService {
   }
 
   async rmdir(remotePath: string) {
-  if (!remotePath || typeof remotePath !== 'string') {
-    throw new Error('Invalid remote path');
-  }
-
-  const normalized = path.posix.normalize(remotePath);
-  if (normalized.split('/').includes('..')) {
-    throw new Error('Invalid remote path: traversal not allowed');
-  }
-
-  return this.withClient(async (c) => {
-    try {
-      await c.rmdir(normalized, true);
-      return true;
-    } catch (err: any) {
-      if (err.code === 2) return false;
-      throw err;
+    if (!remotePath || typeof remotePath !== 'string') {
+      throw new Error('Invalid remote path');
     }
-  });
+
+    const normalized = path.posix.normalize(remotePath);
+    if (normalized.split('/').includes('..')) {
+      throw new Error('Invalid remote path: traversal not allowed');
+    }
+
+    return this.withClient(async (c) => {
+      try {
+        await c.rmdir(normalized, true);
+        return true;
+      } catch (err: any) {
+        if (err.code === 2) return false;
+        throw err;
+      }
+    });
   }
 
   async exists(remotePath: string) {
@@ -166,5 +168,9 @@ export class SftpService {
       }
       throw new Error('SFTP get did not return a buffer');
     });
+  }
+
+  async list(remoteDir: string): Promise<FileInfo[]> {
+    return this.withClient((c) => c.list(remoteDir));
   }
 }
