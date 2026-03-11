@@ -18,9 +18,8 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "resolveJsonModule": true
   },
-  "include": ["src", "prisma", "prisma/seed.ts"]          // <-- add this if missing
+  "include": ["src", "prisma", "prisma/seed.ts"]
 }
-
- 

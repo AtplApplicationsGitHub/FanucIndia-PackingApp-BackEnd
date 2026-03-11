@@ -168,4 +168,16 @@ export class SalesCrudController {
   ) {
     return this.service.printOrderLabel(id, dto);
   }
+
+  @Post('customer-label/:id/print')
+  @Roles('USER', 'ADMIN')
+  @ApiOperation({ summary: 'Print Customer Label using specific IP' })
+  @ApiParam({ name: 'id', type: Number, description: 'The ID from the CustomerLabelPrint table' })
+  @ApiResponse({ status: 200, description: 'Print job sent successfully' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async printCustomerLabel(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.service.printCustomerLabel(id);
+  }
 }
