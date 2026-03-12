@@ -170,4 +170,15 @@ export class AdminOrderController {
   async bulkUpdatePriority(@Body() dto: BulkUpdatePriorityDto, @Req() req: AuthRequest) {
     return this.service.bulkUpdatePriority(dto, req.user);
   }
+
+  @Get('used-customers')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({ summary: 'Get unique customers currently used in Sales Orders' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of used customers returned successfully',
+  })
+  async getUsedCustomers() {
+    return this.service.getUsedCustomers();
+  }
 }

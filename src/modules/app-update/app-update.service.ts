@@ -47,7 +47,7 @@ export class AppUpdateService {
       files.sort();
       const latestApk = files[files.length - 1];
 
-      const versionMatch = latestApk.match(/v(\d+\.\d+\.\d+)/);
+      const versionMatch = latestApk.match(/Vr:(\d+\.\d+\.\d+)/);
       const version = versionMatch ? versionMatch[1] : latestApk.replace('.apk', '');
 
       return {

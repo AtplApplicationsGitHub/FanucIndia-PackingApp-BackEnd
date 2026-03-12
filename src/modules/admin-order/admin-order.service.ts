@@ -798,4 +798,43 @@ export class AdminOrderService {
       skippedCount: orders.length - validOrderIds.length
     };
   }
+
+  async getUsedCustomers() {
+    const orders = await this.prisma.salesOrder.findMany({
+      where: {
+        OR: [
+          { customerId: { not: null } },
+          { customerNameText: { not: null } }
+        ]
+      },
+      select: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
+        customerNameText: true,
+      },
+      distinct: ['customerId', 'customerNameText'],
+    });
+
+    const uniqueCustomers = new Map();
+
+    orders.forEach(order => {
+      if (order.customer) {
+        uniqueCustomers.set(`id_${order.customer.id}`, { 
+          id: order.customer.id, 
+          name: order.customer.name 
+        });
+      } else if (order.customerNameText) {
+        uniqueCustomers.set(`text_${order.customerNameText}`, { 
+          id: order.customerNameText, 
+          name: order.customerNameText 
+        });
+      }
+    });
+
+    return Array.from(uniqueCustomers.values());
+  }
 }
