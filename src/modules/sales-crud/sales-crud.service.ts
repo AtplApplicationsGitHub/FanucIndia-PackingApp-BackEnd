@@ -12,12 +12,11 @@ import { Prisma } from '@prisma/client';
 import { LabelPrintDto } from './dto/label-print.dto';
 import * as net from 'net';
 import { PrintLabelDto } from './dto/print-label.dto';
-import * as fs from 'fs';
-import * as path from 'path';
+import { SftpService } from '../sftp/sftp.service';
 
 @Injectable()
 export class SalesCrudService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly sftpService: SftpService,) {}
 
   async create(dto: CreateSalesCrudDto, userId: number) {
     const saleOrderNumber = dto.saleOrderNumber?.trim();
@@ -748,15 +747,23 @@ export class SalesCrudService {
     const cncPackage = labelPrint.cncText || '';
     const boxNumber = labelPrint.boxNN || '';
 
-    const templatePath = path.join(__dirname, '..', '..', '..', 'templates', 'FANUC_ZEBRA_ZT421_210X150_060326.prn');
+    const fileName = 'FANUC_ZEBRA_ZT421_210X150_060326.prn';
+    
+    const basePath = process.env.PRN_FILE_PATH || 'uploads/fanuc/prn-files/';
+    
+    const sftpTemplatePath = `${basePath.replace(/\/$/, '')}/${fileName}`;
+    
     let prn = '';
 
     try {
-      prn = fs.readFileSync(templatePath, 'utf8');
+      const prnBuffer = await this.sftpService.getBuffer(sftpTemplatePath);
+      
+      prn = prnBuffer.toString('utf8');
+      
     } catch (error) {
-      console.error('Error reading PRN file:', error);
+      console.error(`Error reading PRN file from SFTP at path: ${sftpTemplatePath}`, error);
       throw new InternalServerErrorException(
-        'Failed to read the Printer template file from the server.',
+        `Failed to read the Printer template file from the SFTP server at: ${sftpTemplatePath}. Ensure the file exists.`,
       );
     }
 

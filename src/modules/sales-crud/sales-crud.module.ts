@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { SalesCrudController } from './sales-crud.controller';
 import { SalesCrudService } from './sales-crud.service';
 import { PrismaService } from '../../prisma.service';
+import { SftpModule } from '../sftp/sftp.module';
 
 @Module({
+  imports: [SftpModule],
   controllers: [SalesCrudController],
   providers: [SalesCrudService, PrismaService],
   exports: [SalesCrudService],
