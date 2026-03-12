@@ -788,13 +788,12 @@ export class SalesCrudService {
       );
     }
 
-    return {
-      success: true,
-      message: 'Dry-run successful. Here is the generated payload:',
-      payload: prn,
-    };
+    // return {
+    //   success: true,
+    //   message: 'Dry-run successful. Here is the generated payload:',
+    //   payload: prn,
+    // };
 
-    /*
     return new Promise((resolve, reject) => {
       const client = new net.Socket();
       client.setTimeout(5000);
@@ -820,6 +819,5 @@ export class SalesCrudService {
         );
       });
     });
-    */
   }
 }
