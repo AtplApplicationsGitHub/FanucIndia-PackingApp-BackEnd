@@ -404,6 +404,10 @@ export class AdminOrderService {
           updateData.priority = priority;
         }
 
+        if (order.status === null && (isUserChanging || (priority !== undefined && priority !== null))) {
+          updateData.status = 'R105';
+        }
+
         await tx.salesOrder.update({
           where: { id: order.id },
           data: updateData,

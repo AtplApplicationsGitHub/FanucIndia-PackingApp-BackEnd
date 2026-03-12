@@ -68,7 +68,9 @@ export class SalesCrudService {
 
       if (!resolvedCustomerId && finalCustomerNameText) {
         let existingCustomer = await this.prisma.customer.findFirst({
-          where: { name: { equals: finalCustomerNameText, mode: 'insensitive' } },
+          where: {
+            name: { equals: finalCustomerNameText, mode: 'insensitive' },
+          },
         });
 
         if (!existingCustomer) {
@@ -77,9 +79,8 @@ export class SalesCrudService {
           });
         }
         resolvedCustomerId = existingCustomer.id;
-        finalCustomerNameText = existingCustomer.name; 
-      } 
-      else if (resolvedCustomerId) {
+        finalCustomerNameText = existingCustomer.name;
+      } else if (resolvedCustomerId) {
         const existingCustomer = await this.prisma.customer.findUnique({
           where: { id: resolvedCustomerId },
         });
@@ -100,7 +101,21 @@ export class SalesCrudService {
           ? new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString()
           : dto.deliveryDate;
 
-      const { customerName, customerId, ...rest } = dto as any;
+      let resolvedProductId = dto.productId;
+      if (!resolvedProductId) {
+        let defaultProduct = await this.prisma.product.findFirst({
+          where: { name: { equals: 'FA', mode: 'insensitive' } },
+        });
+        
+        if (!defaultProduct) {
+          defaultProduct = await this.prisma.product.create({
+            data: { name: 'FA' },
+          });
+        }
+        resolvedProductId = defaultProduct.id;
+      }
+
+      const { customerName, customerId, productId, ...rest } = dto as any;
 
       const cleanedRest = Object.fromEntries(
         Object.entries(rest).map(([k, v]) => {
@@ -117,6 +132,7 @@ export class SalesCrudService {
           ...cleanedRest,
           deliveryDate,
           userId,
+          productId: resolvedProductId,
           assignedUserId: null,
           customerId: resolvedCustomerId,
           printerId: null,
@@ -279,14 +295,20 @@ export class SalesCrudService {
       throw new NotFoundException('Sales order not found or access denied.');
     }
 
-    const restrictedStatuses = ['Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'];
+    const restrictedStatuses = [
+      'Packed',
+      'WIP Storage',
+      'Ready for Dispatch',
+      'Dispatched',
+    ];
     if (existing.status && restrictedStatuses.includes(existing.status)) {
-      throw new ForbiddenException(`Cannot modify order. The packing stage is already completed (Current Status: ${existing.status}).`);
+      throw new ForbiddenException(
+        `Cannot modify order. The packing stage is already completed (Current Status: ${existing.status}).`,
+      );
     }
 
     try {
-      let resolvedCustomerId: number | undefined =
-        dto.customerId ?? undefined;
+      let resolvedCustomerId: number | undefined = dto.customerId ?? undefined;
       let finalCustomerNameText: string | undefined =
         (dto as any).customerName && String((dto as any).customerName).trim()
           ? String((dto as any).customerName).trim()
@@ -294,7 +316,9 @@ export class SalesCrudService {
 
       if (!resolvedCustomerId && finalCustomerNameText) {
         let existingCustomer = await this.prisma.customer.findFirst({
-          where: { name: { equals: finalCustomerNameText, mode: 'insensitive' } },
+          where: {
+            name: { equals: finalCustomerNameText, mode: 'insensitive' },
+          },
         });
 
         if (!existingCustomer) {
@@ -304,8 +328,7 @@ export class SalesCrudService {
         }
         resolvedCustomerId = existingCustomer.id;
         finalCustomerNameText = existingCustomer.name;
-      } 
-      else if (resolvedCustomerId) {
+      } else if (resolvedCustomerId) {
         const existingCustomer = await this.prisma.customer.findUnique({
           where: { id: resolvedCustomerId },
         });
@@ -446,18 +469,23 @@ export class SalesCrudService {
 
         if (filters.endDate) {
           const { y, m, d } = parseYMD(filters.endDate);
-          const e = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
+          const e = new Date(
+            Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS,
+          );
           range.lt = e;
         }
 
-        whereClause.deliveryDate = { ...(whereClause.deliveryDate as object), ...range };
+        whereClause.deliveryDate = {
+          ...(whereClause.deliveryDate as object),
+          ...range,
+        };
       }
 
       // 2. APPLY SEARCH ACROSS ALL SPECIFIED COLUMNS
       if (filters.search) {
         const searchStr = filters.search.trim();
         const s = { contains: searchStr, mode: 'insensitive' };
-        
+
         whereClause.OR = [
           { saleOrderNumber: s },
           { outboundDelivery: s },
@@ -603,9 +631,7 @@ export class SalesCrudService {
     });
 
     if (!printer || !printer.name) {
-      throw new InternalServerErrorException(
-        'Printer name not configured.',
-      );
+      throw new InternalServerErrorException('Printer name not configured.');
     }
 
     const qty = dto.quantity || 1;
@@ -631,11 +657,11 @@ export class SalesCrudService {
       `TEXT 460,79,"0",180,12,14,"${salesZone}"`,
       `QRCODE 111,127,L,4,A,180,M2,S7,"${order.saleOrderNumber}"`,
       `PRINT ${qty},1`,
-      ''
+      '',
     ];
 
     const finalPrn = prnCommands.join('\r\n');
-    
+
     // return {
     //   success: true,
     //   message: 'Dry-run successful. Here is the payload:',
@@ -664,7 +690,7 @@ export class SalesCrudService {
         client.destroy();
         reject(
           new InternalServerErrorException(
-            `Printer error: Connection to ${printer.name}:9100 timed out after 5000ms. Verify the printer is online.`
+            `Printer error: Connection to ${printer.name}:9100 timed out after 5000ms. Verify the printer is online.`,
           ),
         );
       });
@@ -677,7 +703,8 @@ export class SalesCrudService {
       include: { entries: true },
     });
 
-    if (!labelPrint) throw new NotFoundException('Customer Label Print record not found');
+    if (!labelPrint)
+      throw new NotFoundException('Customer Label Print record not found');
 
     let addressFirstLine = '';
     let addressSecondline = '';
@@ -694,16 +721,18 @@ export class SalesCrudService {
 
       if (firstSo?.customer) {
         contactNumber = firstSo.customer.contactNumber || '';
-        
-        const addrParts = (firstSo.customer.address || '').split(',').map(s => s.trim());
-        
+
+        const addrParts = (firstSo.customer.address || '')
+          .split(',')
+          .map((s) => s.trim());
+
         addressFirstLine = addrParts[0] || '';
         addressSecondline = addrParts[1] || '';
         addressThirdLine = addrParts[2] || '';
-        
+
         if (addrParts.length >= 5) {
-          pinCode = addrParts.pop() || ''; 
-          addressFourthLine = addrParts.slice(3).join(', ') || ''; 
+          pinCode = addrParts.pop() || '';
+          addressFourthLine = addrParts.slice(3).join(', ') || '';
         } else if (addrParts.length === 4) {
           const lastPart = addrParts[3] || '';
           if (/^\d+$/.test(lastPart)) {
@@ -719,14 +748,20 @@ export class SalesCrudService {
     const cncPackage = labelPrint.cncText || '';
     const boxNumber = labelPrint.boxNN || '';
 
-    const templatePath = path.join(process.cwd(), 'templates', 'FANUC_ZEBRA_ZT421_210X150_060326.prn');
+    const templatePath = path.join(
+      process.cwd(),
+      'templates',
+      'FANUC_ZEBRA_ZT421_210X150_060326.prn',
+    );
     let prn = '';
-    
+
     try {
       prn = fs.readFileSync(templatePath, 'utf8');
     } catch (error) {
       console.error('Error reading PRN file:', error);
-      throw new InternalServerErrorException('Failed to read the Printer template file from the server.');
+      throw new InternalServerErrorException(
+        'Failed to read the Printer template file from the server.',
+      );
     }
 
     for (let i = 0; i < 15; i++) {
@@ -739,19 +774,21 @@ export class SalesCrudService {
     prn = prn.replace(/@@AddressSecondline@@/g, addressSecondline);
     prn = prn.replace(/@@AddressThirdLine@@/g, addressThirdLine);
     prn = prn.replace(/@@AddressFourthLine@@/g, addressFourthLine);
-    prn = prn.replace(/@@CustomerContactNumber/g, contactNumber); 
+    prn = prn.replace(/@@CustomerContactNumber/g, contactNumber);
     prn = prn.replace(/@@ContactNumber@@/g, contactNumber);
     prn = prn.replace(/@@PinCode@@/g, pinCode);
 
     const printerIp = process.env.CUSTOMER_LABEL_PRINTER_IP;
     if (!printerIp) {
-      throw new InternalServerErrorException('Printer IP not configured in .env (CUSTOMER_LABEL_PRINTER_IP)');
+      throw new InternalServerErrorException(
+        'Printer IP not configured in .env (CUSTOMER_LABEL_PRINTER_IP)',
+      );
     }
 
     return {
       success: true,
       message: 'Dry-run successful. Here is the generated payload:',
-      payload: prn
+      payload: prn,
     };
 
     /*

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, NotFoundException, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, NotFoundException, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Roles } from '../auth/roles.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -10,6 +10,88 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@ne
 @UseGuards(JwtAuthGuard) 
 export class AdminSalesOrdersController {
   constructor(private readonly prisma: PrismaService) {}
+
+  @Get('counts/dynamic')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get dynamic counts of R105 and W105 based on filters' })
+  async getDynamicCounts(@Query() query: any) {
+    const { search, paymentFilter, zoneFilter, statusFilter, customerFilter, startDate, endDate } = query;
+    const where: any = {};
+    
+    const baseStatusCondition = { OR: [{ status: 'R105' }, { status: 'W105' }] };
+
+    if (paymentFilter) {
+      where.paymentClearance = paymentFilter === 'true';
+    }
+    if (zoneFilter) {
+      where.salesZoneId = parseInt(zoneFilter, 10);
+    }
+    if (statusFilter) {
+      if (statusFilter === 'None') where.status = null;
+      else where.status = statusFilter;
+    }
+    if (customerFilter) {
+      where.customerId = parseInt(customerFilter, 10);
+    }
+    if (startDate || endDate) {
+      const dateFilter: any = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        dateFilter.gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.lte = end;
+      }
+      where.deliveryDate = dateFilter;
+    }
+
+    if (search) {
+      const lower = search.toLowerCase();
+      const num = Number(search);
+      where.AND = [{
+        OR: [
+          { customer: { is: { name: { contains: search, mode: 'insensitive' } } } },
+          { user: { is: { name: { contains: search, mode: 'insensitive' } } } },
+          { product: { is: { name: { contains: search, mode: 'insensitive' } } } },
+          { transporter: { is: { name: { contains: search, mode: 'insensitive' } } } },
+          { plantCode: { contains: search, mode: 'insensitive' } },
+          { salesZone: { is: { name: { contains: search, mode: 'insensitive' } } } },
+          { packConfig: { is: { configName: { contains: search, mode: 'insensitive' } } } },
+          { assignedUser: { is: { name: { contains: search, mode: 'insensitive' } } } },
+          { saleOrderNumber: { contains: search, mode: 'insensitive' } },
+          { outboundDelivery: { contains: search, mode: 'insensitive' } },
+          { transferOrder: { contains: search, mode: 'insensitive' } },
+          { status: { contains: search, mode: 'insensitive' } },
+          { customerNameText: { contains: search, mode: 'insensitive' } },
+          ...(lower === 'yes' || lower === 'no' ? [{ paymentClearance: { equals: lower === 'yes' } }] : []),
+          ...(!isNaN(num) ? [{ priority: { equals: num } }] : []),
+        ]
+      }];
+    }
+
+    if (!where.AND) {
+      where.AND = [baseStatusCondition];
+    } else {
+      where.AND.push(baseStatusCondition);
+    }
+
+    const results = await this.prisma.salesOrder.groupBy({
+      by: ['status'],
+      where,
+      _count: { status: true },
+    });
+
+    const counts = { R105: 0, W105: 0 };
+    results.forEach(r => {
+      if (r.status === 'R105') counts.R105 = r._count.status;
+      if (r.status === 'W105') counts.W105 = r._count.status;
+    });
+
+    return counts;
+  }
 
   @Get(':id')
   @Roles('ADMIN')

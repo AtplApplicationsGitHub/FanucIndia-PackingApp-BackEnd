@@ -547,11 +547,11 @@ export class SalesOrderService {
 
       const rowErrors: string[] = [];
 
-      let productName = (product || '').toString().trim();
-      if (!productName) {
-        productName = 'FA';
+      let productNameRaw = (product || '').toString().trim();
+      if (!productNameRaw) {
+        productNameRaw = 'FA';
       }
-      const productId = maps.product.get(productName);
+      const productId = maps.product.get(productNameRaw);
 
       const transporterNameRaw = (transporter || '').toString().trim();
       const transporterId = maps.transporter.get(transporterNameRaw);
@@ -579,11 +579,11 @@ export class SalesOrderService {
       const customerId = customerData?.id;
       const customerAddress = customerData?.address;
 
-      if (!productId) {
-        rowErrors.push(
-          `Invalid product (Defaults to 'FA', but 'FA' not found in system)`,
-        );
-      }
+      // if (!productId) {
+      //   rowErrors.push(
+      //     `Invalid product (Defaults to 'FA', but 'FA' not found in system)`,
+      //   );
+      // }
 
       if (!saleOrderNumber) {
         rowErrors.push('Missing saleOrderNumber');
@@ -626,6 +626,7 @@ export class SalesOrderService {
       } else {
         ordersToInsert.push({
           productId,
+          productName: productNameRaw,
           saleOrderNumber: saleOrderNumber.toString(),
           outboundDelivery: outboundDelivery.toString(),
 
@@ -733,6 +734,21 @@ export class SalesOrderService {
       const insertedCount = await this.prisma.$transaction(async (tx) => {
         let count = 0;
         for (const orderData of ordersToInsert) {
+          let finalProductId = orderData.productId;
+
+          if (!finalProductId && orderData.productName) {
+            let foundId = maps.product.get(orderData.productName);
+
+            if (!foundId) {
+              const newProduct = await tx.product.create({
+                data: { name: orderData.productName },
+              });
+              foundId = newProduct.id;
+              maps.product.set(orderData.productName, foundId);
+            }
+            finalProductId = foundId;
+          }
+
           let finalCustomerId = orderData.customerId;
           let finalCustomerAddress = orderData.address;
 
@@ -774,11 +790,12 @@ export class SalesOrderService {
             finalTransporterId = foundId;
           }
 
-          const { customerName, transporterName, ...dataToSave } = orderData;
+          const { customerName, transporterName, productName, ...dataToSave } = orderData;
 
           const newOrder = await tx.salesOrder.create({
             data: {
               ...dataToSave,
+              productId: finalProductId,
               customerId: finalCustomerId,
               transporterId: finalTransporterId,
               address: finalCustomerAddress,

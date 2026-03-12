@@ -10,9 +10,10 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSalesCrudDto {
-  @ApiProperty({ example: 1, description: 'Product ID (lookup)' })
+  @ApiPropertyOptional({ example: 1, description: 'Product ID (lookup)' })
+  @IsOptional()
   @IsInt({ message: 'Product ID must be an integer.' })
-  productId: number;
+  productId?: number;
 
   @ApiProperty({ example: 'SO12345', description: 'Sale Order Number' })
   @IsString({ message: 'Sale Order Number must be a string.' })
