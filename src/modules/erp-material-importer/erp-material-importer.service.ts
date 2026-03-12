@@ -538,6 +538,13 @@ export class ErpMaterialImporterService {
       };
     });
 
+    const uniqueBins = new Set(
+      recordsToCreate
+        .map((r) => r.Bin_No)
+        .filter((bin) => bin !== null && bin !== undefined && bin.trim() !== '')
+    );
+    const binCount = uniqueBins.size;
+
     try {
       await this.prisma.$transaction(async (tx) => {
                 
@@ -555,7 +562,8 @@ export class ErpMaterialImporterService {
         const updateData: Prisma.SalesOrderUpdateInput = {
             UpdatedBy: username, 
             UpdatedDate: new Date(),
-            isErpImported: 1,    
+            isErpImported: 1,
+            binCount: binCount,    
         };
 
         if (computedCustomerName) {

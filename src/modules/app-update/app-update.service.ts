@@ -54,7 +54,6 @@ export class AppUpdateService {
         appName,
         latestVersion: version,
         fileName: latestApk,
-        // Now uses the specific route passed from the controller
         downloadUrl: `${hostUrl}${downloadRoute}`, 
       };
     } catch (error) {

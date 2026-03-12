@@ -106,6 +106,7 @@ model SalesOrder {
   priority              Int?
   skipStage             Boolean?                 @default(false)
   isErpImported         Int                     @default(0)
+  binCount              Int?                    @default(0)
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
   materialData          ERP_Material_Data[]

@@ -86,9 +86,11 @@ export class UserDashboardService {
         priority: true,
         status: true,
         skipStage: true,
+        customer: { select: { name: true } },
         materialData: {
           select: {
             Required_Qty: true,
+            A_D_F: true,
           },
         },
       },
@@ -110,6 +112,8 @@ export class UserDashboardService {
         skipStage: order.skipStage,
         totalMaterials,
         totalItems,
+        customerName: order.customer?.name || null,
+        adf: order.materialData[0]?.A_D_F || null,
       };
     });
   }

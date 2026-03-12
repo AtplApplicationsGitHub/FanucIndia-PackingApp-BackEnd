@@ -171,13 +171,15 @@ export class AdminOrderService {
         take,
         include: {
           user: { select: { id: true, name: true, email: true } },
-          // UPDATED: Removed "code: true"
           product: { select: { id: true, name: true } },
           transporter: { select: { id: true, name: true } },
-          // plantCode: { select: { id: true, code: true, description: true } },
           salesZone: { select: { id: true, name: true } },
           packConfig: { select: { id: true, configName: true } },
           assignedUser: { select: { id: true, name: true } },
+          materialData: {
+            select: { A_D_F: true },
+            take: 1,
+          },
           _count: {
             select: {
               materialData: true,
@@ -422,6 +424,7 @@ export class AdminOrderService {
         specialRemarks: true,
         additionalRemarks: true,
         labelRemarks: true,
+        binCount: true,
         transporter: { select: { name: true } },
         packConfig: { select: { configName: true } },
 
@@ -441,6 +444,10 @@ export class AdminOrderService {
           select: { name: true },
         },
         customerNameText: true,
+        materialData: {
+          select: { A_D_F: true },
+          take: 1, 
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -467,8 +474,10 @@ export class AdminOrderService {
       specialRemarks: order.specialRemarks,
       additionalRemarks: order.additionalRemarks,
       labelRemarks: order.labelRemarks,
+      binCount: order.binCount,
       transporter: order.transporter,
       packConfig: order.packConfig,
+      materialData: order.materialData,
     }));
   }
 

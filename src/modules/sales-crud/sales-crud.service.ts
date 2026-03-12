@@ -672,7 +672,6 @@ export class SalesCrudService {
   }
 
   async printCustomerLabel(labelPrintId: number) {
-    // 1. Fetch the Customer Label Print and its entries (SO Numbers)
     const labelPrint = await this.prisma.customerLabelPrint.findUnique({
       where: { id: labelPrintId },
       include: { entries: true },
@@ -680,12 +679,12 @@ export class SalesCrudService {
 
     if (!labelPrint) throw new NotFoundException('Customer Label Print record not found');
 
-    // 2. Fetch Customer Details using the first Sales Order to get Address & Contact Number
     let addressFirstLine = '';
     let addressSecondline = '';
     let addressThirdLine = '';
     let addressFourthLine = '';
     let contactNumber = '';
+    let pinCode = '';
 
     if (labelPrint.entries.length > 0) {
       const firstSo = await this.prisma.salesOrder.findFirst({
@@ -696,23 +695,30 @@ export class SalesCrudService {
       if (firstSo?.customer) {
         contactNumber = firstSo.customer.contactNumber || '';
         
-        // Split address into 4 parts
         const addrParts = (firstSo.customer.address || '').split(',').map(s => s.trim());
+        
         addressFirstLine = addrParts[0] || '';
         addressSecondline = addrParts[1] || '';
         addressThirdLine = addrParts[2] || '';
-        addressFourthLine = addrParts.slice(3).join(', ') || '';
+        
+        if (addrParts.length >= 5) {
+          pinCode = addrParts.pop() || ''; 
+          addressFourthLine = addrParts.slice(3).join(', ') || ''; 
+        } else if (addrParts.length === 4) {
+          const lastPart = addrParts[3] || '';
+          if (/^\d+$/.test(lastPart)) {
+            pinCode = lastPart;
+          } else {
+            addressFourthLine = lastPart;
+          }
+        }
       }
     }
 
-    // 3. Map values for placeholders
     const soNumbers = labelPrint.entries.map((e) => e.saleOrderNumber);
     const cncPackage = labelPrint.cncText || '';
     const boxNumber = labelPrint.boxNN || '';
-    const pinCode = ''; 
 
-    // 4. Read the Base PRN Template from file
-    // process.cwd() gets the root of the backend execution directory
     const templatePath = path.join(process.cwd(), 'templates', 'FANUC_ZEBRA_ZT421_210X150_060326.prn');
     let prn = '';
     
@@ -723,12 +729,10 @@ export class SalesCrudService {
       throw new InternalServerErrorException('Failed to read the Printer template file from the server.');
     }
 
-    // 5. Replace up to 15 SO Numbers sequentially
     for (let i = 0; i < 15; i++) {
       prn = prn.replace('@@SONumber@@', soNumbers[i] || '');
     }
 
-    // 6. Replace remaining single-value placeholders
     prn = prn.replace(/@@CNCPackage@@/g, cncPackage);
     prn = prn.replace(/@@BoxNumber@@/g, boxNumber);
     prn = prn.replace(/@@AddressFirstLine@@/g, addressFirstLine);
@@ -739,7 +743,6 @@ export class SalesCrudService {
     prn = prn.replace(/@@ContactNumber@@/g, contactNumber);
     prn = prn.replace(/@@PinCode@@/g, pinCode);
 
-    // 7. Send payload to Printer Socket
     const printerIp = process.env.CUSTOMER_LABEL_PRINTER_IP;
     if (!printerIp) {
       throw new InternalServerErrorException('Printer IP not configured in .env (CUSTOMER_LABEL_PRINTER_IP)');
@@ -751,30 +754,32 @@ export class SalesCrudService {
       payload: prn
     };
 
-    // return new Promise((resolve, reject) => {
-    //   const client = new net.Socket();
-    //   client.setTimeout(5000);
+    /*
+    return new Promise((resolve, reject) => {
+      const client = new net.Socket();
+      client.setTimeout(5000);
 
-    //   client.connect(9100, printerIp, () => {
-    //     client.write(prn, () => {
-    //       client.end();
-    //       resolve({ success: true, message: 'Customer Label Print job sent successfully' });
-    //     });
-    //   });
+      client.connect(9100, printerIp, () => {
+        client.write(prn, () => {
+          client.end();
+          resolve({ success: true, message: 'Customer Label Print job sent successfully' });
+        });
+      });
 
-    //   client.on('error', (err) => {
-    //     client.destroy();
-    //     reject(new InternalServerErrorException(`Printer error: ${err.message}`));
-    //   });
+      client.on('error', (err) => {
+        client.destroy();
+        reject(new InternalServerErrorException(`Printer error: ${err.message}`));
+      });
 
-    //   client.on('timeout', () => {
-    //     client.destroy();
-    //     reject(
-    //       new InternalServerErrorException(
-    //         `Printer error: Connection to ${printerIp}:9100 timed out after 5000ms. Verify the printer is online.`
-    //       ),
-    //     );
-    //   });
-    // });
+      client.on('timeout', () => {
+        client.destroy();
+        reject(
+          new InternalServerErrorException(
+            `Printer error: Connection to ${printerIp}:9100 timed out after 5000ms. Verify the printer is online.`
+          ),
+        );
+      });
+    });
+    */
   }
 }
