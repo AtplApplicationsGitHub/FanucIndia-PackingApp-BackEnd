@@ -348,7 +348,7 @@ export class AdminOrderService {
     dto: BulkAssignOrderDto,
     user: { userId: number; name: string },
   ) {
-    const { salesOrderIds, assignedUserId } = dto;
+    const { salesOrderIds, assignedUserId, priority } = dto;
     const now = new Date();
 
     const orders = await this.prisma.salesOrder.findMany({
@@ -367,36 +367,46 @@ export class AdminOrderService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const order of orders) {
-        if (order.assignedUserId === assignedUserId) continue;
+        const isUserChanging = order.assignedUserId !== assignedUserId;
+        if (!isUserChanging && priority === undefined) continue;
+        if (isUserChanging) {
+          let targetStatus = '';
+          if (order.status === 'R105' || !order.status) {
+            targetStatus = 'Under Issue';
+          } else if (order.status === 'W105') {
+            targetStatus = 'Under Packing';
+          }
 
-        let targetStatus = '';
-        if (order.status === 'R105' || !order.status) {
-          targetStatus = 'Under Issue';
-        } else if (order.status === 'W105') {
-          targetStatus = 'Under Packing';
+          if (targetStatus) {
+            await tx.sO_Status_Stepper.updateMany({
+              where: {
+                salesOrderNumber: order.saleOrderNumber,
+                status: targetStatus,
+                createdDateTime: null,
+              },
+              data: {
+                createdDateTime: now,
+                updatedBy: user.name,
+              },
+            });
+          }
         }
+        const updateData: Prisma.SalesOrderUncheckedUpdateInput = {
+          UpdatedBy: user.name,
+          UpdatedDate: now,
+        };
 
-        if (targetStatus) {
-          await tx.sO_Status_Stepper.updateMany({
-            where: {
-              salesOrderNumber: order.saleOrderNumber,
-              status: targetStatus,
-              createdDateTime: null,
-            },
-            data: {
-              createdDateTime: now,
-              updatedBy: user.name,
-            },
-          });
+        if (isUserChanging) {
+          updateData.assignedUserId = assignedUserId;
+        }
+        
+        if (priority !== undefined) {
+          updateData.priority = priority;
         }
 
         await tx.salesOrder.update({
           where: { id: order.id },
-          data: {
-            assignedUserId: assignedUserId,
-            UpdatedBy: user.name,
-            UpdatedDate: now,
-          },
+          data: updateData,
         });
       }
     });
@@ -749,5 +759,43 @@ export class AdminOrderService {
 
       return { message: 'Excel import processed successfully' };
     });
+  }
+
+  async bulkUpdatePriority(
+    dto: { salesOrderIds: number[]; priority?: number | null },
+    user: { name: string }
+  ) {
+    const { salesOrderIds, priority } = dto;
+    const now = new Date();
+
+    const orders = await this.prisma.salesOrder.findMany({
+      where: { id: { in: salesOrderIds } },
+      select: { id: true, status: true },
+    });
+
+    if (orders.length === 0) {
+      throw new NotFoundException('No valid orders found for the provided IDs');
+    }
+
+    const validOrderIds = orders
+      .filter((o) => o.status !== 'Dispatched')
+      .map((o) => o.id);
+
+    if (validOrderIds.length > 0) {
+      await this.prisma.salesOrder.updateMany({
+        where: { id: { in: validOrderIds } },
+        data: {
+          priority: priority ?? null,
+          UpdatedBy: user.name,
+          UpdatedDate: now,
+        },
+      });
+    }
+
+    return { 
+      message: 'Bulk priority update successful', 
+      updatedCount: validOrderIds.length,
+      skippedCount: orders.length - validOrderIds.length
+    };
   }
 }

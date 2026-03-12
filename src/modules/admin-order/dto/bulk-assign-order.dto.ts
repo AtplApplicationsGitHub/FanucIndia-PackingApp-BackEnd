@@ -1,5 +1,5 @@
-import { IsArray, IsInt, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsArray, IsInt, IsNotEmpty, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BulkAssignOrderDto {
   @ApiProperty({ description: 'Array of Sales Order IDs to update', type: [Number] })
@@ -12,4 +12,9 @@ export class BulkAssignOrderDto {
   @IsInt()
   @IsNotEmpty()
   assignedUserId: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Priority value to set during assignment' })
+  @IsOptional()
+  @IsInt()
+  priority?: number | null;
 }

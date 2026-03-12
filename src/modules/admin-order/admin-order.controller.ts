@@ -20,6 +20,7 @@ import { Roles } from '../auth/roles.decorator';
 import { UpdateAdminOrderDto } from './dto/update-admin-order.dto';
 import { BulkAssignOrderDto } from './dto/bulk-assign-order.dto';
 import { BulkSkipStageDto } from './dto/bulk-skip-stage.dto';
+import { BulkUpdatePriorityDto } from './dto/bulk-update-priority.dto';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -159,5 +160,14 @@ export class AdminOrderController {
       throw new BadRequestException('No file uploaded');
     }
     return this.service.processExcelImport(file.buffer, req.user);
+  }
+
+  @Patch('bulk-update-priority')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Bulk update Priority for multiple sales orders' })
+  @ApiBody({ type: BulkUpdatePriorityDto })
+  @ApiResponse({ status: 200, description: 'Priorities updated successfully' })
+  async bulkUpdatePriority(@Body() dto: BulkUpdatePriorityDto, @Req() req: AuthRequest) {
+    return this.service.bulkUpdatePriority(dto, req.user);
   }
 }
