@@ -476,6 +476,7 @@ export class AdminOrderService {
       payment: order.paymentClearance,
       salesZone: order.salesZone?.name,
       customer: order.customer?.name || order.customerNameText,
+      customerId: order.customerId,
       status: order.status,
       priority: order.priority,
       assignedUser: order.assignedUser?.name,

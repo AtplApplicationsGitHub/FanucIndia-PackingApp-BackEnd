@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Client, { FileInfo } from 'ssh2-sftp-client';
 import * as path from 'path';
+import { Response } from 'express';
 
 type ConnectOptions = {
   host: string;
@@ -172,5 +173,36 @@ export class SftpService {
 
   async list(remoteDir: string): Promise<FileInfo[]> {
     return this.withClient((c) => c.list(remoteDir));
+  }
+
+  async streamToResponse(remotePath: string, res: Response): Promise<void> {
+    const client = new Client();
+    try {
+      await client.connect(this.getConfig());
+      
+      // 1. Get the exact file size from the SFTP server
+      const fileStat = await client.stat(remotePath);
+      
+      // 2. Tell Postman/Browser exactly how many bytes to expect so it knows when to stop
+      res.setHeader('Content-Length', fileStat.size);
+
+      // 3. Stream the file directly to the client
+      await client.get(remotePath, res);
+
+    } catch (err: any) {
+      this.logger.error(`SFTP stream error: ${err?.message || err}`);
+      if (!res.headersSent) {
+        res.status(500).send('Error downloading file from SFTP');
+      }
+    } finally {
+      // 4. CRITICAL: Force the Express response to terminate. 
+      // This tells Postman "The file is completely done, stop spinning!"
+      res.end();
+
+      // Safely close the SFTP SSH connection
+      try {
+        await client.end();
+      } catch (e) {}
+    }
   }
 }
