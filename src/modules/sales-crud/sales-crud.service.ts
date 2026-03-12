@@ -748,11 +748,7 @@ export class SalesCrudService {
     const cncPackage = labelPrint.cncText || '';
     const boxNumber = labelPrint.boxNN || '';
 
-    const templatePath = path.join(
-      process.cwd(),
-      'templates',
-      'FANUC_ZEBRA_ZT421_210X150_060326.prn',
-    );
+    const templatePath = path.join(__dirname, '..', '..', '..', 'templates', 'FANUC_ZEBRA_ZT421_210X150_060326.prn');
     let prn = '';
 
     try {
