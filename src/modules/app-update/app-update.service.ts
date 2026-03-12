@@ -52,7 +52,7 @@ export class AppUpdateService {
 
       return {
         appName,
-        latestVersion: version,
+        latestVersion: versionMatch ? `Vr: ${version}` : version,
         fileName: latestApk,
         downloadUrl: `${hostUrl}${downloadRoute}`, 
       };
