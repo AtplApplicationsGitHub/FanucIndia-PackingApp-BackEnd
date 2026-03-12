@@ -8,15 +8,12 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 export class AppUpdateController {
   constructor(private readonly appUpdateService: AppUpdateService) {}
 
-  // ==========================================
-  // APP A ENDPOINTS
-  // ==========================================
-
   @Get('app-a/latest-version')
   @ApiOperation({ summary: 'Get the latest APK version info for App A' })
   async getAppALatestVersion(@Req() req: Request) {
-    const hostUrl = `${req.protocol}://${req.get('host')}`;
-    // Hardcode 'app-a' and pass the specific download route for App A
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const hostUrl = `${protocol}://${req.get('host')}`;
+    
     return await this.appUpdateService.getLatestVersionInfo('app-a', hostUrl, '/app-update/app-a/download');
   }
 
@@ -33,15 +30,12 @@ export class AppUpdateController {
     return await this.appUpdateService.downloadApk('app-a');
   }
 
-  // ==========================================
-  // APP B ENDPOINTS
-  // ==========================================
-
   @Get('app-b/latest-version')
   @ApiOperation({ summary: 'Get the latest APK version info for App B' })
   async getAppBLatestVersion(@Req() req: Request) {
-    const hostUrl = `${req.protocol}://${req.get('host')}`;
-    // Hardcode 'app-b' and pass the specific download route for App B
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const hostUrl = `${protocol}://${req.get('host')}`;
+    
     return await this.appUpdateService.getLatestVersionInfo('app-b', hostUrl, '/app-update/app-b/download');
   }
 

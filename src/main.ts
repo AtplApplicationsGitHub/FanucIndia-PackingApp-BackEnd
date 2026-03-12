@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { PinoLogger } from './common/pino-logger.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -7,7 +8,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  app.set('trust proxy', 1);
 
   app.use(json({ limit: '200mb' }));
   app.use(urlencoded({ extended: true, limit: '200mb' }));

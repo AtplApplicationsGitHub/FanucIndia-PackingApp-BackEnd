@@ -453,6 +453,7 @@ export class AdminOrderService {
         customer: {
           select: { name: true },
         },
+        customerId: true,
         customerNameText: true,
         materialData: {
           select: { A_D_F: true },
@@ -804,7 +805,6 @@ export class AdminOrderService {
       where: {
         OR: [
           { customerId: { not: null } },
-          { customerNameText: { not: null } }
         ]
       },
       select: {
@@ -814,27 +814,10 @@ export class AdminOrderService {
             name: true,
           }
         },
-        customerNameText: true,
       },
-      distinct: ['customerId', 'customerNameText'],
+      distinct: ['customerId'],
     });
 
-    const uniqueCustomers = new Map();
-
-    orders.forEach(order => {
-      if (order.customer) {
-        uniqueCustomers.set(`id_${order.customer.id}`, { 
-          id: order.customer.id, 
-          name: order.customer.name 
-        });
-      } else if (order.customerNameText) {
-        uniqueCustomers.set(`text_${order.customerNameText}`, { 
-          id: order.customerNameText, 
-          name: order.customerNameText 
-        });
-      }
-    });
-
-    return Array.from(uniqueCustomers.values());
+    return orders.map(order => order.customer).filter(Boolean);
   }
 }
