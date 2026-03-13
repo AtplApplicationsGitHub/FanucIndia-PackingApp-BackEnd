@@ -549,6 +549,65 @@ export class SalesCrudService {
     }
   }
 
+  // async processLabelPrint(dto: LabelPrintDto, userId: number) {
+  //   const { saleOrderNumbers, cncText, boxNN } = dto;
+  //   const statusToSet = 'Ready for Dispatch';
+
+  //   const user = await this.prisma.user.findUnique({ where: { id: userId } });
+  //   const userName = user?.name || 'System';
+  //   const now = new Date();
+
+  //   try {
+  //     await this.prisma.$transaction(async (tx) => {
+  //       await tx.salesOrder.updateMany({
+  //         where: {
+  //           saleOrderNumber: { in: saleOrderNumbers },
+  //           status: { not: 'Dispatched' },
+  //         },
+  //         data: {
+  //           UpdatedBy: userName,
+  //           UpdatedDate: now,
+  //         },
+  //       });
+
+  //       await tx.sO_Status_Stepper.updateMany({
+  //         where: {
+  //           salesOrderNumber: { in: saleOrderNumbers },
+  //           status: statusToSet,
+  //         },
+  //         data: {
+  //           createdDateTime: now,
+  //           updatedBy: userName,
+  //         },
+  //       });
+
+  //       await tx.customerLabelPrint.create({
+  //         data: {
+  //           userId: userId,
+  //           userName: userName,
+  //           cncText: cncText || 'CNC Package',
+  //           boxNN: boxNN || '1/1',
+  //           createdAt: now,
+  //           entries: {
+  //             create: saleOrderNumbers.map((soNumber) => ({
+  //               saleOrderNumber: soNumber,
+  //             })),
+  //           },
+  //         },
+  //       });
+  //     });
+
+  //     return {
+  //       message: 'Labels printed, status updated, and print history saved.',
+  //       count: saleOrderNumbers.length,
+  //     };
+  //   } catch (err: any) {
+  //     throw new InternalServerErrorException(
+  //       'Failed to update order status for label print.',
+  //       err.message,
+  //     );
+  //   }
+  // }
   async processLabelPrint(dto: LabelPrintDto, userId: number) {
     const { saleOrderNumbers, cncText, boxNN } = dto;
     const statusToSet = 'Ready for Dispatch';
@@ -557,8 +616,10 @@ export class SalesCrudService {
     const userName = user?.name || 'System';
     const now = new Date();
 
+    let newLabelPrintId: number;
+
     try {
-      await this.prisma.$transaction(async (tx) => {
+      const createdLabelPrint = await this.prisma.$transaction(async (tx) => {
         await tx.salesOrder.updateMany({
           where: {
             saleOrderNumber: { in: saleOrderNumbers },
@@ -581,7 +642,7 @@ export class SalesCrudService {
           },
         });
 
-        await tx.customerLabelPrint.create({
+        return await tx.customerLabelPrint.create({
           data: {
             userId: userId,
             userName: userName,
@@ -597,14 +658,26 @@ export class SalesCrudService {
         });
       });
 
+      newLabelPrintId = createdLabelPrint.id;
+
+    } catch (err: any) {
+      throw new InternalServerErrorException(
+        'Failed to update order status and save print history.',
+        err.message,
+      );
+    }
+
+    try {
+      const printResult = await this.printCustomerLabel(newLabelPrintId);
+
       return {
-        message: 'Labels printed, status updated, and print history saved.',
+        message: 'Status updated, history saved, and physical print job sent successfully.',
         count: saleOrderNumbers.length,
+        printStatus: printResult, 
       };
     } catch (err: any) {
       throw new InternalServerErrorException(
-        'Failed to update order status for label print.',
-        err.message,
+        `Database updated successfully, but the printer failed: ${err.message}`
       );
     }
   }
