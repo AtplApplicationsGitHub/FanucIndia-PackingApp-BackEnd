@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "CustomerLabelPrint" ALTER COLUMN "boxNN" DROP DEFAULT,
+ALTER COLUMN "cncText" DROP DEFAULT;

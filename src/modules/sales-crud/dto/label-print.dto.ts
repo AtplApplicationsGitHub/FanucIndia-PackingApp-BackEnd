@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class LabelPrintDto {
   @ApiProperty({
@@ -20,4 +21,9 @@ export class LabelPrintDto {
   @IsOptional()
   @IsString()
   boxNN?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  quantity?: number;
 }

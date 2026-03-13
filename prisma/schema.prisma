@@ -464,8 +464,8 @@ model CustomerLabelPrint {
   createdAt DateTime @default(now())
   userId    Int
   userName  String?
-  cncText   String?  @default("CNC Package") @db.VarChar(255) // <-- ADDED
-  boxNN     String?  @default("1/1") @db.VarChar(50)
+  cncText   String?  @db.VarChar(255)
+  boxNN     String?  @db.VarChar(50)
   user    User                      @relation(fields: [userId], references: [id])
   entries CustomerLabelPrintEntry[]
 }
