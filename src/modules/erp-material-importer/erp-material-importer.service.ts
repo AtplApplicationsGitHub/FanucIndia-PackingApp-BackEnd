@@ -578,6 +578,11 @@ export class ErpMaterialImporterService {
                         address: computedCustomerAddress || null
                     },
                 });
+            } else if (computedCustomerAddress) {
+                existingCustomer = await tx.customer.update({
+                    where: { id: existingCustomer.id },
+                    data: { address: computedCustomerAddress }
+                });
             }
 
             updateData.customer = { connect: { id: existingCustomer.id } };

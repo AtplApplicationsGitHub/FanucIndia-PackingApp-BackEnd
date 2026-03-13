@@ -712,8 +712,9 @@ export class SalesCrudService {
     const salesZone = order.salesZone?.name || '';
 
     const prnCommands = [
-      'SIZE 60 mm, 30 mm',
+      'SIZE 61.5 mm, 40 mm',
       'GAP 3 mm, 0 mm',
+      'SET RIBBON ON',
       'DIRECTION 0,0',
       'REFERENCE 0,0',
       'OFFSET 0 mm',
@@ -723,7 +724,7 @@ export class SalesCrudService {
       'SET TEAR ON',
       'CLS',
       'CODEPAGE 1252',
-      `TEXT 460,265,"0",180,11,16,"${customerName}"`,
+      `TEXT 460,283,"0",180,11,16,"${customerName}"`,
       `TEXT 460,208,"0",180,24,26,"${order.saleOrderNumber}"`,
       `TEXT 368,79,"0",180,12,14,"${labelRemarks}"`,
       `TEXT 460,79,"0",180,12,14,"${salesZone}"`,
@@ -791,26 +792,28 @@ export class SalesCrudService {
         include: { customer: true },
       });
 
-      if (firstSo?.customer) {
-        contactNumber = firstSo.customer.contactNumber || '';
+      if (firstSo) {
+        addressFirstLine = firstSo.customer?.name || firstSo.customerNameText || '';
+        
+        contactNumber = firstSo.customer?.contactNumber || '';
 
-        const addrParts = (firstSo.customer.address || '')
-          .split(',')
-          .map((s) => s.trim());
+        const rawAddress = firstSo.customer?.address || firstSo.address || '';
 
-        addressFirstLine = addrParts[0] || '';
-        addressSecondline = addrParts[1] || '';
-        addressThirdLine = addrParts[2] || '';
+        if (rawAddress) {
+          const addrParts = rawAddress.split(',').map(s => s.trim()).filter(Boolean);
 
-        if (addrParts.length >= 5) {
-          pinCode = addrParts.pop() || '';
-          addressFourthLine = addrParts.slice(3).join(', ') || '';
-        } else if (addrParts.length === 4) {
-          const lastPart = addrParts[3] || '';
-          if (/^\d+$/.test(lastPart)) {
-            pinCode = lastPart;
-          } else {
-            addressFourthLine = lastPart;
+          if (addrParts.length > 0) {
+            pinCode = addrParts.pop() || '';
+          }
+
+          if (addrParts.length > 0) {
+            addressFourthLine = addrParts.pop() || '';
+          }
+
+          if (addrParts.length > 0) {
+            const half = Math.ceil(addrParts.length / 2);
+            addressSecondline = addrParts.slice(0, half).join(', ');
+            addressThirdLine = addrParts.slice(half).join(', ');
           }
         }
       }
@@ -850,7 +853,7 @@ export class SalesCrudService {
     prn = prn.replace(/@@AddressSecondline@@/g, addressSecondline);
     prn = prn.replace(/@@AddressThirdLine@@/g, addressThirdLine);
     prn = prn.replace(/@@AddressFourthLine@@/g, addressFourthLine);
-    prn = prn.replace(/@@CustomerContactNumber/g, contactNumber);
+    prn = prn.replace(/@@CustomerContactNumber@@/g, contactNumber);
     prn = prn.replace(/@@ContactNumber@@/g, contactNumber);
     prn = prn.replace(/@@PinCode@@/g, pinCode);
 
