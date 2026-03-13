@@ -712,7 +712,7 @@ export class SalesCrudService {
     const salesZone = order.salesZone?.name || '';
 
     const prnCommands = [
-      'SIZE 61.5 mm, 40 mm',
+      'SIZE 60 mm, 30 mm',
       'GAP 3 mm, 0 mm',
       'SET RIBBON ON',
       'DIRECTION 0,0',
