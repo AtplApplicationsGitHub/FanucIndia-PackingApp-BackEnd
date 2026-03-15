@@ -61,7 +61,7 @@ async function verifySaleOrderAccess(
   userRole: string,
 ) {
   if (userRole === 'ADMIN' || userRole === 'SALES') {
-    const order = await prisma.salesOrder.findUnique({
+    const order = await prisma.salesOrder.findFirst({
       where: { saleOrderNumber },
     });
     if (!order)

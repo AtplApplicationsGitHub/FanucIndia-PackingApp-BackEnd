@@ -10,6 +10,7 @@ import { Workbook } from 'exceljs';
 import { Prisma } from '@prisma/client';
 import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
+import { Response } from 'express';
 
 const columnMapping = {
   'SO Number': 'saleOrderNumber',
@@ -56,7 +57,7 @@ export class ErpMaterialImporterService {
   async importFromDrive(saleOrderNumber: string, username: string) {
     this.logger.log(`Initiating Drive Import for SO: ${saleOrderNumber}`);
 
-    const so = await this.prisma.salesOrder.findUnique({
+    const so = await this.prisma.salesOrder.findFirst({
       where: { saleOrderNumber },
       select: { outboundDelivery: true },
     });
@@ -401,7 +402,7 @@ export class ErpMaterialImporterService {
       return `The SO Number in the file ('${soNumber}') does not match the expected SO Number ('${expectedSaleOrderNumber}').`;
     }
 
-    const orderExists = await this.prisma.salesOrder.findUnique({
+    const orderExists = await this.prisma.salesOrder.findFirst({
       where: { saleOrderNumber: soNumber },
     });
 
@@ -548,7 +549,7 @@ export class ErpMaterialImporterService {
     try {
       await this.prisma.$transaction(async (tx) => {
                 
-        const so = await tx.salesOrder.findUnique({
+        const so = await tx.salesOrder.findFirst({
             where: { saleOrderNumber: soNumber },
             select: { id: true },
         });
@@ -594,7 +595,7 @@ export class ErpMaterialImporterService {
         }
 
         await tx.salesOrder.update({
-            where: { saleOrderNumber: soNumber },
+            where: { id: so.id },
             data: updateData,
         });
 
@@ -619,5 +620,76 @@ export class ErpMaterialImporterService {
       }
       throw new InternalServerErrorException('Database transaction failed.');
     }
+  }
+
+  async bulkDownloadFromDrive(saleOrderNumbers: string[], res: Response) {
+    this.logger.log(`Initiating Bulk Download for ${saleOrderNumbers.length} SOs`);
+
+    const salesOrders = await this.prisma.salesOrder.findMany({
+      where: { saleOrderNumber: { in: saleOrderNumbers } },
+      select: { saleOrderNumber: true, outboundDelivery: true }
+    });
+
+    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    const activeDir = path.posix.join(baseDir, 'active');
+
+    const missingSOs: string[] = [];
+    const filesToZip: { name: string; buffer: Buffer }[] = [];
+
+    for (const soNumber of saleOrderNumbers) {
+      const so = salesOrders.find(s => s.saleOrderNumber === soNumber);
+      
+      if (!so || !so.outboundDelivery) {
+        missingSOs.push(soNumber);
+        continue;
+      }
+
+      const filename = `${so.saleOrderNumber}_${so.outboundDelivery}.xlsx`;
+      const filePath = path.posix.join(activeDir, filename);
+
+      try {
+        const exists = await this.sftpService.exists(filePath);
+        if (exists) {
+          const buffer = await this.sftpService.getBuffer(filePath);
+          filesToZip.push({ name: filename, buffer });
+        } else {
+          missingSOs.push(soNumber);
+        }
+      } catch (err) {
+        this.logger.error(`Failed to read file for SO ${soNumber}`, err);
+        missingSOs.push(soNumber);
+      }
+    }
+
+    if (filesToZip.length === 0) {
+      return res.status(404).json({ 
+        message: `Data not available for the following SO(s): ${missingSOs.join(', ')}`, 
+        missing: missingSOs 
+      });
+    }
+
+    // Set headers for ZIP download and expose custom header for missing SOs
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="ERP_Data.zip"');
+    res.setHeader('X-Missing-SOs', missingSOs.join(','));
+    res.setHeader('Access-Control-Expose-Headers', 'X-Missing-SOs');
+
+    let archiver;
+    try {
+      archiver = require('archiver');
+    } catch (err) {
+      this.logger.error('Archiver package not found.');
+      throw new InternalServerErrorException('Zip package missing on server.');
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err: any) => { throw err; });
+    archive.pipe(res);
+
+    for (const file of filesToZip) {
+      archive.append(file.buffer, { name: file.name });
+    }
+
+    await archive.finalize();
   }
 }

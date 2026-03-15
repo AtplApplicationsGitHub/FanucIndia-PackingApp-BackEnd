@@ -131,6 +131,8 @@ export class ErpMaterialDataService {
         Issue_stage: { increment: 1 },
         UpdatedBy: userName,
         UpdatedDate: new Date(),
+        IssueUpdatedBy: userName,
+        IssueUpdatedDate: new Date(),
       },
     });
 
@@ -227,6 +229,8 @@ export class ErpMaterialDataService {
         Issue_stage: newIssueStage,
         UpdatedBy: userName,
         UpdatedDate: new Date(),
+        IssueUpdatedBy: userName,
+        IssueUpdatedDate: new Date(),
       },
       select: {
         ID: true,
@@ -326,6 +330,8 @@ export class ErpMaterialDataService {
         Packing_stage: { increment: 1 },
         UpdatedBy: userName,
         UpdatedDate: new Date(),
+        PackingUpdatedBy: userName,
+        PackingUpdatedDate: new Date(),
       },
     });
 
@@ -409,6 +415,8 @@ export class ErpMaterialDataService {
                 Issue_stage: item.Required_Qty,
                 UpdatedBy: userName,
                 UpdatedDate: now,
+                IssueUpdatedBy: userName,
+                IssueUpdatedDate: now,
               },
             });
           }
@@ -422,6 +430,8 @@ export class ErpMaterialDataService {
                 Packing_stage: item.Required_Qty,
                 UpdatedBy: userName,
                 UpdatedDate: now,
+                PackingUpdatedBy: userName,
+                PackingUpdatedDate: now,
               },
             });
           }
@@ -564,6 +574,8 @@ export class ErpMaterialDataService {
         Packing_stage: newPackingStage,
         UpdatedBy: userName,
         UpdatedDate: new Date(),
+        PackingUpdatedBy: userName,
+        PackingUpdatedDate: new Date(),
       },
     });
 
@@ -668,6 +680,8 @@ export class ErpMaterialDataService {
               Issue_stage: item.Required_Qty,
               UpdatedBy: userName,
               UpdatedDate: now,
+              IssueUpdatedBy: userName,
+              IssueUpdatedDate: now,
             },
           });
         }

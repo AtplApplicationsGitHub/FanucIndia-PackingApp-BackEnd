@@ -87,6 +87,7 @@ export class SalesCrudController {
     @Query('paymentClearance') paymentClearance?: string,
     @Query('salesZoneId') salesZoneId?: string,
     @Query('status') status?: string,
+    @Query('excludeStatus') excludeStatus?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
@@ -97,7 +98,7 @@ export class SalesCrudController {
       pageNumber,
       pageSize,
       req.user.userId,
-      { search, paymentClearance, salesZoneId, status, startDate, endDate }
+      { search, paymentClearance, salesZoneId, status, excludeStatus, startDate, endDate }
     );
   }
 

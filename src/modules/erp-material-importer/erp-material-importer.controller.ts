@@ -7,6 +7,7 @@ import {
   BadRequestException,
   Body,
   Req,
+  Res
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ErpMaterialImporterService } from './erp-material-importer.service';
@@ -14,6 +15,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { BulkImportDriveDto } from './dto/bulk-import-drive.dto';
 import { AuthRequest } from '../auth/types/auth-request.type';
+import { Response } from 'express';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -92,5 +94,16 @@ export class ErpMaterialImporterController {
       throw new BadRequestException('Sale Order Number is required.');
     }
     return this.service.importFromDrive(saleOrderNumber, req.user.name);
+  }
+  
+  @Post('bulk-download-drive')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({ summary: 'Download ERP material files as ZIP for multiple SOs' })
+  @ApiBody({ type: BulkImportDriveDto })
+  async bulkDownloadFromDrive(@Body() dto: BulkImportDriveDto, @Res() res: Response) {
+    if (!dto.saleOrderNumbers || dto.saleOrderNumbers.length === 0) {
+      throw new BadRequestException('Sale Order Numbers list is required.');
+    }
+    return this.service.bulkDownloadFromDrive(dto.saleOrderNumbers, res);
   }
 }

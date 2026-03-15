@@ -142,28 +142,35 @@ export class DispatchService {
       }
 
       if (saleOrderNumbers && saleOrderNumbers.length > 0) {
+        const dispatchSoData: { dispatchId: number; saleOrderNumber: string; salesOrderId: number }[] = [];
+
         for (const so of saleOrderNumbers) {
-          const salesOrder = await tx.salesOrder.findUnique({
+          const salesOrder = await tx.salesOrder.findFirst({
             where: { saleOrderNumber: so },
           });
           if (!salesOrder)
             throw new BadRequestException(`Sale Order ${so} not found.`);
+          
+          dispatchSoData.push({
+            dispatchId: newDispatch.id,
+            saleOrderNumber: so,
+            salesOrderId: salesOrder.id, 
+          });
         }
 
         await tx.dispatch_SO.createMany({
-          data: saleOrderNumbers.map((so) => ({
-            dispatchId: newDispatch.id,
-            saleOrderNumber: so,
-          })),
+          data: dispatchSoData, 
         });
+
+        const salesOrderIdsToUpdate = dispatchSoData.map(d => d.salesOrderId);
 
         await tx.salesOrder.updateMany({
           where: {
-            saleOrderNumber: { in: saleOrderNumbers },
+            id: { in: salesOrderIdsToUpdate },
           },
           data: {
             status: 'Dispatched',
-            fgLocation: null,
+            fgLocation: Prisma.DbNull,
           },
         });
       }
@@ -321,8 +328,12 @@ export class DispatchService {
         );
       }
 
-      const createdLink = await tx.dispatch_SO.create({
-        data: { dispatchId, saleOrderNumber: salesOrder.saleOrderNumber },
+     const createdLink = await tx.dispatch_SO.create({
+        data: { 
+          dispatchId, 
+          saleOrderNumber: salesOrder.saleOrderNumber,
+          salesOrderId: salesOrder.id // Fixed: passing the foreign key
+        },
       });
 
       await tx.dispatch.update({
@@ -332,12 +343,12 @@ export class DispatchService {
         },
       });
 
-      await tx.salesOrder.update({
-        where: { saleOrderNumber: salesOrder.saleOrderNumber },
+      await tx.salesOrder.update({ 
+        where: { id: salesOrder.id },
         data: {
           assignedUserId: null,
           status: 'Dispatched',
-          fgLocation: null,
+          fgLocation: Prisma.DbNull,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -505,7 +516,7 @@ export class DispatchService {
           mode: 'insensitive',
         },
       },
-      select: { saleOrderNumber: true },
+      select: { id: true, saleOrderNumber: true },
     });
 
     if (!salesOrder) {
@@ -520,6 +531,7 @@ export class DispatchService {
           data: {
             dispatchId,
             saleOrderNumber: salesOrder.saleOrderNumber,
+            salesOrderId: salesOrder.id,
           },
         });
 
@@ -531,11 +543,11 @@ export class DispatchService {
         });
 
         await tx.salesOrder.update({
-          where: { saleOrderNumber: salesOrder.saleOrderNumber },
+          where: { id: salesOrder.id },
           data: {
             assignedUserId: null,
             status: 'Dispatched',
-            fgLocation: null,
+            fgLocation: Prisma.DbNull, 
             UpdatedBy: userName,
             UpdatedDate: new Date(),
           },
@@ -579,8 +591,8 @@ export class DispatchService {
     await this.prisma.$transaction(async (tx) => {
       await tx.dispatch_SO.delete({ where: { id: soId } });
 
-      await tx.salesOrder.update({
-        where: { saleOrderNumber: dispatchSoLink.saleOrderNumber },
+      await tx.salesOrder.update({ 
+        where: { id: dispatchSoLink.salesOrderId },
         data: {
           status: 'F105',
           UpdatedBy: userName,

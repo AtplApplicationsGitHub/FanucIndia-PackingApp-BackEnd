@@ -17,7 +17,7 @@ export class SoArchiveService {
   ) {}
 
   async archive(saleOrderNumber: string) {
-    const so = await this.prisma.salesOrder.findUnique({
+    const so = await this.prisma.salesOrder.findFirst({
       where: { saleOrderNumber },
       include: {
         materialData: true,
@@ -55,6 +55,13 @@ export class SoArchiveService {
     });
 
     return this.prisma.$transaction(async (tx) => {
+      const remainingActiveOrders = await tx.salesOrder.count({
+        where: {
+          saleOrderNumber: so.saleOrderNumber,
+          id: { not: so.id },
+        },
+      });
+
       const {
         id,
         updatedAt,
@@ -67,7 +74,14 @@ export class SoArchiveService {
         ...soData
       } = so;
 
-      await tx.salesOrderArchive.create({ data: soData });
+      await tx.salesOrderArchive.create({ 
+        data: {
+          ...soData,
+          transferOrder: soData.transferOrder ?? '',
+          packConfigId: soData.packConfigId ?? 0,
+          fgLocation: soData.fgLocation ?? Prisma.DbNull
+        } 
+      });
 
       if (materialLogs.length > 0) {
         await tx.eRPMaterialLogArchive.createMany({
@@ -77,9 +91,11 @@ export class SoArchiveService {
           })),
         });
 
-        await tx.eRPMaterialLog.deleteMany({
-          where: { soNo: saleOrderNumber },
-        });
+        if (remainingActiveOrders === 0) {
+          await tx.eRPMaterialLog.deleteMany({
+            where: { soNo: saleOrderNumber },
+          });
+        }
       }
 
       if (materialData.length > 0) {
@@ -98,8 +114,9 @@ export class SoArchiveService {
       if (chatMessages && chatMessages.length > 0) {
         await tx.salesOrderChatMessageArchive.createMany({
           data: chatMessages.map((msg) => ({
-            id: msg.id, // Preserve original ID for linkage
-            salesOrderNumber: so.saleOrderNumber, // Use SO Number as FK string
+            id: msg.id, 
+            salesOrderNumber: so.saleOrderNumber, 
+            salesOrderId: so.id, // Fix: Added missing required field
             fromUserId: msg.fromUserId,
             toUserId: msg.toUserId,
             message: msg.message,
@@ -114,6 +131,7 @@ export class SoArchiveService {
           data: soChatNotifications.map((notif) => ({
             id: notif.id,
             salesOrderNumber: so.saleOrderNumber,
+            salesOrderId: so.id,
             userId: notif.userId,
             messageId: notif.messageId,
             createdAt: notif.createdAt,
@@ -134,9 +152,17 @@ export class SoArchiveService {
 
       if (vehicleEntries.length > 0) {
         await tx.vehicleEntryArchive.createMany({
-          data: vehicleEntries.map(({ attachments, ...ve }) => ({
-            ...ve,
-            attachments: attachments ?? Prisma.DbNull,
+          data: vehicleEntries.map((ve) => ({
+            id: ve.id,
+            customerName: ve.customerName,
+            vehicleNumber: ve.vehicleNumber,
+            transporterName: ve.transporterName,
+            driverNumber: ve.driverNumber,
+            createdBy: ve.createdBy,
+            createdAt: ve.createdAt,
+            updatedBy: ve.updatedBy,
+            updatedAt: ve.updatedAt,
+            attachments: ve.attachments ?? Prisma.DbNull,
           })),
           skipDuplicates: true,
         });
@@ -156,9 +182,11 @@ export class SoArchiveService {
         });
       }
 
-      await tx.eRP_Material_File.deleteMany({ where: { saleOrderNumber } });
-      await tx.eRP_Material_Data.deleteMany({ where: { saleOrderNumber } });
-      await tx.dispatch_SO.deleteMany({ where: { saleOrderNumber } });
+      if (remainingActiveOrders === 0) {
+        await tx.eRP_Material_File.deleteMany({ where: { saleOrderNumber } });
+        await tx.eRP_Material_Data.deleteMany({ where: { saleOrderNumber } });
+      }
+      await tx.dispatch_SO.deleteMany({ where: { salesOrderId: so.id } });
 
       for (const dispatch of dispatches) {
         const totalSOsLinked = dispatch._count.dispatchSOs;
@@ -184,12 +212,14 @@ export class SoArchiveService {
             salesOrderNumber: so.saleOrderNumber,
           })),
         });
-        await tx.sO_Status_Stepper.deleteMany({
-          where: { salesOrderNumber: saleOrderNumber },
-        });
+        if (remainingActiveOrders === 0) {
+          await tx.sO_Status_Stepper.deleteMany({
+            where: { salesOrderNumber: saleOrderNumber },
+          });
+        }
       }
 
-      await tx.salesOrder.delete({ where: { saleOrderNumber } });
+      await tx.salesOrder.delete({ where: { id: so.id } });
 
       return {
         success: true,

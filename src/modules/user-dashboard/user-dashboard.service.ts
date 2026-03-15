@@ -161,7 +161,7 @@ export class UserDashboardService {
   ) {
     await this.authorizeOrderAccess(saleOrderNumber, userId, userRole);
 
-    const order = await this.prisma.salesOrder.findUnique({
+    const order = await this.prisma.salesOrder.findFirst({
       where: { saleOrderNumber },
       select: {
         labelRemarks: true,
@@ -353,6 +353,25 @@ export class UserDashboardService {
     }
 
     for (const material of materials) {
+      let issueChanged = false;
+      let packingChanged = false;
+
+      if (material.ID) {
+        const existing = await prismaClient.eRP_Material_Data.findUnique({
+          where: { ID: BigInt(material.ID) },
+        });
+        if (existing && existing.Issue_stage !== material.Issue_stage) issueChanged = true;
+        if (existing && existing.Packing_stage !== material.Packing_stage) packingChanged = true;
+      } else {
+        const existingList = await prismaClient.eRP_Material_Data.findMany({
+          where: { saleOrderNumber, Material_Code: material.Material_Code },
+        });
+        if (existingList.some((e) => e.Issue_stage !== material.Issue_stage)) issueChanged = true;
+        if (existingList.some((e) => e.Packing_stage !== material.Packing_stage)) packingChanged = true;
+      }
+
+      const updatedDate = material.UpdatedDate ? new Date(material.UpdatedDate) : new Date();
+
       const updateData: Prisma.ERP_Material_DataUpdateInput = {
         Issue_stage: material.Issue_stage,
         Packing_stage: material.Packing_stage,
@@ -360,10 +379,18 @@ export class UserDashboardService {
         Group: material.Group,
         Mapping_Barcode: material.Mapping_Barcode,
         UpdatedBy: userName,
-        UpdatedDate: material.UpdatedDate
-          ? new Date(material.UpdatedDate)
-          : new Date(),
+        UpdatedDate: updatedDate,
       };
+
+      if (issueChanged) {
+        updateData.IssueUpdatedBy = userName;
+        updateData.IssueUpdatedDate = updatedDate;
+      }
+      if (packingChanged) {
+        updateData.PackingUpdatedBy = userName;
+        updateData.PackingUpdatedDate = updatedDate;
+      }
+
       if (material.ID) {
         await prismaClient.eRP_Material_Data.update({
           where: { ID: BigInt(material.ID) },
@@ -429,7 +456,7 @@ export class UserDashboardService {
     userId: number,
     userRole: string,
   ) {
-    const order = await this.prisma.salesOrder.findUnique({
+    const order = await this.prisma.salesOrder.findFirst({
       where: { saleOrderNumber },
     });
     if (!order) {
@@ -447,7 +474,7 @@ export class UserDashboardService {
     prismaClient: Prisma.TransactionClient | PrismaService,
     userName: string,
   ) {
-    const order = await prismaClient.salesOrder.findUnique({
+    const order = await prismaClient.salesOrder.findFirst({
       where: { saleOrderNumber },
       select: { id: true, status: true },
     });

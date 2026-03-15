@@ -590,7 +590,7 @@ export class AdminOrderService {
 
         if (!saleOrderNumber) continue;
 
-        const dbOrder = await tx.salesOrder.findUnique({
+        const dbOrder = await tx.salesOrder.findFirst({
           where: { saleOrderNumber },
           include: {
             product: true,
@@ -711,6 +711,17 @@ export class AdminOrderService {
           if (!isNaN(p)) priority = p;
         }
 
+        let skipStage = dbOrder.skipStage;
+        const rowSkipIssue = getCellString('SKIP ISSUE STAGE');
+        const rowSkipPacking = getCellString('SKIP PACKING STAGE');
+
+        if (rowSkipIssue !== undefined || rowSkipPacking !== undefined) {
+          const isIssueSkip = rowSkipIssue?.toLowerCase() === 'yes';
+          const isPackingSkip = rowSkipPacking?.toLowerCase() === 'yes';
+          
+          skipStage = isIssueSkip || isPackingSkip;
+        }
+
         // Delivery Date
         let deliveryDate = dbOrder.deliveryDate;
         const deliveryDateCell = colMap['DELIVERY DATE']
@@ -740,6 +751,7 @@ export class AdminOrderService {
             assignedUserId,
             paymentClearance,
             priority,
+            skipStage,
             deliveryDate,
             plantCode: safeString(
               getCellString('PLANT CODE'),

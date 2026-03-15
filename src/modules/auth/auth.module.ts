@@ -15,7 +15,7 @@ import { APP_GUARD, Reflector } from '@nestjs/core';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '2h' },
+        signOptions: { expiresIn: '24h' },
       }),
       inject: [ConfigService],
     }),

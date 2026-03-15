@@ -23,39 +23,26 @@ export class SalesCrudService {
     const outboundDelivery = dto.outboundDelivery?.trim();
     const transferOrder = dto.transferOrder?.trim();
 
-    const or: any[] = [];
-    if (saleOrderNumber) or.push({ saleOrderNumber });
-    if (outboundDelivery) or.push({ outboundDelivery });
-    if (transferOrder) or.push({ transferOrder }); // only if non-empty
-
-    const existingOrder = or.length
-      ? await this.prisma.salesOrder.findFirst({ where: { OR: or } })
-      : null;
-
-    if (existingOrder) {
-      if (
-        saleOrderNumber &&
-        existingOrder.saleOrderNumber === saleOrderNumber
-      ) {
-        throw new ConflictException(
-          'An order with this Sale Order Number already exists.',
-        );
+    if (transferOrder) {
+      const existingTo = await this.prisma.salesOrder.findUnique({
+        where: { transferOrder },
+      });
+      if (existingTo) {
+        throw new ConflictException(`An order with Transfer Order '${transferOrder}' already exists.`);
       }
+    }
 
-      if (
-        outboundDelivery &&
-        existingOrder.outboundDelivery === outboundDelivery
-      ) {
-        throw new ConflictException(
-          'An order with this Outbound Delivery number already exists.',
-        );
-      }
+    const existingComposite = await this.prisma.salesOrder.findUnique({
+      where: {
+        saleOrderNumber_outboundDelivery: {
+          saleOrderNumber,
+          outboundDelivery,
+        },
+      },
+    });
 
-      if (transferOrder && existingOrder.transferOrder === transferOrder) {
-        throw new ConflictException(
-          'An order with this Transfer Order number already exists.',
-        );
-      }
+    if (existingComposite) {
+      throw new ConflictException(`An order with Sale Order '${saleOrderNumber}' and Outbound Delivery '${outboundDelivery}' already exists.`);
     }
 
     try {
@@ -153,6 +140,7 @@ export class SalesCrudService {
       await this.prisma.sO_Status_Stepper.createMany({
         data: statuses.map((status) => ({
           salesOrderNumber: newOrder.saleOrderNumber,
+          salesOrderId: newOrder.id,
           status: status,
           createdDateTime:
             status === 'To be Issued' ? newOrder.createdAt : null,
@@ -424,6 +412,7 @@ export class SalesCrudService {
       paymentClearance?: string;
       salesZoneId?: string;
       status?: string;
+      excludeStatus?: string;
       startDate?: string;
       endDate?: string;
     },
@@ -447,7 +436,18 @@ export class SalesCrudService {
           ];
         } else {
           whereClause.status = filters.status;
-        }
+        } 
+      } else if (filters.excludeStatus) {
+        whereClause.AND = [
+          ...(Array.isArray(whereClause.AND) ? whereClause.AND : []),
+          {
+            OR: [
+              { status: { not: filters.excludeStatus } },
+              { status: null },
+              { status: '' },
+            ],
+          },
+        ];
       }
       const parseYMD = (s: string) => {
         const datePart = s.includes('T') ? s.split('T')[0] : s;
@@ -561,27 +561,28 @@ export class SalesCrudService {
 
     try {
       const createdLabelPrint = await this.prisma.$transaction(async (tx) => {
-        await tx.salesOrder.updateMany({
-          where: {
-            saleOrderNumber: { in: saleOrderNumbers },
-            status: { not: 'Dispatched' },
-          },
-          data: {
-            UpdatedBy: userName,
-            UpdatedDate: now,
-          },
+        const ordersToUpdate = await tx.salesOrder.findMany({
+           where: {
+             saleOrderNumber: { in: saleOrderNumbers },
+             status: { not: 'Dispatched' },
+           }
         });
 
-        await tx.sO_Status_Stepper.updateMany({
-          where: {
-            salesOrderNumber: { in: saleOrderNumbers },
-            status: statusToSet,
-          },
-          data: {
-            createdDateTime: now,
-            updatedBy: userName,
-          },
+        const orderIds = ordersToUpdate.map(o => o.id);
+
+        await tx.salesOrder.updateMany({
+          where: { id: { in: orderIds } },
+          data: { UpdatedBy: userName, UpdatedDate: now },
         });
+
+        for (const order of ordersToUpdate) {
+          await tx.sO_Status_Stepper.update({
+            where: {
+              salesOrderId_status: { salesOrderId: order.id, status: statusToSet }
+            },
+            data: { createdDateTime: now, updatedBy: userName },
+          });
+        }
 
         return await tx.customerLabelPrint.create({
           data: {
@@ -591,8 +592,9 @@ export class SalesCrudService {
             boxNN: boxNN || '1/1',
             createdAt: now,
             entries: {
-              create: saleOrderNumbers.map((soNumber) => ({
-                saleOrderNumber: soNumber,
+              create: ordersToUpdate.map((order) => ({
+                saleOrderNumber: order.saleOrderNumber,
+                salesOrderId: order.id,
               })),
             },
           },
