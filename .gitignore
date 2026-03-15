@@ -57,3 +57,11 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /generated/prisma
 prisma/seed.ts
+
+# Database backups
+database_backup.sql
+database_backup.dump
+
+# Alternatively, you can use wildcards to ignore ALL .sql and .dump files:
+*.sql
+*.dump
