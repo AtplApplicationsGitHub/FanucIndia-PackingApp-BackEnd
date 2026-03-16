@@ -31,15 +31,18 @@ export class SoSearchService {
 
   async findDetailsBySoNumber(
     saleOrderNumber: string,
+    obd: string | undefined,
     user: { userId: number; role: string },
   ) {
+    const whereActive: any = {
+      saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' },
+    };
+    if (obd) {
+      whereActive.outboundDelivery = { equals: obd, mode: 'insensitive' };
+    }
+
     const salesOrder = await this.prisma.salesOrder.findFirst({
-      where: {
-        saleOrderNumber: {
-          equals: saleOrderNumber,
-          mode: 'insensitive',
-        },
-      },
+      where: whereActive,
       include: {
         customer: true,
         product: true,
@@ -139,13 +142,15 @@ export class SoSearchService {
       return convertBigInts(result);
     }
 
+    const whereArchive: any = {
+      saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' },
+    };
+    if (obd) {
+      whereArchive.outboundDelivery = { equals: obd, mode: 'insensitive' };
+    }
+
     const archivedSalesOrder = await this.prisma.salesOrderArchive.findFirst({
-      where: {
-        saleOrderNumber: {
-          equals: saleOrderNumber,
-          mode: 'insensitive',
-        },
-      },
+      where: whereArchive,
     });
 
     if (archivedSalesOrder) {

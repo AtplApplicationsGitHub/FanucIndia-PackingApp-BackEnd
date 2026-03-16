@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SoSearchService } from './so-search.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -14,7 +14,11 @@ export class SoSearchController {
 
   @Get(':soNumber')
   @Roles('ADMIN', 'USER', 'SALES')
-  findDetails(@Param('soNumber') soNumber: string, @Req() req: AuthRequest) {
-    return this.soSearchService.findDetailsBySoNumber(soNumber, req.user);
+  findDetails(
+    @Param('soNumber') soNumber: string, 
+    @Query('obd') obd: string, // <-- Added obd query parameter
+    @Req() req: AuthRequest
+  ) {
+    return this.soSearchService.findDetailsBySoNumber(soNumber, obd, req.user);
   }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -12,28 +12,31 @@ import { SoChatService } from './so-chat.service';
 export class SoChatController {
   constructor(private readonly soChatService: SoChatService) {}
 
-  @Get(':soNumber/mention-users') 
+  @Get(':orderId/mention-users') 
   @Roles('ADMIN', 'SALES', 'USER')
   getMentionUsers(
-    @Param('soNumber') soNumber: string,
+    @Param('orderId', ParseIntPipe) orderId: number, // <--- Updated
     @Req() req: AuthRequest
   ) {
-    return this.soChatService.getMentionUsers(soNumber, req.user);
+    return this.soChatService.getMentionUsers(orderId, req.user);
   }
 
-  @Get(':soNumber/messages')
+  @Get(':orderId/messages')
   @Roles('ADMIN', 'SALES', 'USER')
-  listMessages(@Param('soNumber') soNumber: string, @Req() req: AuthRequest) {
-    return this.soChatService.listMessages(soNumber, req.user);
+  listMessages(
+    @Param('orderId', ParseIntPipe) orderId: number, // <--- Updated
+    @Req() req: AuthRequest
+  ) {
+    return this.soChatService.listMessages(orderId, req.user);
   }
 
-  @Post(':soNumber/messages')
+  @Post(':orderId/messages')
   @Roles('ADMIN', 'SALES', 'USER')
   sendMessage(
-    @Param('soNumber') soNumber: string,
+    @Param('orderId', ParseIntPipe) orderId: number, // <--- Updated
     @Body() body: { toUserId: number; message: string },
     @Req() req: AuthRequest,
   ) {
-    return this.soChatService.sendMessage(soNumber, req.user, body);
+    return this.soChatService.sendMessage(orderId, req.user, body);
   }
 }
