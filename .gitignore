@@ -61,6 +61,8 @@ prisma/seed.ts
 # Database backups
 database_backup.sql
 database_backup.dump
+backup_contents.txt
+restore_list.txt
 
 # Alternatively, you can use wildcards to ignore ALL .sql and .dump files:
 *.sql
