@@ -112,7 +112,12 @@ export class ErpMaterialImporterService {
     try {
       const result = await this.processFile(mockFile, saleOrderNumber, username);
 
-      const archivePath = path.posix.join(archivedDir, filename);
+      const timestamp = Date.now();
+      const ext = path.posix.extname(filename);
+      const baseName = path.posix.basename(filename, ext);
+      const uniqueFilename = `${baseName}_${timestamp}${ext}`;
+
+      const archivePath = path.posix.join(archivedDir, uniqueFilename);
       await this.sftpService.rename(filePath, archivePath);
       this.logger.log(`Moved file to SFTP Archive: ${archivePath}`);
 
@@ -123,7 +128,12 @@ export class ErpMaterialImporterService {
         error,
       );
       try {
-        const errorPath = path.posix.join(errorDir, filename);
+        const timestamp = Date.now();
+        const ext = path.posix.extname(filename);
+        const baseName = path.posix.basename(filename, ext);
+        const uniqueFilename = `${baseName}_${timestamp}${ext}`;
+
+        const errorPath = path.posix.join(errorDir, uniqueFilename);
         await this.sftpService.rename(filePath, errorPath);
       } catch (moveErr) {
         this.logger.error(
@@ -253,7 +263,12 @@ export class ErpMaterialImporterService {
 
         await this.processFile(mockFile, soNumber, username);
 
-        const archivePath = path.posix.join(archivedDir, filename);
+        const timestamp = Date.now();
+        const ext = path.posix.extname(filename);
+        const baseName = path.posix.basename(filename, ext);
+        const uniqueFilename = `${baseName}_${timestamp}${ext}`;
+
+        const archivePath = path.posix.join(archivedDir, uniqueFilename);
         await this.sftpService.rename(filePath, archivePath);
         
         results.push({ soNumber, status: 'Success', reason: 'Imported successfully' });
@@ -264,7 +279,12 @@ export class ErpMaterialImporterService {
         try {
           const exists = await this.sftpService.exists(filePath);
           if (exists) {
-            const errorPath = path.posix.join(errorDir, filename);
+            const timestamp = Date.now();
+            const ext = path.posix.extname(filename);
+            const baseName = path.posix.basename(filename, ext);
+            const uniqueFilename = `${baseName}_${timestamp}${ext}`;
+
+            const errorPath = path.posix.join(errorDir, uniqueFilename);
             await this.sftpService.rename(filePath, errorPath);
           }
         } catch (moveErr) {

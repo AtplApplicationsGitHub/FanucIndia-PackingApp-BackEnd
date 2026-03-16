@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Req, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -24,9 +24,12 @@ export class SoNotificationsController {
     return this.service.delete(Number(id), req.user);
   }
 
-  @Delete('clear-so/:soNumber')
+  @Delete('clear-so/:orderId')
   @Roles('ADMIN', 'SALES', 'USER')
-  clearForOrder(@Param('soNumber') soNumber: string, @Req() req: AuthRequest) {
-    return this.service.clearForOrder(soNumber, req.user.userId);
+  clearForOrder(
+    @Param('orderId', ParseIntPipe) orderId: number, 
+    @Req() req: AuthRequest
+  ) {
+    return this.service.clearForOrder(orderId, req.user.userId);
   }
 }

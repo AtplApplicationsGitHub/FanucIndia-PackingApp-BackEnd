@@ -13,9 +13,9 @@ export class SoChatService {
     private readonly soNotificationsService: SoNotificationsService,
   ) {}
 
-  private async getSalesOrderOrThrow(soNumber: string) {
-    const salesOrder = await this.prisma.salesOrder.findFirst({
-      where: { saleOrderNumber: { equals: soNumber, mode: 'insensitive' } },
+  private async getSalesOrderOrThrow(orderId: number) {
+    const salesOrder = await this.prisma.salesOrder.findUnique({
+      where: { id: orderId }, 
       select: { id: true, userId: true, saleOrderNumber: true, assignedUserId: true },
     });
     if (!salesOrder) throw new NotFoundException('Sales order not found.');
@@ -34,8 +34,8 @@ export class SoChatService {
     }
   }
 
-  async getMentionUsers(soNumber: string, user: { userId: number; role: string }) {
-    const so = await this.getSalesOrderOrThrow(soNumber);
+  async getMentionUsers(orderId: number, user: { userId: number; role: string }) {
+    const so = await this.getSalesOrderOrThrow(orderId);
 
     this.enforceSoAccess(user, so);
 
@@ -58,8 +58,8 @@ export class SoChatService {
     }
   }
 
-  async listMessages(soNumber: string, user: { userId: number; role: string }) {
-    const so = await this.getSalesOrderOrThrow(soNumber);
+  async listMessages(orderId: number, user: { userId: number; role: string }) {
+    const so = await this.getSalesOrderOrThrow(orderId);
 
     this.enforceSoAccess(user, so);
 
@@ -81,11 +81,11 @@ export class SoChatService {
   }
 
   async sendMessage(
-    soNumber: string,
+    orderId: number,
     user: { userId: number; role: string },
     body: { toUserId: number; message: string },
   ) {
-    const so = await this.getSalesOrderOrThrow(soNumber);
+    const so = await this.getSalesOrderOrThrow(orderId);
     this.enforceSoAccess(user, so);
 
     const message = (body.message || '').trim();
