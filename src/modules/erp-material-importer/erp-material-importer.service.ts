@@ -390,7 +390,7 @@ export class ErpMaterialImporterService {
       return `The SO Number in the file ('${soNumber}') does not match the expected SO Number ('${expectedSaleOrderNumber}').`;
     }
 
-    const obdHeader = 'FG_OBD'; 
+    const obdHeader = 'FG OBD'; 
     const obds = new Set(records.map((r) => r[obdHeader]).filter(Boolean));
     if (obds.size > 1) {
       return 'Inconsistent FG OBD found in the file. All records must belong to the same Outbound Delivery.';
