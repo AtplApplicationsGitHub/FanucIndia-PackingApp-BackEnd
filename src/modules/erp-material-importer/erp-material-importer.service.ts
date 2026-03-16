@@ -358,21 +358,11 @@ export class ErpMaterialImporterService {
       return 'File is empty.';
     }
 
-    const optionalHeaders = new Set<string>([
-      'STATUS',
-      'Status',
-      'COUNTRY',
-      'Remarks',
-      'REMARKS',
-    ]);
-    const expectedHeaders = Object.keys(columnMapping).filter(
-      (h) => !optionalHeaders.has(h),
-    );
+    const optionalHeaders = new Set<string>(['STATUS', 'Status', 'COUNTRY', 'Remarks', 'REMARKS']);
+    const expectedHeaders = Object.keys(columnMapping).filter((h) => !optionalHeaders.has(h));
     const actualHeaders = Object.keys(records[0]);
 
-    const missingHeaders = expectedHeaders.filter(
-      (h) => !actualHeaders.includes(h),
-    );
+    const missingHeaders = expectedHeaders.filter((h) => !actualHeaders.includes(h));
     if (missingHeaders.length > 0) {
       return `Header mismatch. Missing columns: ${missingHeaders.join(', ')}`;
     }
@@ -385,9 +375,7 @@ export class ErpMaterialImporterService {
     }
 
     const soNumberHeader = 'SO Number';
-    const soNumbers = new Set(
-      records.map((r) => r[soNumberHeader]).filter(Boolean),
-    );
+    const soNumbers = new Set(records.map((r) => r[soNumberHeader]).filter(Boolean));
     if (soNumbers.size > 1) {
       return 'Inconsistent SO Numbers found in the file. All records must belong to the same SO Number.';
     }
@@ -402,12 +390,24 @@ export class ErpMaterialImporterService {
       return `The SO Number in the file ('${soNumber}') does not match the expected SO Number ('${expectedSaleOrderNumber}').`;
     }
 
+    const obdHeader = 'FG_OBD'; 
+    const obds = new Set(records.map((r) => r[obdHeader]).filter(Boolean));
+    if (obds.size > 1) {
+      return 'Inconsistent FG OBD found in the file. All records must belong to the same Outbound Delivery.';
+    }
+
+    const obdValue = obds.values().next().value;
+    if (!obdValue) {
+      return 'Missing FG OBD in one or more rows.';
+    }
+    const obd = String(obdValue);
+
     const orderExists = await this.prisma.salesOrder.findFirst({
-      where: { saleOrderNumber: soNumber },
+      where: { saleOrderNumber: soNumber, outboundDelivery: obd },
     });
 
     if (!orderExists) {
-      return `Sales Order Number '${soNumber}' does not exist in the system.`;
+      return `Sales Order '${soNumber}' with Outbound Delivery '${obd}' does not exist in the system.`;
     }
 
     return null;
@@ -427,9 +427,18 @@ export class ErpMaterialImporterService {
     if (records.length === 0) return;
 
     const soNumber = String(records[0].saleOrderNumber);
-    this.logger.log(
-      `Upserting ${records.length} records for SO Number: ${soNumber}`,
-    );
+    const obd = String(records[0].FG_OBD);
+    
+    this.logger.log(`Upserting ${records.length} records for SO: ${soNumber}, OBD: ${obd}`);
+
+    const exactSo = await this.prisma.salesOrder.findFirst({
+       where: { saleOrderNumber: soNumber, outboundDelivery: obd },
+       select: { id: true }
+    });
+
+    if (!exactSo) {
+        throw new BadRequestException(`Sales Order '${soNumber}' with OBD '${obd}' does not exist.`);
+    }
 
     const safeParseInt = (
       val: any,
@@ -509,7 +518,6 @@ export class ErpMaterialImporterService {
 
     const recordsToCreate = records.map((r) => {
       const matCode = safeToString(r.Material_Code, '')!;
-
       const barcodeData = barcodeMap.get(matCode);
       const excelGroup = safeToString(r.Material_Group);
 
@@ -536,6 +544,8 @@ export class ErpMaterialImporterService {
         Accept_Bulk_Data: barcodeData?.acceptBulkData ?? null,
         Remarks_Required: barcodeData?.remarksRequired ?? null,
         Classification: barcodeData?.classification ?? null,
+
+        salesOrderId: exactSo.id,
       };
     });
 
@@ -550,7 +560,7 @@ export class ErpMaterialImporterService {
       await this.prisma.$transaction(async (tx) => {
                 
         const so = await tx.salesOrder.findFirst({
-            where: { saleOrderNumber: soNumber },
+            where: { id: exactSo.id },
             select: { id: true },
         });
 
@@ -599,12 +609,12 @@ export class ErpMaterialImporterService {
             data: updateData,
         });
 
-        this.logger.log(`Deleting existing records for SO: ${soNumber}`);
+        this.logger.log(`Deleting existing records for SO: ${soNumber}, OBD: ${obd}`);
         await tx.eRP_Material_Data.deleteMany({
-          where: { saleOrderNumber: soNumber },
+          where: { salesOrderId: exactSo.id },
         });
 
-        this.logger.log(`Inserting new records for SO: ${soNumber}`);
+        this.logger.log(`Inserting new records for SO: ${soNumber}, OBD: ${obd}`);
         await tx.eRP_Material_Data.createMany({
           data: recordsToCreate,
         });
