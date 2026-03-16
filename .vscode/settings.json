@@ -1,0 +1,6 @@
+{
+    "githubPullRequests.ignoredPullRequestBranches": [
+        "dev"
+    ],
+    "prisma.pinToPrisma6": true
+}

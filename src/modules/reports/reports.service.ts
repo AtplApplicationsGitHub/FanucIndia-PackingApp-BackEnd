@@ -71,16 +71,37 @@ export class ReportsSalesOrderService {
 
   async getAdminOrderSummary() {
     const orders = await this.prisma.salesOrder.findMany({
+      where: {
+        OR: [
+          { status: null },
+          { status: 'R105' },
+          { status: 'W105' },
+          { status: 'F105' },
+          { status: 'Dispatched' },
+        ],
+      },
       select: {
+        id: true,
         saleOrderNumber: true,
         outboundDelivery: true,
         paymentClearance: true,
         customerNameText: true,
+        status: true,
+        isErpImported: true,
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    const orderIds = orders.map((o) => o.id);
+
+    const printedEntries = await this.prisma.customerLabelPrintEntry.findMany({
+      where: { salesOrderId: { in: orderIds } },
+      select: { salesOrderId: true },
+    });
+
+    const printedOrderIds = new Set(printedEntries.map((e) => e.salesOrderId));
 
     return orders.map((order) => ({
       salesordernumber: order.saleOrderNumber,
@@ -88,6 +109,9 @@ export class ReportsSalesOrderService {
       'Customer name': order.customer?.name || order.customerNameText || 'N/A',
       SalesZone: order.salesZone?.name || 'N/A',
       payment: order.paymentClearance,
+      Status: order.status || 'N/A',
+      isErpImported: order.isErpImported === 1,
+      Customerlableprint: printedOrderIds.has(order.id),
     }));
   }
 }
