@@ -24,9 +24,10 @@ import { VehicleEntryModule } from './modules/vehicle-entry/vehicle-entry.module
 import { SoChatModule } from './modules/so-chat/so-chat.module';
 import { SoNotificationsModule } from './modules/so-notifications/so-notifications.module';
 import { AppUpdateModule } from './modules/app-update/app-update.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule, ErpMaterialImporterModule, DispatchModule, SoSearchModule, FgDashboardModule, FgStorageModule, SoArchiveModule, DashboardModule, VehicleEntryModule, SoChatModule, SoNotificationsModule, AppUpdateModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule, ErpMaterialImporterModule, DispatchModule, SoSearchModule, FgDashboardModule, FgStorageModule, SoArchiveModule, DashboardModule, VehicleEntryModule, SoChatModule, SoNotificationsModule, AppUpdateModule, ReportsModule],
   controllers: [AppController],
   providers: [AppService],
 })
