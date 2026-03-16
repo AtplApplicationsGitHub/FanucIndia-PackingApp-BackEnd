@@ -342,14 +342,10 @@ export class SalesOrderService {
       throw new BadRequestException({ message: 'No valid orders found to process.' });
     }
 
-    const transferOrders = ordersToUpsert.map(o => o.transferOrder).filter(t => !!t);
     const soObdPairs = ordersToUpsert.map(o => `${o.saleOrderNumber}_${o.outboundDelivery}`);
     
     const hasDuplicates = (arr: string[]) => new Set(arr).size !== arr.length;
     
-    if (hasDuplicates(transferOrders)) {
-      throw new BadRequestException('The import file contains duplicate Transfer Order numbers.');
-    }
     if (hasDuplicates(soObdPairs)) {
       throw new BadRequestException('The import file contains identical Sale Order + Outbound Delivery combinations.');
     }

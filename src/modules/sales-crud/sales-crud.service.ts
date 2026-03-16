@@ -21,16 +21,6 @@ export class SalesCrudService {
   async create(dto: CreateSalesCrudDto, userId: number) {
     const saleOrderNumber = dto.saleOrderNumber?.trim();
     const outboundDelivery = dto.outboundDelivery?.trim();
-    const transferOrder = dto.transferOrder?.trim();
-
-    if (transferOrder) {
-      const existingTo = await this.prisma.salesOrder.findUnique({
-        where: { transferOrder },
-      });
-      if (existingTo) {
-        throw new ConflictException(`An order with Transfer Order '${transferOrder}' already exists.`);
-      }
-    }
 
     const existingComposite = await this.prisma.salesOrder.findUnique({
       where: {
