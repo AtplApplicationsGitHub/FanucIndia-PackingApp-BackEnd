@@ -91,16 +91,20 @@ export class SalesOrderService {
       where.deliveryDate = { ...(where.deliveryDate as object), ...range };
     }
 
-    const orders = await this.prisma.salesOrder.findMany({
-      where,
-      include: {
-        product: true,
-        salesZone: true,
-        packConfig: true,
-        transporter: true,
-        customer: true,
-      },
-    });
+    let orders: any[] = [];
+
+    if (filters.blank !== 'true') {
+      orders = await this.prisma.salesOrder.findMany({
+        where,
+        include: {
+          product: true,
+          salesZone: true,
+          packConfig: true,
+          transporter: true,
+          customer: true,
+        },
+      });
+    }
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Bulk Import');
@@ -247,11 +251,26 @@ export class SalesOrderService {
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       if (rowNumber === 1) return;
 
-      const [
+      let [
         product, saleOrderNumber, outboundDelivery, transferOrder, deliveryDate,
         transporter, plantCode, paymentClearance, salesZone, packConfig,
         customer, specialRemarks, additionalRemarks, labelRemarks,
       ] = (row.values as any[]).slice(1);
+
+      const extractText = (cellValue: any): string => {
+        if (cellValue === null || cellValue === undefined) return '';
+        if (typeof cellValue === 'object') {
+          if (cellValue.result !== undefined) return String(cellValue.result); 
+          if (cellValue.richText) return cellValue.richText.map((rt: any) => rt.text).join('');
+          if (cellValue.text) return String(cellValue.text);
+        }
+        return String(cellValue);
+      };
+
+      saleOrderNumber = extractText(saleOrderNumber);
+      outboundDelivery = extractText(outboundDelivery);
+      transferOrder = extractText(transferOrder);
+      plantCode = extractText(plantCode);
 
       const rowErrors: string[] = [];
 
@@ -261,9 +280,17 @@ export class SalesOrderService {
       const transporterNameRaw = (transporter || '').toString().trim();
       const rawPlantCode = (plantCode || '').toString().trim();
       const plantCodeString = rawPlantCode === '' ? null : rawPlantCode;
-
+      
       const salesZoneNameRaw = (salesZone || '').toString().trim().toLowerCase();
-      const salesZoneId = maps.salesZone.get(salesZoneNameRaw);
+      let salesZoneId: number | null = null;
+      if (salesZoneNameRaw) {
+        const foundId = maps.salesZone.get(salesZoneNameRaw);
+        if (foundId) {
+          salesZoneId = foundId;
+        } else {
+          rowErrors.push(`Invalid salesZone: ${salesZone}`);
+        }
+      }
 
       const packConfigName = (packConfig || '').toString().trim();
       let packConfigId: number | null = null;
@@ -277,23 +304,30 @@ export class SalesOrderService {
       }
 
       const customerNameRaw = (customer || '').toString().trim();
-      const customerData = maps.customer.get(customerNameRaw.toLowerCase());
-      const customerId = customerData?.id;
-      const customerAddress = customerData?.address;
+      let customerId: number | null = null;
+      let customerAddress: string | null = null;
+      if (customerNameRaw) {
+        const customerData = maps.customer.get(customerNameRaw.toLowerCase());
+        if (customerData) {
+          customerId = customerData.id;
+          customerAddress = customerData.address;
+        }
+      }
 
+      // We still require Sale Order Number as it is the primary identifier
       if (!saleOrderNumber) rowErrors.push('Missing saleOrderNumber');
       else if (saleOrderNumber.toString().trim().length < 10) rowErrors.push('Sale Order Number must be at least 10 characters');
       
-      if (!outboundDelivery) rowErrors.push('Missing outboundDelivery');
-      if (!deliveryDate) rowErrors.push('Missing deliveryDate');
-      if (!transporterNameRaw) rowErrors.push('Missing transporter');
-      
-      if (!['Yes', 'No', true, false, 'yes', 'no'].includes(paymentClearance?.toString())) {
-        rowErrors.push('Invalid paymentClearance (must be Yes or No)');
+      let paymentClearanceProvided = false;
+      let paymentClearanceVal = false;
+      if (paymentClearance !== undefined && paymentClearance !== null && paymentClearance !== '') {
+        paymentClearanceProvided = true;
+        if (!['Yes', 'No', true, false, 'yes', 'no'].includes(paymentClearance.toString())) {
+          rowErrors.push('Invalid paymentClearance (must be Yes or No)');
+        } else {
+          paymentClearanceVal = paymentClearance.toString().toLowerCase() === 'yes' || paymentClearance === true;
+        }
       }
-
-      if (!salesZoneId) rowErrors.push('Invalid salesZone');
-      if (!customerNameRaw) rowErrors.push('Missing customer Name');
 
       let deliveryDateObj: Date | null = null;
       if (deliveryDate) {
@@ -311,14 +345,15 @@ export class SalesOrderService {
         ordersToUpsert.push({
           rowNumber,
           productName: productNameRaw,
-          saleOrderNumber: saleOrderNumber.toString(),
-          outboundDelivery: outboundDelivery.toString(),
-          transferOrder: transferOrder ? transferOrder.toString() : null,
+          saleOrderNumber: saleOrderNumber.toString().trim(),
+          outboundDelivery: outboundDelivery ? outboundDelivery.toString().trim() : '',
+          transferOrder: transferOrder ? transferOrder.toString().trim() : null,
           plantCode: plantCodeString,
           packConfigId: packConfigId,
           deliveryDate: deliveryDateObj,
           transporterName: transporterNameRaw,
-          paymentClearance: paymentClearance?.toString().toLowerCase() === 'yes' || paymentClearance === true,
+          paymentClearanceProvided, // Track if it was actually provided
+          paymentClearance: paymentClearanceVal,
           salesZoneId,
           customerId,
           customerName: customerNameRaw,
@@ -354,13 +389,23 @@ export class SalesOrderService {
       where: {
         OR: ordersToUpsert.map(o => ({
           saleOrderNumber: o.saleOrderNumber,
-          outboundDelivery: o.outboundDelivery
+          ...(o.outboundDelivery ? { outboundDelivery: o.outboundDelivery } : {})
         }))
       },
     });
 
     const existingMap = new Map();
-    existingOrders.forEach(o => existingMap.set(`${o.saleOrderNumber}_${o.outboundDelivery}`, o));
+    const existingMapBySo = new Map();
+    
+    existingOrders.forEach(o => {
+      existingMap.set(`${o.saleOrderNumber}_${o.outboundDelivery || ''}`, o);
+      
+      if (!existingMapBySo.has(o.saleOrderNumber)) {
+        existingMapBySo.set(o.saleOrderNumber, [o]);
+      } else {
+        existingMapBySo.get(o.saleOrderNumber).push(o);
+      }
+    });
 
     try {
       const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -381,7 +426,7 @@ export class SalesOrderService {
 
           let finalCustomerId = orderData.customerId;
           let finalCustomerAddress = orderData.address;
-          if (!finalCustomerId) {
+          if (!finalCustomerId && orderData.customerName) { 
             let foundCust = maps.customer.get(orderData.customerName.toLowerCase());
             if (!foundCust) {
               const newCustomer = await tx.customer.create({ data: { name: orderData.customerName } });
@@ -393,32 +438,66 @@ export class SalesOrderService {
           }
 
           let finalTransporterId: number | null = null;
-          let foundTransId = maps.transporter.get(orderData.transporterName.toLowerCase());
-          if (!foundTransId) {
-            const newTransporter = await tx.transporter.create({ data: { name: orderData.transporterName } });
-            foundTransId = newTransporter.id;
-            maps.transporter.set(orderData.transporterName.toLowerCase(), foundTransId);
+          if (orderData.transporterName) { 
+            let foundTransId = maps.transporter.get(orderData.transporterName.toLowerCase());
+            if (!foundTransId) {
+              const newTransporter = await tx.transporter.create({ data: { name: orderData.transporterName } });
+              foundTransId = newTransporter.id;
+              maps.transporter.set(orderData.transporterName.toLowerCase(), foundTransId);
+            }
+            finalTransporterId = foundTransId;
           }
-          finalTransporterId = foundTransId;
 
-          const { customerName, transporterName, productName, rowNumber, ...dataToSave } = orderData;
+          const { customerName, transporterName, productName, rowNumber, paymentClearanceProvided, ...dataToSave } = orderData;
           
           const compositeKey = `${orderData.saleOrderNumber}_${orderData.outboundDelivery}`;
-          const existing = existingMap.get(compositeKey);
+          let existing = existingMap.get(compositeKey);
+
+          // Fallback: If Outbound Delivery was left blank, try to find the order just by Sale Order Number
+          if (!existing && !orderData.outboundDelivery) {
+            const matches = existingMapBySo.get(orderData.saleOrderNumber);
+            if (matches && matches.length === 1) {
+              existing = matches[0];
+            } else if (matches && matches.length > 1) {
+              throw new BadRequestException(`Multiple orders found for Sale Order ${orderData.saleOrderNumber}. Please provide Outbound Delivery to update the correct one.`);
+            }
+          }
 
           if (existing) {
+            const updatePayload: any = {};
+            
+            if (finalProductId) updatePayload.productId = finalProductId;
+            if (finalCustomerId) updatePayload.customerId = finalCustomerId;
+            if (finalCustomerAddress) updatePayload.address = finalCustomerAddress;
+            if (finalTransporterId) updatePayload.transporterId = finalTransporterId;
+            if (orderData.plantCode) updatePayload.plantCode = orderData.plantCode;
+            if (orderData.packConfigId) updatePayload.packConfigId = orderData.packConfigId;
+            if (orderData.deliveryDate) updatePayload.deliveryDate = orderData.deliveryDate;
+            if (orderData.salesZoneId) updatePayload.salesZoneId = orderData.salesZoneId;
+            if (orderData.specialRemarks) updatePayload.specialRemarks = orderData.specialRemarks;
+            if (orderData.additionalRemarks) updatePayload.additionalRemarks = orderData.additionalRemarks;
+            if (orderData.labelRemarks) updatePayload.labelRemarks = orderData.labelRemarks;
+            if (orderData.transferOrder) updatePayload.transferOrder = orderData.transferOrder;
+            if (orderData.outboundDelivery) updatePayload.outboundDelivery = orderData.outboundDelivery;
+            if (paymentClearanceProvided) updatePayload.paymentClearance = orderData.paymentClearance;
+
             await tx.salesOrder.update({
               where: { id: existing.id },
-              data: {
-                ...dataToSave,
-                productId: finalProductId,
-                customerId: finalCustomerId,
-                transporterId: finalTransporterId,
-                address: finalCustomerAddress,
-              },
+              data: updatePayload,
             });
             updatedCount++;
           } else {
+            const missingForNew: string[] = [];
+            if (!orderData.outboundDelivery) missingForNew.push('Outbound Delivery');
+            if (!orderData.deliveryDate) missingForNew.push('Delivery Date');
+            if (!finalTransporterId) missingForNew.push('Transporter');
+            if (!finalCustomerId) missingForNew.push('Customer');
+            if (!orderData.salesZoneId) missingForNew.push('Sales Zone');
+
+            if (missingForNew.length > 0) {
+              throw new BadRequestException(`Row ${orderData.rowNumber} (Sale Order: ${orderData.saleOrderNumber}) is treated as a NEW order but is missing mandatory fields: ${missingForNew.join(', ')}`);
+            }
+
             const newOrder = await tx.salesOrder.create({
               data: {
                 ...dataToSave,
@@ -456,6 +535,9 @@ export class SalesOrderService {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         const target = (err.meta?.target as string[])?.join(', ');
         throw new ConflictException(`Database error: A constraint failed. The value for '${target}' must be unique.`);
+      }
+      if (err instanceof BadRequestException || err instanceof ConflictException) {
+        throw err;
       }
       throw new InternalServerErrorException('Database operation failed', err.message);
     }

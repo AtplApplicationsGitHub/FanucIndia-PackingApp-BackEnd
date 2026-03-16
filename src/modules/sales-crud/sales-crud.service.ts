@@ -645,29 +645,53 @@ export class SalesCrudService {
     const labelRemarks = order.labelRemarks || '';
     const salesZone = order.salesZone?.name || '';
 
-    const prnCommands = [
-      'SIZE 61.5 mm, 40 mm',
-      'GAP 3 mm, 0 mm',
-      'SET RIBBON ON',
-      'DIRECTION 0,0',
-      'REFERENCE 0,0',
-      'OFFSET 0 mm',
-      'SET PEEL OFF',
-      'SET CUTTER OFF',
-      'SET PARTIAL_CUTTER OFF',
-      'SET TEAR ON',
-      'CLS',
-      'CODEPAGE 1252',
-      `TEXT 460,283,"0",180,11,16,"${customerName}"`,
-      `TEXT 460,208,"0",180,24,26,"${order.saleOrderNumber}"`,
-      `TEXT 368,79,"0",180,12,14,"${labelRemarks}"`,
-      `TEXT 460,79,"0",180,12,14,"${salesZone}"`,
-      `QRCODE 111,127,L,4,A,180,M2,S7,"${order.saleOrderNumber}"`,
-      `PRINT ${qty},1`,
-      '',
-    ];
+    // const prnCommands = [
+    //   'SIZE 61.5 mm, 40 mm',
+    //   'GAP 3 mm, 0 mm',
+    //   'SET RIBBON ON',
+    //   'DIRECTION 0,0',
+    //   'REFERENCE 0,0',
+    //   'OFFSET 0 mm',
+    //   'SET PEEL OFF',
+    //   'SET CUTTER OFF',
+    //   'SET PARTIAL_CUTTER OFF',
+    //   'SET TEAR ON',
+    //   'CLS',
+    //   'CODEPAGE 1252',
+    //   `TEXT 460,283,"0",180,11,16,"${customerName}"`,
+    //   `TEXT 460,208,"0",180,24,26,"${order.saleOrderNumber}"`,
+    //   `TEXT 368,79,"0",180,12,14,"${labelRemarks}"`,
+    //   `TEXT 460,79,"0",180,12,14,"${salesZone}"`,
+    //   `QRCODE 111,127,L,4,A,180,M2,S7,"${order.saleOrderNumber}"`,
+    //   `PRINT ${qty},1`,
+    //   '',
+    // ];
 
-    const finalPrn = prnCommands.join('\r\n');
+    // const finalPrn = prnCommands.join('\r\n');
+
+    const fileName = 'FANUC_60X40_TE210_160226-LAN.prn'; 
+    const basePath = process.env.PRN_FILE_PATH || 'uploads/fanuc/prn-files/';
+    const sftpTemplatePath = `${basePath.replace(/\/$/, '')}/${fileName}`;
+    
+    let prnTemplate = '';
+
+    try {
+      const prnBuffer = await this.sftpService.getBuffer(sftpTemplatePath);
+      prnTemplate = prnBuffer.toString('utf8');
+    } catch (error) {
+      console.error(`Error reading PRN file from SFTP at path: ${sftpTemplatePath}`, error);
+      throw new InternalServerErrorException(
+        `Failed to read the Printer template file from the SFTP server at: ${sftpTemplatePath}. Ensure the file exists.`
+      );
+    }
+
+    let finalPrn = prnTemplate;
+    
+    finalPrn = finalPrn.replace(/@@CustomerName@@/g, customerName);
+    finalPrn = finalPrn.replace(/@@SONumber@@/g, order.saleOrderNumber); 
+    finalPrn = finalPrn.replace(/@@LabelRemarks@@/g, labelRemarks);
+    finalPrn = finalPrn.replace(/@@SalesZone@@/g, salesZone);
+    finalPrn = finalPrn.replace(/@@Quantity@@/g, qty.toString());
 
     // return {
     //   success: true,
