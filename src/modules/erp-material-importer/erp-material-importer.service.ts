@@ -11,6 +11,7 @@ import { Prisma } from '@prisma/client';
 import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import { Response } from 'express';
+import { Interval, Cron } from '@nestjs/schedule';
 
 const columnMapping = {
   'SO Number': 'saleOrderNumber',
@@ -53,6 +54,97 @@ export class ErpMaterialImporterService {
     private prisma: PrismaService,
     private sftpService: SftpService, 
   ) {}
+
+  @Interval(parseInt(process.env.SFTP_SCAN_INTERVAL_MS || '300000'))
+  async autoProcessActiveFolder() {
+    this.logger.log('Running automated scheduled scan of SFTP active folder...');
+
+    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    const activeDir = path.posix.join(baseDir, 'active');
+
+    try {
+      const files = (await this.sftpService.list(activeDir)) as Array<{ type: string; name: string }>;
+      const soNumbersToImport: string[] = [];
+
+      for (const file of files) {
+        if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
+          continue; 
+        }
+
+        const baseName = file.name.replace('.xlsx', '');
+        const nameParts = baseName.split('_');
+
+        if (nameParts.length !== 2) {
+          continue; 
+        }
+
+        soNumbersToImport.push(nameParts[0]);
+      }
+
+      if (soNumbersToImport.length > 0) {
+        this.logger.log(`Auto-scan found ${soNumbersToImport.length} potential files. Delegating to existing bulk import logic...`);
+        
+        const result = await this.bulkImportFromDrive(soNumbersToImport, 'System Auto Job');
+        
+        const logsToInsert = result.summary.map((s: any) => ({
+          saleOrderNumber: s.soNumber,
+          status: s.status, 
+          message: s.reason,
+          createdAt: new Date(),
+        }));
+
+        if (logsToInsert.length > 0) {
+          await this.prisma.eRP_Data_Cron_Logs.createMany({
+            data: logsToInsert,
+          });
+        }
+        
+        this.logger.log(`Auto-scan bulk import completed. Summary: ${JSON.stringify(result.summary)}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to execute automated SFTP folder scan.', error);
+    }
+  }
+
+  @Cron(process.env.ERP_LOG_EXPORT_CRON || '0 21 * * *')
+  async exportDailyCronLogs() {
+    this.logger.log('Running daily export of ERP Cron Logs...');
+    
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    try {
+      const logs = await this.prisma.eRP_Data_Cron_Logs.findMany({
+        where: { createdAt: { gte: startOfDay } },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      if (logs.length === 0) {
+        this.logger.log('No ERP logs found for today. Skipping log file generation.');
+        return;
+      }
+
+      const dateStr = startOfDay.toISOString().split('T')[0];
+      let fileContent = `ERP Data Automated Import Logs - ${dateStr}\n`;
+      fileContent += `==========================================================================\n\n`;
+
+      logs.forEach((log) => {
+        const timeStr = log.createdAt.toISOString().replace('T', ' ').substring(0, 19);
+        fileContent += `[${timeStr}] SO Number: ${log.saleOrderNumber.padEnd(15)} | Status: ${log.status.padEnd(10)} | Message: ${log.message || 'N/A'}\n`;
+      });
+
+      const buffer = Buffer.from(fileContent, 'utf-8');
+      
+      const logDir = process.env.ERP_CRON_LOGS || 'uploads/fanuc/logs/';
+      const filename = `ERP_Cron_Logs_${dateStr.replace(/-/g, '')}.txt`;
+      const remotePath = path.posix.join(logDir, filename);
+
+      await this.sftpService.put(buffer, remotePath);
+      this.logger.log(`Successfully exported daily logs to SFTP: ${remotePath}`);
+    } catch (error) {
+      this.logger.error('Failed to export daily ERP logs to SFTP.', error);
+    }
+  }
 
   async importFromDrive(saleOrderNumber: string, username: string) {
     this.logger.log(`Initiating Drive Import for SO: ${saleOrderNumber}`);
@@ -112,14 +204,14 @@ export class ErpMaterialImporterService {
     try {
       const result = await this.processFile(mockFile, saleOrderNumber, username);
 
-      const timestamp = Date.now();
-      const ext = path.posix.extname(filename);
-      const baseName = path.posix.basename(filename, ext);
-      const uniqueFilename = `${baseName}_${timestamp}${ext}`;
-
-      const archivePath = path.posix.join(archivedDir, uniqueFilename);
+      const archivePath = path.posix.join(archivedDir, filename);
+      
+      if (await this.sftpService.exists(archivePath)) {
+        await this.sftpService.delete(archivePath);
+      }
+      
       await this.sftpService.rename(filePath, archivePath);
-      this.logger.log(`Moved file to SFTP Archive: ${archivePath}`);
+      this.logger.log(`Moved file to SFTP Archive (Overwrite allowed): ${archivePath}`);
 
       return result;
     } catch (error) {
@@ -128,13 +220,14 @@ export class ErpMaterialImporterService {
         error,
       );
       try {
-        const timestamp = Date.now();
-        const ext = path.posix.extname(filename);
-        const baseName = path.posix.basename(filename, ext);
-        const uniqueFilename = `${baseName}_${timestamp}${ext}`;
+        const errorPath = path.posix.join(errorDir, filename);
+        
+        if (await this.sftpService.exists(errorPath)) {
+          await this.sftpService.delete(errorPath);
+        }
 
-        const errorPath = path.posix.join(errorDir, uniqueFilename);
         await this.sftpService.rename(filePath, errorPath);
+        this.logger.log(`Moved file to SFTP Error (Overwrite allowed): ${errorPath}`);
       } catch (moveErr) {
         this.logger.error(
           `Failed to move file ${filename} to Error folder on SFTP`,
@@ -197,13 +290,15 @@ export class ErpMaterialImporterService {
     this.logger.log(`Initiating Bulk Drive Import for ${saleOrderNumbers.length} SOs`);
 
     const results: { soNumber: string; status: string; reason: string }[] = [];
-    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || '';
+    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
     const activeDir = path.posix.join(baseDir, 'active');
     const archivedDir = path.posix.join(baseDir, 'archive');
     const errorDir = path.posix.join(baseDir, 'error');
 
+    const uniqueSoNumbers = [...new Set(saleOrderNumbers)];
+
     const salesOrders = await this.prisma.salesOrder.findMany({
-      where: { saleOrderNumber: { in: saleOrderNumbers } },
+      where: { saleOrderNumber: { in: uniqueSoNumbers } },
       select: { 
         saleOrderNumber: true, 
         outboundDelivery: true,
@@ -212,42 +307,32 @@ export class ErpMaterialImporterService {
       },
     });
 
-    const soMap = new Map(salesOrders.map(so => [so.saleOrderNumber, so]));
-
-    for (const soNumber of saleOrderNumbers) {
-      const so = soMap.get(soNumber);
+    for (const so of salesOrders) {
+      const soNumber = so.saleOrderNumber;
+      const obd = so.outboundDelivery;
       
-      if (!so) {
-        results.push({ soNumber, status: 'Failed', reason: 'Sales Order not found in system' });
+      const displayId = obd ? `${soNumber}_${obd}` : soNumber;
+
+      if (so.isErpImported === 1 || so._count.materialData > 0) {
+        results.push({ soNumber: displayId, status: 'Skipped', reason: 'Data already imported' });
         continue;
       }
 
-      if (so.isErpImported === 1) {
-        results.push({ soNumber, status: 'Skipped', reason: 'Data already imported' });
+      if (!obd) {
+        results.push({ soNumber: displayId, status: 'Skipped', reason: 'Outbound Delivery (OBD) missing in system' });
         continue;
       }
 
-      if (so._count.materialData > 0) {
-        results.push({ soNumber, status: 'Skipped', reason: 'Data already imported' });
-        continue;
-      }
-
-      if (!so.outboundDelivery) {
-        results.push({ soNumber, status: 'Skipped', reason: 'Outbound Delivery (OBD) missing' });
-        continue;
-      }
-
-      const filename = `${soNumber}_${so.outboundDelivery}.xlsx`;
+      const filename = `${soNumber}_${obd}.xlsx`;
       const filePath = path.posix.join(activeDir, filename);
 
       try {
         const exists = await this.sftpService.exists(filePath);
         if (!exists) {
-          results.push({ soNumber, status: 'Skipped', reason: `File not found: ${filename}` });
+          results.push({ soNumber: displayId, status: 'Skipped', reason: `File not found: ${filename}` });
           continue;
-        }
+        }        
         const fileBuffer = await this.sftpService.getBuffer(filePath);
-
         const mockFile: Express.Multer.File = {
           fieldname: 'file',
           originalname: filename,
@@ -263,35 +348,31 @@ export class ErpMaterialImporterService {
 
         await this.processFile(mockFile, soNumber, username);
 
-        const timestamp = Date.now();
-        const ext = path.posix.extname(filename);
-        const baseName = path.posix.basename(filename, ext);
-        const uniqueFilename = `${baseName}_${timestamp}${ext}`;
-
-        const archivePath = path.posix.join(archivedDir, uniqueFilename);
+        const archivePath = path.posix.join(archivedDir, filename);
+        if (await this.sftpService.exists(archivePath)) {
+          await this.sftpService.delete(archivePath);
+        }
         await this.sftpService.rename(filePath, archivePath);
         
-        results.push({ soNumber, status: 'Success', reason: 'Imported successfully' });
+        results.push({ soNumber: displayId, status: 'Success', reason: 'Imported successfully' });
 
       } catch (error) {
-        this.logger.error(`Bulk import error for ${soNumber}`, error);
+        this.logger.error(`Bulk import error for ${displayId}`, error);
         
         try {
           const exists = await this.sftpService.exists(filePath);
           if (exists) {
-            const timestamp = Date.now();
-            const ext = path.posix.extname(filename);
-            const baseName = path.posix.basename(filename, ext);
-            const uniqueFilename = `${baseName}_${timestamp}${ext}`;
-
-            const errorPath = path.posix.join(errorDir, uniqueFilename);
+            const errorPath = path.posix.join(errorDir, filename);
+            if (await this.sftpService.exists(errorPath)) {
+              await this.sftpService.delete(errorPath);
+            }
             await this.sftpService.rename(filePath, errorPath);
           }
         } catch (moveErr) {
           this.logger.error(`Failed to move file ${filename} to Error folder`, moveErr);
         }
 
-        results.push({ soNumber, status: 'Failed', reason: error.message || 'Processing failed' });
+        results.push({ soNumber: displayId, status: 'Failed', reason: error.message || 'Processing failed' });
       }
     }
 

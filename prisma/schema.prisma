@@ -498,3 +498,11 @@ model CustomerLabelPrintEntry {
 
   customerLabelPrint CustomerLabelPrint @relation(fields: [customerLabelPrintId], references: [id], onDelete: Cascade)
 }
+
+model ERP_Data_Cron_Logs {
+  id              Int      @id @default(autoincrement())
+  saleOrderNumber String
+  status          String
+  message         String?
+  createdAt       DateTime @default(now())
+}
