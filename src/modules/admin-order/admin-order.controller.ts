@@ -32,13 +32,26 @@ import {
 } from '@nestjs/swagger';
 import { AuthRequest } from '../auth/types/auth-request.type';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { SftpService } from '../sftp/sftp.service';
 
 @ApiTags('Admin Orders')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('admin/sales-orders')
 export class AdminOrderController {
-  constructor(private readonly service: AdminOrderService) {}
+  constructor(
+    private readonly service: AdminOrderService,
+    private readonly sftpService: SftpService
+  ) {}
+
+  @Get('sftp-status')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Check Samba/SFTP connection status' })
+  @ApiResponse({ status: 200, description: 'Returns UP or DOWN status' })
+  async getSftpStatus() {
+    const isConnected = await this.sftpService.checkConnection();
+    return { status: isConnected ? 'UP' : 'DOWN' };
+  }
 
   @Get()
   @Roles('ADMIN')

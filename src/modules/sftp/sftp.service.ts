@@ -205,4 +205,21 @@ export class SftpService {
       } catch (e) {}
     }
   }
+
+  // Add this inside the SftpService class
+  async checkConnection(): Promise<boolean> {
+    try {
+      // Use the base directory variable you mentioned, default to root if not set
+      const testPath = process.env.SFTP_BASE_DIR_DRIVE || '/';
+      
+      return await this.withClient(async (c) => {
+        // Checking if the path exists validates both authentication and network reachability
+        const exists = await c.exists(testPath);
+        return !!exists;
+      });
+    } catch (error: any) {
+      this.logger.error(`Samba/SFTP Connection Check Failed: ${error?.message || error}`);
+      return false; // Connection is DOWN
+    }
+  }
 }
