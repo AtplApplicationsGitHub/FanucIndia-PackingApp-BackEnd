@@ -105,12 +105,13 @@ export class ReportsSalesOrderService {
     const printedOrderIds = new Set(printedEntries.map((e) => e.salesOrderId));
 
     return orders.map((order) => {
-      // Create the JSON status object based on your logic rules
+      // Create the JSON status object based on your logic rules.
+      // If a later status is reached, the earlier statuses are also considered true.
       const statusObj = {
         isErpImported: order.isErpImported === 1,
-        isR105: order.status === 'R105',
-        isW105: order.status === 'W105',
-        isF105: order.status === 'F105',
+        isR105: ['R105', 'W105', 'F105', 'Dispatched'].includes(order.status ?? ''),
+        isW105: ['W105', 'F105', 'Dispatched'].includes(order.status ?? ''),
+        isF105: ['F105', 'Dispatched'].includes(order.status ?? ''),
         isStored: order.fgLocation !== null, // True if FG Location is not null
         isCustomerLabelPrinted: printedOrderIds.has(order.id),
         isDispatched: order.status === 'Dispatched',
