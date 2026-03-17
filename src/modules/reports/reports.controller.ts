@@ -35,7 +35,15 @@ export class ReportsSalesOrderController {
     return this.reportsSalesOrderService.getCustomerReportByMaterialCode(materialCode);
   }
 
-  // @Get('analysis')
+  @Get('fg-storage-report')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get report of FG Storage with orders not dispatched' })
+  @ApiResponse({ status: 200, description: 'FG storage report returned successfully' })
+  getFgStorageReport() {
+    return this.reportsSalesOrderService.getFgStorageReport();
+  }
+
+   // @Get('analysis')
   // @Roles('ADMIN')
   // @ApiOperation({ summary: 'Get reports analysis for Sales Orders' })
   // @ApiQuery({ name: 'startDate', required: false, type: String, description: 'YYYY-MM-DD' })

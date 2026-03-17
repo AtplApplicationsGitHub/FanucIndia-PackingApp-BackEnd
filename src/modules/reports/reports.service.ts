@@ -242,4 +242,53 @@ export class ReportsSalesOrderService {
       ],
     };
   }
+
+  // FG STROAGE 
+  async getFgStorageReport() {
+    const orders = await this.prisma.salesOrder.findMany({
+      where: {
+        OR: [
+          { status: { not: 'Dispatched' } },
+          { status: null },
+        ],
+      },
+      select: {
+        fgLocation: true,
+        saleOrderNumber: true,
+        outboundDelivery: true,
+        UpdatedBy: true,
+        updatedAt: true,
+      },
+      orderBy: {
+        updatedAt: 'asc',
+      },
+    });
+
+    const reportData = orders.map((order) => {
+      let locationStr = 'N/A';
+      if (order.fgLocation) {
+        const loc = order.fgLocation as any;
+        if (Array.isArray(loc)) {
+          locationStr = loc.map((l: any) => String(l).trim()).join(', ');
+        } else if (typeof loc === 'string') {
+          locationStr = loc.trim();
+        } else {
+          locationStr = String(loc);
+        }
+      }
+
+      return {
+        fgLocation: locationStr,
+        saleOrderNumber: order.saleOrderNumber,
+        outboundDelivery: order.outboundDelivery,
+        LastUpdatedBy: order.UpdatedBy || 'Unknown',
+        dateTime: order.updatedAt,
+      };
+    });
+
+    return {
+      success: true,
+      data: reportData,
+    };
+  }
 }
