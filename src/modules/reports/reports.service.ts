@@ -104,14 +104,14 @@ export class ReportsSalesOrderService {
     const printedOrderIds = new Set(printedEntries.map((e) => e.salesOrderId));
 
     return orders.map((order) => ({
-      salesordernumber: order.saleOrderNumber,
-      OBD: order.outboundDelivery,
-      'Customer name': order.customer?.name || order.customerNameText || 'N/A',
-      SalesZone: order.salesZone?.name || 'N/A',
-      payment: order.paymentClearance,
-      Status: order.status || 'N/A',
+      saleOrderNumber: order.saleOrderNumber,
+      outboundDelivery: order.outboundDelivery,
+      customerName: order.customer?.name || order.customerNameText || 'N/A',
+      salesZone: order.salesZone?.name || 'N/A',
+      paymentClearance: order.paymentClearance,
+      status: order.status || 'N/A',
       isErpImported: order.isErpImported === 1,
-      Customerlableprint: printedOrderIds.has(order.id),
+      isCustomerLabelPrinted: printedOrderIds.has(order.id),
     }));
   }
 }
