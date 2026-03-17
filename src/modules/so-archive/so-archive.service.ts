@@ -2,15 +2,18 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { SftpService } from '../sftp/sftp.service';
 import { Prisma } from '@prisma/client';
 import { Response } from 'express';
 import * as path from 'path';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class SoArchiveService {
+  private readonly logger = new Logger(SoArchiveService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly sftp: SftpService,
@@ -505,6 +508,57 @@ export class SoArchiveService {
     } catch (error) {
       console.error('SFTP download error:', error);
       res.status(404).send('File not found in storage.');
+    }
+  }
+
+  @Cron(process.env.SO_ARCHIVE_CRON || '0 22 * * *')
+  async autoArchiveDispatchedOrders() {
+    this.logger.log('Running automated archival scan for Dispatched orders...');
+
+    const cutoffDate = new Date();
+    const daysToWait = parseInt(process.env.SO_ARCHIVE_WAIT_DAYS || '3', 10);
+    cutoffDate.setDate(cutoffDate.getDate() - daysToWait);
+
+    try {
+      const eligibleOrders = await this.prisma.salesOrder.findMany({
+        where: {
+          status: 'Dispatched',
+          statusStepper: {
+            some: {
+              status: 'Dispatched',
+              createdDateTime: {
+                lte: cutoffDate,
+              },
+            },
+          },
+        },
+        select: { saleOrderNumber: true },
+      });
+
+      if (eligibleOrders.length === 0) {
+        this.logger.log('No eligible Dispatched orders found for archiving today.');
+        return;
+      }
+
+      this.logger.log(`Found ${eligibleOrders.length} order(s) eligible for auto-archival.`);
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const order of eligibleOrders) {
+        try {
+          await this.archive(order.saleOrderNumber);
+          successCount++;
+          this.logger.log(`Successfully auto-archived SO: ${order.saleOrderNumber}`);
+        } catch (err) {
+          failCount++;
+          this.logger.error(`Failed to auto-archive SO: ${order.saleOrderNumber}`, err);
+        }
+      }
+
+      this.logger.log(`Auto-archival complete. Success: ${successCount}, Failed: ${failCount}`);
+    } catch (error) {
+      this.logger.error('Failed to execute automated archival job.', error);
     }
   }
 }
