@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -17,6 +17,22 @@ export class ReportsSalesOrderController {
   @ApiResponse({ status: 200, description: 'Order summary returned successfully' })
   getAdminOrderSummary() {
     return this.reportsSalesOrderService.getAdminOrderSummary();
+  }
+
+  @Get('customer-report')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get report of how many Sales Orders per Customer' })
+  @ApiResponse({ status: 200, description: 'Customer report returned successfully' })
+  getCustomerReport() {
+    return this.reportsSalesOrderService.getCustomerReport();
+  }
+
+  @Get('customers-by-material/:materialCode')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get report of customers who ordered a specific material code' })
+  @ApiResponse({ status: 200, description: 'Customer report filtered by material returned successfully' })
+  getCustomerReportByMaterialCode(@Param('materialCode') materialCode: string) {
+    return this.reportsSalesOrderService.getCustomerReportByMaterialCode(materialCode);
   }
 
   // @Get('analysis')

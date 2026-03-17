@@ -127,4 +127,119 @@ export class ReportsSalesOrderService {
       };
     });
   }
+  // CUSTOMER REPORTS 
+  async getCustomerReport() {
+    const grouped = await this.prisma.salesOrder.groupBy({
+      by: ['customerId', 'customerNameText'],
+      _count: {
+        id: true,
+      },
+    });
+
+    const customerIds = [
+      ...new Set(
+        grouped
+          .filter((g) => g.customerId !== null)
+          .map((g) => g.customerId as number),
+      ),
+    ];
+
+    const customers = await this.prisma.customer.findMany({
+      where: { id: { in: customerIds } },
+    });
+    const customerMap = new Map(customers.map((c) => [c.id, c.name]));
+
+    const resultMap = new Map<string, number>();
+
+    for (const g of grouped) {
+      const name =
+        (g.customerId ? customerMap.get(g.customerId) : g.customerNameText) ||
+        'N/A';
+      resultMap.set(name, (resultMap.get(name) || 0) + g._count.id);
+    }
+
+    const reportData = Array.from(resultMap.entries()).map(
+      ([customerName, saleOrderNumberCount]) => ({
+        customerName,
+        saleOrderNumberCount,
+      }),
+    );
+
+    // Sort by count descending
+    reportData.sort((a, b) => b.saleOrderNumberCount - a.saleOrderNumberCount);
+
+    return {
+      success: true,
+      data: reportData,
+    };
+  }
+
+  async getCustomerReportByMaterialCode(materialCode: string) {
+    if (!materialCode) {
+      return { success: true, data: [] };
+    }
+
+    const salesOrders = await this.prisma.salesOrder.findMany({
+      where: {
+        materialData: {
+          some: {
+            Material_Code: {
+              contains: materialCode,
+              mode: 'insensitive',
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        customerId: true,
+        customerNameText: true,
+      },
+    });
+
+    const customerIds = [
+      ...new Set(
+        salesOrders
+          .filter((so) => so.customerId !== null)
+          .map((so) => so.customerId as number),
+      ),
+    ];
+
+    const customers = await this.prisma.customer.findMany({
+      where: { id: { in: customerIds } },
+    });
+    const customerMap = new Map(customers.map((c) => [c.id, c.name]));
+
+    const resultMap = new Map<string, number>();
+
+    for (const so of salesOrders) {
+      const name =
+        (so.customerId ? customerMap.get(so.customerId) : so.customerNameText) ||
+        'N/A';
+      resultMap.set(name, (resultMap.get(name) || 0) + 1);
+    }
+
+    const sortedData = Array.from(resultMap.entries()).map(
+      ([customerName, count]) => ({
+        customerName,
+        count,
+      }),
+    );
+
+    // Sort by count descending
+    sortedData.sort((a, b) => b.count - a.count);
+
+    // Remove the count from the final output
+    const reportData = sortedData.map(item => ({
+      customerName: item.customerName,
+    }));
+
+    return {
+      success: true,
+      data: [
+        { MaterialCode: materialCode },
+        ...reportData,
+      ],
+    };
+  }
 }
