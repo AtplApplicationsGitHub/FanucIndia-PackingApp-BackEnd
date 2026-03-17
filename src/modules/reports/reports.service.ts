@@ -11,7 +11,7 @@ export class ReportsSalesOrderService {
   //   if (filters.startDate || filters.endDate) {
   //     const gte = filters.startDate ? new Date(filters.startDate) : undefined;
   //     const lt = filters.endDate ? new Date(filters.endDate) : undefined;
-      
+
   //     where.createdAt = {};
   //     if (gte) where.createdAt.gte = gte;
   //     // If endDate is provided, encompass the entire day
@@ -88,6 +88,7 @@ export class ReportsSalesOrderService {
         customerNameText: true,
         status: true,
         isErpImported: true,
+        fgLocation: true,
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
       },
@@ -103,16 +104,26 @@ export class ReportsSalesOrderService {
 
     const printedOrderIds = new Set(printedEntries.map((e) => e.salesOrderId));
 
-    return orders.map((order) => ({
-      saleOrderNumber: order.saleOrderNumber,
-      outboundDelivery: order.outboundDelivery,
-      customerName: order.customer?.name || order.customerNameText || 'N/A',
-      salesZone: order.salesZone?.name || 'N/A',
-      paymentClearance: order.paymentClearance,
-      status: order.status || 'N/A',
-      isErpImported: order.isErpImported === 1,
-      isCustomerLabelPrinted: printedOrderIds.has(order.id),
-    }));
+    return orders.map((order) => {
+      // Create the JSON status object based on your logic rules
+      const statusObj = {
+        isErpImported: order.isErpImported === 1,
+        isR105: order.status === 'R105',
+        isW105: order.status === 'W105',
+        isF105: order.status === 'F105',
+        isStored: order.fgLocation !== null, // True if FG Location is not null
+        isCustomerLabelPrinted: printedOrderIds.has(order.id),
+        isDispatched: order.status === 'Dispatched',
+      };
+
+      return {
+        saleOrderNumber: order.saleOrderNumber,
+        outboundDelivery: order.outboundDelivery,
+        customerName: order.customer?.name || order.customerNameText || 'N/A',
+        salesZone: order.salesZone?.name || 'N/A',
+        paymentClearance: order.paymentClearance,
+        status: statusObj, // Replaces the old string output with the new JSON object
+      };
+    });
   }
 }
-
