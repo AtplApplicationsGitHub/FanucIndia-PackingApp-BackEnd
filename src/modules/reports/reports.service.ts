@@ -5,69 +5,99 @@ import { PrismaService } from '../../prisma.service';
 export class ReportsSalesOrderService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // async getSalesOrderReportsAnalysis(filters: any) {
-  //   const where: any = {};
+  async getSalesOrderReportsAnalysis(filters: any) {
+    const where: any = {};
 
-  //   if (filters.startDate || filters.endDate) {
-  //     const gte = filters.startDate ? new Date(filters.startDate) : undefined;
-  //     const lt = filters.endDate ? new Date(filters.endDate) : undefined;
+    if (filters.date) {
+      const gte = new Date(filters.date);
+      const lt = new Date(filters.date);
+      lt.setDate(lt.getDate() + 1);
+      
+      where.createdAt = {
+        gte,
+        lt,
+      };
+    } else if (filters.startDate || filters.endDate) {
+      const gte = filters.startDate ? new Date(filters.startDate) : undefined;
+      const lt = filters.endDate ? new Date(filters.endDate) : undefined;
 
-  //     where.createdAt = {};
-  //     if (gte) where.createdAt.gte = gte;
-  //     // If endDate is provided, encompass the entire day
-  //     if (lt) {
-  //       const nextDay = new Date(lt);
-  //       nextDay.setDate(nextDay.getDate() + 1);
-  //       where.createdAt.lt = nextDay;
-  //     }
-  //   }
+      where.createdAt = {};
+      if (gte) where.createdAt.gte = gte;
+      // If endDate is provided, encompass the entire day
+      if (lt) {
+        const nextDay = new Date(lt);
+        nextDay.setDate(nextDay.getDate() + 1);
+        where.createdAt.lt = nextDay;
+      }
+    }
 
-  //   if (filters.status) {
-  //     where.status = filters.status;
-  //   }
+    if (filters.search) {
+      where.OR = [
+        { saleOrderNumber: { contains: filters.search, mode: 'insensitive' } },
+        { customerNameText: { contains: filters.search, mode: 'insensitive' } },
+        { customer: { name: { contains: filters.search, mode: 'insensitive' } } }
+      ];
+    }
 
-  //   if (filters.salesZoneId) {
-  //     where.salesZoneId = parseInt(filters.salesZoneId, 10);
-  //   }
+    if (filters.payment) {
+      const paymentVal = String(filters.payment).toLowerCase();
+      if (paymentVal === 'cash' || paymentVal === 'true' || paymentVal === 'cleared') {
+        where.paymentClearance = true;
+      } else if (paymentVal === 'credit' || paymentVal === 'false' || paymentVal === 'pending') {
+        where.paymentClearance = false;
+      }
+    }
 
-  //   // 1. Total Orders count
-  //   const totalOrders = await this.prisma.salesOrder.count({ where });
+    if (filters.status) {
+      where.status = filters.status;
+    }
 
-  //   // 2. Orders grouped by status
-  //   const groupStatus = await this.prisma.salesOrder.groupBy({
-  //     by: ['status'],
-  //     where,
-  //     _count: { id: true },
-  //   });
+    if (filters.salesZoneId) {
+      where.salesZoneId = parseInt(filters.salesZoneId, 10);
+    }
 
-  //   // 3. Orders grouped by Payment Clearance
-  //   const groupPayment = await this.prisma.salesOrder.groupBy({
-  //     by: ['paymentClearance'],
-  //     where,
-  //     _count: { id: true },
-  //   });
+    if (filters.customerId) {
+      where.customerId = parseInt(filters.customerId, 10);
+    }
 
-  //   // 4. Transform data for analysis
-  //   const analysisByStatus = groupStatus.map(g => ({
-  //     status: g.status || 'No Status',
-  //     count: g._count.id
-  //   }));
+    // 1. Total Orders count
+    const totalOrders = await this.prisma.salesOrder.count({ where });
 
-  //   const paymentClearedCount = groupPayment.find(g => g.paymentClearance === true)?._count.id || 0;
-  //   const paymentPendingCount = groupPayment.find(g => g.paymentClearance === false)?._count.id || 0;
+    // 2. Orders grouped by status
+    const groupStatus = await this.prisma.salesOrder.groupBy({
+      by: ['status'],
+      where,
+      _count: { id: true },
+    });
 
-  //   return {
-  //     success: true,
-  //     data: {
-  //       totalOrders,
-  //       analysisByStatus,
-  //       paymentStatus: {
-  //         cleared: paymentClearedCount,
-  //         pending: paymentPendingCount
-  //       }
-  //     }
-  //   };
-  // }
+    // 3. Orders grouped by Payment Clearance
+    const groupPayment = await this.prisma.salesOrder.groupBy({
+      by: ['paymentClearance'],
+      where,
+      _count: { id: true },
+    });
+
+    // 4. Transform data for analysis
+    const analysisByStatus = groupStatus.map(g => ({
+      status: g.status || 'No Status',
+      count: g._count.id
+    }));
+
+    const paymentClearedCount = groupPayment.find(g => g.paymentClearance === true)?._count.id || 0;
+    const paymentPendingCount = groupPayment.find(g => g.paymentClearance === false)?._count.id || 0;
+
+    return {
+      success: true,
+      data: {
+        totalOrders,
+        analysisByStatus,
+        paymentStatus: {
+          Yes: paymentClearedCount,
+          No: paymentPendingCount
+        }
+      }
+    };
+  }
 
   async getAdminOrderSummary() {
     const orders = await this.prisma.salesOrder.findMany({

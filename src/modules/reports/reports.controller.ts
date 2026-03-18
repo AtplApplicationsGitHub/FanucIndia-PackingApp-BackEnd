@@ -43,14 +43,15 @@ export class ReportsSalesOrderController {
     return this.reportsSalesOrderService.getFgStorageReport();
   }
 
-   // @Get('analysis')
-  // @Roles('ADMIN')
-  // @ApiOperation({ summary: 'Get reports analysis for Sales Orders' })
-  // @ApiQuery({ name: 'startDate', required: false, type: String, description: 'YYYY-MM-DD' })
-  // @ApiQuery({ name: 'endDate', required: false, type: String, description: 'YYYY-MM-DD' })
-  // @ApiQuery({ name: 'status', required: false, type: String })
-  // @ApiQuery({ name: 'salesZoneId', required: false, type: Number })
-  // async getReportsAnalysis(@Query() filters: any) {
-  //   return this.reportsSalesOrderService.getSalesOrderReportsAnalysis(filters);
-  // }
+   @Get('analysis')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get reports analysis for Sales Orders' })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'payment', required: false, type: String })
+  @ApiQuery({ name: 'salesZoneId', required: false, type: Number })
+  @ApiQuery({ name: 'customerId', required: false, type: Number })
+  @ApiQuery({ name: 'date', required: false, type: String, description: 'YYYY-MM-DD' })
+  async getReportsAnalysis(@Query() filters: any) {
+    return this.reportsSalesOrderService.getSalesOrderReportsAnalysis(filters);
+  }
 }
