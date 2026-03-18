@@ -260,7 +260,7 @@ export class ReportsSalesOrderService {
         updatedAt: true,
       },
       orderBy: {
-        updatedAt: 'asc',
+        fgLocation: 'asc',
       },
     });
 
