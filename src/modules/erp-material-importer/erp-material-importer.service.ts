@@ -57,6 +57,16 @@ export class ErpMaterialImporterService {
 
   @Interval(parseInt(process.env.SFTP_SCAN_INTERVAL_MS || '300000'))
   async autoProcessActiveFolder() {
+    // 1. Calculate current time in IST (UTC + 5:30)
+    const nowUtc = new Date();
+    const istTime = new Date(nowUtc.getTime() + 5.5 * 60 * 60 * 1000);
+    const currentHourIst = istTime.getUTCHours();
+
+    // 2. Schedule Check: Run ONLY between 7 AM and 9 PM (21:00)
+    if (currentHourIst < 7 || currentHourIst >= 21) {
+      return; // Exit silently if outside operational hours
+    }
+
     this.logger.log('Running automated scheduled scan of SFTP active folder...');
 
     const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
@@ -64,8 +74,9 @@ export class ErpMaterialImporterService {
 
     try {
       const files = (await this.sftpService.list(activeDir)) as Array<{ type: string; name: string }>;
-      const soNumbersToImport: string[] = [];
+      const soNumbersFromFiles: string[] = [];
 
+      // 3. Extract all potential SO Numbers from the files
       for (const file of files) {
         if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
           continue; 
@@ -78,28 +89,56 @@ export class ErpMaterialImporterService {
           continue; 
         }
 
-        soNumbersToImport.push(nameParts[0]);
+        soNumbersFromFiles.push(nameParts[0]);
       }
 
-      if (soNumbersToImport.length > 0) {
-        this.logger.log(`Auto-scan found ${soNumbersToImport.length} potential files. Delegating to existing bulk import logic...`);
-        
-        const result = await this.bulkImportFromDrive(soNumbersToImport, 'System Auto Job');
-        
-        const logsToInsert = result.summary.map((s: any) => ({
-          saleOrderNumber: s.soNumber,
-          status: s.status, 
-          message: s.reason,
-          createdAt: new Date(),
-        }));
+      if (soNumbersFromFiles.length > 0) {
+        // 4. Calculate exactly what "Today" means in IST mapped back to UTC for Prisma
+        const startOfTodayIst = new Date(istTime);
+        startOfTodayIst.setUTCHours(0, 0, 0, 0);
+        const startOfTodayUtc = new Date(startOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000);
 
-        if (logsToInsert.length > 0) {
-          await this.prisma.eRP_Data_Cron_Logs.createMany({
-            data: logsToInsert,
-          });
+        const endOfTodayIst = new Date(istTime);
+        endOfTodayIst.setUTCHours(23, 59, 59, 999);
+        const endOfTodayUtc = new Date(endOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000);
+
+        // 5. Query DB to filter ONLY orders created today matching those files
+        const todayOrders = await this.prisma.salesOrder.findMany({
+          where: {
+            saleOrderNumber: { in: soNumbersFromFiles },
+            createdAt: {
+              gte: startOfTodayUtc,
+              lte: endOfTodayUtc
+            }
+          },
+          select: { saleOrderNumber: true }
+        });
+
+        // 6. Get unique valid SO numbers
+        const validSoNumbers = [...new Set(todayOrders.map(o => o.saleOrderNumber))];
+
+        if (validSoNumbers.length > 0) {
+          this.logger.log(`Auto-scan found ${validSoNumbers.length} valid files for today's orders. Delegating to bulk import...`);
+          
+          const result = await this.bulkImportFromDrive(validSoNumbers, 'System Auto Job');
+          
+          const logsToInsert = result.summary.map((s: any) => ({
+            saleOrderNumber: s.soNumber,
+            status: s.status, 
+            message: s.reason,
+            createdAt: new Date(),
+          }));
+
+          if (logsToInsert.length > 0) {
+            await this.prisma.eRP_Data_Cron_Logs.createMany({
+              data: logsToInsert,
+            });
+          }
+          
+          this.logger.log(`Auto-scan bulk import completed. Summary: ${JSON.stringify(result.summary)}`);
+        } else {
+          this.logger.log('Files found, but none correspond to Orders created today. Skipping import.');
         }
-        
-        this.logger.log(`Auto-scan bulk import completed. Summary: ${JSON.stringify(result.summary)}`);
       }
     } catch (error) {
       this.logger.error('Failed to execute automated SFTP folder scan.', error);
@@ -736,39 +775,62 @@ export class ErpMaterialImporterService {
   async bulkDownloadFromDrive(saleOrderNumbers: string[], res: Response) {
     this.logger.log(`Initiating Bulk Download for ${saleOrderNumbers.length} SOs`);
 
+    // 1. Deduplicate the input array
+    const uniqueSoNumbers = [...new Set(saleOrderNumbers)];
+
+    // 2. Fetch all matching orders from DB to handle multiple OBDs for the same SO number
     const salesOrders = await this.prisma.salesOrder.findMany({
-      where: { saleOrderNumber: { in: saleOrderNumbers } },
-      select: { saleOrderNumber: true, outboundDelivery: true }
+      where: { saleOrderNumber: { in: uniqueSoNumbers } },
+      select: { saleOrderNumber: true, outboundDelivery: true, isErpImported: true }
     });
 
     const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
     const activeDir = path.posix.join(baseDir, 'active');
+    const errorDir = path.posix.join(baseDir, 'error');
 
     const missingSOs: string[] = [];
     const filesToZip: { name: string; buffer: Buffer }[] = [];
 
-    for (const soNumber of saleOrderNumbers) {
-      const so = salesOrders.find(s => s.saleOrderNumber === soNumber);
+    // 3. Iterate over the DB results (so we catch ANI001 and ANI002 separately)
+    for (const so of salesOrders) {
+      // If it's already imported (like ANI001), skip it. 
+      // We only want to download the missing ones.
+      if (so.isErpImported === 1) {
+        continue;
+      }
+
+      const soNumber = so.saleOrderNumber;
+      const obd = so.outboundDelivery;
       
-      if (!so || !so.outboundDelivery) {
+      if (!obd) {
         missingSOs.push(soNumber);
         continue;
       }
 
-      const filename = `${so.saleOrderNumber}_${so.outboundDelivery}.xlsx`;
-      const filePath = path.posix.join(activeDir, filename);
+      const filename = `${soNumber}_${obd}.xlsx`;
+      const activePath = path.posix.join(activeDir, filename);
+      const errorPath = path.posix.join(errorDir, filename);
 
       try {
-        const exists = await this.sftpService.exists(filePath);
-        if (exists) {
-          const buffer = await this.sftpService.getBuffer(filePath);
+        // Check active folder first
+        const existsInActive = await this.sftpService.exists(activePath);
+        if (existsInActive) {
+          const buffer = await this.sftpService.getBuffer(activePath);
           filesToZip.push({ name: filename, buffer });
         } else {
-          missingSOs.push(soNumber);
+          // If not in active, check error folder
+          const existsInError = await this.sftpService.exists(errorPath);
+          if (existsInError) {
+            const buffer = await this.sftpService.getBuffer(errorPath);
+            filesToZip.push({ name: filename, buffer });
+          } else {
+            // Not found in either folder (Pushing SO_OBD format for better frontend clarity)
+            missingSOs.push(`${soNumber}_${obd}`);
+          }
         }
       } catch (err) {
-        this.logger.error(`Failed to read file for SO ${soNumber}`, err);
-        missingSOs.push(soNumber);
+        this.logger.error(`Failed to read file for SO ${soNumber}_${obd}`, err);
+        missingSOs.push(`${soNumber}_${obd}`);
       }
     }
 

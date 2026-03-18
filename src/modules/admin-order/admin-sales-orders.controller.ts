@@ -13,9 +13,9 @@ export class AdminSalesOrdersController {
 
   @Get('counts/dynamic')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get dynamic counts of R105 and W105 based on filters' })
+  @ApiOperation({ summary: 'Get dynamic counts of R105, W105 and Pending Imports based on filters' })
   async getDynamicCounts(@Query() query: any) {
-    const { search, paymentFilter, zoneFilter, statusFilter, customerFilter, startDate, endDate } = query;
+    const { search, paymentFilter, zoneFilter, statusFilter, customerFilter, startDate, endDate, pendingImportFilter } = query;
     const where: any = {};
     
     const baseStatusCondition = { OR: [{ status: 'R105' }, { status: 'W105' }] };
@@ -33,6 +33,10 @@ export class AdminSalesOrdersController {
     if (customerFilter) {
       where.customerId = parseInt(customerFilter, 10);
     }
+    if (pendingImportFilter === 'true') {
+      where.isErpImported = 0;
+    }
+
     if (startDate || endDate) {
       const dateFilter: any = {};
       if (startDate) {
@@ -84,7 +88,24 @@ export class AdminSalesOrdersController {
       _count: { status: true },
     });
 
-    const counts = { R105: 0, W105: 0 };
+    const pendingImportWhere = { ...where };
+    if (pendingImportWhere.AND) {
+       pendingImportWhere.AND = pendingImportWhere.AND.filter((cond: any) => cond !== baseStatusCondition);
+    } else {
+       pendingImportWhere.AND = [];
+    }
+    
+    if (!statusFilter) {
+      pendingImportWhere.AND.push({
+        OR: [{ status: null }, { status: 'R105' }, { status: 'W105' }]
+      });
+    }
+    
+    const pendingImportCount = await this.prisma.salesOrder.count({
+      where: { ...pendingImportWhere, isErpImported: 0 },
+    });
+
+    const counts = { R105: 0, W105: 0, PendingImport: pendingImportCount };
     results.forEach(r => {
       if (r.status === 'R105') counts.R105 = r._count.status;
       if (r.status === 'W105') counts.W105 = r._count.status;
