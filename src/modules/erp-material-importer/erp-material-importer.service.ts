@@ -122,12 +122,14 @@ export class ErpMaterialImporterService {
           
           const result = await this.bulkImportFromDrive(validSoNumbers, 'System Auto Job');
           
-          const logsToInsert = result.summary.map((s: any) => ({
-            saleOrderNumber: s.soNumber,
-            status: s.status, 
-            message: s.reason,
-            createdAt: new Date(),
-          }));
+          const logsToInsert = result.summary
+            .filter((s: any) => s.status !== 'Skipped')
+            .map((s: any) => ({
+              saleOrderNumber: s.soNumber,
+              status: s.status, 
+              message: s.reason,
+              createdAt: new Date(),
+            }));
 
           if (logsToInsert.length > 0) {
             await this.prisma.eRP_Data_Cron_Logs.createMany({
@@ -145,30 +147,39 @@ export class ErpMaterialImporterService {
     }
   }
 
-  @Cron(process.env.ERP_LOG_EXPORT_CRON || '0 21 * * *')
+  // NEW: Explicitly set the timezone so 21:00 means 9:00 PM IST
+  @Cron(process.env.ERP_LOG_EXPORT_CRON || '0 21 * * *', { timeZone: 'Asia/Kolkata' })
   async exportDailyCronLogs() {
     this.logger.log('Running daily export of ERP Cron Logs...');
     
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    // Safely calculate 12:00 AM today in IST, mapped to UTC for the database query
+    const nowUtc = new Date();
+    const istTime = new Date(nowUtc.getTime() + 5.5 * 60 * 60 * 1000);
+    
+    const startOfTodayIst = new Date(istTime);
+    startOfTodayIst.setUTCHours(0, 0, 0, 0);
+    const startOfDayUtc = new Date(startOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000);
 
     try {
       const logs = await this.prisma.eRP_Data_Cron_Logs.findMany({
-        where: { createdAt: { gte: startOfDay } },
+        where: { createdAt: { gte: startOfDayUtc } },
         orderBy: { createdAt: 'asc' },
       });
 
       if (logs.length === 0) {
-        this.logger.log('No ERP logs found for today. Skipping log file generation.');
+        this.logger.log('No ERP logs found for today (Skipped items are excluded). Skipping log file generation.');
         return;
       }
 
-      const dateStr = startOfDay.toISOString().split('T')[0];
+      // Use the IST date for the filename so it is accurate to local time
+      const dateStr = startOfTodayIst.toISOString().split('T')[0];
       let fileContent = `ERP Data Automated Import Logs - ${dateStr}\n`;
       fileContent += `==========================================================================\n\n`;
 
       logs.forEach((log) => {
-        const timeStr = log.createdAt.toISOString().replace('T', ' ').substring(0, 19);
+        // Convert the UTC DB time to IST for the human-readable log file
+        const logTimeIst = new Date(log.createdAt.getTime() + 5.5 * 60 * 60 * 1000);
+        const timeStr = logTimeIst.toISOString().replace('T', ' ').substring(0, 19);
         fileContent += `[${timeStr}] SO Number: ${log.saleOrderNumber.padEnd(15)} | Status: ${log.status.padEnd(10)} | Message: ${log.message || 'N/A'}\n`;
       });
 
