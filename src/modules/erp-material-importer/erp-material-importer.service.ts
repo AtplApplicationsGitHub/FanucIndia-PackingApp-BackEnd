@@ -93,14 +93,13 @@ export class ErpMaterialImporterService {
       }
 
       if (soNumbersFromFiles.length > 0) {
-        // 4. Calculate exactly what "Today" means in IST mapped back to UTC for Prisma
-        const startOfTodayIst = new Date(istTime);
-        startOfTodayIst.setUTCHours(0, 0, 0, 0);
-        const startOfTodayUtc = new Date(startOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000);
-
-        const endOfTodayIst = new Date(istTime);
-        endOfTodayIst.setUTCHours(23, 59, 59, 999);
-        const endOfTodayUtc = new Date(endOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000);
+        // 4. Calculate exactly what "Today" means using foolproof IST string parsing
+        const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
+        const todayIstString = formatter.format(new Date()); // Formats exactly as "YYYY-MM-DD" in IST
+        
+        // The "+05:30" explicitly locks it to IST, bypassing the server's local timezone completely
+        const startOfTodayUtc = new Date(`${todayIstString}T00:00:00.000+05:30`);
+        const endOfTodayUtc = new Date(`${todayIstString}T23:59:59.999+05:30`);
 
         // 5. Query DB to filter ONLY orders created today matching those files
         const todayOrders = await this.prisma.salesOrder.findMany({
@@ -120,8 +119,14 @@ export class ErpMaterialImporterService {
         if (validSoNumbers.length > 0) {
           this.logger.log(`Auto-scan found ${validSoNumbers.length} valid files for today's orders. Delegating to bulk import...`);
           
-          const result = await this.bulkImportFromDrive(validSoNumbers, 'System Auto Job');
+          // 7. Pass the strict date boundaries into the bulk import method
+          const result = await this.bulkImportFromDrive(
+            validSoNumbers, 
+            'System Auto Job',
+            { gte: startOfTodayUtc, lte: endOfTodayUtc }
+          );
           
+          // 8. Filter out 'Skipped' items before logging to DB
           const logsToInsert = result.summary
             .filter((s: any) => s.status !== 'Skipped')
             .map((s: any) => ({
@@ -336,7 +341,11 @@ export class ErpMaterialImporterService {
     };
   }
 
-  async bulkImportFromDrive(saleOrderNumbers: string[], username: string) {
+  async bulkImportFromDrive(
+    saleOrderNumbers: string[], 
+    username: string, 
+    dateRange?: { gte: Date; lte: Date; }
+  ) {
     this.logger.log(`Initiating Bulk Drive Import for ${saleOrderNumbers.length} SOs`);
 
     const results: { soNumber: string; status: string; reason: string }[] = [];
@@ -347,8 +356,19 @@ export class ErpMaterialImporterService {
 
     const uniqueSoNumbers = [...new Set(saleOrderNumbers)];
 
+    const whereClause: Prisma.SalesOrderWhereInput = {
+      saleOrderNumber: { in: uniqueSoNumbers },
+    };
+
+    if (dateRange) {
+      whereClause.createdAt = {
+        gte: dateRange.gte,
+        lte: dateRange.lte,
+      };
+    }
+
     const salesOrders = await this.prisma.salesOrder.findMany({
-      where: { saleOrderNumber: { in: uniqueSoNumbers } },
+      where: whereClause,
       select: { 
         saleOrderNumber: true, 
         outboundDelivery: true,
