@@ -5,25 +5,19 @@ import { PrismaService } from '../../prisma.service';
 export class ReportsSalesOrderService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getSalesOrderReportsAnalysis(filters: any) {
+  async getAdminOrderSummary(filters: any = {}) {
     const where: any = {};
 
     if (filters.date) {
       const gte = new Date(filters.date);
       const lt = new Date(filters.date);
       lt.setDate(lt.getDate() + 1);
-      
-      where.createdAt = {
-        gte,
-        lt,
-      };
+      where.createdAt = { gte, lt };
     } else if (filters.startDate || filters.endDate) {
       const gte = filters.startDate ? new Date(filters.startDate) : undefined;
       const lt = filters.endDate ? new Date(filters.endDate) : undefined;
-
       where.createdAt = {};
       if (gte) where.createdAt.gte = gte;
-      // If endDate is provided, encompass the entire day
       if (lt) {
         const nextDay = new Date(lt);
         nextDay.setDate(nextDay.getDate() + 1);
@@ -34,6 +28,7 @@ export class ReportsSalesOrderService {
     if (filters.search) {
       where.OR = [
         { saleOrderNumber: { contains: filters.search, mode: 'insensitive' } },
+        { outboundDelivery: { contains: filters.search, mode: 'insensitive' } },
         { customerNameText: { contains: filters.search, mode: 'insensitive' } },
         { customer: { name: { contains: filters.search, mode: 'insensitive' } } }
       ];
@@ -50,66 +45,37 @@ export class ReportsSalesOrderService {
 
     if (filters.status) {
       where.status = filters.status;
+    } else {
+      const baseSummaryOr = [
+        { status: null },
+        { status: 'R105' },
+        { status: 'W105' },
+        { status: 'F105' },
+        { status: 'Dispatched' },
+      ];
+
+      if (where.OR) {
+        where.AND = [
+          { OR: where.OR },
+          { OR: baseSummaryOr }
+        ];
+        delete where.OR;
+      } else {
+        where.OR = baseSummaryOr;
+      }
     }
 
     if (filters.salesZoneId) {
       where.salesZoneId = parseInt(filters.salesZoneId, 10);
     }
-
     if (filters.customerId) {
       where.customerId = parseInt(filters.customerId, 10);
     }
 
-    // 1. Total Orders count
     const totalOrders = await this.prisma.salesOrder.count({ where });
 
-    // 2. Orders grouped by status
-    const groupStatus = await this.prisma.salesOrder.groupBy({
-      by: ['status'],
-      where,
-      _count: { id: true },
-    });
-
-    // 3. Orders grouped by Payment Clearance
-    const groupPayment = await this.prisma.salesOrder.groupBy({
-      by: ['paymentClearance'],
-      where,
-      _count: { id: true },
-    });
-
-    // 4. Transform data for analysis
-    const analysisByStatus = groupStatus.map(g => ({
-      status: g.status || 'No Status',
-      count: g._count.id
-    }));
-
-    const paymentClearedCount = groupPayment.find(g => g.paymentClearance === true)?._count.id || 0;
-    const paymentPendingCount = groupPayment.find(g => g.paymentClearance === false)?._count.id || 0;
-
-    return {
-      success: true,
-      data: {
-        totalOrders,
-        analysisByStatus,
-        paymentStatus: {
-          Yes: paymentClearedCount,
-          No: paymentPendingCount
-        }
-      }
-    };
-  }
-
-  async getAdminOrderSummary() {
     const orders = await this.prisma.salesOrder.findMany({
-      where: {
-        OR: [
-          { status: null },
-          { status: 'R105' },
-          { status: 'W105' },
-          { status: 'F105' },
-          { status: 'Dispatched' },
-        ],
-      },
+      where,
       select: {
         id: true,
         saleOrderNumber: true,
@@ -119,6 +85,7 @@ export class ReportsSalesOrderService {
         status: true,
         isErpImported: true,
         fgLocation: true,
+        createdAt: true,
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
       },
@@ -134,29 +101,39 @@ export class ReportsSalesOrderService {
 
     const printedOrderIds = new Set(printedEntries.map((e) => e.salesOrderId));
 
-    return orders.map((order) => {
-      // Create the JSON status object based on your logic rules.
-      // If a later status is reached, the earlier statuses are also considered true.
+    const formattedOrders = orders.map((order) => {
       const statusObj = {
         isErpImported: order.isErpImported === 1,
         isR105: ['R105', 'W105', 'F105', 'Dispatched'].includes(order.status ?? ''),
         isW105: ['W105', 'F105', 'Dispatched'].includes(order.status ?? ''),
         isF105: ['F105', 'Dispatched'].includes(order.status ?? ''),
-        isStored: order.fgLocation !== null, // True if FG Location is not null
+        isStored: order.fgLocation !== null, 
         isCustomerLabelPrinted: printedOrderIds.has(order.id),
         isDispatched: order.status === 'Dispatched',
       };
 
       return {
+        id: order.id,
         saleOrderNumber: order.saleOrderNumber,
         outboundDelivery: order.outboundDelivery,
-        customerName: order.customer?.name || order.customerNameText || 'N/A',
-        salesZone: order.salesZone?.name || 'N/A',
+        customerName: order.customer?.name || order.customerNameText || '-',
+        salesZone: order.salesZone?.name || '-',
         paymentClearance: order.paymentClearance,
-        status: statusObj, // Replaces the old string output with the new JSON object
+        createdAt: order.createdAt,
+        status: order.status || '-',
+        statusObj: statusObj,
       };
     });
+
+    return {
+      success: true,
+      data: {
+        totalOrders,
+        orders: formattedOrders
+      }
+    };
   }
+
   // CUSTOMER REPORTS 
   async getCustomerReport() {
     const grouped = await this.prisma.salesOrder.groupBy({
@@ -295,7 +272,7 @@ export class ReportsSalesOrderService {
     });
 
     const reportData = orders.map((order) => {
-      let locationStr = 'N/A';
+      let locationStr = '-';
       if (order.fgLocation) {
         const loc = order.fgLocation as any;
         if (Array.isArray(loc)) {

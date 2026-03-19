@@ -13,10 +13,16 @@ export class ReportsSalesOrderController {
 
   @Get('summary')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get summary list with SO, OBD, Customer, Zone, Payment (Admin only)' })
+  @ApiOperation({ summary: 'Get summary list with SO, OBD, Customer, Zone, Payment and Filters (Combined)' })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'payment', required: false, type: String })
+  @ApiQuery({ name: 'salesZoneId', required: false, type: Number })
+  @ApiQuery({ name: 'customerId', required: false, type: Number })
+  @ApiQuery({ name: 'date', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'status', required: false, type: String })
   @ApiResponse({ status: 200, description: 'Order summary returned successfully' })
-  getAdminOrderSummary() {
-    return this.reportsSalesOrderService.getAdminOrderSummary();
+  getAdminOrderSummary(@Query() filters: any) {
+    return this.reportsSalesOrderService.getAdminOrderSummary(filters);
   }
 
   @Get('customer-report')
@@ -41,17 +47,5 @@ export class ReportsSalesOrderController {
   @ApiResponse({ status: 200, description: 'FG storage report returned successfully' })
   getFgStorageReport() {
     return this.reportsSalesOrderService.getFgStorageReport();
-  }
-
-   @Get('analysis')
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get reports analysis for Sales Orders' })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'payment', required: false, type: String })
-  @ApiQuery({ name: 'salesZoneId', required: false, type: Number })
-  @ApiQuery({ name: 'customerId', required: false, type: Number })
-  @ApiQuery({ name: 'date', required: false, type: String, description: 'YYYY-MM-DD' })
-  async getReportsAnalysis(@Query() filters: any) {
-    return this.reportsSalesOrderService.getSalesOrderReportsAnalysis(filters);
   }
 }

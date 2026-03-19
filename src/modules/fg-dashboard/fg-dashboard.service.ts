@@ -21,7 +21,10 @@ export class FgDashboardService {
     const { search, date, payment, zone, status, page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
     const where: Prisma.SalesOrderWhereInput = {
-      status: { not: 'Dispatched' }
+      OR: [
+        { status: { not: 'Dispatched' } },
+        { status: null }
+      ]
     };
 
     if (date) {
@@ -49,6 +52,8 @@ export class FgDashboardService {
     }
 
     if (status) {
+      delete where.OR;
+      
       if (status === 'None') {
          where.OR = [
            { status: { equals: null } },
