@@ -20,6 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "overrides": {
+    "socket.io-parser": "^4.2.6",
     "js-yaml": ">=4.1.1",
     "validator": ">=13.15.20",
     "fast-redact": ">=3.6.0",
@@ -39,7 +40,7 @@
     "@mui/icons-material": "^7.2.0",
     "@nestjs/common": "^11.1.14",
     "@nestjs/config": "^4.0.2",
-    "@nestjs/core": "^11.0.1",
+    "@nestjs/core": "^11.1.17",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.16",
