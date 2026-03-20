@@ -26,9 +26,10 @@ import { SoNotificationsModule } from './modules/so-notifications/so-notificatio
 import { AppUpdateModule } from './modules/app-update/app-update.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { SambaModule } from './modules/samba/samba.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule, ErpMaterialImporterModule, DispatchModule, SoSearchModule, FgDashboardModule, FgStorageModule, SoArchiveModule, DashboardModule, VehicleEntryModule, SoChatModule, SoNotificationsModule, AppUpdateModule, ReportsModule, ScheduleModule.forRoot()],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SalesOrderModule, AuthModule, LookupModule, SalesCrudModule, AdminOrderModule, UserModule, ErpMaterialDataModule, ErpMaterialFileModule, SftpModule, UserDashboardModule, ErpMaterialImporterModule, DispatchModule, SoSearchModule, FgDashboardModule, FgStorageModule, SoArchiveModule, DashboardModule, VehicleEntryModule, SoChatModule, SoNotificationsModule, AppUpdateModule, ReportsModule, ScheduleModule.forRoot(), SambaModule],
   controllers: [AppController],
   providers: [AppService],
 })
