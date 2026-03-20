@@ -20,6 +20,8 @@ export class ReportsSalesOrderController {
   @ApiQuery({ name: 'customerId', required: false, type: Number })
   @ApiQuery({ name: 'date', required: false, type: String, description: 'YYYY-MM-DD' })
   @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, options: 10, 20, 50, 100)' })
   @ApiResponse({ status: 200, description: 'Order summary returned successfully' })
   getAdminOrderSummary(@Query() filters: any) {
     return this.reportsSalesOrderService.getAdminOrderSummary(filters);
@@ -44,8 +46,13 @@ export class ReportsSalesOrderController {
   @Get('fg-storage-report')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Get report of FG Storage with orders not dispatched' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, options: 10, 20, 50, 100)' })
   @ApiResponse({ status: 200, description: 'FG storage report returned successfully' })
-  getFgStorageReport() {
-    return this.reportsSalesOrderService.getFgStorageReport();
+  getFgStorageReport(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string
+  ) {
+    return this.reportsSalesOrderService.getFgStorageReport(page, limit);
   }
 }

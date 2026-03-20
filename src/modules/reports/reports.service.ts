@@ -8,6 +8,10 @@ export class ReportsSalesOrderService {
   async getAdminOrderSummary(filters: any = {}) {
     const where: any = {};
 
+    const page = filters.page ? parseInt(filters.page, 10) : 1;
+    const limit = filters.limit ? parseInt(filters.limit, 10) : 10;
+    const skip = (page - 1) * limit;
+
     if (filters.date) {
       const gte = new Date(filters.date);
       const lt = new Date(filters.date);
@@ -90,6 +94,8 @@ export class ReportsSalesOrderService {
         salesZone: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
     });
 
     const orderIds = orders.map((o) => o.id);
@@ -129,6 +135,9 @@ export class ReportsSalesOrderService {
       success: true,
       data: {
         totalOrders,
+        page,              
+        limit,             
+        totalPages: Math.ceil(totalOrders / limit), 
         orders: formattedOrders
       }
     };
@@ -250,15 +259,23 @@ export class ReportsSalesOrderService {
     };
   }
 
-  // FG STROAGE 
-  async getFgStorageReport() {
+  // FG STORAGE
+  async getFgStorageReport(pageParam?: string, limitParam?: string) {
+    const page = pageParam ? parseInt(pageParam, 10) : 1;
+    const limit = limitParam ? parseInt(limitParam, 10) : 10;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      OR: [
+        { status: { not: 'Dispatched' } },
+        { status: null },
+      ],
+    };
+
+    const totalOrders = await this.prisma.salesOrder.count({ where });
+
     const orders = await this.prisma.salesOrder.findMany({
-      where: {
-        OR: [
-          { status: { not: 'Dispatched' } },
-          { status: null },
-        ],
-      },
+      where,
       select: {
         fgLocation: true,
         saleOrderNumber: true,
@@ -269,6 +286,8 @@ export class ReportsSalesOrderService {
       orderBy: {
         fgLocation: 'asc',
       },
+      skip,
+      take: limit,
     });
 
     const reportData = orders.map((order) => {
@@ -295,7 +314,13 @@ export class ReportsSalesOrderService {
 
     return {
       success: true,
-      data: reportData,
+      data: {
+        totalOrders,
+        page,              
+        limit,             
+        totalPages: Math.ceil(totalOrders / limit),
+        reportData
+      }
     };
   }
 }
