@@ -210,6 +210,17 @@ export class ReportsSalesOrderService {
         id: true,
         customerId: true,
         customerNameText: true,
+        materialData: {
+          where: {
+            Material_Code: {
+              contains: materialCode,
+              mode: 'insensitive',
+            },
+          },
+          select: {
+            Required_Qty: true,
+          },
+        },
       },
     });
 
@@ -231,30 +242,31 @@ export class ReportsSalesOrderService {
     for (const so of salesOrders) {
       const name =
         (so.customerId ? customerMap.get(so.customerId) : so.customerNameText) ||
-        'N/A';
-      resultMap.set(name, (resultMap.get(name) || 0) + 1);
+        '-';
+      
+      let orderMaterialQty = 0;
+      for (const mat of so.materialData) {
+        const qty = Number(mat.Required_Qty) || 0; 
+        orderMaterialQty += qty;
+      }
+
+      resultMap.set(name, (resultMap.get(name) || 0) + orderMaterialQty);
     }
 
     const sortedData = Array.from(resultMap.entries()).map(
-      ([customerName, count]) => ({
+      ([customerName, totalQuantity]) => ({
         customerName,
-        count,
+        totalQuantity, 
       }),
     );
 
-    // Sort by count descending
-    sortedData.sort((a, b) => b.count - a.count);
-
-    // Remove the count from the final output
-    const reportData = sortedData.map(item => ({
-      customerName: item.customerName,
-    }));
+    sortedData.sort((a, b) => b.totalQuantity - a.totalQuantity);
 
     return {
       success: true,
       data: [
         { MaterialCode: materialCode },
-        ...reportData,
+        ...sortedData,
       ],
     };
   }
