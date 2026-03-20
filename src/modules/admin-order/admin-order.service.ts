@@ -160,9 +160,8 @@ export class AdminOrderService {
         return { total: 0, page: 1, limit: 0, data: [] };
       }
 
-      const isFilterActive = !!search || !!startDate || !!endDate;
-      const skip = isFilterActive ? 0 : (parsedPage - 1) * parsedLimit;
-      const take = isFilterActive ? total : parsedLimit;
+      const skip = (parsedPage - 1) * parsedLimit;
+      const take = parsedLimit;
 
       const data = await this.prisma.salesOrder.findMany({
         where,
@@ -191,8 +190,8 @@ export class AdminOrderService {
 
       return {
         total,
-        page: isFilterActive ? 1 : parsedPage,
-        limit: isFilterActive ? total : parsedLimit,
+        page: parsedPage,
+        limit: parsedLimit,
         data: data.map(({ _count, ...order }) => ({
           ...order,
           hasMaterialData: order.isErpImported === 1,
