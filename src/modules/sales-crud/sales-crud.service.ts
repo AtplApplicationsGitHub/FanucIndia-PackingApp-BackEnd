@@ -358,7 +358,7 @@ export class SalesCrudService {
         }
         if (err.code === 'P2002') {
           throw new ConflictException(
-            'Update would violate a unique constraint.',
+            'An order with this Sale Order Number and Outbound Delivery combination already exists.',
           );
         }
       }
