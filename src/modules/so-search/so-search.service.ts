@@ -162,10 +162,10 @@ export class SoSearchService {
         materialFiles,
         statusStepper,
       ] = await Promise.all([
-        this.prisma.dispatch_SOArchive.findMany({ where: { salesOrderId: archivedSalesOrder.id }, select: { dispatchId: true } }), 
-        this.prisma.eRP_Material_DataArchive.findMany({ where: { salesOrderId: archivedSalesOrder.id }, orderBy: { ID: 'asc' } }), 
-        this.prisma.eRP_Material_FileArchive.findMany({ where: { salesOrderId: archivedSalesOrder.id } }), 
-        this.prisma.sO_Status_StepperArchive.findMany({ where: { salesOrderId: archivedSalesOrder.id } }), 
+        this.prisma.dispatch_SOArchive.findMany({ where: { saleOrderNumber: canonicalSoNumber }, select: { dispatchId: true } }), 
+        this.prisma.eRP_Material_DataArchive.findMany({ where: { saleOrderNumber: canonicalSoNumber }, orderBy: { ID: 'asc' } }), 
+        this.prisma.eRP_Material_FileArchive.findMany({ where: { saleOrderNumber: canonicalSoNumber } }), 
+        this.prisma.sO_Status_StepperArchive.findMany({ where: { salesOrderNumber: canonicalSoNumber } }), 
       ]);
 
       const [product, customer, transporter, /*plantCode,*/ salesZone, packConfig] = await Promise.all([
