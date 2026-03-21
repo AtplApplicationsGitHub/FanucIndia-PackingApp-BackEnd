@@ -255,6 +255,7 @@ model SalesOrderArchive {
   priority          Int?
   skipStage         Boolean?
   isErpImported     Int?
+  binCount          Int?
   createdAt         DateTime
   UpdatedBy         String?
   UpdatedDate       DateTime?

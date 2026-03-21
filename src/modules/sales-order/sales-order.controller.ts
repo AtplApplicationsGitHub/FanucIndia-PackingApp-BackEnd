@@ -49,7 +49,10 @@ export class SalesOrderController {
 
     const date = new Date();
     const timestamp = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}${String(date.getMinutes()).padStart(2, '0')}`;
-    const filename = `Sales_Orders_${timestamp}.xlsx`;
+    
+    const isBlank = String(filters.blank) === 'true';
+    const filenamePrefix = isBlank ? 'Blank_Sales_Orders_' : 'Sales_Orders_';
+    const filename = `${filenamePrefix}${timestamp}.xlsx`;
 
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     res.setHeader(

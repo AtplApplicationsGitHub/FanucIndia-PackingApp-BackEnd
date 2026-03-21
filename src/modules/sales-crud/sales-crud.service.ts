@@ -16,7 +16,10 @@ import { SftpService } from '../sftp/sftp.service';
 
 @Injectable()
 export class SalesCrudService {
-  constructor(private readonly prisma: PrismaService, private readonly sftpService: SftpService,) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sftpService: SftpService,
+  ) {}
 
   async create(dto: CreateSalesCrudDto, userId: number) {
     const saleOrderNumber = dto.saleOrderNumber?.trim();
@@ -32,7 +35,9 @@ export class SalesCrudService {
     });
 
     if (existingComposite) {
-      throw new ConflictException(`An order with Sale Order '${saleOrderNumber}' and Outbound Delivery '${outboundDelivery}' already exists.`);
+      throw new ConflictException(
+        `An order with Sale Order '${saleOrderNumber}' and Outbound Delivery '${outboundDelivery}' already exists.`,
+      );
     }
 
     try {
@@ -82,7 +87,7 @@ export class SalesCrudService {
         let defaultProduct = await this.prisma.product.findFirst({
           where: { name: { equals: 'FA', mode: 'insensitive' } },
         });
-        
+
         if (!defaultProduct) {
           defaultProduct = await this.prisma.product.create({
             data: { name: 'FA' },
@@ -426,7 +431,7 @@ export class SalesCrudService {
           ];
         } else {
           whereClause.status = filters.status;
-        } 
+        }
       } else if (filters.excludeStatus) {
         whereClause.AND = [
           ...(Array.isArray(whereClause.AND) ? whereClause.AND : []),
@@ -552,13 +557,16 @@ export class SalesCrudService {
     try {
       const createdLabelPrint = await this.prisma.$transaction(async (tx) => {
         const ordersToUpdate = await tx.salesOrder.findMany({
-           where: {
-             saleOrderNumber: { in: saleOrderNumbers },
-             status: { not: 'Dispatched' },
-           }
+          where: {
+            saleOrderNumber: { in: saleOrderNumbers },
+            OR: [
+              { status: { not: 'Dispatched' } },
+              { status: null },
+            ],
+          },
         });
 
-        const orderIds = ordersToUpdate.map(o => o.id);
+        const orderIds = ordersToUpdate.map((o) => o.id);
 
         await tx.salesOrder.updateMany({
           where: { id: { in: orderIds } },
@@ -568,7 +576,10 @@ export class SalesCrudService {
         for (const order of ordersToUpdate) {
           await tx.sO_Status_Stepper.update({
             where: {
-              salesOrderId_status: { salesOrderId: order.id, status: statusToSet }
+              salesOrderId_status: {
+                salesOrderId: order.id,
+                status: statusToSet,
+              },
             },
             data: { createdDateTime: now, updatedBy: userName },
           });
@@ -592,7 +603,6 @@ export class SalesCrudService {
       });
 
       newLabelPrintId = createdLabelPrint.id;
-
     } catch (err: any) {
       throw new InternalServerErrorException(
         'Failed to update order status and save print history.',
@@ -601,17 +611,21 @@ export class SalesCrudService {
     }
 
     try {
-      const printQty = quantity && quantity > 0 ? quantity : 1;      
-      const printResult = await this.printCustomerLabel(newLabelPrintId, printQty);
+      const printQty = quantity && quantity > 0 ? quantity : 1;
+      const printResult = await this.printCustomerLabel(
+        newLabelPrintId,
+        printQty,
+      );
 
       return {
-        message: 'Status updated, history saved, and physical print job sent successfully.',
+        message:
+          'Status updated, history saved, and physical print job sent successfully.',
         count: saleOrderNumbers.length,
-        printStatus: printResult, 
+        printStatus: printResult,
       };
     } catch (err: any) {
       throw new InternalServerErrorException(
-        `Database updated successfully, but the printer failed: ${err.message}`
+        `Database updated successfully, but the printer failed: ${err.message}`,
       );
     }
   }
@@ -669,26 +683,29 @@ export class SalesCrudService {
 
     // const finalPrn = prnCommands.join('\r\n');
 
-    const fileName = 'FANUC_60X40_TE210_160226-LAN.prn'; 
+    const fileName = 'FANUC_60X40_TE210_160226-LAN.prn';
     const basePath = process.env.PRN_FILE_PATH || 'uploads/fanuc/prn-files/';
     const sftpTemplatePath = `${basePath.replace(/\/$/, '')}/${fileName}`;
-    
+
     let prnTemplate = '';
 
     try {
       const prnBuffer = await this.sftpService.getBuffer(sftpTemplatePath);
       prnTemplate = prnBuffer.toString('utf8');
     } catch (error) {
-      console.error(`Error reading PRN file from SFTP at path: ${sftpTemplatePath}`, error);
+      console.error(
+        `Error reading PRN file from SFTP at path: ${sftpTemplatePath}`,
+        error,
+      );
       throw new InternalServerErrorException(
-        `Failed to read the Printer template file from the SFTP server at: ${sftpTemplatePath}. Ensure the file exists.`
+        `Failed to read the Printer template file from the SFTP server at: ${sftpTemplatePath}. Ensure the file exists.`,
       );
     }
 
     let finalPrn = prnTemplate;
-    
+
     finalPrn = finalPrn.replace(/@@CustomerName@@/g, customerName);
-    finalPrn = finalPrn.replace(/@@SONumber@@/g, order.saleOrderNumber); 
+    finalPrn = finalPrn.replace(/@@SONumber@@/g, order.saleOrderNumber);
     finalPrn = finalPrn.replace(/@@LabelRemarks@@/g, labelRemarks);
     finalPrn = finalPrn.replace(/@@SalesZone@@/g, salesZone);
     finalPrn = finalPrn.replace(/@@Quantity@@/g, qty.toString());
@@ -751,14 +768,18 @@ export class SalesCrudService {
       });
 
       if (firstSo) {
-        addressFirstLine = firstSo.customer?.name || firstSo.customerNameText || '';
-        
+        addressFirstLine =
+          firstSo.customer?.name || firstSo.customerNameText || '';
+
         contactNumber = firstSo.customer?.contactNumber || '';
 
         const rawAddress = firstSo.customer?.address || firstSo.address || '';
 
         if (rawAddress) {
-          const addrParts = rawAddress.split(',').map(s => s.trim()).filter(Boolean);
+          const addrParts = rawAddress
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
 
           if (addrParts.length > 0) {
             pinCode = addrParts.pop() || '';
@@ -782,20 +803,22 @@ export class SalesCrudService {
     const boxNumber = labelPrint.boxNN || '';
 
     const fileName = 'FANUC_ZEBRA_ZT421_210X150_060326.prn';
-    
+
     const basePath = process.env.PRN_FILE_PATH || 'uploads/fanuc/prn-files/';
-    
+
     const sftpTemplatePath = `${basePath.replace(/\/$/, '')}/${fileName}`;
-    
+
     let prn = '';
 
     try {
       const prnBuffer = await this.sftpService.getBuffer(sftpTemplatePath);
-      
+
       prn = prnBuffer.toString('utf8');
-      
     } catch (error) {
-      console.error(`Error reading PRN file from SFTP at path: ${sftpTemplatePath}`, error);
+      console.error(
+        `Error reading PRN file from SFTP at path: ${sftpTemplatePath}`,
+        error,
+      );
       throw new InternalServerErrorException(
         `Failed to read the Printer template file from the SFTP server at: ${sftpTemplatePath}. Ensure the file exists.`,
       );
@@ -837,20 +860,25 @@ export class SalesCrudService {
       client.connect(9100, printerIp, () => {
         client.write(finalPayload, () => {
           client.end();
-          resolve({ success: true, message: 'Customer Label Print job sent successfully' });
+          resolve({
+            success: true,
+            message: 'Customer Label Print job sent successfully',
+          });
         });
       });
 
       client.on('error', (err) => {
         client.destroy();
-        reject(new InternalServerErrorException(`Printer error: ${err.message}`));
+        reject(
+          new InternalServerErrorException(`Printer error: ${err.message}`),
+        );
       });
 
       client.on('timeout', () => {
         client.destroy();
         reject(
           new InternalServerErrorException(
-            `Printer error: Connection to ${printerIp}:9100 timed out after 5000ms. Verify the printer is online.`
+            `Printer error: Connection to ${printerIp}:9100 timed out after 5000ms. Verify the printer is online.`,
           ),
         );
       });
