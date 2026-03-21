@@ -30,17 +30,28 @@ export class ReportsSalesOrderController {
   @Get('customer-report')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Get report of how many Sales Orders per Customer' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'YYYY-MM-DD' })
   @ApiResponse({ status: 200, description: 'Customer report returned successfully' })
-  getCustomerReport() {
-    return this.reportsSalesOrderService.getCustomerReport();
+  getCustomerReport(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    return this.reportsSalesOrderService.getCustomerReport(startDate, endDate);
   }
 
   @Get('customers-by-material/:materialCode')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Get report of customers who ordered a specific material code' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'YYYY-MM-DD' })
   @ApiResponse({ status: 200, description: 'Customer report filtered by material returned successfully' })
-  getCustomerReportByMaterialCode(@Param('materialCode') materialCode: string) {
-    return this.reportsSalesOrderService.getCustomerReportByMaterialCode(materialCode);
+  getCustomerReportByMaterialCode(
+    @Param('materialCode') materialCode: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    return this.reportsSalesOrderService.getCustomerReportByMaterialCode(materialCode, startDate, endDate);
   }
 
   @Get('fg-storage-report')

@@ -144,9 +144,26 @@ export class ReportsSalesOrderService {
   }
 
   // CUSTOMER REPORTS 
-  async getCustomerReport() {
+  async getCustomerReport(startDate?: string, endDate?: string) {
+    const where: any = {};
+
+    // Apply deliveryDate filter if startDate or endDate are provided
+    if (startDate || endDate) {
+      where.deliveryDate = {};
+      if (startDate) {
+        where.deliveryDate.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        // Set time to end of the day to make the filter inclusive
+        end.setUTCHours(23, 59, 59, 999); 
+        where.deliveryDate.lte = end;
+      }
+    }
+
     const grouped = await this.prisma.salesOrder.groupBy({
       by: ['customerId', 'customerNameText'],
+      where, // Add the where clause here
       _count: {
         id: true,
       },
@@ -190,22 +207,38 @@ export class ReportsSalesOrderService {
     };
   }
 
-  async getCustomerReportByMaterialCode(materialCode: string) {
+  async getCustomerReportByMaterialCode(materialCode: string, startDate?: string, endDate?: string) {
     if (!materialCode) {
       return { success: true, data: [] };
     }
 
-    const salesOrders = await this.prisma.salesOrder.findMany({
-      where: {
-        materialData: {
-          some: {
-            Material_Code: {
-              contains: materialCode,
-              mode: 'insensitive',
-            },
+    const where: any = {
+      materialData: {
+        some: {
+          Material_Code: {
+            contains: materialCode,
+            mode: 'insensitive',
           },
         },
       },
+    };
+
+    // Apply deliveryDate filter alongside the materialCode filter
+    if (startDate || endDate) {
+      where.deliveryDate = {};
+      if (startDate) {
+        where.deliveryDate.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        // Set time to end of the day to make the filter inclusive
+        end.setUTCHours(23, 59, 59, 999);
+        where.deliveryDate.lte = end;
+      }
+    }
+
+    const salesOrders = await this.prisma.salesOrder.findMany({
+      where, // Pass the combined where clause here
       select: {
         id: true,
         customerId: true,
@@ -289,15 +322,17 @@ export class ReportsSalesOrderService {
     const orders = await this.prisma.salesOrder.findMany({
       where,
       select: {
+        id: true,
         fgLocation: true,
         saleOrderNumber: true,
         outboundDelivery: true,
         UpdatedBy: true,
         updatedAt: true,
       },
-      orderBy: {
-        fgLocation: 'asc',
-      },
+      orderBy: [
+        { fgLocation: 'asc' },
+        { id: 'asc' }
+      ],
       skip,
       take: limit,
     });
