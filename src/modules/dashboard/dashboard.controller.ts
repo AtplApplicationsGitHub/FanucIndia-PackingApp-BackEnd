@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -31,8 +31,8 @@ export class DashboardController {
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: 'Get KPI counters for the ADMIN dashboard' })
   @ApiResponse({ status: 200, type: AdminKpiDto })
-  async getAdminKpis(): Promise<AdminKpiDto> {
-    return this.dashboardService.getAdminKpis();
+  async getAdminKpis(@Query('date') date?: string): Promise<AdminKpiDto> {
+    return this.dashboardService.getAdminKpis(date);
   }
 
   @Get('admin-new-imports')
@@ -55,24 +55,24 @@ export class DashboardController {
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: 'Get system-wide counts of orders by status' })
   @ApiResponse({ status: 200, type: AdminOverallStatusDto })
-  async getAdminOverallStatus(): Promise<AdminOverallStatusDto> {
-    return this.dashboardService.getAdminOverallStatus();
+  async getAdminOverallStatus(@Query('date') date?: string): Promise<AdminOverallStatusDto> {
+    return this.dashboardService.getAdminOverallStatus(date);
   }
 
   @Get('admin-status-by-zone')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Get system-wide order status counts by sales zone (Row 3)' })
   @ApiResponse({ status: 200, type: [AdminStatusByZoneDto] })
-  async getAdminStatusByZone(): Promise<AdminStatusByZoneDto[]> {
-    return this.dashboardService.getAdminStatusByZone();
+  async getAdminStatusByZone(@Query('date') date?: string): Promise<AdminStatusByZoneDto[]> {
+    return this.dashboardService.getAdminStatusByZone(date);
   }
 
   @Get('admin-payment-by-zone')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Get system-wide payment clearance counts by sales zone (Row 4)' })
   @ApiResponse({ status: 200, type: [AdminPaymentByZoneDto] })
-  async getAdminPaymentByZone(): Promise<AdminPaymentByZoneDto[]> {
-    return this.dashboardService.getAdminPaymentByZone();
+  async getAdminPaymentByZone(@Query('date') date?: string): Promise<AdminPaymentByZoneDto[]> {
+    return this.dashboardService.getAdminPaymentByZone(date);
   }
 
   @Get('admin-orders-by-product')
@@ -95,9 +95,7 @@ export class DashboardController {
   @Roles('SALES')
   @ApiOperation({ summary: 'Get KPI counters for the SALES dashboard' })
   @ApiResponse({ status: 200, type: SalesKpiDto })
-  async getSalesKpis(
-    @Req() req: AuthRequest,
-  ): Promise<SalesKpiDto> {
+  async getSalesKpis(@Req() req: AuthRequest): Promise<SalesKpiDto> {
     return this.dashboardService.getSalesKpis(req.user.userId);
   }
 
@@ -105,24 +103,37 @@ export class DashboardController {
   @Roles('SALES')
   @ApiOperation({ summary: 'Get recent activity feed for the SALES dashboard' })
   @ApiResponse({ status: 200, type: [SalesActivityDto] })
-  async getSalesRecentActivity(
-    @Req() req: AuthRequest,
-  ): Promise<SalesActivityDto[]> {
+  async getSalesRecentActivity(@Req() req: AuthRequest): Promise<SalesActivityDto[]> {
     return this.dashboardService.getSalesRecentActivity(req.user.userId);
   }
 
   @Get('sales-payment-clearance')
   @Roles('SALES')
-  @ApiOperation({
-    summary:
-      'Get payment clearance counts by sales zone for the SALES user (for graph)',
-  })
+  @ApiOperation({ summary: 'Get payment clearance counts by sales zone for the SALES user' })
   @ApiResponse({ status: 200, type: [SalesPaymentClearanceDto] })
-  async getSalesPaymentClearance(
-    @Req() req: AuthRequest,
-  ): Promise<SalesPaymentClearanceDto[]> {
-    return this.dashboardService.getSalesPaymentClearanceByZone(
-      req.user.userId,
-    );
+  async getSalesPaymentClearance(@Req() req: AuthRequest): Promise<SalesPaymentClearanceDto[]> {
+    return this.dashboardService.getSalesPaymentClearanceByZone(req.user.userId);
+  }
+
+  @Get('admin-upcoming-orders')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({ summary: 'Get upcoming material order counts for the next 5 days' })
+  @ApiResponse({ status: 200, type: [AdminNewImportDto] }) 
+  async getAdminUpcomingOrders(): Promise<AdminNewImportDto[]> {
+    return this.dashboardService.getAdminUpcomingOrders();
+  }
+
+  @Get('admin-status-by-customer')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get system-wide order status counts by Top 15 Customers' })
+  async getAdminStatusByCustomer(@Query('date') date?: string) {
+    return this.dashboardService.getAdminStatusByCustomer(date);
+  }
+
+  @Get('admin-payment-by-customer')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get payment clearance counts by Top 15 Customers' })
+  async getAdminPaymentByCustomer(@Query('date') date?: string) {
+    return this.dashboardService.getAdminPaymentByCustomer(date);
   }
 }
