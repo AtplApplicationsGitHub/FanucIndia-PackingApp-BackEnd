@@ -59,11 +59,13 @@ export class ReportsSalesOrderController {
   @ApiOperation({ summary: 'Get report of FG Storage with orders not dispatched' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, options: 10, 20, 50, 100)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by SO, OBD, or Location' }) // <-- Added search query
   @ApiResponse({ status: 200, description: 'FG storage report returned successfully' })
   getFgStorageReport(
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
+    @Query('search') search?: string 
   ) {
-    return this.reportsSalesOrderService.getFgStorageReport(page, limit);
+    return this.reportsSalesOrderService.getFgStorageReport(page, limit, search);
   }
 }

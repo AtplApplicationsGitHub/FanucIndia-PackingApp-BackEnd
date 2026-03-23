@@ -317,17 +317,32 @@ export class ReportsSalesOrderService {
   }
 
   // FG STORAGE
-  async getFgStorageReport(pageParam?: string, limitParam?: string) {
+  async getFgStorageReport(pageParam?: string, limitParam?: string, search?: string) {
     const page = pageParam ? parseInt(pageParam, 10) : 1;
     const limit = limitParam ? parseInt(limitParam, 10) : 10;
     const skip = (page - 1) * limit;
 
-    const where = {
+    const where: any = {
+      fgLocation: { not: null }, 
       OR: [
-        { status: { not: 'Dispatched' } },
         { status: null },
+        { status: { in: ['R105', 'W105', 'F105'] } },
       ],
     };
+
+    if (search) {
+      where.AND = [
+        {
+          OR: [
+            { saleOrderNumber: { contains: search, mode: 'insensitive' } },
+            { outboundDelivery: { contains: search, mode: 'insensitive' } },
+            { 
+              fgLocation: { array_contains: search } 
+            }
+          ]
+        }
+      ];
+    }
 
     const totalOrders = await this.prisma.salesOrder.count({ where });
 
@@ -338,8 +353,8 @@ export class ReportsSalesOrderService {
         fgLocation: true,
         saleOrderNumber: true,
         outboundDelivery: true,
-        UpdatedBy: true,
-        updatedAt: true,
+        FGUpdatedBy: true,
+        FGUpdatedDateTime: true,
       },
       orderBy: [
         { fgLocation: 'asc' },
@@ -348,6 +363,8 @@ export class ReportsSalesOrderService {
       skip,
       take: limit,
     });
+
+    const now = new Date();
 
     const reportData = orders.map((order) => {
       let locationStr = '-';
@@ -362,12 +379,20 @@ export class ReportsSalesOrderService {
         }
       }
 
+      let durationDays = 0;
+      if (order.FGUpdatedDateTime) {
+        const diffTime = now.getTime() - new Date(order.FGUpdatedDateTime).getTime();
+        durationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
+      }
+
       return {
         fgLocation: locationStr,
         saleOrderNumber: order.saleOrderNumber,
         outboundDelivery: order.outboundDelivery,
-        LastUpdatedBy: order.UpdatedBy || 'Unknown',
-        dateTime: order.updatedAt,
+        LastUpdatedBy: order.FGUpdatedBy || 'Unknown',
+        dateTime: order.FGUpdatedDateTime,
+        durationDays: durationDays,
+        durationText: `${durationDays} day(s)`
       };
     });
 

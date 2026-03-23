@@ -122,6 +122,8 @@ model SalesOrder {
   Dispatch_SO           Dispatch_SO[]
   UpdatedBy             String?
   UpdatedDate           DateTime?               @updatedAt
+  FGUpdatedBy           String?                 @db.VarChar(255)
+  FGUpdatedDateTime     DateTime?
   statusStepper         SO_Status_Stepper[]
   chatMessages          SalesOrderChatMessage[]
   soChatNotifications   SoChatNotification[]
@@ -259,6 +261,8 @@ model SalesOrderArchive {
   createdAt         DateTime
   UpdatedBy         String?
   UpdatedDate       DateTime?
+  FGUpdatedBy       String?   @db.VarChar(255)
+  FGUpdatedDateTime DateTime?
   archivedAt        DateTime  @default(now())
 }
 

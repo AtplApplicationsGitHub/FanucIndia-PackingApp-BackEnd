@@ -44,6 +44,8 @@ export class FgStorageService {
         fgLocation: currentLocations as Prisma.JsonArray,
         UpdatedBy: user.name, 
         UpdatedDate: new Date(),
+        FGUpdatedBy: user.name,
+        FGUpdatedDateTime: new Date(),
       },
     });
 
