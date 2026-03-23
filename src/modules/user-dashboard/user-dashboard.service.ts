@@ -11,6 +11,18 @@ import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import * as fs from 'fs';
 
+function getDayBoundariesIST(date: Date) {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const y = date.getFullYear();
+  const m = date.getMonth();
+  const d = date.getDate();
+
+  const startOfDay = new Date(Date.UTC(y, m, d, 0, 0, 0) - IST_OFFSET_MS);
+  const endOfDay = new Date(Date.UTC(y, m, d + 1, 0, 0, 0) - IST_OFFSET_MS);
+
+  return { startOfDay, endOfDay };
+}
+
 @Injectable()
 export class UserDashboardService {
   constructor(
@@ -544,15 +556,65 @@ export class UserDashboardService {
     }
   }
 
-  async getDashboardStats(userId: number) {
-    const assignedOrdersCount = await this.prisma.salesOrder.count({
-      where: {
-        assignedUserId: userId,
+  async getDashboardStats(userId: number, dateStr?: string) {
+    let completedOrdersCount = 0;
+    
+    const assignedFilter: Prisma.SalesOrderWhereInput = {
+      assignedUserId: userId,
+      materialData: {
+        some: {},
+      },
+    };
+
+    if (dateStr) {
+      const targetDate = new Date(dateStr);
+      const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+
+      assignedFilter.updatedAt = { gte: startOfDay, lt: endOfDay };
+
+      const user = await this.prisma.user.findUnique({ 
+        where: { id: userId }, 
+        select: { name: true } 
+      });
+
+      if (user?.name) {
+        const completedOrders = await this.prisma.sO_Status_Stepper.findMany({
+          where: {
+            updatedBy: user.name,
+            status: { in: ['Issued', 'Packed'] },
+            createdDateTime: { gte: startOfDay, lt: endOfDay },
+          },
+          distinct: ['salesOrderNumber'],
+          select: { salesOrderNumber: true },
+        });
+        
+        completedOrdersCount = completedOrders.length;
+      }
+    }
+
+    const assignedOrders = await this.prisma.salesOrder.findMany({
+      where: assignedFilter,
+      select: {
+        materialData: {
+          select: { Required_Qty: true, Issue_stage: true, Packing_stage: true },
+        },
       },
     });
 
+    const incompleteOrders = assignedOrders.filter((order) => {
+      if (order.materialData.length === 0) return false;
+      const isComplete = order.materialData.every(
+        (material) =>
+          material.Required_Qty > 0 &&
+          material.Required_Qty === material.Issue_stage &&
+          material.Issue_stage === material.Packing_stage,
+      );
+      return !isComplete;
+    });
+
     return {
-      assignedOrdersCount,
+      assignedOrdersCount: incompleteOrders.length,
+      completedOrdersCount: dateStr ? completedOrdersCount : undefined,
     };
   }
 

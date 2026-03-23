@@ -10,6 +10,7 @@ import {
   BadRequestException,
   UploadedFile,
   UploadedFiles,
+  Query
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -107,8 +108,11 @@ export class UserDashboardController {
   @Get('stats')
   @Roles('USER')
   @ApiOperation({ summary: 'Get specific stats for User Dashboard (Assigned Count)' })
-  async getUserDashboardStats(@Req() req: AuthRequest) {
-    return this.userDashboardService.getDashboardStats(req.user.userId);
+  async getUserDashboardStats(
+    @Req() req: AuthRequest, 
+    @Query('date') dateStr?: string
+  ) {
+    return this.userDashboardService.getDashboardStats(req.user.userId, dateStr);
   }
 
   @Get('recent-activity')

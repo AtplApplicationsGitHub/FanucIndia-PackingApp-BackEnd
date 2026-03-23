@@ -36,58 +36,77 @@ function getDayBoundariesIST(date: Date) {
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
-    let dateFilter: any = {};
-    let prevDateFilter: any = { id: 0 }; // Dummy filter, won't be used if no date
-    let dispatchFilter: any = { status: 'Dispatched' };
-    let prevDispatchFilter: any = { id: 0 };
-    // For all-time overdue, we just check if deliveryDate is before right now
-    let overdueFilter: any = { deliveryDate: { lt: new Date() }, status: { not: 'Dispatched' } };
-    let prevOverdueFilter: any = { id: 0 };
+async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
+  let dateFilter: any = {};
+  let prevDateFilter: any = { id: 0 }; 
+  
+  let dispatchFilter: any = { status: 'Dispatched' };
+  let prevDispatchFilter: any = { id: 0 };
+  
+  let overdueFilter: any = { 
+    deliveryDate: { lt: new Date() }, 
+    status: { not: 'Dispatched' } 
+  };
+  let prevOverdueFilter: any = { id: 0 };
 
-    if (dateStr) {
-      const targetDate = new Date(dateStr);
-      const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
-      
-      const previousDay = new Date(targetDate);
-      previousDay.setDate(previousDay.getDate() - 1);
-      const { startOfDay: prevStart, endOfDay: prevEnd } = getDayBoundariesIST(previousDay);
+  if (dateStr) {
+    const targetDate = new Date(dateStr);
+    const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+    
+    const previousDay = new Date(targetDate);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const { startOfDay: prevStart, endOfDay: prevEnd } = getDayBoundariesIST(previousDay);
 
-      dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
-      prevDateFilter = { createdAt: { gte: prevStart, lt: prevEnd } };
+    dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
+    prevDateFilter = { createdAt: { gte: prevStart, lt: prevEnd } };
 
-      dispatchFilter = { status: 'Dispatched', createdDateTime: { gte: startOfDay, lt: endOfDay } };
-      prevDispatchFilter = { status: 'Dispatched', createdDateTime: { gte: prevStart, lt: prevEnd } };
-
-      overdueFilter = { deliveryDate: { lt: startOfDay }, status: { not: 'Dispatched' } };
-      prevOverdueFilter = { deliveryDate: { lt: prevStart }, status: { not: 'Dispatched' } };
-    }
-
-    // CHANGED this.prisma.$transaction to Promise.all
-    const [
-      totalSoCount, prevTotalSoCount,
-      overdueCount, prevOverdueCount,
-      dispatchedTotalCount, prevDispatchedCount,
-    ] = await Promise.all([
-      this.prisma.salesOrder.count({ where: dateFilter }),
-      dateStr ? this.prisma.salesOrder.count({ where: prevDateFilter }) : Promise.resolve(0),
-      
-      this.prisma.salesOrder.count({ where: overdueFilter }),
-      dateStr ? this.prisma.salesOrder.count({ where: prevOverdueFilter }) : Promise.resolve(0),
-      
-      this.prisma.sO_Status_Stepper.count({ where: dispatchFilter }),
-      dateStr ? this.prisma.sO_Status_Stepper.count({ where: prevDispatchFilter }) : Promise.resolve(0),
-    ]);
-
-    return {
-      totalSoCount,
-      totalSoCountPercentageChange: dateStr ? calculatePercentageChange(totalSoCount, prevTotalSoCount) : 0,
-      overdueSoCount: overdueCount,
-      overdueSoCountPercentageChange: dateStr ? calculatePercentageChange(overdueCount, prevOverdueCount) : 0,
-      dispatchedSoCount: dispatchedTotalCount,
-      dispatchedSoCountPercentageChange: dateStr ? calculatePercentageChange(dispatchedTotalCount, prevDispatchedCount) : 0,
+    dispatchFilter = { 
+      status: 'Dispatched', 
+      statusStepper: {
+        some: {
+          status: 'Dispatched',
+          createdDateTime: { gte: startOfDay, lt: endOfDay }
+        }
+      }
     };
+    prevDispatchFilter = { 
+      status: 'Dispatched', 
+      statusStepper: {
+        some: {
+          status: 'Dispatched',
+          createdDateTime: { gte: prevStart, lt: prevEnd }
+        }
+      }
+    };
+
+    overdueFilter = { deliveryDate: { lt: startOfDay }, status: { not: 'Dispatched' } };
+    prevOverdueFilter = { deliveryDate: { lt: prevStart }, status: { not: 'Dispatched' } };
   }
+
+  const [
+    totalSoCount, prevTotalSoCount,
+    overdueCount, prevOverdueCount,
+    dispatchedTotalCount, prevDispatchedCount,
+  ] = await Promise.all([
+    this.prisma.salesOrder.count({ where: dateFilter }),
+    dateStr ? this.prisma.salesOrder.count({ where: prevDateFilter }) : Promise.resolve(0),
+    
+    this.prisma.salesOrder.count({ where: overdueFilter }),
+    dateStr ? this.prisma.salesOrder.count({ where: prevOverdueFilter }) : Promise.resolve(0),
+    
+    this.prisma.salesOrder.count({ where: dispatchFilter }),
+    dateStr ? this.prisma.salesOrder.count({ where: prevDispatchFilter }) : Promise.resolve(0),
+  ]);
+
+  return {
+    totalSoCount,
+    totalSoCountPercentageChange: dateStr ? calculatePercentageChange(totalSoCount, prevTotalSoCount) : 0,
+    overdueSoCount: overdueCount,
+    overdueSoCountPercentageChange: dateStr ? calculatePercentageChange(overdueCount, prevOverdueCount) : 0,
+    dispatchedSoCount: dispatchedTotalCount,
+    dispatchedSoCountPercentageChange: dateStr ? calculatePercentageChange(dispatchedTotalCount, prevDispatchedCount) : 0,
+  };
+}
 
   async getAdminNewImports(): Promise<AdminNewImportDto[]> {
     const results: AdminNewImportDto[] = [];
