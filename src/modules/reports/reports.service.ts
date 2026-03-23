@@ -143,6 +143,20 @@ export class ReportsSalesOrderService {
       };
     });
 
+    const groupedOrdersMap = formattedOrders.reduce((acc, order) => {
+      const cName = order.customerName;
+      if (!acc[cName]) {
+        acc[cName] = [];
+      }
+      acc[cName].push(order);
+      return acc;
+    }, {} as Record<string, typeof formattedOrders>);
+
+    const groupedData = Object.keys(groupedOrdersMap).map((customerName) => ({
+      customerName,
+      orders: groupedOrdersMap[customerName],
+    }));
+
     return {
       success: true,
       data: {
@@ -150,7 +164,8 @@ export class ReportsSalesOrderService {
         page,              
         limit,             
         totalPages: Math.ceil(totalOrders / limit), 
-        orders: formattedOrders
+        orders: formattedOrders,
+        groupedOrders: groupedData,
       }
     };
   }

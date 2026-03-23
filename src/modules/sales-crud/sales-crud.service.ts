@@ -333,8 +333,15 @@ export class SalesCrudService {
           : dto.deliveryDate;
 
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
-
       const { customerName, customerId, ...rest } = dto as any;
+
+      let fgTrackingData = {};
+      if ('fgLocation' in rest && rest.fgLocation !== existing.fgLocation) {
+        fgTrackingData = {
+          FGUpdatedBy: user?.name || 'System',
+          FGUpdatedDateTime: new Date(),
+        };
+      }
 
       return await this.prisma.salesOrder.update({
         where: { id },
@@ -347,6 +354,7 @@ export class SalesCrudService {
             ? { customerId: resolvedCustomerId }
             : {}),
           ...(address !== undefined && { address }),
+          ...fgTrackingData,
         },
         include: {
           customer: true,

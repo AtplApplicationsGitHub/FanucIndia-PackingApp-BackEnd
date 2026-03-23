@@ -311,6 +311,8 @@ export class AdminOrderService {
           updatedBy: user.name,
         },
       });
+      data.FGUpdatedBy = user.name;
+      data.FGUpdatedDateTime = now;
     }
 
     return this.prisma.salesOrder.update({
