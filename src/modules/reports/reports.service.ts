@@ -93,7 +93,19 @@ export class ReportsSalesOrderService {
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        {
+          customer: {
+            name: 'asc',
+          },
+        },
+        {
+          customerNameText: 'asc',
+        },
+        {
+          saleOrderNumber: 'asc',
+        },
+      ],
       skip,
       take: limit,
     });
