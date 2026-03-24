@@ -37,76 +37,90 @@ export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
 async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
-  let dateFilter: any = {};
-  let prevDateFilter: any = { id: 0 }; 
-  
-  let dispatchFilter: any = { status: 'Dispatched' };
-  let prevDispatchFilter: any = { id: 0 };
-  
-  let overdueFilter: any = { 
-    deliveryDate: { lt: new Date() }, 
-    status: { not: 'Dispatched' } 
-  };
-  let prevOverdueFilter: any = { id: 0 };
+    if (dateStr) {
+      const targetDate = new Date(dateStr);
+      const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+      
+      const previousDay = new Date(targetDate);
+      previousDay.setDate(previousDay.getDate() - 1);
+      const { startOfDay: prevStart, endOfDay: prevEnd } = getDayBoundariesIST(previousDay);
 
-  if (dateStr) {
-    const targetDate = new Date(dateStr);
-    const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
-    
-    const previousDay = new Date(targetDate);
-    previousDay.setDate(previousDay.getDate() - 1);
-    const { startOfDay: prevStart, endOfDay: prevEnd } = getDayBoundariesIST(previousDay);
+      const dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
+      const prevDateFilter = { createdAt: { gte: prevStart, lt: prevEnd } };
 
-    dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
-    prevDateFilter = { createdAt: { gte: prevStart, lt: prevEnd } };
-
-    dispatchFilter = { 
-      status: 'Dispatched', 
-      statusStepper: {
-        some: {
-          status: 'Dispatched',
-          createdDateTime: { gte: startOfDay, lt: endOfDay }
+      const dispatchFilter = { 
+        status: 'Dispatched', 
+        statusStepper: {
+          some: { status: 'Dispatched', createdDateTime: { gte: startOfDay, lt: endOfDay } }
         }
-      }
-    };
-    prevDispatchFilter = { 
-      status: 'Dispatched', 
-      statusStepper: {
-        some: {
-          status: 'Dispatched',
-          createdDateTime: { gte: prevStart, lt: prevEnd }
+      };
+      const prevDispatchFilter = { 
+        status: 'Dispatched', 
+        statusStepper: {
+          some: { status: 'Dispatched', createdDateTime: { gte: prevStart, lt: prevEnd } }
         }
-      }
-    };
+      };
 
-    overdueFilter = { deliveryDate: { lt: startOfDay }, status: { not: 'Dispatched' } };
-    prevOverdueFilter = { deliveryDate: { lt: prevStart }, status: { not: 'Dispatched' } };
+      const overdueFilter = { deliveryDate: { lt: startOfDay }, status: { not: 'Dispatched' } };
+      const prevOverdueFilter = { deliveryDate: { lt: prevStart }, status: { not: 'Dispatched' } };
+
+      const [
+        totalSoCount, prevTotalSoCount,
+        overdueCount, prevOverdueCount,
+        dispatchedTotalCount, prevDispatchedCount,
+      ] = await Promise.all([
+        this.prisma.salesOrder.count({ where: dateFilter }),
+        this.prisma.salesOrder.count({ where: prevDateFilter }),
+        this.prisma.salesOrder.count({ where: overdueFilter }),
+        this.prisma.salesOrder.count({ where: prevOverdueFilter }),
+        this.prisma.salesOrder.count({ where: dispatchFilter }),
+        this.prisma.salesOrder.count({ where: prevDispatchFilter }),
+      ]);
+
+      return {
+        totalSoCount,
+        totalSoCountPercentageChange: calculatePercentageChange(totalSoCount, prevTotalSoCount),
+        overdueSoCount: overdueCount,
+        overdueSoCountPercentageChange: calculatePercentageChange(overdueCount, prevOverdueCount),
+        dispatchedSoCount: dispatchedTotalCount,
+        dispatchedSoCountPercentageChange: calculatePercentageChange(dispatchedTotalCount, prevDispatchedCount),
+      };
+    } else {
+      const now = new Date();
+      
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+      const [totalSoCount, overdueCount, dispatchedTotalCount] = await Promise.all([
+        this.prisma.salesOrder.count(),
+        this.prisma.salesOrder.count({ where: { deliveryDate: { lt: new Date() }, status: { not: 'Dispatched' } } }),
+        this.prisma.salesOrder.count({ where: { status: 'Dispatched' } })
+      ]);
+
+      const [currTotal, currOverdue, currDispatched] = await Promise.all([
+        this.prisma.salesOrder.count({ where: { createdAt: { gte: startOfCurrentMonth } } }),
+        this.prisma.salesOrder.count({ where: { deliveryDate: { lt: new Date() }, status: { not: 'Dispatched' }, createdAt: { gte: startOfCurrentMonth } } }),
+        this.prisma.salesOrder.count({ where: { status: 'Dispatched', statusStepper: { some: { status: 'Dispatched', createdDateTime: { gte: startOfCurrentMonth } } } } })
+      ]);
+
+      const [prevTotal, prevOverdue, prevDispatched] = await Promise.all([
+        this.prisma.salesOrder.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
+        this.prisma.salesOrder.count({ where: { deliveryDate: { lt: new Date() }, status: { not: 'Dispatched' }, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
+        this.prisma.salesOrder.count({ where: { status: 'Dispatched', statusStepper: { some: { status: 'Dispatched', createdDateTime: { gte: startOfLastMonth, lte: endOfLastMonth } } } } })
+      ]);
+
+      return {
+        totalSoCount,
+        totalSoCountPercentageChange: calculatePercentageChange(currTotal, prevTotal),
+        overdueSoCount: overdueCount,
+        overdueSoCountPercentageChange: calculatePercentageChange(currOverdue, prevOverdue),
+        dispatchedSoCount: dispatchedTotalCount,
+        dispatchedSoCountPercentageChange: calculatePercentageChange(currDispatched, prevDispatched),
+      };
+    }
   }
-
-  const [
-    totalSoCount, prevTotalSoCount,
-    overdueCount, prevOverdueCount,
-    dispatchedTotalCount, prevDispatchedCount,
-  ] = await Promise.all([
-    this.prisma.salesOrder.count({ where: dateFilter }),
-    dateStr ? this.prisma.salesOrder.count({ where: prevDateFilter }) : Promise.resolve(0),
-    
-    this.prisma.salesOrder.count({ where: overdueFilter }),
-    dateStr ? this.prisma.salesOrder.count({ where: prevOverdueFilter }) : Promise.resolve(0),
-    
-    this.prisma.salesOrder.count({ where: dispatchFilter }),
-    dateStr ? this.prisma.salesOrder.count({ where: prevDispatchFilter }) : Promise.resolve(0),
-  ]);
-
-  return {
-    totalSoCount,
-    totalSoCountPercentageChange: dateStr ? calculatePercentageChange(totalSoCount, prevTotalSoCount) : 0,
-    overdueSoCount: overdueCount,
-    overdueSoCountPercentageChange: dateStr ? calculatePercentageChange(overdueCount, prevOverdueCount) : 0,
-    dispatchedSoCount: dispatchedTotalCount,
-    dispatchedSoCountPercentageChange: dateStr ? calculatePercentageChange(dispatchedTotalCount, prevDispatchedCount) : 0,
-  };
-}
 
   async getAdminNewImports(): Promise<AdminNewImportDto[]> {
     const results: AdminNewImportDto[] = [];
