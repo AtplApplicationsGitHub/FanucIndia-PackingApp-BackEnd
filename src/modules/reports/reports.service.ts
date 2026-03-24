@@ -158,7 +158,6 @@ export class ReportsSalesOrderService {
         limit,             
         totalPages: Math.ceil(totalOrdersCount / limit), 
         groupedOrders: groupedData,
-        orders: formattedOrders,
       }
     };
   }
@@ -379,11 +378,11 @@ export class ReportsSalesOrderService {
         fgLocation: locationStr,
         saleOrderNumber: order.saleOrderNumber,
         outboundDelivery: order.outboundDelivery,
-        LastUpdatedBy: order.FGUpdatedBy || 'Unknown',
+        LastUpdatedBy: order.FGUpdatedBy,
         dateTime: order.FGUpdatedDateTime,
         durationDays: durationDays,
-        durationText: `${durationDays} day(s)`
-      };
+        durationText: `${durationDays} ${durationDays > 1 ? 'days' : 'day'}`
+};
     });
 
     let filteredOrders = formattedOrders;
