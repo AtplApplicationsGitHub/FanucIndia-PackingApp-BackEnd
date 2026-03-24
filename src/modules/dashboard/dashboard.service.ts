@@ -87,28 +87,30 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
       };
     } else {
       const now = new Date();
+
+      const { startOfDay: todayStart } = getDayBoundariesIST(now);
       
       const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      const endOfLastMonthMTD = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate(), 23, 59, 59, 999);
 
       const [totalSoCount, overdueCount, dispatchedTotalCount] = await Promise.all([
         this.prisma.salesOrder.count(),
-        this.prisma.salesOrder.count({ where: { deliveryDate: { lt: new Date() }, status: { not: 'Dispatched' } } }),
+        this.prisma.salesOrder.count({ where: { deliveryDate: { lt: todayStart }, status: { not: 'Dispatched' } } }),
         this.prisma.salesOrder.count({ where: { status: 'Dispatched' } })
       ]);
 
       const [currTotal, currOverdue, currDispatched] = await Promise.all([
         this.prisma.salesOrder.count({ where: { createdAt: { gte: startOfCurrentMonth } } }),
-        this.prisma.salesOrder.count({ where: { deliveryDate: { lt: new Date() }, status: { not: 'Dispatched' }, createdAt: { gte: startOfCurrentMonth } } }),
+        this.prisma.salesOrder.count({ where: { deliveryDate: { lt: todayStart }, status: { not: 'Dispatched' }, createdAt: { gte: startOfCurrentMonth } } }),
         this.prisma.salesOrder.count({ where: { status: 'Dispatched', statusStepper: { some: { status: 'Dispatched', createdDateTime: { gte: startOfCurrentMonth } } } } })
       ]);
 
       const [prevTotal, prevOverdue, prevDispatched] = await Promise.all([
-        this.prisma.salesOrder.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
-        this.prisma.salesOrder.count({ where: { deliveryDate: { lt: new Date() }, status: { not: 'Dispatched' }, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
-        this.prisma.salesOrder.count({ where: { status: 'Dispatched', statusStepper: { some: { status: 'Dispatched', createdDateTime: { gte: startOfLastMonth, lte: endOfLastMonth } } } } })
+        this.prisma.salesOrder.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } }),
+        this.prisma.salesOrder.count({ where: { deliveryDate: { lt: todayStart }, status: { not: 'Dispatched' }, createdAt: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } }),
+        this.prisma.salesOrder.count({ where: { status: 'Dispatched', statusStepper: { some: { status: 'Dispatched', createdDateTime: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } } } })
       ]);
 
       return {
@@ -514,20 +516,17 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
   }
 
   async getOperatorStats(dateStr?: string) {
-    // ---> FIXED DATE FILTER LOGIC <---
     let dateFilter: any = {};
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
+      dateFilter = { UpdatedDate: { gte: startOfDay, lt: endOfDay } };
     }
 
-    // 1. Fetch all floor workers (Operators)
     const operators = await this.prisma.user.findMany({
       where: { role: 'USER' },
       select: { id: true, name: true },
     });
 
-    // 2. Fetch all orders for the selected date that have an assigned user
     const orders = await this.prisma.salesOrder.findMany({
       where: {
         ...dateFilter,
@@ -536,26 +535,42 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
       select: { assignedUserId: true, status: true },
     });
 
-    // 3. Map the counts to every operator
     const stats = operators.map((op) => {
       const opOrders = orders.filter((o) => o.assignedUserId === op.id);
       
-      const assigned = opOrders.length;
-      
-      // Define what "Closed" means (Adjust these statuses if needed for your business logic)
-      const closed = opOrders.filter((o) => 
-        ['Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'].includes(o.status || '')
-      ).length;
+      let issueAssigned = 0;
+      let issueCompleted = 0;
+      let packingAssigned = 0;
+      let packingCompleted = 0;
+
+      opOrders.forEach((o) => {
+        const s = o.status || '';
+        
+        const isPastIssue = ['W105', 'F105', 'Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'].includes(s);
+        const isPastPacking = ['F105', 'Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'].includes(s);
+
+        issueAssigned++;
+
+        if (isPastIssue) {
+          issueCompleted++;
+          packingAssigned++; 
+        }
+
+        if (isPastPacking) {
+          packingCompleted++;
+        }
+      });
 
       return {
         operatorName: op.name,
-        assigned,
-        closed,
+        issueAssigned,
+        issueCompleted,
+        packingAssigned,
+        packingCompleted,
       };
     });
 
-    // 4. Sort by Assigned Descending
-    stats.sort((a, b) => b.assigned - a.assigned);
+    stats.sort((a, b) => b.issueAssigned - a.issueAssigned);
 
     return { success: true, data: stats };
   }

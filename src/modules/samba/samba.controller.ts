@@ -26,4 +26,10 @@ export class SambaController {
   ) {
     return this.sambaService.downloadFiles(body.folder, body.filenames, res);
   }
+
+  @Get('db-logs')
+  @Roles('ADMIN')
+  async getDbLogs(@Query('date') date?: string) {
+    return this.sambaService.getDbLogs(date);
+  }
 }

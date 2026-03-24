@@ -76,10 +76,12 @@ export class ReportsSalesOrderService {
     if (filters.customerId) {
       where.customerId = parseInt(filters.customerId, 10);
     }
-
+    const totalOrdersCount = await this.prisma.salesOrder.count({ where });
     // --- 1. FETCH ALL MATCHING ORDERS (No Skip/Take here) ---
     const orders = await this.prisma.salesOrder.findMany({
       where,
+      skip,
+      take: limit,
       select: {
         id: true,
         saleOrderNumber: true,
@@ -148,20 +150,15 @@ export class ReportsSalesOrderService {
       orders: groupedOrdersMap[customerName],
     }));
 
-    // --- 3. PAGINATE THE GROUPS (Customers) ---
-    const totalCustomers = groupedData.length;
-    const paginatedGroups = groupedData.slice(skip, skip + limit);
-
-    // --- 4. RETURN ONLY THE GROUPED DATA ---
     return {
       success: true,
       data: {
-        totalCustomers: totalCustomers,
-        totalOrders: orders.length, 
+        totalOrders: totalOrdersCount, 
         page,              
         limit,             
-        totalPages: Math.ceil(totalCustomers / limit), 
-        groupedOrders: paginatedGroups, // This is now your main returned array
+        totalPages: Math.ceil(totalOrdersCount / limit), 
+        groupedOrders: groupedData,
+        orders: formattedOrders,
       }
     };
   }

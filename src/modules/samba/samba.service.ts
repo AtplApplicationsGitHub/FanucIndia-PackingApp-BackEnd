@@ -2,13 +2,14 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { SftpService } from '../sftp/sftp.service';
 import { Response } from 'express';
 import * as archiver from 'archiver';
+import { PrismaService } from '../../prisma.service';
 
 @Injectable()
 export class SambaService {
   private readonly logger = new Logger(SambaService.name);
   private readonly baseDir = process.env.SFTP_BASE_DIR_DRIVE || '/uploads/fanuc/samba_mount_drive';
 
-  constructor(private readonly sftpService: SftpService) {}
+  constructor(private readonly sftpService: SftpService, private prisma: PrismaService) {}
 
   async listFiles(folder: string) {
     const validFolders = ['active', 'archive', 'error', 'logs'];
@@ -91,5 +92,35 @@ export class SambaService {
       }
       await archive.finalize();
     }
+  }
+
+  async getDbLogs(dateStr?: string) {
+    const whereClause: any = {};
+    
+    if (dateStr) {
+      const startOfTodayIst = new Date(`${dateStr}T00:00:00.000+05:30`);
+      const endOfTodayIst = new Date(`${dateStr}T23:59:59.999+05:30`);
+      whereClause.createdAt = {
+        gte: new Date(startOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000),
+        lte: new Date(endOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000),
+      };
+    } else {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      whereClause.createdAt = { gte: sevenDaysAgo };
+    }
+
+    const logs = await this.prisma.eRP_Data_Cron_Logs.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        saleOrderNumber: true,
+        status: true,
+        message: true,
+        createdAt: true,
+      }
+    });
+
+    return logs;
   }
 }

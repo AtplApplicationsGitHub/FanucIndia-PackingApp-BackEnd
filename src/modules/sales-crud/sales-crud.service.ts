@@ -567,10 +567,6 @@ export class SalesCrudService {
         const ordersToUpdate = await tx.salesOrder.findMany({
           where: {
             saleOrderNumber: { in: saleOrderNumbers },
-            OR: [
-              { status: { not: 'Dispatched' } },
-              { status: null },
-            ],
           },
         });
 

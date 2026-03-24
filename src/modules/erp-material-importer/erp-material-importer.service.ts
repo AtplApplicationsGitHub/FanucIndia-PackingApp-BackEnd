@@ -171,25 +171,21 @@ export class ErpMaterialImporterService {
         orderBy: { createdAt: 'asc' },
       });
 
-      if (logs.length === 0) {
-        this.logger.log('No ERP logs found for today (Skipped items are excluded). Skipping log file generation.');
-        return;
-      }
-
-      // Use the IST date for the filename so it is accurate to local time
       const dateStr = startOfTodayIst.toISOString().split('T')[0];
       let fileContent = `ERP Data Automated Import Logs - ${dateStr}\n`;
       fileContent += `==========================================================================\n\n`;
 
-      logs.forEach((log) => {
-        // Convert the UTC DB time to IST for the human-readable log file
-        const logTimeIst = new Date(log.createdAt.getTime() + 5.5 * 60 * 60 * 1000);
-        const timeStr = logTimeIst.toISOString().replace('T', ' ').substring(0, 19);
-        fileContent += `[${timeStr}] SO Number: ${log.saleOrderNumber.padEnd(15)} | Status: ${log.status.padEnd(10)} | Message: ${log.message || 'N/A'}\n`;
-      });
+      if (logs.length === 0) {
+        fileContent += `[System Status] No failed or processed auto-imports found for today.\n`;
+      } else {
+        logs.forEach((log) => {
+          const logTimeIst = new Date(log.createdAt.getTime() + 5.5 * 60 * 60 * 1000);
+          const timeStr = logTimeIst.toISOString().replace('T', ' ').substring(0, 19);
+          fileContent += `[${timeStr}] SO Number: ${log.saleOrderNumber.padEnd(15)} | Status: ${log.status.padEnd(10)} | Message: ${log.message || 'N/A'}\n`;
+        });
+      }
 
       const buffer = Buffer.from(fileContent, 'utf-8');
-      
       const logDir = process.env.ERP_CRON_LOGS || 'uploads/fanuc/logs/';
       const filename = `ERP_Cron_Logs_${dateStr.replace(/-/g, '')}.txt`;
       const remotePath = path.posix.join(logDir, filename);
