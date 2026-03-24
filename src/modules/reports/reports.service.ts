@@ -12,6 +12,7 @@ export class ReportsSalesOrderService {
     const limit = filters.limit ? parseInt(filters.limit, 10) : 10;
     const skip = (page - 1) * limit;
 
+    // --- APPLY FILTERS ---
     if (filters.date) {
       const gte = new Date(filters.date);
       const lt = new Date(filters.date);
@@ -76,8 +77,7 @@ export class ReportsSalesOrderService {
       where.customerId = parseInt(filters.customerId, 10);
     }
 
-    const totalOrders = await this.prisma.salesOrder.count({ where });
-
+    // --- 1. FETCH ALL MATCHING ORDERS (No Skip/Take here) ---
     const orders = await this.prisma.salesOrder.findMany({
       where,
       select: {
@@ -94,20 +94,10 @@ export class ReportsSalesOrderService {
         salesZone: { select: { name: true } },
       },
       orderBy: [
-        {
-          customer: {
-            name: 'asc',
-          },
-        },
-        {
-          customerNameText: 'asc',
-        },
-        {
-          saleOrderNumber: 'asc',
-        },
+        { customer: { name: 'asc' } },
+        { customerNameText: 'asc' },
+        { saleOrderNumber: 'asc' },
       ],
-      skip,
-      take: limit,
     });
 
     const orderIds = orders.map((o) => o.id);
@@ -143,6 +133,7 @@ export class ReportsSalesOrderService {
       };
     });
 
+    // --- 2. GROUP ALL ORDERS BY CUSTOMER NAME ---
     const groupedOrdersMap = formattedOrders.reduce((acc, order) => {
       const cName = order.customerName;
       if (!acc[cName]) {
@@ -157,15 +148,20 @@ export class ReportsSalesOrderService {
       orders: groupedOrdersMap[customerName],
     }));
 
+    // --- 3. PAGINATE THE GROUPS (Customers) ---
+    const totalCustomers = groupedData.length;
+    const paginatedGroups = groupedData.slice(skip, skip + limit);
+
+    // --- 4. RETURN ONLY THE GROUPED DATA ---
     return {
       success: true,
       data: {
-        totalOrders,
+        totalCustomers: totalCustomers,
+        totalOrders: orders.length, 
         page,              
         limit,             
-        totalPages: Math.ceil(totalOrders / limit), 
-        orders: formattedOrders,
-        groupedOrders: groupedData,
+        totalPages: Math.ceil(totalCustomers / limit), 
+        groupedOrders: paginatedGroups, // This is now your main returned array
       }
     };
   }
