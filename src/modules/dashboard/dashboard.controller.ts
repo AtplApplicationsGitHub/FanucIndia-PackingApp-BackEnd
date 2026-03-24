@@ -136,4 +136,11 @@ export class DashboardController {
   async getAdminPaymentByCustomer(@Query('date') date?: string) {
     return this.dashboardService.getAdminPaymentByCustomer(date);
   }
+
+  @Get('operator-stats')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get Operator assigned vs closed stats' })
+  async getOperatorStats(@Query('date') date?: string) {
+    return this.dashboardService.getOperatorStats(date);
+  }
 }

@@ -345,23 +345,7 @@ export class ReportsSalesOrderService {
       ],
     };
 
-    if (search) {
-      where.AND = [
-        {
-          OR: [
-            { saleOrderNumber: { contains: search, mode: 'insensitive' } },
-            { outboundDelivery: { contains: search, mode: 'insensitive' } },
-            { 
-              fgLocation: { array_contains: search } 
-            }
-          ]
-        }
-      ];
-    }
-
-    const totalOrders = await this.prisma.salesOrder.count({ where });
-
-    const orders = await this.prisma.salesOrder.findMany({
+    const allOrders = await this.prisma.salesOrder.findMany({
       where,
       select: {
         id: true,
@@ -374,14 +358,12 @@ export class ReportsSalesOrderService {
       orderBy: [
         { fgLocation: 'asc' },
         { id: 'asc' }
-      ],
-      skip,
-      take: limit,
+      ]
     });
 
     const now = new Date();
 
-    const reportData = orders.map((order) => {
+    const formattedOrders = allOrders.map((order) => {
       let locationStr = '-';
       if (order.fgLocation) {
         const loc = order.fgLocation as any;
@@ -411,6 +393,21 @@ export class ReportsSalesOrderService {
       };
     });
 
+    let filteredOrders = formattedOrders;
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      filteredOrders = formattedOrders.filter((o) => {
+        const soMatch = o.saleOrderNumber.toLowerCase().includes(lowerSearch);
+        const obdMatch = o.outboundDelivery?.toLowerCase().includes(lowerSearch);
+        const locMatch = o.fgLocation.toLowerCase().includes(lowerSearch);
+        
+        return soMatch || obdMatch || locMatch;
+      });
+    }
+
+    const totalOrders = filteredOrders.length;
+    const pagedReportData = filteredOrders.slice(skip, skip + limit);
+
     return {
       success: true,
       data: {
@@ -418,7 +415,7 @@ export class ReportsSalesOrderService {
         page,              
         limit,             
         totalPages: Math.ceil(totalOrders / limit),
-        reportData
+        reportData: pagedReportData
       }
     };
   }

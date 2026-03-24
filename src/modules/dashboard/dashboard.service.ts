@@ -450,12 +450,15 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
       }
     }
 
-    return Array.from(resultsMap.values())
-      .sort((a, b) => {
-        const totalA = a.toBeIssuedCount + a.r105Count + a.w105Count + a.f105Count + a.dispatchedCount;
-        const totalB = b.toBeIssuedCount + b.r105Count + b.w105Count + b.f105Count + b.dispatchedCount;
-        return totalB - totalA;
-      });
+  //   return Array.from(resultsMap.values())
+  //     .sort((a, b) => {
+  //       const totalA = a.toBeIssuedCount + a.r105Count + a.w105Count + a.f105Count + a.dispatchedCount;
+  //       const totalB = b.toBeIssuedCount + b.r105Count + b.w105Count + b.f105Count + b.dispatchedCount;
+  //       return totalB - totalA;
+  //     });
+  // }
+  return Array.from(resultsMap.values())
+      .sort((a, b) => a.customerName.localeCompare(b.customerName));
   }
 
   async getAdminPaymentByCustomer(dateStr?: string): Promise<AdminPaymentByCustomerDto[]> {
@@ -489,7 +492,57 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
       }
     }
 
-    return Array.from(resultsMap.values())
-      .sort((a, b) => (b.paymentCleared + b.paymentPending) - (a.paymentCleared + a.paymentPending));
+  //   return Array.from(resultsMap.values())
+  //     .sort((a, b) => (b.paymentCleared + b.paymentPending) - (a.paymentCleared + a.paymentPending));
+  // }
+  return Array.from(resultsMap.values())
+      .sort((a, b) => a.customerName.localeCompare(b.customerName));
+  }
+
+  async getOperatorStats(dateStr?: string) {
+    // ---> FIXED DATE FILTER LOGIC <---
+    let dateFilter: any = {};
+    if (dateStr) {
+      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
+      dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
+    }
+
+    // 1. Fetch all floor workers (Operators)
+    const operators = await this.prisma.user.findMany({
+      where: { role: 'USER' },
+      select: { id: true, name: true },
+    });
+
+    // 2. Fetch all orders for the selected date that have an assigned user
+    const orders = await this.prisma.salesOrder.findMany({
+      where: {
+        ...dateFilter,
+        assignedUserId: { not: null },
+      },
+      select: { assignedUserId: true, status: true },
+    });
+
+    // 3. Map the counts to every operator
+    const stats = operators.map((op) => {
+      const opOrders = orders.filter((o) => o.assignedUserId === op.id);
+      
+      const assigned = opOrders.length;
+      
+      // Define what "Closed" means (Adjust these statuses if needed for your business logic)
+      const closed = opOrders.filter((o) => 
+        ['Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'].includes(o.status || '')
+      ).length;
+
+      return {
+        operatorName: op.name,
+        assigned,
+        closed,
+      };
+    });
+
+    // 4. Sort by Assigned Descending
+    stats.sort((a, b) => b.assigned - a.assigned);
+
+    return { success: true, data: stats };
   }
 }
