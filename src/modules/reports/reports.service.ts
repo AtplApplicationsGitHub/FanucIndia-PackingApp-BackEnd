@@ -12,22 +12,31 @@ export class ReportsSalesOrderService {
     const limit = filters.limit ? parseInt(filters.limit, 10) : 10;
     const skip = (page - 1) * limit;
 
-    // --- APPLY FILTERS ---
     if (filters.date) {
       const gte = new Date(filters.date);
-      const lt = new Date(filters.date);
+      gte.setHours(0, 0, 0, 0); 
+      
+      const lt = new Date(gte);
       lt.setDate(lt.getDate() + 1);
-      where.createdAt = { gte, lt };
+      
+      where.deliveryDate = { gte, lt };
     } else if (filters.startDate || filters.endDate) {
       const gte = filters.startDate ? new Date(filters.startDate) : undefined;
       const lt = filters.endDate ? new Date(filters.endDate) : undefined;
-      where.createdAt = {};
-      if (gte) where.createdAt.gte = gte;
+      
+      where.deliveryDate = {};
+      
+      if (gte) {
+        gte.setHours(0, 0, 0, 0);
+        where.deliveryDate.gte = gte;
+      }
       if (lt) {
         const nextDay = new Date(lt);
+        nextDay.setHours(0, 0, 0, 0);
         nextDay.setDate(nextDay.getDate() + 1);
-        where.createdAt.lt = nextDay;
+        where.deliveryDate.lt = nextDay;
       }
+      if (!gte && !lt) delete where.deliveryDate; 
     }
 
     if (filters.search) {

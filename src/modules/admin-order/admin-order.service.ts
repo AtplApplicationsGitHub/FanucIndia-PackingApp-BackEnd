@@ -175,6 +175,8 @@ export class AdminOrderService {
           salesZone: { select: { id: true, name: true } },
           packConfig: { select: { id: true, configName: true } },
           assignedUser: { select: { id: true, name: true } },
+          issueAssignedUser: { select: { id: true, name: true } },
+          packingAssignedUser: { select: { id: true, name: true } },
           materialData: {
             select: { A_D_F: true },
             take: 1,

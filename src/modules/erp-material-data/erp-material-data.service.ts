@@ -92,7 +92,7 @@ export class ErpMaterialDataService {
     await verifyOrderAccess(this.prisma, orderId, userId, userRole);
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true },
+      select: { saleOrderNumber: true, packingAssignedUserId: true },
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
@@ -152,7 +152,7 @@ export class ErpMaterialDataService {
         data: {
           status: 'W105',
           skipStage: null,
-          assignedUserId: null,
+          assignedUserId: salesOrder.packingAssignedUserId || null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -189,7 +189,7 @@ export class ErpMaterialDataService {
 
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true },
+      select: { saleOrderNumber: true, packingAssignedUserId: true },
     });
 
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
@@ -256,7 +256,7 @@ export class ErpMaterialDataService {
         data: {
           status: 'W105',
           skipStage: null,
-          assignedUserId: null,
+          assignedUserId: salesOrder.packingAssignedUserId || null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -478,7 +478,7 @@ export class ErpMaterialDataService {
           data: {
             status: 'W105',
             skipStage: null,
-            assignedUserId: null,
+            assignedUserId: current.packingAssignedUserId || null,
             UpdatedBy: userName,
             UpdatedDate: new Date(),
           },
