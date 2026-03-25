@@ -17,6 +17,8 @@ model User {
   updatedAt                DateTime       @updatedAt
   salesOrders              SalesOrder[]   @relation("CreatedOrders")
   assignedOrders           SalesOrder[]   @relation("AssignedOrders")
+  issueAssignedOrders      SalesOrder[]   @relation("IssueAssignedOrders")
+  packingAssignedOrders    SalesOrder[]   @relation("PackingAssignedOrders")
   dispatches               Dispatch[]
   vehicleEntries           VehicleEntry[]
   accessPickPack           Boolean        @default(false)
@@ -105,6 +107,10 @@ model SalesOrder {
   status                String?
   priority              Int?
   skipStage             Boolean?                @default(false)
+  issueAssignedUserId   Int?
+  packingAssignedUserId Int?
+  skipIssueStage        Boolean?                @default(false)
+  skipPackingStage      Boolean?                @default(false)
   isErpImported         Int                     @default(0)
   binCount              Int?                    @default(0)
   createdAt             DateTime                @default(now())
@@ -117,6 +123,8 @@ model SalesOrder {
   product               Product                 @relation(fields: [productId], references: [id])
   salesZone             SalesZone               @relation(fields: [salesZoneId], references: [id])
   assignedUser          User?                   @relation("AssignedOrders", fields: [assignedUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  issueAssignedUser     User?                   @relation("IssueAssignedOrders", fields: [issueAssignedUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  packingAssignedUser   User?                   @relation("PackingAssignedOrders", fields: [packingAssignedUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   transporter           Transporter             @relation(fields: [transporterId], references: [id])
   user                  User                    @relation("CreatedOrders", fields: [userId], references: [id])
   Dispatch_SO           Dispatch_SO[]
@@ -256,6 +264,10 @@ model SalesOrderArchive {
   status            String?
   priority          Int?
   skipStage         Boolean?
+  issueAssignedUserId   Int?
+  packingAssignedUserId Int?
+  skipIssueStage        Boolean?
+  skipPackingStage      Boolean?
   isErpImported     Int?
   binCount          Int?
   createdAt         DateTime

@@ -349,7 +349,7 @@ export class AdminOrderService {
     dto: BulkAssignOrderDto,
     user: { userId: number; name: string },
   ) {
-    const { salesOrderIds, assignedUserId, priority } = dto;
+    const { salesOrderIds, assignedUserId, issueAssignedUserId, packingAssignedUserId, skipIssueStage, skipPackingStage, priority } = dto;
     const now = new Date();
 
     const orders = await this.prisma.salesOrder.findMany({
@@ -368,8 +368,20 @@ export class AdminOrderService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const order of orders) {
-        const isUserChanging = order.assignedUserId !== assignedUserId;
-        if (!isUserChanging && priority === undefined) continue;
+        
+        let newAssignedUserId = order.assignedUserId;
+        const currentStatus = order.status || 'R105';
+
+        if (currentStatus === 'R105' || currentStatus === null) {
+          if (issueAssignedUserId !== undefined) newAssignedUserId = issueAssignedUserId;
+          else if (assignedUserId !== undefined) newAssignedUserId = assignedUserId;
+        } else if (currentStatus === 'W105') {
+          if (packingAssignedUserId !== undefined) newAssignedUserId = packingAssignedUserId;
+          else if (assignedUserId !== undefined) newAssignedUserId = assignedUserId;
+        }
+
+        const isUserChanging = order.assignedUserId !== newAssignedUserId;
+
         if (isUserChanging) {
           let targetStatus = '';
           if (order.status === 'R105' || !order.status) {
@@ -398,9 +410,14 @@ export class AdminOrderService {
         };
 
         if (isUserChanging) {
-          updateData.assignedUserId = assignedUserId;
+          updateData.assignedUserId = newAssignedUserId;
         }
-        
+
+        if (issueAssignedUserId !== undefined) updateData.issueAssignedUserId = issueAssignedUserId;
+        if (packingAssignedUserId !== undefined) updateData.packingAssignedUserId = packingAssignedUserId;
+        if (skipIssueStage !== undefined) updateData.skipIssueStage = skipIssueStage;
+        if (skipPackingStage !== undefined) updateData.skipPackingStage = skipPackingStage;
+
         if (priority !== undefined) {
           updateData.priority = priority;
         }

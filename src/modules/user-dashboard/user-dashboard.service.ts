@@ -488,7 +488,7 @@ export class UserDashboardService {
   ) {
     const order = await prismaClient.salesOrder.findFirst({
       where: { saleOrderNumber },
-      select: { id: true, status: true },
+      select: { id: true, status: true, packingAssignedUserId: true }, 
     });
     if (!order) return;
 
@@ -513,7 +513,7 @@ export class UserDashboardService {
         data: {
           status: 'W105',
           skipStage: null,
-          assignedUserId: null,
+          assignedUserId: order.packingAssignedUserId || null, 
         },
       });
 
@@ -539,7 +539,7 @@ export class UserDashboardService {
         data: {
           status: 'F105',
           skipStage: null,
-          assignedUserId: null,
+          assignedUserId: null, 
         },
       });
 

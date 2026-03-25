@@ -522,6 +522,7 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
     });
 
     const stats = operators.map((op) => ({
+      operatorId: op.id,
       operatorName: op.name,
       issueAssigned: 0,
       issueCompleted: 0,
@@ -529,117 +530,93 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
       packingCompleted: 0,
     }));
 
-    // Define the statuses that mean Issue and Packing are complete
     const issueCompletedStatuses = ['W105', 'F105', 'Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'];
     const packingCompletedStatuses = ['F105', 'Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'];
 
     if (!dateStr) {
-      // 1. OVERALL DATA (No date filter applied)
       const orders = await this.prisma.salesOrder.findMany({
-        where: { assignedUserId: { not: null } },
-        select: { assignedUserId: true, status: true },
+        where: {
+          OR: [
+            { issueAssignedUserId: { not: null } },
+            { packingAssignedUserId: { not: null } }
+          ]
+        },
+        select: { issueAssignedUserId: true, packingAssignedUserId: true, status: true },
       });
 
       orders.forEach((o) => {
-        const op = operators.find((operator) => operator.id === o.assignedUserId);
-        if (!op) return;
-        const stat = stats.find((s) => s.operatorName === op.name);
-        if (!stat) return;
-
         const s = o.status || '';
         const isPastIssue = issueCompletedStatuses.includes(s);
         const isPastPacking = packingCompletedStatuses.includes(s);
 
-        stat.issueAssigned++; // Baseline count for assigned to Issue
-
-        if (isPastIssue) {
-          stat.issueCompleted++;
-          stat.packingAssigned++; // Once issue is finished, it enters packing stage
+        if (o.issueAssignedUserId) {
+          const stat = stats.find((s) => s.operatorId === o.issueAssignedUserId);
+          if (stat) {
+            stat.issueAssigned++;
+            if (isPastIssue) stat.issueCompleted++;
+          }
         }
 
-        if (isPastPacking) {
-          stat.packingCompleted++;
+        if (o.packingAssignedUserId) {
+          const stat = stats.find((s) => s.operatorId === o.packingAssignedUserId);
+          if (stat) {
+            stat.packingAssigned++;
+            if (isPastPacking) stat.packingCompleted++;
+          }
         }
       });
     } else {
-      // 2. DAILY DATA (Specific date selected)
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
 
-      // A. Count orders assigned/touched today
-      const ordersUpdatedToday = await this.prisma.salesOrder.findMany({
-        where: {
-          assignedUserId: { not: null },
-          UpdatedDate: { gte: startOfDay, lt: endOfDay },
-        },
-        select: { assignedUserId: true },
-      });
-
-      ordersUpdatedToday.forEach((o) => {
-        const op = operators.find((operator) => operator.id === o.assignedUserId);
-        if (!op) return;
-        const stat = stats.find((s) => s.operatorName === op.name);
-        if (stat) stat.issueAssigned++;
-      });
-
-      // B. Accurately count COMPLETIONS today using the Stepper Table history
-      const steppersToday = await this.prisma.sO_Status_Stepper.findMany({
+      const stepperAssignmentsToday = await this.prisma.sO_Status_Stepper.findMany({
         where: {
           createdDateTime: { gte: startOfDay, lt: endOfDay },
+          status: { in: ['Under Issue', 'Under Packing'] }
+        },
+        select: { 
+          status: true, 
+          salesOrder: { select: { issueAssignedUserId: true, packingAssignedUserId: true } } 
+        }
+      });
+
+      stepperAssignmentsToday.forEach((st) => {
+        if (st.status === 'Under Issue' && st.salesOrder?.issueAssignedUserId) {
+          const stat = stats.find((s) => s.operatorId === st.salesOrder.issueAssignedUserId);
+          if (stat) stat.issueAssigned++;
+        }
+        if (st.status === 'Under Packing' && st.salesOrder?.packingAssignedUserId) {
+          const stat = stats.find((s) => s.operatorId === st.salesOrder.packingAssignedUserId);
+          if (stat) stat.packingAssigned++;
+        }
+      });
+
+      const steppersCompletionsToday = await this.prisma.sO_Status_Stepper.findMany({
+        where: {
+          createdDateTime: { gte: startOfDay, lt: endOfDay },
+          status: { in: ['Issued', 'Packed'] }
         },
         select: {
-          salesOrderId: true,
           status: true,
-          salesOrder: { select: { assignedUserId: true } },
+          salesOrder: { select: { issueAssignedUserId: true, packingAssignedUserId: true } },
         },
       });
 
-      // Use a Set to prevent double counting if an order had multiple stepper updates today
-      const issueCompletedSet = new Set<string>();
-      const packingCompletedSet = new Set<string>();
-
-      steppersToday.forEach((st) => {
-        if (!st.salesOrder?.assignedUserId) return;
-        const key = `${st.salesOrder.assignedUserId}-${st.salesOrderId}`;
-        
-        if (issueCompletedStatuses.includes(st.status)) {
-          issueCompletedSet.add(key);
+      steppersCompletionsToday.forEach((st) => {
+        if (st.status === 'Issued' && st.salesOrder?.issueAssignedUserId) {
+          const stat = stats.find((s) => s.operatorId === st.salesOrder.issueAssignedUserId);
+          if (stat) stat.issueCompleted++;
         }
-        if (packingCompletedStatuses.includes(st.status)) {
-          packingCompletedSet.add(key);
-        }
-      });
-
-      // Tally the Issue stage completions and Packing stage assignments
-      issueCompletedSet.forEach((key) => {
-        const [userIdStr] = key.split('-');
-        const userId = parseInt(userIdStr, 10);
-        const op = operators.find((operator) => operator.id === userId);
-        if (!op) return;
-        
-        const stat = stats.find((s) => s.operatorName === op.name);
-        if (stat) {
-          stat.issueCompleted++;
-          stat.packingAssigned++; // If Issue was completed today, Packing is now assigned today
-        }
-      });
-
-      // Tally the Packing stage completions
-      packingCompletedSet.forEach((key) => {
-        const [userIdStr] = key.split('-');
-        const userId = parseInt(userIdStr, 10);
-        const op = operators.find((operator) => operator.id === userId);
-        if (!op) return;
-
-        const stat = stats.find((s) => s.operatorName === op.name);
-        if (stat) {
-          stat.packingCompleted++;
+        if (st.status === 'Packed' && st.salesOrder?.packingAssignedUserId) {
+          const stat = stats.find((s) => s.operatorId === st.salesOrder.packingAssignedUserId);
+          if (stat) stat.packingCompleted++;
         }
       });
     }
 
-    // Sort table rows so the operator with the most activity is on top
-    stats.sort((a, b) => b.issueAssigned - a.issueAssigned);
+    const finalData = stats.map(({ operatorId, ...rest }) => rest);
 
-    return { success: true, data: stats };
+    finalData.sort((a, b) => b.issueAssigned - a.issueAssigned);
+
+    return { success: true, data: finalData };
   }
 }
