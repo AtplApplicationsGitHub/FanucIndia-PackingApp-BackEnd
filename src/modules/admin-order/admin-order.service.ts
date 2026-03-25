@@ -349,7 +349,15 @@ export class AdminOrderService {
     dto: BulkAssignOrderDto,
     user: { userId: number; name: string },
   ) {
-    const { salesOrderIds, assignedUserId, issueAssignedUserId, packingAssignedUserId, skipIssueStage, skipPackingStage, priority } = dto;
+    const {
+      salesOrderIds,
+      assignedUserId,
+      issueUserId,
+      packingUserId,
+      skipIssueStage,
+      skipPackingStage,
+      priority,
+    } = dto;
     const now = new Date();
 
     const orders = await this.prisma.salesOrder.findMany({
@@ -373,10 +381,10 @@ export class AdminOrderService {
         const currentStatus = order.status || 'R105';
 
         if (currentStatus === 'R105' || currentStatus === null) {
-          if (issueAssignedUserId !== undefined) newAssignedUserId = issueAssignedUserId;
+          if (issueUserId !== undefined) newAssignedUserId = issueUserId;
           else if (assignedUserId !== undefined) newAssignedUserId = assignedUserId;
         } else if (currentStatus === 'W105') {
-          if (packingAssignedUserId !== undefined) newAssignedUserId = packingAssignedUserId;
+          if (packingUserId !== undefined) newAssignedUserId = packingUserId;
           else if (assignedUserId !== undefined) newAssignedUserId = assignedUserId;
         }
 
@@ -413,8 +421,9 @@ export class AdminOrderService {
           updateData.assignedUserId = newAssignedUserId;
         }
 
-        if (issueAssignedUserId !== undefined) updateData.issueAssignedUserId = issueAssignedUserId;
-        if (packingAssignedUserId !== undefined) updateData.packingAssignedUserId = packingAssignedUserId;
+        if (issueUserId !== undefined) updateData.issueAssignedUserId = issueUserId;
+        if (packingUserId !== undefined) updateData.packingAssignedUserId = packingUserId;
+        
         if (skipIssueStage !== undefined) updateData.skipIssueStage = skipIssueStage;
         if (skipPackingStage !== undefined) updateData.skipPackingStage = skipPackingStage;
 
@@ -472,6 +481,12 @@ export class AdminOrderService {
         assignedUser: {
           select: { name: true },
         },
+        issueAssignedUserId: true,
+        packingAssignedUserId: true,
+        skipIssueStage: true,
+        skipPackingStage: true,
+        issueAssignedUser: { select: { name: true } },
+        packingAssignedUser: { select: { name: true } },
         customer: {
           select: { name: true },
         },
@@ -502,6 +517,12 @@ export class AdminOrderService {
       status: order.status,
       priority: order.priority,
       assignedUser: order.assignedUser?.name,
+      issueUserId: order.issueAssignedUserId,
+      issueUser: order.issueAssignedUser,
+      packingUserId: order.packingAssignedUserId,
+      packingUser: order.packingAssignedUser,
+      skipIssueStage: order.skipIssueStage,
+      skipPackingStage: order.skipPackingStage,
       skipStage: order.skipStage,
       hasMaterialData: order.isErpImported === 1,
       plantCode: order.plantCode,

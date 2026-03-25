@@ -16,24 +16,24 @@ export class BulkAssignOrderDto {
   @ApiPropertyOptional({ description: 'ID of the user to assign for Issue stage', type: Number })
   @IsOptional()
   @IsInt()
-  issueAssignedUserId?: number | null;
+  issueUserId?: number | null;
 
   @ApiPropertyOptional({ description: 'ID of the user to assign for Packing stage', type: Number })
   @IsOptional()
   @IsInt()
-  packingAssignedUserId?: number | null;
+  packingUserId?: number | null;
 
   @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
   @IsBoolean()
-  skipIssueStage?: boolean | null;
+  skipIssueStage?: boolean;
 
   @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
   @IsBoolean()
-  skipPackingStage?: boolean | null;
+  skipPackingStage?: boolean;
 
-  @ApiPropertyOptional({ type: Number, description: 'Priority value to set during assignment' })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsInt()
   priority?: number | null;
