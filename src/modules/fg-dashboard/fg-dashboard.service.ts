@@ -20,12 +20,13 @@ export class FgDashboardService {
   ) {
     const { search, date, payment, zone, status, page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
-    const where: Prisma.SalesOrderWhereInput = {
-      OR: [
-        { status: { not: 'Dispatched' } },
-        { status: null }
-      ]
-    };
+    // const where: Prisma.SalesOrderWhereInput = {
+    //   OR: [
+    //     { status: { not: 'Dispatched' } },
+    //     { status: null }
+    //   ]
+    // };
+    const where: Prisma.SalesOrderWhereInput = {};
 
     if (date) {
       const parseYMD = (s: string) => {
@@ -52,7 +53,7 @@ export class FgDashboardService {
     }
 
     if (status) {
-      delete where.OR;
+      // delete where.OR;
       
       if (status === 'None') {
          where.OR = [
@@ -76,6 +77,7 @@ export class FgDashboardService {
 
       const searchConditions: Prisma.SalesOrderWhereInput[] = [
         { saleOrderNumber: { contains: search, mode: 'insensitive' } },
+        { outboundDelivery: { contains: search, mode: 'insensitive' } },
         { transferOrder: { contains: search, mode: 'insensitive' } },
         { product: { name: { contains: search, mode: 'insensitive' } } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
@@ -84,7 +86,10 @@ export class FgDashboardService {
         { status: { contains: search, mode: 'insensitive' } },
         { fgLocation: { array_contains: search } },
         { specialRemarks: { contains: search, mode: 'insensitive' } },
+        { additionalRemarks: { contains: search, mode: 'insensitive' } },
         { UpdatedBy: { contains: search, mode: 'insensitive' } },
+        { user: { name: { contains: search, mode: 'insensitive' } } }, // Added Creator Username
+        { Dispatch_SO: { some: { dispatch: { vehicleNumber: { contains: search, mode: 'insensitive' } } } } },
       ];
 
       if (paymentBoolean !== undefined) {
@@ -104,15 +109,27 @@ export class FgDashboardService {
           id: true,
           deliveryDate: true,
           saleOrderNumber: true,
+          outboundDelivery: true,
           transferOrder: true,
           paymentClearance: true,
           status: true,
           fgLocation: true,
           specialRemarks: true,
+          additionalRemarks: true,
           UpdatedBy: true,
           UpdatedDate: true,
           assignedUserId: true,
           customerNameText: true,
+          user: { select: { name: true } },
+          Dispatch_SO: { 
+            select: {
+              dispatch: {
+                select: {
+                  vehicleNumber: true,
+                },
+              },
+            },
+          },
           statusStepper: {
             where: {
               status: { in: ['Ready for Dispatch', 'WIP Storage'] },
@@ -140,11 +157,15 @@ export class FgDashboardService {
     const fgData = salesOrders.map((order) => {
       const isReadyForDispatch = order.statusStepper.some(s => s.status === 'Ready for Dispatch');
       const isWipStorage = order.statusStepper.some(s => s.status === 'WIP Storage');
+      const vehicleNumber = order.Dispatch_SO?.length > 0 
+        ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch?.vehicleNumber 
+        : null;
 
       return {
         id: order.id,
         deliveryDate: order.deliveryDate,
         saleOrderNumber: order.saleOrderNumber,
+        outboundDelivery: order.outboundDelivery,
         transferOrder: order.transferOrder,
         product: order.product?.name,
         customerName: order.customerNameText || order.customer?.name,
@@ -154,6 +175,9 @@ export class FgDashboardService {
         status: order.status,
         fgLocation: order.fgLocation,
         specialRemarks: order.specialRemarks,
+        additionalRemarks: order.additionalRemarks,
+        createdBy: order.user?.name, 
+        vehicleNumber: vehicleNumber,
         updatedBy: order.UpdatedBy,
         updatedDate: order.UpdatedDate,
         assignedUserId: order.assignedUserId, 
