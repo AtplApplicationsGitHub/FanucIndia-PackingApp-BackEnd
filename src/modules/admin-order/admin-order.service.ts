@@ -96,6 +96,8 @@ export class AdminOrderService {
       const lower = search.toLowerCase();
       const num = Number(search);
 
+      const isValidInt = Number.isInteger(num) && num <= 2147483647 && num >= -2147483648;
+
       where.OR = [
         {
           customer: { is: { name: { contains: search, mode: 'insensitive' } } },
@@ -138,7 +140,7 @@ export class AdminOrderService {
         ...(lower === 'yes' || lower === 'no'
           ? [{ paymentClearance: { equals: lower === 'yes' } }]
           : []),
-        ...(!isNaN(num) ? [{ priority: { equals: num } }] : []),
+        ...(isValidInt ? [{ priority: { equals: num } }] : []),
       ];
     }
 
