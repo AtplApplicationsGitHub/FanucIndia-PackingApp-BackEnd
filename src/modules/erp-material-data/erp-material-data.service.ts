@@ -43,7 +43,14 @@ async function verifyOrderAccess(
   }
 
   const order = await prisma.salesOrder.findFirst({
-    where: { id: orderId, assignedUserId: userId },
+    where: { 
+      id: orderId,
+      OR: [
+        { issueAssignedUserId: userId },
+        { packingAssignedUserId: userId },
+      ]
+      // assignedUserId: userId 
+    },
   });
   if (!order) {
     throw new ForbiddenException(
@@ -151,8 +158,8 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'W105',
-          skipStage: null,
-          assignedUserId: salesOrder.packingAssignedUserId || null,
+          // skipStage: null,
+          // assignedUserId: salesOrder.packingAssignedUserId || null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -255,8 +262,8 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'W105',
-          skipStage: null,
-          assignedUserId: salesOrder.packingAssignedUserId || null,
+          // skipStage: null,
+          // assignedUserId: salesOrder.packingAssignedUserId || null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -349,8 +356,8 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'F105',
-          skipStage: null,
-          assignedUserId: null,
+          // skipStage: null,
+          // assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -477,8 +484,8 @@ export class ErpMaterialDataService {
           where: { id: orderId },
           data: {
             status: 'W105',
-            skipStage: null,
-            assignedUserId: current.packingAssignedUserId || null,
+            // skipStage: null,
+            // assignedUserId: current.packingAssignedUserId || null,
             UpdatedBy: userName,
             UpdatedDate: new Date(),
           },
@@ -500,8 +507,8 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'F105',
-          skipStage: null,
-          assignedUserId: null,
+          // skipStage: null,
+          // assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -593,8 +600,8 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'F105',
-          skipStage: null,
-          assignedUserId: null,
+          // skipStage: null,
+          // assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },

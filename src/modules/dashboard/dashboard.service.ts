@@ -524,11 +524,20 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
     const stats = operators.map((op) => ({
       operatorId: op.id,
       operatorName: op.name,
-      issueAssigned: 0,
-      issueCompleted: 0,
-      packingAssigned: 0,
-      packingCompleted: 0,
+      issueAssigned: [] as any[],
+      issueCompleted: [] as any[],
+      packingAssigned: [] as any[],
+      packingCompleted: [] as any[],
     }));
+
+    const addOrder = (array: any[], orderData: any) => {
+      if (!array.find((o) => o.saleOrderNumber === orderData.saleOrderNumber)) {
+        array.push({
+          saleOrderNumber: orderData.saleOrderNumber,
+          outboundDelivery: orderData.outboundDelivery || '-',
+        });
+      }
+    };
 
     const issueCompletedStatuses = ['W105', 'F105', 'Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'];
     const packingCompletedStatuses = ['F105', 'Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'];
@@ -538,10 +547,10 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
         where: {
           OR: [
             { issueAssignedUserId: { not: null } },
-            { packingAssignedUserId: { not: null } }
-          ]
+            { packingAssignedUserId: { not: null } },
+          ],
         },
-        select: { issueAssignedUserId: true, packingAssignedUserId: true, status: true },
+        select: { issueAssignedUserId: true, packingAssignedUserId: true, status: true, saleOrderNumber: true, outboundDelivery: true },
       });
 
       orders.forEach((o) => {
@@ -552,16 +561,16 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
         if (o.issueAssignedUserId) {
           const stat = stats.find((s) => s.operatorId === o.issueAssignedUserId);
           if (stat) {
-            stat.issueAssigned++;
-            if (isPastIssue) stat.issueCompleted++;
+            addOrder(stat.issueAssigned, o);
+            if (isPastIssue) addOrder(stat.issueCompleted, o);
           }
         }
 
         if (o.packingAssignedUserId) {
           const stat = stats.find((s) => s.operatorId === o.packingAssignedUserId);
           if (stat) {
-            stat.packingAssigned++;
-            if (isPastPacking) stat.packingCompleted++;
+            addOrder(stat.packingAssigned, o);
+            if (isPastPacking) addOrder(stat.packingCompleted, o);
           }
         }
       });
@@ -571,51 +580,54 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
       const stepperAssignmentsToday = await this.prisma.sO_Status_Stepper.findMany({
         where: {
           createdDateTime: { gte: startOfDay, lt: endOfDay },
-          status: { in: ['Under Issue', 'Under Packing'] }
+          status: { in: ['Under Issue', 'Under Packing'] },
         },
-        select: { 
-          status: true, 
-          salesOrder: { select: { issueAssignedUserId: true, packingAssignedUserId: true } } 
-        }
+        select: {
+          status: true,
+          salesOrderNumber: true,
+          salesOrder: { select: { outboundDelivery: true, issueAssignedUserId: true, packingAssignedUserId: true } },
+        },
       });
 
       stepperAssignmentsToday.forEach((st) => {
+        const orderData = { saleOrderNumber: st.salesOrderNumber, outboundDelivery: st.salesOrder?.outboundDelivery };
         if (st.status === 'Under Issue' && st.salesOrder?.issueAssignedUserId) {
           const stat = stats.find((s) => s.operatorId === st.salesOrder.issueAssignedUserId);
-          if (stat) stat.issueAssigned++;
+          if (stat) addOrder(stat.issueAssigned, orderData);
         }
         if (st.status === 'Under Packing' && st.salesOrder?.packingAssignedUserId) {
           const stat = stats.find((s) => s.operatorId === st.salesOrder.packingAssignedUserId);
-          if (stat) stat.packingAssigned++;
+          if (stat) addOrder(stat.packingAssigned, orderData);
         }
       });
 
       const steppersCompletionsToday = await this.prisma.sO_Status_Stepper.findMany({
         where: {
           createdDateTime: { gte: startOfDay, lt: endOfDay },
-          status: { in: ['Issued', 'Packed'] }
+          status: { in: ['Issued', 'Packed'] },
         },
         select: {
           status: true,
-          salesOrder: { select: { issueAssignedUserId: true, packingAssignedUserId: true } },
+          salesOrderNumber: true,
+          salesOrder: { select: { outboundDelivery: true, issueAssignedUserId: true, packingAssignedUserId: true } },
         },
       });
 
       steppersCompletionsToday.forEach((st) => {
+        const orderData = { saleOrderNumber: st.salesOrderNumber, outboundDelivery: st.salesOrder?.outboundDelivery };
         if (st.status === 'Issued' && st.salesOrder?.issueAssignedUserId) {
           const stat = stats.find((s) => s.operatorId === st.salesOrder.issueAssignedUserId);
-          if (stat) stat.issueCompleted++;
+          if (stat) addOrder(stat.issueCompleted, orderData);
         }
         if (st.status === 'Packed' && st.salesOrder?.packingAssignedUserId) {
           const stat = stats.find((s) => s.operatorId === st.salesOrder.packingAssignedUserId);
-          if (stat) stat.packingCompleted++;
+          if (stat) addOrder(stat.packingCompleted, orderData);
         }
       });
     }
 
     const finalData = stats.map(({ operatorId, ...rest }) => rest);
-
-    finalData.sort((a, b) => b.issueAssigned - a.issueAssigned);
+    finalData.sort((a, b) => b.issueAssigned.length - a.issueAssigned.length);
 
     return { success: true, data: finalData };
   }

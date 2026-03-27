@@ -33,7 +33,21 @@ export class UserDashboardService {
   async findAssignedOrders(userId: number) {
     const assignedOrders = await this.prisma.salesOrder.findMany({
       where: {
-        assignedUserId: userId,
+        // assignedUserId: userId,
+        OR: [
+          { issueAssignedUserId: userId },
+          {
+            AND: [
+              { packingAssignedUserId: userId },
+              { 
+                OR: [
+                  { status: 'W105' }, 
+                  { skipIssueStage: true }
+                ] 
+              }
+            ]
+          }
+        ],
         materialData: {
           some: {},
         },
@@ -88,7 +102,11 @@ export class UserDashboardService {
   async getAssignedOrdersSummary(userId: number) {
     const assignedOrders = await this.prisma.salesOrder.findMany({
       where: {
-        assignedUserId: userId,
+        // assignedUserId: userId,
+        OR: [
+          { issueAssignedUserId: userId },
+          { packingAssignedUserId: userId },
+        ],
         materialData: {
           some: {},
         },
@@ -97,7 +115,8 @@ export class UserDashboardService {
         saleOrderNumber: true,
         priority: true,
         status: true,
-        skipStage: true,
+        skipIssueStage: true,
+        skipPackingStage: true,
         customer: { select: { name: true } },
         materialData: {
           select: {
@@ -121,7 +140,8 @@ export class UserDashboardService {
         saleOrderNumber: order.saleOrderNumber,
         priority: order.priority,
         status: order.status,
-        skipStage: order.skipStage,
+        skipIssueStage: order.skipIssueStage,
+        skipPackingStage: order.skipPackingStage,
         totalMaterials,
         totalItems,
         customerName: order.customer?.name || null,
@@ -134,7 +154,11 @@ export class UserDashboardService {
     const whereClause: Prisma.SalesOrderWhereInput = { id: orderId };
 
     if (userRole !== 'ADMIN') {
-      whereClause.assignedUserId = userId;
+      // whereClause.assignedUserId = userId;
+      whereClause.OR = [
+        { issueAssignedUserId: userId },
+        { packingAssignedUserId: userId },
+      ];
     }
 
     const order = await this.prisma.salesOrder.findFirst({
@@ -162,7 +186,8 @@ export class UserDashboardService {
     }
     return this.getMaterialDetails(
       order.saleOrderNumber,
-      order.skipStage ?? undefined,
+      order.skipIssueStage ?? false,
+      order.skipPackingStage ?? false
     );
   }
 
@@ -178,6 +203,8 @@ export class UserDashboardService {
       select: {
         labelRemarks: true,
         customerNameText: true,
+        skipIssueStage: true,  
+        skipPackingStage: true,
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
       },
@@ -213,18 +240,24 @@ export class UserDashboardService {
     const customerName =
       order?.customer?.name ?? order?.customerNameText ?? null;
 
+    const skipIssueStage = order?.skipIssueStage ?? false;
+    const skipPackingStage = order?.skipPackingStage ?? false;
+
     return materials.map((material) => ({
       ...material,
       ID: material.ID.toString(),
       salesZone,
       labelRemarks,
       customerName,
+      skipIssueStage,
+      skipPackingStage,
     }));
   }
 
   private async getMaterialDetails(
     saleOrderNumber: string,
-    skipStage?: boolean,
+    skipIssueStage?: boolean,
+    skipPackingStage?: boolean,
   ) {
     const materials = await this.prisma.eRP_Material_Data.findMany({
       where: { saleOrderNumber },
@@ -253,7 +286,8 @@ export class UserDashboardService {
     return materials.map((material) => ({
       ...material,
       ID: material.ID.toString(),
-      skipStage: !!skipStage,
+      skipIssueStage: !!skipIssueStage,
+      skipPackingStage: !!skipPackingStage,
     }));
   }
 
@@ -474,7 +508,8 @@ export class UserDashboardService {
     if (!order) {
       throw new NotFoundException('Sales Order not found.');
     }
-    if (userRole === 'USER' && order.assignedUserId !== userId) {
+    // if (userRole === 'USER' && order.assignedUserId !== userId) {
+    if (userRole === 'USER' && order.issueAssignedUserId !== userId && order.packingAssignedUserId !== userId) {
       throw new ForbiddenException(
         'You are not authorized to modify this order.',
       );
@@ -512,8 +547,8 @@ export class UserDashboardService {
         where: { id: order.id },
         data: {
           status: 'W105',
-          skipStage: null,
-          assignedUserId: order.packingAssignedUserId || null, 
+          // skipStage: null,
+          // assignedUserId: order.packingAssignedUserId || null, 
         },
       });
 
@@ -538,8 +573,8 @@ export class UserDashboardService {
         where: { id: order.id },
         data: {
           status: 'F105',
-          skipStage: null,
-          assignedUserId: null, 
+          // skipStage: null,
+          // assignedUserId: null, 
         },
       });
 
@@ -560,7 +595,11 @@ export class UserDashboardService {
     let completedOrdersCount = 0;
     
     const assignedFilter: Prisma.SalesOrderWhereInput = {
-      assignedUserId: userId,
+      // assignedUserId: userId,
+      OR: [
+        { issueAssignedUserId: userId },
+        { packingAssignedUserId: userId },
+      ],
       materialData: {
         some: {},
       },

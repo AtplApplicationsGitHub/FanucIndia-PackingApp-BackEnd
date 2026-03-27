@@ -24,6 +24,16 @@ export class UpdateAdminOrderDto {
   @IsInt()
   assignedUserId?: number;
 
+  @ApiPropertyOptional({ example: 1, description: 'Issue Stage Assigned User ID' })
+  @IsOptional()
+  @IsInt()
+  issueAssignedUserId?: number;
+
+  @ApiPropertyOptional({ example: 2, description: 'Packing Stage Assigned User ID' })
+  @IsOptional()
+  @IsInt()
+  packingAssignedUserId?: number;
+
   @ApiPropertyOptional({ example: 1, description: 'Customer ID (lookup)' })
   @IsInt()
   @IsOptional()
