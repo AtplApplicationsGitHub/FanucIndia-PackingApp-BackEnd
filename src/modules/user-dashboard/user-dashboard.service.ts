@@ -686,16 +686,22 @@ export class UserDashboardService {
 
   private getAssignedVisibilityFilter(userId: number): Prisma.SalesOrderWhereInput['OR'] {
     return [
-      { issueAssignedUserId: userId },
+      {
+        AND: [
+          { issueAssignedUserId: userId },
+          {
+            OR: [
+              { status: 'R105' },
+              { status: null },
+              { status: '' }
+            ]
+          }
+        ]
+      },
       {
         AND: [
           { packingAssignedUserId: userId },
-          {
-            OR: [
-              { status: { in: ['W105', 'F105'] } },
-              { skipIssueStage: true }
-            ]
-          }
+          { status: 'W105' }
         ]
       }
     ];
