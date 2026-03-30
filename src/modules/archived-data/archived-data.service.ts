@@ -9,7 +9,7 @@ export class ArchivedDataService {
   async findAll(query: any) {
     const {
       page = 1,
-      limit = 20,
+      limit = 10,
       search,
       paymentFilter,
       zoneFilter,
@@ -19,7 +19,7 @@ export class ArchivedDataService {
     } = query;
 
     const parsedPage = Number(page) > 0 ? Number(page) : 1;
-    const parsedLimit = Number(limit) > 0 && Number(limit) <= 100 ? Number(limit) : 20;
+    const parsedLimit = Number(limit) > 0 && Number(limit) <= 100 ? Number(limit) : 10;
 
     const where: Prisma.SalesOrderArchiveWhereInput = {};
 
