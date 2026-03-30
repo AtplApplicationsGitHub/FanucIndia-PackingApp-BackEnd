@@ -120,7 +120,7 @@ export class FgDashboardService {
           UpdatedDate: true,
           assignedUserId: true,
           customerNameText: true,
-          user: { select: { name: true } },
+          user: { select: { name: true, email: true } },
           Dispatch_SO: { 
             select: {
               dispatch: {
@@ -177,6 +177,7 @@ export class FgDashboardService {
         specialRemarks: order.specialRemarks,
         additionalRemarks: order.additionalRemarks,
         createdBy: order.user?.name, 
+        createdByEmail: order.user?.email,
         vehicleNumber: vehicleNumber,
         updatedBy: order.UpdatedBy,
         updatedDate: order.UpdatedDate,

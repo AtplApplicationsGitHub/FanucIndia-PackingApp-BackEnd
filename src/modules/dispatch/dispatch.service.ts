@@ -38,9 +38,9 @@ export class DispatchService {
     } catch (e) {}
   }
 
-  private async getUserName(userId: number): Promise<string> {
+  private async getUserEmail(userId: number): Promise<string> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    return user?.name || 'System';
+    return user?.email || 'System';
   }
 
   constructor(
@@ -78,7 +78,7 @@ export class DispatchService {
     return this.prisma.$transaction(async (tx) => {
 
       const user = await tx.user.findUnique({ where: { id: userId } });
-      const userName = user?.name || 'System';
+      const userName = user?.email || 'System';
 
       const finalTransporterId = transporterIdString
         ? parseInt(transporterIdString, 10)
@@ -237,7 +237,7 @@ export class DispatchService {
       }
 
       const user = await tx.user.findUnique({ where: { id: userId } });
-      const userName = user?.name || 'System';
+      const userName = user?.email || 'System';
 
       const newDispatch = await tx.dispatch.create({
         data: {
@@ -304,7 +304,7 @@ export class DispatchService {
     saleOrderNumber: string,
     userId: number,
   ) {
-    const userName = await this.getUserName(userId);
+    const userName = await this.getUserEmail(userId);
     return this.prisma.$transaction(async (tx) => {
       const dispatch = await tx.dispatch.findUnique({
         where: { id: dispatchId },
@@ -424,7 +424,7 @@ export class DispatchService {
       data: {
         transporterId: transporterId ? Number(transporterId) : undefined,
         vehicleNumber,
-        UpdatedBy: user?.name || 'System',
+        UpdatedBy: user?.email || 'System',
         UpdatedDate: new Date(),
       },
     });
@@ -459,7 +459,7 @@ export class DispatchService {
         finalTransporterName = null;
       }
 
-      const userName = await this.getUserName(userId);
+      const userName = await this.getUserEmail(userId);
 
       const updatedDispatch = await tx.dispatch.update({
         where: { id: dispatchId },
@@ -523,7 +523,7 @@ export class DispatchService {
       throw new NotFoundException('Invalid SO Number');
     }
 
-    const userName = await this.getUserName(userId);
+    const userName = await this.getUserEmail(userId);
 
     return this.prisma.$transaction(async (tx) => {
       try {
@@ -586,7 +586,7 @@ export class DispatchService {
       throw new NotFoundException('Dispatch link not found.');
     }
 
-    const userName = await this.getUserName(userId);
+    const userName = await this.getUserEmail(userId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.dispatch_SO.delete({ where: { id: soId } });

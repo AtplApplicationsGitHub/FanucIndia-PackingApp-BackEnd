@@ -176,9 +176,9 @@ export class AdminOrderService {
           transporter: { select: { id: true, name: true } },
           salesZone: { select: { id: true, name: true } },
           packConfig: { select: { id: true, configName: true } },
-          assignedUser: { select: { id: true, name: true } },
-          issueAssignedUser: { select: { id: true, name: true } },
-          packingAssignedUser: { select: { id: true, name: true } },
+          assignedUser: { select: { id: true, name: true, email: true } },
+          issueAssignedUser: { select: { id: true, name: true, email: true } },
+          packingAssignedUser: { select: { id: true, name: true, email: true } },
           materialData: {
             select: { A_D_F: true },
             take: 1,
@@ -482,15 +482,13 @@ export class AdminOrderService {
         salesZone: {
           select: { name: true },
         },
-        assignedUser: {
-          select: { name: true },
-        },
+        assignedUser: { select: { name: true, email: true } },
+        issueAssignedUser: { select: { name: true, email: true } },
+        packingAssignedUser: { select: { name: true, email: true } },
         issueAssignedUserId: true,
         packingAssignedUserId: true,
         skipIssueStage: true,
         skipPackingStage: true,
-        issueAssignedUser: { select: { name: true } },
-        packingAssignedUser: { select: { name: true } },
         customer: {
           select: { name: true },
         },

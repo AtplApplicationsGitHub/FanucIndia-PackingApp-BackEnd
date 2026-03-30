@@ -518,12 +518,13 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
   async getOperatorStats(dateStr?: string) {
     const operators = await this.prisma.user.findMany({
       where: { role: 'USER' },
-      select: { id: true, name: true },
+      select: { id: true, name: true, email: true },
     });
 
     const stats = operators.map((op) => ({
       operatorId: op.id,
       operatorName: op.name,
+      operatorEmail: op.email,
       issueAssigned: [] as any[],
       issueCompleted: [] as any[],
       packingAssigned: [] as any[],
