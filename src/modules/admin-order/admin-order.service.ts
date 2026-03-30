@@ -737,6 +737,28 @@ export class AdminOrderService {
           if (u) assignedUserId = u.id;
         }
 
+        let customerId = dbOrder.customerId;
+        let customerNameText = dbOrder.customerNameText;
+        const rowCustomer = getCellString('CUSTOMER NAME');
+
+        if (rowCustomer !== undefined) {
+          if (rowCustomer === '') {
+            customerId = null;
+            customerNameText = null;
+          } else {
+            const c = await tx.customer.findFirst({
+              where: { name: rowCustomer },
+            });
+            if (c) {
+              customerId = c.id;
+              customerNameText = null;
+            } else {
+              customerId = null;
+              customerNameText = rowCustomer;
+            }
+          }
+        }
+
         // ----------------------------------------------------
         // 3. PARSE FORMATTED DATA (Date, Boolean, Number)
         // ----------------------------------------------------
@@ -792,6 +814,8 @@ export class AdminOrderService {
             transporterId,
             packConfigId,
             assignedUserId,
+            customerId,
+            customerNameText,
             paymentClearance,
             priority,
             skipStage,
