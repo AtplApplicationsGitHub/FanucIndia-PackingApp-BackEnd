@@ -41,6 +41,7 @@ model Product {
   id          Int          @id @default(autoincrement())
   name        String
   salesOrders SalesOrder[]
+  archivedOrders SalesOrderArchive[]
 }
 
 model Transporter {
@@ -60,6 +61,7 @@ model SalesZone {
   id          Int          @id @default(autoincrement())
   name        String
   salesOrders SalesOrder[]
+  archivedOrders SalesOrderArchive[]
 }
 
 model PackConfig {
@@ -74,6 +76,7 @@ model Customer {
   address       String?
   contactNumber String?
   salesOrders   SalesOrder[]
+  archivedOrders SalesOrderArchive[]
 }
 
 model Printer {
@@ -276,6 +279,10 @@ model SalesOrderArchive {
   FGUpdatedBy       String?   @db.VarChar(255)
   FGUpdatedDateTime DateTime?
   archivedAt        DateTime  @default(now())
+
+  product           Product   @relation(fields: [productId], references: [id])
+  salesZone         SalesZone @relation(fields: [salesZoneId], references: [id])
+  customer          Customer? @relation(fields: [customerId], references: [id])
 }
 
 model ERP_Material_DataArchive {
