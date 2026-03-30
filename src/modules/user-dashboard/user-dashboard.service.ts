@@ -33,21 +33,7 @@ export class UserDashboardService {
   async findAssignedOrders(userId: number) {
     const assignedOrders = await this.prisma.salesOrder.findMany({
       where: {
-        // assignedUserId: userId,
-        OR: [
-          { issueAssignedUserId: userId },
-          {
-            AND: [
-              { packingAssignedUserId: userId },
-              { 
-                OR: [
-                  { status: 'W105' }, 
-                  { skipIssueStage: true }
-                ] 
-              }
-            ]
-          }
-        ],
+        OR: this.getAssignedVisibilityFilter(userId),
         materialData: {
           some: {},
         },
@@ -102,11 +88,7 @@ export class UserDashboardService {
   async getAssignedOrdersSummary(userId: number) {
     const assignedOrders = await this.prisma.salesOrder.findMany({
       where: {
-        // assignedUserId: userId,
-        OR: [
-          { issueAssignedUserId: userId },
-          { packingAssignedUserId: userId },
-        ],
+        OR: this.getAssignedVisibilityFilter(userId),
         materialData: {
           some: {},
         },
@@ -154,11 +136,7 @@ export class UserDashboardService {
     const whereClause: Prisma.SalesOrderWhereInput = { id: orderId };
 
     if (userRole !== 'ADMIN') {
-      // whereClause.assignedUserId = userId;
-      whereClause.OR = [
-        { issueAssignedUserId: userId },
-        { packingAssignedUserId: userId },
-      ];
+      whereClause.OR = this.getAssignedVisibilityFilter(userId);
     }
 
     const order = await this.prisma.salesOrder.findFirst({
@@ -508,11 +486,21 @@ export class UserDashboardService {
     if (!order) {
       throw new NotFoundException('Sales Order not found.');
     }
-    // if (userRole === 'USER' && order.assignedUserId !== userId) {
-    if (userRole === 'USER' && order.issueAssignedUserId !== userId && order.packingAssignedUserId !== userId) {
-      throw new ForbiddenException(
-        'You are not authorized to modify this order.',
-      );
+    
+    if (userRole === 'USER') {
+      const isIssueUser = order.issueAssignedUserId === userId;
+      const isPackingUser = order.packingAssignedUserId === userId;
+
+      if (!isIssueUser && !isPackingUser) {
+        throw new ForbiddenException('You are not authorized to modify this order.');
+      }
+
+      if (!isIssueUser && isPackingUser) {
+        const isIssueCompleted = ['W105', 'F105'].includes(order.status ?? '') || order.skipIssueStage;
+        if (!isIssueCompleted) {
+          throw new ForbiddenException('Cannot access order: Issue stage is not completed yet.');
+        }
+      }
     }
   }
 
@@ -595,11 +583,7 @@ export class UserDashboardService {
     let completedOrdersCount = 0;
     
     const assignedFilter: Prisma.SalesOrderWhereInput = {
-      // assignedUserId: userId,
-      OR: [
-        { issueAssignedUserId: userId },
-        { packingAssignedUserId: userId },
-      ],
+      OR: this.getAssignedVisibilityFilter(userId),
       materialData: {
         some: {},
       },
@@ -698,5 +682,22 @@ export class UserDashboardService {
       .slice(0, 10);
 
     return combinedActivity;
+  }
+
+  private getAssignedVisibilityFilter(userId: number): Prisma.SalesOrderWhereInput['OR'] {
+    return [
+      { issueAssignedUserId: userId },
+      {
+        AND: [
+          { packingAssignedUserId: userId },
+          {
+            OR: [
+              { status: { in: ['W105', 'F105'] } },
+              { skipIssueStage: true }
+            ]
+          }
+        ]
+      }
+    ];
   }
 }
