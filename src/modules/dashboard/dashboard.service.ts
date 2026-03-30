@@ -617,17 +617,28 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
         const orderData = { saleOrderNumber: st.salesOrderNumber, outboundDelivery: st.salesOrder?.outboundDelivery };
         if (st.status === 'Issued' && st.salesOrder?.issueAssignedUserId) {
           const stat = stats.find((s) => s.operatorId === st.salesOrder.issueAssignedUserId);
-          if (stat) addOrder(stat.issueCompleted, orderData);
+          if (stat) {
+            addOrder(stat.issueCompleted, orderData);
+            addOrder(stat.issueAssigned, orderData);
+          }
         }
         if (st.status === 'Packed' && st.salesOrder?.packingAssignedUserId) {
           const stat = stats.find((s) => s.operatorId === st.salesOrder.packingAssignedUserId);
-          if (stat) addOrder(stat.packingCompleted, orderData);
+          if (stat) {
+            addOrder(stat.packingCompleted, orderData);
+            addOrder(stat.packingAssigned, orderData);
+          }
         }
       });
     }
-
-    const finalData = stats.map(({ operatorId, ...rest }) => rest);
-    finalData.sort((a, b) => b.issueAssigned.length - a.issueAssigned.length);
+    const finalData = stats.map(({ operatorId, ...rest }) => ({
+      ...rest,
+      issueAssignedCount: rest.issueAssigned.length,
+      issueCompletedCount: rest.issueCompleted.length,
+      packingAssignedCount: rest.packingAssigned.length,
+      packingCompletedCount: rest.packingCompleted.length,
+    }));
+    finalData.sort((a, b) => b.issueAssignedCount - a.issueAssignedCount);
 
     return { success: true, data: finalData };
   }
