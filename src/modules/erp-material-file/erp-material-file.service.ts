@@ -111,16 +111,17 @@ export class ErpMaterialFileService {
     try {
       const resolvedPath = path.resolve(filePath);
       const tempDir = path.resolve(os.tmpdir());
-      
+
       if (resolvedPath.startsWith(tempDir)) {
         if (fs.existsSync(resolvedPath)) {
-           fs.unlinkSync(resolvedPath);
+          fs.unlinkSync(resolvedPath);
         }
       } else {
-        console.warn(`Security Block: Attempted to delete file outside temp dir: ${filePath}`);
+        console.warn(
+          `Security Block: Attempted to delete file outside temp dir: ${filePath}`,
+        );
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   async list(query: QueryErpMaterialFileDto, userId: number, userRole: string) {
@@ -277,7 +278,9 @@ export class ErpMaterialFileService {
     }
 
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
-    const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
+    const soDir = opts.saleOrderNumber
+      ? sanitize(opts.saleOrderNumber)
+      : 'misc';
     const remoteDir = path.posix.join(baseDir, soDir);
 
     const uploads: { localPath: string; remotePath: string }[] = [];
@@ -307,8 +310,8 @@ export class ErpMaterialFileService {
 
       const created: any[] = [];
       for (const data of dbRecords) {
-         const row = await this.prisma.eRP_Material_File.create({ data });
-         created.push(row);
+        const row = await this.prisma.eRP_Material_File.create({ data });
+        created.push(row);
       }
 
       return {
@@ -319,7 +322,9 @@ export class ErpMaterialFileService {
         })),
       };
     } catch (e: any) {
-      throw new InternalServerErrorException('Upload failed. ' + (e?.message || ''));
+      throw new InternalServerErrorException(
+        'Upload failed. ' + (e?.message || ''),
+      );
     } finally {
       for (const f of files) {
         this.safeUnlink(f.path);
@@ -353,7 +358,9 @@ export class ErpMaterialFileService {
     }
 
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
-    const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
+    const soDir = opts.saleOrderNumber
+      ? sanitize(opts.saleOrderNumber)
+      : 'misc';
     const remoteDir = path.posix.join(baseDir, soDir);
 
     const uploads: { localPath: string; remotePath: string }[] = [];
@@ -415,23 +422,170 @@ export class ErpMaterialFileService {
         })),
       };
     } catch (e: any) {
-      throw new InternalServerErrorException('Upload failed. ' + (e?.message || ''));
+      throw new InternalServerErrorException(
+        'Upload failed. ' + (e?.message || ''),
+      );
     } finally {
-       for (const f of files) { 
-        this.safeUnlink(f.path); 
+      for (const f of files) {
+        this.safeUnlink(f.path);
+      }
+    }
+  }
+
+  async getMobileSoVariants(
+    saleOrderNumber: string,
+    userId: number,
+    userRole: string,
+  ) {
+    const orders = await this.prisma.salesOrder.findMany({
+      where: {
+        saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+        saleOrderNumber: true,
+        outboundDelivery: true,
+      },
+      orderBy: { outboundDelivery: 'asc' },
+    });
+
+    if (orders.length === 0) {
+      throw new NotFoundException(
+        `No orders found matching SO Number: ${saleOrderNumber}`,
+      );
+    }
+
+    return orders;
+  }
+
+  async uploadAndCreateMobile(
+    files: Express.Multer.File[],
+    opts: { saleOrderNumber: string | null; descriptions: string },
+    userId: number,
+    userRole: string,
+  ) {
+    // 1. Validate inputs early to maintain scope
+    if (!opts.saleOrderNumber) {
+      throw new BadRequestException('You must specify a Sale Order Number.');
+    }
+
+    // 2. Fetch the specific Sales Order so we can grab its unique ID for strict OBD linking
+    const orderExists = await this.prisma.salesOrder.findFirst({
+      where: {
+        saleOrderNumber: {
+          equals: opts.saleOrderNumber,
+          mode: 'insensitive',
+        },
+      },
+    });
+
+    if (!orderExists) {
+      throw new NotFoundException(
+        `Sales Order ${opts.saleOrderNumber} not found in the system.`,
+      );
+    }
+
+    // 3. Parse file descriptions
+    let descriptionMap: { [key: string]: string };
+    try {
+      descriptionMap = JSON.parse(opts.descriptions || '{}');
+    } catch (error) {
+      throw new BadRequestException('Invalid descriptions JSON.');
+    }
+
+    // 4. Setup SFTP remote directory paths
+    const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
+    const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
+    const remoteDir = path.posix.join(baseDir, soDir);
+
+    const uploads: { localPath: string; remotePath: string }[] = [];
+    const dbRecords: any[] = [];
+
+    try {
+      // 5. Fetch existing files to prevent duplicate name overwriting
+      const existingDbFiles = await this.prisma.eRP_Material_File.findMany({
+        where: { saleOrderNumber: opts.saleOrderNumber },
+        select: { fileName: true },
+      });
+      const existingFileNames = new Set(existingDbFiles.map((f) => f.fileName));
+
+      // 6. Process each uploaded file
+      for (const f of files) {
+        const checksum = await sha256File(f.path);
+        const description = descriptionMap[f.originalname] || null;
+
+        const { name, ext } = this.splitFileName(f.originalname);
+
+        // Inject '-mobile' before the extension
+        let finalDbFileName = `${name}-mobile${ext}`;
+
+        // Handle auto-incrementing if the same mobile file is uploaded twice
+        if (existingFileNames.has(finalDbFileName)) {
+          let counter = 1;
+          do {
+            finalDbFileName = `${name}-mobile-${counter}${ext}`;
+            counter++;
+          } while (existingFileNames.has(finalDbFileName));
+        }
+
+        existingFileNames.add(finalDbFileName);
+
+        const remotePath = path.posix.join(remoteDir, finalDbFileName);
+
+        uploads.push({ localPath: f.path, remotePath });
+
+        dbRecords.push({
+          saleOrderNumber: opts.saleOrderNumber,
+          salesOrderId: orderExists.id, // Strictly links to the specific SO-OBD record ID
+          fileName: finalDbFileName,
+          description: description,
+          sftpPath: remotePath,
+          sftpDir: remoteDir,
+          fileSizeBytes: BigInt(f.size),
+          mimeType: f.mimetype,
+          checksumSha256: checksum,
+        });
+      }
+
+      // 7. Upload files to SFTP server
+      await this.sftp.uploadBatch(uploads);
+
+      // 8. Save records to the database
+      const created: any[] = [];
+      for (const data of dbRecords) {
+        const row = await this.prisma.eRP_Material_File.create({ data });
+        created.push(row);
+      }
+
+      // 9. Format response for the frontend/mobile client
+      return {
+        success: true,
+        items: created.map((r) => ({
+          ...r,
+          fileSizeBytes: Number(r.fileSizeBytes),
+        })),
+      };
+    } catch (e: any) {
+      throw new InternalServerErrorException(
+        'Upload failed. ' + (e?.message || ''),
+      );
+    } finally {
+      // 10. Clean up temporary files stored by Multer
+      for (const f of files) {
+        this.safeUnlink(f.path);
       }
     }
   }
 
   private splitFileName(filename: string): { name: string; ext: string } {
-      const lastDotIndex = filename.lastIndexOf('.');
-      if (lastDotIndex === -1 || lastDotIndex === 0) {
-          return { name: filename, ext: '' };
-      }
-      return {
-          name: filename.substring(0, lastDotIndex),
-          ext: filename.substring(lastDotIndex), 
-      };
+    const lastDotIndex = filename.lastIndexOf('.');
+    if (lastDotIndex === -1 || lastDotIndex === 0) {
+      return { name: filename, ext: '' };
+    }
+    return {
+      name: filename.substring(0, lastDotIndex),
+      ext: filename.substring(lastDotIndex),
+    };
   }
 }
 

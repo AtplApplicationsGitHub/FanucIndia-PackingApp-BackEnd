@@ -265,4 +265,83 @@ export class ErpMaterialFileController {
       role,
     );
   }
+
+  @Get('mobile/so-variants/:soNumber')
+  @Roles('USER', 'SALES', 'ADMIN')
+  @ApiOperation({ summary: 'Fetch all OBD variants for a given Sale Order Number (Mobile Option B)' })
+  @ApiParam({ name: 'soNumber', type: String })
+  async getMobileVariants(
+    @Param('soNumber') soNumber: string,
+    @Req() req: AuthRequest,
+  ) {
+    const { userId, role } = req.user;
+    return this.service.getMobileSoVariants(soNumber, userId, role);
+  }
+
+  @Post('mobile/upload')
+  @Roles('USER', 'SALES', 'ADMIN')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Mobile specific upload: Appends -mobile to filenames and stores them.',
+  })
+  @ApiBody({
+    type: UploadErpMaterialFileDto,
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+        saleOrderNumber: {
+          type: 'string',
+        },
+        descriptions: {
+          type: 'string',
+          description: 'JSON string mapping original filenames to their descriptions'
+        },
+      },
+    },
+  })
+  @UseInterceptors(
+    FilesInterceptor('files', 20, {
+      storage: diskStorage({
+        destination: os.tmpdir(),
+        filename: (_req, file, cb) => {
+          const { ext } = splitExt(file.originalname);
+          const id = randomUUID();
+          cb(null, `${id}${ext}`);
+        },
+      }),
+      limits: { fileSize: MAX_UPLOAD_BYTES }, 
+    }),
+  )
+  async uploadMobile(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: UploadErpMaterialFileDto,
+    @Req() req?: AuthRequest,
+  ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files received');
+    }
+
+    if (!req?.user) {
+      throw new BadRequestException('User information not available');
+    }
+
+    const { userId, role } = req.user;
+
+    return this.service.uploadAndCreateMobile(
+      files,
+      {
+        saleOrderNumber: body.saleOrderNumber?.trim() || null,
+        descriptions: body.descriptions,
+      },
+      userId,
+      role,
+    );
+  }
 }
