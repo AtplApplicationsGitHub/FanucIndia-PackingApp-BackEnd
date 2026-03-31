@@ -587,6 +587,29 @@ export class ErpMaterialFileService {
       ext: filename.substring(lastDotIndex),
     };
   }
+
+  async getMobileAttachments(salesOrderId: number) {
+    const files = await this.prisma.eRP_Material_File.findMany({
+      where: { 
+        salesOrderId: salesOrderId 
+      },
+      select: {
+        ID: true,
+        fileName: true,
+        description: true,
+        createdAt: true,
+      },
+      orderBy: { 
+        createdAt: 'desc' 
+      },
+    });
+
+    if (files.length === 0) {
+      throw new NotFoundException(`No attachments found for this specific Order.`);
+    }
+
+    return normalizeBigInt(files);
+  }
 }
 
 async function sha256File(localPath: string): Promise<string> {

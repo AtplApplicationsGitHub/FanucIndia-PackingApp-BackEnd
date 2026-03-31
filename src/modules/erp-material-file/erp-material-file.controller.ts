@@ -278,6 +278,16 @@ export class ErpMaterialFileController {
     return this.service.getMobileSoVariants(soNumber, userId, role);
   }
 
+  @Get('mobile/attachments/:salesOrderId')
+  @Roles('USER', 'SALES', 'ADMIN')
+  @ApiOperation({ summary: 'Fetch Filename and Description for a specific Order variant (by ID)' })
+  @ApiParam({ name: 'salesOrderId', type: Number, description: 'The unique ID returned from the so-variants API' })
+  async getMobileAttachments(
+    @Param('salesOrderId', ParseIntPipe) salesOrderId: number,
+  ) {
+    return this.service.getMobileAttachments(salesOrderId);
+  }
+
   @Post('mobile/upload')
   @Roles('USER', 'SALES', 'ADMIN')
   @ApiConsumes('multipart/form-data')
