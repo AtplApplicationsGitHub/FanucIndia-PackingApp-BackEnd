@@ -249,23 +249,31 @@ export class SalesCrudService {
 
   async findOne(id: number, userId: number) {
     try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
       const order = await this.prisma.salesOrder.findUnique({
         where: { id },
         include: {
           customer: true,
           product: true,
           transporter: true,
-          // plantCode: true,
           salesZone: true,
           packConfig: true,
         },
       });
-      if (!order || order.userId !== userId) {
-        throw new NotFoundException('Sales order not found or access denied.');
+      
+      if (!order) {
+        throw new NotFoundException('Sales order not found.');
       }
+
+      if (user?.salesZoneId && order.salesZoneId !== user.salesZoneId) {
+        throw new ForbiddenException('Access denied. This order belongs to a different zone.');
+      } else if (!user?.salesZoneId && order.userId !== userId) {
+        throw new ForbiddenException('Access denied.');
+      }
+
       return order;
     } catch (err) {
-      if (err instanceof NotFoundException) throw err;
+      if (err instanceof NotFoundException || err instanceof ForbiddenException) throw err;
       throw new InternalServerErrorException(
         'Failed to retrieve sales order.',
         (err as Error).message,
@@ -275,11 +283,11 @@ export class SalesCrudService {
 
   async update(id: number, dto: UpdateSalesCrudDto, userId: number) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const existing = await this.prisma.salesOrder.findFirst({
-      where: { id, userId },
+    const existing = await this.prisma.salesOrder.findUnique({
+      where: { id },
     });
     if (!existing) {
-      throw new NotFoundException('Sales order not found or access denied.');
+      throw new NotFoundException('Sales order not found.');
     }
     if (user?.salesZoneId && existing.salesZoneId !== user.salesZoneId) {
       throw new ForbiddenException('Access denied. This order belongs to a different zone.');
@@ -396,11 +404,18 @@ export class SalesCrudService {
   }
 
   async remove(id: number, userId: number) {
-    const existing = await this.prisma.salesOrder.findFirst({
-      where: { id, userId },
-    });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const existing = await this.prisma.salesOrder.findUnique({
+      where: { id },
+    });    
     if (!existing) {
-      throw new NotFoundException('Sales order not found or access denied.');
+      throw new NotFoundException('Sales order not found.');
+    }
+
+    if (user?.salesZoneId && existing.salesZoneId !== user.salesZoneId) {
+      throw new ForbiddenException('Access denied. This order belongs to a different zone.');
+    } else if (!user?.salesZoneId && existing.userId !== userId) {
+      throw new ForbiddenException('Access denied.');
     }
 
     try {
