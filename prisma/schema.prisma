@@ -386,10 +386,14 @@ model SO_Status_StepperArchive {
 
 model VehicleEntry {
   id              Int     @id @default(autoincrement())
-  customerName    String
+  customerName    String?
   vehicleNumber   String
   transporterName String
   driverNumber    String?
+
+  driverName      String?
+  inTime          String?
+  outTime         String?
 
   attachments Json?
 
@@ -404,10 +408,14 @@ model VehicleEntry {
 
 model VehicleEntryArchive {
   id              Int     @id
-  customerName    String
+  customerName    String?
   vehicleNumber   String
   transporterName String
   driverNumber    String?
+
+  driverName      String?
+  inTime          String?
+  outTime         String?
 
   attachments Json?
 

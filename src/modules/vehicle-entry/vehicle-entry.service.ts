@@ -22,6 +22,11 @@ export class VehicleEntryService {
         vehicleNumber: dto.vehicleNumber,
         transporterName: dto.transporterName,
         driverNumber: dto.driverNumber,
+
+        driverName: dto.driverName,
+        inTime: dto.inTime,
+        outTime: dto.outTime,
+
         createdBy: userId,
         updatedBy: userName,
         attachments: Prisma.JsonNull,
