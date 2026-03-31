@@ -59,19 +59,26 @@ export class DispatchService {
       saleOrderNumbers,
     } = dto;
 
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
 
     const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
       where: { 
         vehicleNumber: vehicleNumber,
-        createdAt: { gte: oneDayAgo } 
+        createdAt: { 
+          gte: startOfToday,
+          lte: endOfToday 
+        } 
       },
       orderBy: { createdAt: 'desc' }, 
     });
 
     if (!vehicleEntry) {
       throw new BadRequestException(
-        `Vehicle Number '${vehicleNumber}' not found in Vehicle Entry records.`
+        `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`
       );
     }
 
@@ -205,12 +212,26 @@ export class DispatchService {
       vehicleNumber,
     } = dto;
 
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
     const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
-      where: { vehicleNumber: vehicleNumber },
+      where: { 
+        vehicleNumber: vehicleNumber,
+        createdAt: {
+          gte: startOfToday,
+          lte: endOfToday
+        }
+      },
+      orderBy: { createdAt: 'desc' }
     });
+
     if (!vehicleEntry) {
       throw new BadRequestException(
-        `Vehicle Number '${vehicleNumber}' not found in Vehicle Entry records.`
+        `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`
       );
     }
 

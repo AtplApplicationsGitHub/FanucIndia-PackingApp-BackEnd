@@ -57,7 +57,7 @@ export class ArchivedDataService {
         const { y, m, d } = parseYMD(endDate);
         range.lt = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
       }
-      where.deliveryDate = range;
+      where.archivedAt = range;
     }
 
     // 3. Global Search Logic
