@@ -18,7 +18,18 @@ export class SalesOrderService {
     if (!Number.isFinite(authUserId)) {
       throw new BadRequestException('Invalid userId in request context');
     }
-    const where: any = { userId: authUserId };
+
+    // 1. Fetch the user to determine their Zone authorization
+    const user = await this.prisma.user.findUnique({ where: { id: authUserId } });
+    
+    const where: any = {};
+    
+    // 2. Base Query: Restrict to Zone if applicable, otherwise fallback to userId
+    if (user?.salesZoneId) {
+      where.salesZoneId = user.salesZoneId;
+    } else {
+      where.userId = authUserId;
+    }
 
     if (filters.search) {
       const searchStr = filters.search.trim();
@@ -46,10 +57,20 @@ export class SalesOrderService {
         where.OR.push({ paymentClearance: false });
       }
     }
+    
     if (filters.paymentClearance !== undefined)
       where.paymentClearance = filters.paymentClearance === 'true';
-    if (filters.salesZoneId)
-      where.salesZoneId = parseInt(filters.salesZoneId, 10);
+    
+    // Ensure frontend filters cannot bypass the user's zone restriction
+    if (filters.salesZoneId) {
+      const reqZone = parseInt(filters.salesZoneId, 10);
+      if (user?.salesZoneId && reqZone !== user.salesZoneId) {
+        where.salesZoneId = user.salesZoneId;
+      } else {
+        where.salesZoneId = reqZone;
+      }
+    }
+
     if (filters.status) {
       if (filters.status === 'None') {
         where.AND = [
@@ -71,6 +92,7 @@ export class SalesOrderService {
         },
       ];
     }
+    
     const parseYMD = (s: string) => {
       const datePart = s.includes('T') ? s.split('T')[0] : s;
       const [y, m, d] = datePart.split('-').map(Number);
@@ -155,10 +177,17 @@ export class SalesOrderService {
     const refSheet = workbook.addWorksheet('ReferenceData');
     refSheet.state = 'hidden';
 
-    const [products, transporters, salesZones, packConfigs, customers] = await Promise.all([
+    // 3. Restrict "Sales Zone" Dropdown Reference Data to the user's specific zone
+    let salesZonesData;
+    if (user?.salesZoneId) {
+       salesZonesData = await this.prisma.salesZone.findMany({ where: { id: user.salesZoneId } });
+    } else {
+       salesZonesData = await this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } });
+    }
+
+    const [products, transporters, packConfigs, customers] = await Promise.all([
       this.prisma.product.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.transporter.findMany({ orderBy: { name: 'asc' } }),
-      this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.packConfig.findMany({ orderBy: { configName: 'asc' } }),
       this.prisma.customer.findMany({ orderBy: { name: 'asc' } }),
     ]);
@@ -166,7 +195,7 @@ export class SalesOrderService {
     const dropdowns: Record<string, string[]> = {
       Product: products.map((p) => p.name),
       Transporter: transporters.map((t) => t.name),
-      'Sales Zone': salesZones.map((s) => s.name),
+      'Sales Zone': salesZonesData.map((s) => s.name), // Restricted to their zone if applicable
       'Packing Config': packConfigs.map((p) => p.configName),
       'Payment Clearance': ['Yes', 'No'],
       Customer: customers.map((c) => c.name),
@@ -206,6 +235,10 @@ export class SalesOrderService {
   }
 
   async importBulkOrders(fileBuffer: any, userId: number) {
+    // 1. Fetch user to enforce Zone Security Rules
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const userZoneId = user?.salesZoneId;
+
     let workbook: ExcelJS.Workbook;
     try {
       workbook = new ExcelJS.Workbook();
@@ -292,6 +325,15 @@ export class SalesOrderService {
         }
       }
 
+      // 2. Zone Security & Auto-assignment
+      if (userZoneId) {
+        if (!salesZoneId) {
+          salesZoneId = userZoneId; // Auto-assign user's zone if left blank in excel
+        } else if (salesZoneId !== userZoneId) {
+          rowErrors.push(`Access Denied: You cannot import/assign orders to a different zone.`);
+        }
+      }
+
       const packConfigName = (packConfig || '').toString().trim();
       let packConfigId: number | null = null;
       if (packConfigName) {
@@ -314,7 +356,6 @@ export class SalesOrderService {
         }
       }
 
-      // We still require Sale Order Number as it is the primary identifier
       if (!saleOrderNumber) rowErrors.push('Missing saleOrderNumber');
       else if (saleOrderNumber.toString().trim().length < 10) rowErrors.push('Sale Order Number must be at least 10 characters');
       
@@ -352,7 +393,7 @@ export class SalesOrderService {
           packConfigId: packConfigId,
           deliveryDate: deliveryDateObj,
           transporterName: transporterNameRaw,
-          paymentClearanceProvided, // Track if it was actually provided
+          paymentClearanceProvided, 
           paymentClearance: paymentClearanceVal,
           salesZoneId,
           customerId,
@@ -378,7 +419,6 @@ export class SalesOrderService {
     }
 
     const soObdPairs = ordersToUpsert.map(o => `${o.saleOrderNumber}_${o.outboundDelivery}`);
-    
     const hasDuplicates = (arr: string[]) => new Set(arr).size !== arr.length;
     
     if (hasDuplicates(soObdPairs)) {
@@ -453,7 +493,6 @@ export class SalesOrderService {
           const compositeKey = `${orderData.saleOrderNumber}_${orderData.outboundDelivery}`;
           let existing = existingMap.get(compositeKey);
 
-          // Fallback: If Outbound Delivery was left blank, try to find the order just by Sale Order Number
           if (!existing && !orderData.outboundDelivery) {
             const matches = existingMapBySo.get(orderData.saleOrderNumber);
             if (matches && matches.length === 1) {
@@ -464,6 +503,11 @@ export class SalesOrderService {
           }
 
           if (existing) {
+            // 3. Security check: User cannot update an order that belongs to another zone
+            if (userZoneId && existing.salesZoneId !== userZoneId) {
+              throw new ConflictException(`Row ${orderData.rowNumber}: Order ${existing.saleOrderNumber} belongs to a different zone. You do not have permission to modify it.`);
+            }
+
             const updatePayload: any = {};
             
             if (finalProductId) updatePayload.productId = finalProductId;

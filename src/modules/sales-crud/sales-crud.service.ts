@@ -22,6 +22,7 @@ export class SalesCrudService {
   ) {}
 
   async create(dto: CreateSalesCrudDto, userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const saleOrderNumber = dto.saleOrderNumber?.trim();
     const outboundDelivery = dto.outboundDelivery?.trim();
 
@@ -96,7 +97,9 @@ export class SalesCrudService {
         resolvedProductId = defaultProduct.id;
       }
 
-      const { customerName, customerId, productId, ...rest } = dto as any;
+      const { customerName, customerId, productId, salesZoneId: dtoSalesZoneId, ...rest } = dto as any;
+
+      const finalSalesZoneId = user?.salesZoneId || dtoSalesZoneId;
 
       const cleanedRest = Object.fromEntries(
         Object.entries(rest).map(([k, v]) => {
@@ -118,6 +121,7 @@ export class SalesCrudService {
           customerId: resolvedCustomerId,
           printerId: null,
           address: address,
+          salesZoneId: finalSalesZoneId,
         },
         include: { customer: true },
       });
@@ -270,11 +274,20 @@ export class SalesCrudService {
   }
 
   async update(id: number, dto: UpdateSalesCrudDto, userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const existing = await this.prisma.salesOrder.findFirst({
       where: { id, userId },
     });
     if (!existing) {
       throw new NotFoundException('Sales order not found or access denied.');
+    }
+    if (user?.salesZoneId && existing.salesZoneId !== user.salesZoneId) {
+      throw new ForbiddenException('Access denied. This order belongs to a different zone.');
+    } else if (!user?.salesZoneId && existing.userId !== userId) {
+      throw new ForbiddenException('Access denied.'); // Fallback
+    }
+    if (user?.salesZoneId && dto.salesZoneId && dto.salesZoneId !== user.salesZoneId) {
+      throw new ForbiddenException('You can only assign orders to your own zone.');
     }
 
     const restrictedStatuses = [
@@ -422,14 +435,26 @@ export class SalesCrudService {
   ) {
     try {
       const skip = (page - 1) * limit;
-      const whereClause: any = { userId };
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      const whereClause: any = {};
+
+      if (user?.salesZoneId) {
+        whereClause.salesZoneId = user.salesZoneId; 
+      } else {
+        whereClause.userId = userId;
+      }
 
       // 1. APPLY INDIVIDUAL FILTERS
       if (filters.paymentClearance !== undefined) {
         whereClause.paymentClearance = filters.paymentClearance === 'true';
       }
       if (filters.salesZoneId) {
-        whereClause.salesZoneId = parseInt(filters.salesZoneId, 10);
+        const reqZone = parseInt(filters.salesZoneId, 10);
+        if (user?.salesZoneId && reqZone !== user.salesZoneId) {
+          whereClause.salesZoneId = user.salesZoneId;
+        } else {
+          whereClause.salesZoneId = reqZone;
+        }
       }
       if (filters.status) {
         if (filters.status === 'None') {
