@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsNotEmpty,
   IsBoolean,
+  IsInt
 } from 'class-validator';
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 
@@ -38,6 +39,12 @@ export class CreateUserDto {
   @IsString()
   @IsIn(['ADMIN', 'SALES', 'USER'])
   role: string;
+
+  @ApiProperty({ description: 'Sales Zone ID (Required if role is SALES)', required: false })
+  @ValidateIf((o) => o.role === 'SALES')
+  @IsNotEmpty({ message: 'Sales Zone is required when the role is SALES' })
+  @IsInt()
+  salesZoneId?: number;
 
   @ApiProperty({ description: 'Access to Pick & Pack module', required: false })
   @IsOptional()

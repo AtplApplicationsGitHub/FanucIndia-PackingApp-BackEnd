@@ -13,6 +13,8 @@ model User {
   email                    String         @unique
   password                 String
   role                     String         @default("SALES")
+  salesZoneId              Int?           
+  salesZone                SalesZone?     @relation(fields: [salesZoneId], references: [id])
   createdAt                DateTime       @default(now())
   updatedAt                DateTime       @updatedAt
   salesOrders              SalesOrder[]   @relation("CreatedOrders")
@@ -62,6 +64,7 @@ model SalesZone {
   name        String
   salesOrders SalesOrder[]
   archivedOrders SalesOrderArchive[]
+  users          User[]
 }
 
 model PackConfig {

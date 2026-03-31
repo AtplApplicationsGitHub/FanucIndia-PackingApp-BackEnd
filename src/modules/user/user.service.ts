@@ -31,6 +31,7 @@ export class UserService {
         email: email,
         password: hashedPassword,
         role: dto.role,
+        salesZoneId: dto.role === 'SALES' ? dto.salesZoneId : null,
         accessPickPack: dto.accessPickPack || false,
         accessLabelPrint: dto.accessLabelPrint || false,
         accessMaterialFgTransfer: dto.accessMaterialFgTransfer || false,
@@ -57,6 +58,13 @@ export class UserService {
         accessContentAccuracy: true,
         accessPutAway: true,
         accessErpBarcode: true,
+        salesZoneId: true,
+        salesZone: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
       },
     });
   }
@@ -85,6 +93,13 @@ export class UserService {
         accessContentAccuracy: true,
         accessPutAway: true,
         accessErpBarcode: true,
+        salesZoneId: true,
+        salesZone: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -117,6 +132,10 @@ export class UserService {
       delete updateData.password;
     }
 
+    if (dto.role && dto.role !== 'SALES') {
+      updateData.salesZoneId = null;
+    }
+
     return this.prisma.user.update({
       where: { id },
       data: updateData,
@@ -136,6 +155,13 @@ export class UserService {
         accessContentAccuracy: true,
         accessPutAway: true,
         accessErpBarcode: true,
+        salesZoneId: true,
+        salesZone: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
       },
     });
   }
