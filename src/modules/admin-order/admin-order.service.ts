@@ -220,7 +220,12 @@ export class AdminOrderService {
       throw new NotFoundException('Order not found');
     }
 
-    if (user.role === 'USER' && order.assignedUserId !== user.userId) {
+    if (
+      user.role === 'USER' && 
+      order.assignedUserId !== user.userId &&
+      order.issueAssignedUserId !== user.userId &&
+      order.packingAssignedUserId !== user.userId
+    ) {
       throw new ForbiddenException(
         'You can only update orders assigned to you.',
       );

@@ -48,8 +48,8 @@ async function verifyOrderAccess(
       OR: [
         { issueAssignedUserId: userId },
         { packingAssignedUserId: userId },
+        { assignedUserId: userId }
       ]
-      // assignedUserId: userId 
     },
   });
   if (!order) {

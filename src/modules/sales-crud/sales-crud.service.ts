@@ -265,10 +265,12 @@ export class SalesCrudService {
         throw new NotFoundException('Sales order not found.');
       }
 
-      if (user?.salesZoneId && order.salesZoneId !== user.salesZoneId) {
-        throw new ForbiddenException('Access denied. This order belongs to a different zone.');
-      } else if (!user?.salesZoneId && order.userId !== userId) {
-        throw new ForbiddenException('Access denied.');
+      if (user?.role === 'SALES') {
+        if (user?.salesZoneId && order.salesZoneId !== user.salesZoneId) {
+          throw new ForbiddenException('Access denied. This order belongs to a different zone.');
+        } else if (!user?.salesZoneId && order.userId !== userId) {
+          throw new ForbiddenException('Access denied.');
+        }
       }
 
       return order;
@@ -289,13 +291,15 @@ export class SalesCrudService {
     if (!existing) {
       throw new NotFoundException('Sales order not found.');
     }
-    if (user?.salesZoneId && existing.salesZoneId !== user.salesZoneId) {
-      throw new ForbiddenException('Access denied. This order belongs to a different zone.');
-    } else if (!user?.salesZoneId && existing.userId !== userId) {
-      throw new ForbiddenException('Access denied.'); // Fallback
-    }
-    if (user?.salesZoneId && dto.salesZoneId && dto.salesZoneId !== user.salesZoneId) {
-      throw new ForbiddenException('You can only assign orders to your own zone.');
+    if (user?.role === 'SALES') {
+      if (user?.salesZoneId && existing.salesZoneId !== user.salesZoneId) {
+        throw new ForbiddenException('Access denied. This order belongs to a different zone.');
+      } else if (!user?.salesZoneId && existing.userId !== userId) {
+        throw new ForbiddenException('Access denied.'); // Fallback
+      }
+      if (user?.salesZoneId && dto.salesZoneId && dto.salesZoneId !== user.salesZoneId) {
+        throw new ForbiddenException('You can only assign orders to your own zone.');
+      }
     }
 
     const restrictedStatuses = [
@@ -412,10 +416,12 @@ export class SalesCrudService {
       throw new NotFoundException('Sales order not found.');
     }
 
-    if (user?.salesZoneId && existing.salesZoneId !== user.salesZoneId) {
-      throw new ForbiddenException('Access denied. This order belongs to a different zone.');
-    } else if (!user?.salesZoneId && existing.userId !== userId) {
-      throw new ForbiddenException('Access denied.');
+    if (user?.role === 'SALES') {
+      if (user?.salesZoneId && existing.salesZoneId !== user.salesZoneId) {
+        throw new ForbiddenException('Access denied. This order belongs to a different zone.');
+      } else if (!user?.salesZoneId && existing.userId !== userId) {
+        throw new ForbiddenException('Access denied.');
+      }
     }
 
     try {
@@ -453,10 +459,18 @@ export class SalesCrudService {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
       const whereClause: any = {};
 
-      if (user?.salesZoneId) {
-        whereClause.salesZoneId = user.salesZoneId; 
-      } else {
-        whereClause.userId = userId;
+      if (user?.role === 'SALES') {
+        if (user?.salesZoneId) {
+          whereClause.salesZoneId = user.salesZoneId; 
+        } else {
+          whereClause.userId = userId;
+        }
+      } else if (user?.role === 'USER') {
+        whereClause.OR = [
+          { assignedUserId: userId },
+          { issueAssignedUserId: userId },
+          { packingAssignedUserId: userId }
+        ];
       }
 
       // 1. APPLY INDIVIDUAL FILTERS
