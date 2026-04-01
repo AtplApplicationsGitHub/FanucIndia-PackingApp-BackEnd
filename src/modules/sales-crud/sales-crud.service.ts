@@ -492,35 +492,25 @@ export class SalesCrudService {
           },
         ];
       }
+
+      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
       const parseYMD = (s: string) => {
         const datePart = s.includes('T') ? s.split('T')[0] : s;
         const [y, m, d] = datePart.split('-').map(Number);
         return { y, m, d };
       };
 
-      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-
       if (filters.startDate || filters.endDate) {
         const range: { gte?: Date; lt?: Date } = {};
-
         if (filters.startDate) {
           const { y, m, d } = parseYMD(filters.startDate);
-          const s = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
-          range.gte = s;
+          range.gte = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
         }
-
         if (filters.endDate) {
           const { y, m, d } = parseYMD(filters.endDate);
-          const e = new Date(
-            Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS,
-          );
-          range.lt = e;
+          range.lt = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
         }
-
-        whereClause.deliveryDate = {
-          ...(whereClause.deliveryDate as object),
-          ...range,
-        };
+        whereClause.deliveryDate = { ...(whereClause.deliveryDate as object), ...range };
       }
 
       // 2. APPLY SEARCH ACROSS ALL SPECIFIED COLUMNS
@@ -543,7 +533,6 @@ export class SalesCrudService {
           { customer: { is: { name: s } } },
         ];
 
-        // Handle Payment Clearance Search (Boolean mapping)
         const lowerSearch = searchStr.toLowerCase();
         if (['yes', 'true'].includes(lowerSearch)) {
           whereClause.OR.push({ paymentClearance: true });
@@ -552,7 +541,63 @@ export class SalesCrudService {
         }
       }
 
-      // 3. FETCH PAGINATED RESULTS AND COUNT
+      // 3. FETCH PAGINATED RESULTS (INTERCEPT FOR DISPATCHED STATUS)
+      if (filters.status === 'Dispatched') {
+        // Fetch from both tables concurrently
+        const [primaryOrders, archivedOrders] = await Promise.all([
+          this.prisma.salesOrder.findMany({
+            where: whereClause,
+            include: {
+              customer: true,
+              product: true,
+              transporter: true,
+              salesZone: true,
+              packConfig: true,
+              assignedUser: true,
+              _count: {
+                select: { materialData: true, soChatNotifications: { where: { userId } } },
+              },
+            },
+          }),
+          this.prisma.salesOrderArchive.findMany({
+            where: whereClause,
+            include: {
+              customer: true,
+              product: true,
+              salesZone: true,
+            },
+          })
+        ]);
+
+        // Map and format results
+        const mappedPrimary = primaryOrders.map((order) => ({
+          ...order,
+          hasMaterialData: order._count.materialData > 0,
+          notificationCount: order._count.soChatNotifications,
+          isArchived: false
+        }));
+
+        const mappedArchived = archivedOrders.map((order) => ({
+          ...order,
+          hasMaterialData: false, // Archival doesn't track this directly
+          notificationCount: 0,
+          isArchived: true
+        }));
+
+        // Combine, Sort, and Paginate manually
+        const combinedOrders = [...mappedPrimary, ...mappedArchived].sort((a: any, b: any) => {
+          const dateA = new Date(a.UpdatedDate || a.createdAt).getTime();
+          const dateB = new Date(b.UpdatedDate || b.createdAt).getTime();
+          return dateB - dateA; // Descending
+        });
+
+        const totalCount = combinedOrders.length;
+        const paginatedCombined = combinedOrders.slice(skip, skip + limit);
+
+        return { orders: paginatedCombined, totalCount };
+      }
+
+      // 4. STANDARD FLOW FOR ALL OTHER STATUSES (Optimized DB Pagination)
       const [orders, totalCount] = await this.prisma.$transaction([
         this.prisma.salesOrder.findMany({
           where: whereClause,
@@ -581,6 +626,7 @@ export class SalesCrudService {
         ...order,
         hasMaterialData: order._count.materialData > 0,
         notificationCount: order._count.soChatNotifications,
+        isArchived: false
       }));
 
       return { orders: mappedOrders, totalCount };
