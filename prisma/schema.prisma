@@ -37,6 +37,7 @@ model User {
   receivedSoChatMessages SalesOrderChatMessage[] @relation("SoChatTo")
   soChatNotifications    SoChatNotification[]
   customerLabelPrints    CustomerLabelPrint[]
+  salesOrderAttachments  SalesOrderAttachment[]
 }
 
 model Product {
@@ -143,6 +144,25 @@ model SalesOrder {
   soChatNotifications   SoChatNotification[]
 
   @@unique([saleOrderNumber, outboundDelivery])
+  attachments SalesOrderAttachment[]
+}
+
+model SalesOrderAttachment {
+  id               Int        @id @default(autoincrement())
+  salesOrderId     Int
+  saleOrderNumber  String     @db.VarChar(500)
+  outboundDelivery String     @db.VarChar(500)
+  fileName         String     @db.VarChar(500)
+  sftpPath         String     @db.VarChar(1000)
+  mimeType         String?    @db.VarChar(255)
+  fileSizeBytes    Int
+  uploadedBy       Int
+  createdAt        DateTime   @default(now())
+
+  salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  user             User       @relation(fields: [uploadedBy], references: [id])
+
+  @@index([salesOrderId])
 }
 
 model ERP_Material_Data {

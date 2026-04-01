@@ -175,7 +175,6 @@ export class ReportsSalesOrderService {
   async getCustomerReport(startDate?: string, endDate?: string) {
     const where: any = {};
 
-    // Apply deliveryDate filter if startDate or endDate are provided
     if (startDate || endDate) {
       where.deliveryDate = {};
       if (startDate) {
@@ -183,23 +182,32 @@ export class ReportsSalesOrderService {
       }
       if (endDate) {
         const end = new Date(endDate);
-        // Set time to end of the day to make the filter inclusive
         end.setUTCHours(23, 59, 59, 999); 
         where.deliveryDate.lte = end;
       }
     }
 
-    const grouped = await this.prisma.salesOrder.groupBy({
+    const groupedPrimary = await this.prisma.salesOrder.groupBy({
       by: ['customerId', 'customerNameText'],
-      where, // Add the where clause here
+      where, 
       _count: {
         id: true,
       },
     });
 
+    const groupedArchive = await this.prisma.salesOrderArchive.groupBy({
+      by: ['customerId', 'customerNameText'],
+      where,
+      _count: {
+        id: true,
+      },
+    });
+
+    const combinedGrouped = [...groupedPrimary, ...groupedArchive];
+
     const customerIds = [
       ...new Set(
-        grouped
+        combinedGrouped
           .filter((g) => g.customerId !== null)
           .map((g) => g.customerId as number),
       ),
@@ -212,7 +220,7 @@ export class ReportsSalesOrderService {
 
     const resultMap = new Map<string, number>();
 
-    for (const g of grouped) {
+    for (const g of combinedGrouped) {
       const name =
         (g.customerId ? customerMap.get(g.customerId) : g.customerNameText) ||
         'N/A';
@@ -226,7 +234,6 @@ export class ReportsSalesOrderService {
       }),
     );
 
-    // Sort by count descending
     reportData.sort((a, b) => b.saleOrderNumberCount - a.saleOrderNumberCount);
 
     return {
@@ -240,7 +247,21 @@ export class ReportsSalesOrderService {
       return { success: true, data: [] };
     }
 
-    const where: any = {
+    const dateFilter: any = {};
+    if (startDate || endDate) {
+      dateFilter.deliveryDate = {};
+      if (startDate) {
+        dateFilter.deliveryDate.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setUTCHours(23, 59, 59, 999);
+        dateFilter.deliveryDate.lte = end;
+      }
+    }
+
+    const primaryWhere: any = {
+      ...dateFilter,
       materialData: {
         some: {
           Material_Code: {
@@ -251,22 +272,8 @@ export class ReportsSalesOrderService {
       },
     };
 
-    // Apply deliveryDate filter alongside the materialCode filter
-    if (startDate || endDate) {
-      where.deliveryDate = {};
-      if (startDate) {
-        where.deliveryDate.gte = new Date(startDate);
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        // Set time to end of the day to make the filter inclusive
-        end.setUTCHours(23, 59, 59, 999);
-        where.deliveryDate.lte = end;
-      }
-    }
-
-    const salesOrders = await this.prisma.salesOrder.findMany({
-      where, // Pass the combined where clause here
+    const primarySalesOrders = await this.prisma.salesOrder.findMany({
+      where: primaryWhere,
       select: {
         id: true,
         customerId: true,
@@ -285,40 +292,76 @@ export class ReportsSalesOrderService {
       },
     });
 
-    const customerIds = [
-      ...new Set(
-        salesOrders
-          .filter((so) => so.customerId !== null)
-          .map((so) => so.customerId as number),
-      ),
-    ];
+    const archivedMaterials = await this.prisma.eRP_Material_DataArchive.findMany({
+      where: {
+        Material_Code: {
+          contains: materialCode,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        salesOrderId: true,
+        Required_Qty: true,
+      },
+    });
+
+    const archivedSoIds = [
+      ...new Set(archivedMaterials.map((m) => m.salesOrderId).filter((id) => id !== null)),
+    ] as number[];
+
+    const archiveWhere: any = {
+      ...dateFilter,
+      id: { in: archivedSoIds },
+    };
+
+    const archivedSalesOrders = await this.prisma.salesOrderArchive.findMany({
+      where: archiveWhere,
+      select: {
+        id: true,
+        customerId: true,
+        customerNameText: true,
+      },
+    });
+
+    const archiveQtyMap = new Map<number, number>();
+    for (const mat of archivedMaterials) {
+      if (mat.salesOrderId) {
+        const qty = Number(mat.Required_Qty) || 0;
+        archiveQtyMap.set(mat.salesOrderId, (archiveQtyMap.get(mat.salesOrderId) || 0) + qty);
+      }
+    }
+
+    const allCustomerIds = new Set<number>();
+    primarySalesOrders.forEach((so) => { if (so.customerId) allCustomerIds.add(so.customerId); });
+    archivedSalesOrders.forEach((so) => { if (so.customerId) allCustomerIds.add(so.customerId); });
 
     const customers = await this.prisma.customer.findMany({
-      where: { id: { in: customerIds } },
+      where: { id: { in: Array.from(allCustomerIds) } },
     });
     const customerMap = new Map(customers.map((c) => [c.id, c.name]));
 
     const resultMap = new Map<string, number>();
 
-    for (const so of salesOrders) {
-      const name =
-        (so.customerId ? customerMap.get(so.customerId) : so.customerNameText) ||
-        '-';
-      
+    for (const so of primarySalesOrders) {
+      const name = (so.customerId ? customerMap.get(so.customerId) : so.customerNameText) || '-';
       let orderMaterialQty = 0;
       for (const mat of so.materialData) {
-        const qty = Number(mat.Required_Qty) || 0; 
-        orderMaterialQty += qty;
+        orderMaterialQty += Number(mat.Required_Qty) || 0;
       }
+      resultMap.set(name, (resultMap.get(name) || 0) + orderMaterialQty);
+    }
 
+    for (const so of archivedSalesOrders) {
+      const name = (so.customerId ? customerMap.get(so.customerId) : so.customerNameText) || '-';
+      const orderMaterialQty = archiveQtyMap.get(so.id) || 0;
       resultMap.set(name, (resultMap.get(name) || 0) + orderMaterialQty);
     }
 
     const sortedData = Array.from(resultMap.entries()).map(
       ([customerName, totalQuantity]) => ({
         customerName,
-        totalQuantity, 
-      }),
+        totalQuantity,
+      })
     );
 
     sortedData.sort((a, b) => b.totalQuantity - a.totalQuantity);
