@@ -656,7 +656,13 @@ export class AdminOrderService {
         // Helper function to safely get string values from row
         const getCellString = (colName: string) => {
           if (!colMap[colName]) return undefined;
-          const val = row.getCell(colMap[colName]).value;
+          let val = row.getCell(colMap[colName]).value;
+          
+          // Handle ExcelJS rich text objects safely
+          if (val && typeof val === 'object' && 'richText' in val) {
+            val = (val as any).richText.map((rt: any) => rt.text).join('');
+          }
+          
           return val ? val.toString().trim() : undefined;
         };
 
@@ -664,14 +670,18 @@ export class AdminOrderService {
         // 1. VALIDATE READ-ONLY COLUMNS (Ensure no tampering)
         // ----------------------------------------------------
         const rowProduct = getCellString('PRODUCT');
-        if (rowProduct && rowProduct !== (dbOrder.product?.name || '')) {
+        const dbProduct = (dbOrder.product?.name || '').trim();
+        
+        if (rowProduct && rowProduct.toLowerCase() !== dbProduct.toLowerCase()) {
           throw new BadRequestException(
             `Row ${i}: Modifying read-only column 'PRODUCT' is not allowed.`,
           );
         }
 
         const rowOBD = getCellString('OUT BOUND DELIVERY');
-        if (rowOBD !== undefined && rowOBD !== (dbOrder.outboundDelivery || '')) {
+        const dbOBD = (dbOrder.outboundDelivery || '').trim();
+        
+        if (rowOBD !== undefined && rowOBD.toLowerCase() !== dbOBD.toLowerCase()) {
           if (dbOrder.isErpImported === 1) {
             throw new BadRequestException(
               `Row ${i}: Modifying 'OUT BOUND DELIVERY' is not allowed because ERP Material Data has already been imported.`
@@ -680,7 +690,9 @@ export class AdminOrderService {
         }
 
         const rowTO = getCellString('TRANSFER ORDER');
-        if (rowTO && rowTO !== (dbOrder.transferOrder || '')) {
+        const dbTO = (dbOrder.transferOrder || '').trim();
+        
+        if (rowTO && rowTO.toLowerCase() !== dbTO.toLowerCase()) {
           throw new BadRequestException(
             `Row ${i}: Modifying read-only column 'TRANSFER ORDER' is not allowed.`,
           );
