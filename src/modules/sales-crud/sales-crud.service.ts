@@ -928,4 +928,163 @@ export class SalesCrudService {
       });
     });
   }
+
+  async uploadAttachments(salesOrderIds: number[], files: Express.Multer.File[], userId: number) {
+    // 1. Fetch the user to check their assigned Sales Zone
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    // 2. Fetch the selected Sales Orders, now including salesZoneId
+    const salesOrders = await this.prisma.salesOrder.findMany({
+      where: { id: { in: salesOrderIds } },
+      select: { id: true, saleOrderNumber: true, outboundDelivery: true, salesZoneId: true },
+    });
+
+    if (salesOrders.length === 0) {
+      throw new NotFoundException('No valid sales orders found for the provided IDs.');
+    }
+
+    if (user?.salesZoneId) {
+      const unauthorizedOrders = salesOrders.filter(
+        (order) => Number(order.salesZoneId) !== Number(user.salesZoneId)
+      );
+      
+      if (unauthorizedOrders.length > 0) {
+        const mismatchedDetails = unauthorizedOrders
+          .map((o) => `Order ID ${o.id} is Zone ${o.salesZoneId}`)
+          .join(', ');
+
+        throw new ForbiddenException(
+          `Access denied. Your Sales Zone ID is ${user.salesZoneId}, but you selected restricted orders: [${mismatchedDetails}]`
+        );
+      }
+    }
+
+    // 4. Define base path from env or use a default
+    const basePath = process.env.SFTP_BASE_DIR_SALESUSER_ORDER || 'uploads/fanuc/salesuser-order-attachments';
+    const attachmentRecords: Prisma.SalesOrderAttachmentCreateManyInput[] = [];
+
+    // 5. Process each Sales Order
+    for (const order of salesOrders) {
+      // Format the folder name as SO-OBD and sanitize it
+      const folderName = `${order.saleOrderNumber}-${order.outboundDelivery}`.replace(/[^a-zA-Z0-9-_]/g, '_');
+      const remoteDir = `${basePath.replace(/\/$/, '')}/${folderName}`;
+
+      // Ensure the directory exists on the SFTP server
+      await this.sftpService.ensureDir(remoteDir);
+
+      // 6. Process and upload each file for the current Sales Order
+      for (const file of files) {
+        const lastDotIndex = file.originalname.lastIndexOf('.');
+        let baseName = file.originalname;
+        let extension = '';
+        
+        if (lastDotIndex !== -1 && lastDotIndex !== 0) {
+          baseName = file.originalname.substring(0, lastDotIndex);
+          extension = file.originalname.substring(lastDotIndex);
+        }
+
+        let finalFileName = file.originalname;
+        let remotePath = `${remoteDir}/${finalFileName}`;
+        let counter = 1;
+
+        // Check if file exists on SFTP and increment counter until a free name is found
+        while (await this.sftpService.exists(remotePath)) {
+          finalFileName = `${baseName}-${counter}${extension}`;
+          remotePath = `${remoteDir}/${finalFileName}`;
+          counter++;
+        }
+
+        // Upload to SFTP
+        await this.sftpService.put(file.buffer, remotePath);
+
+        // Prepare the DB record
+        attachmentRecords.push({
+          salesOrderId: order.id,
+          saleOrderNumber: order.saleOrderNumber,
+          outboundDelivery: order.outboundDelivery,
+          fileName: finalFileName,
+          sftpPath: remotePath, 
+          mimeType: file.mimetype,
+          fileSizeBytes: file.size,
+          uploadedBy: userId,
+        });
+      }
+    }
+
+    // 7. Save all metadata records to the database in one transaction
+    try {
+      await this.prisma.salesOrderAttachment.createMany({
+        data: attachmentRecords,
+      });
+    } catch (err: any) {
+      throw new InternalServerErrorException(
+        'Files uploaded to SFTP, but failed to save metadata to the database.',
+        err.message,
+      );
+    }
+
+    return { 
+      message: 'Attachments uploaded successfully', 
+      totalFilesUploaded: files.length, 
+      appliedToOrdersCount: salesOrders.length 
+    };
+  }
+
+  async getAttachments(salesOrderId: number) {
+    try {
+      const attachments = await this.prisma.salesOrderAttachment.findMany({
+        where: { salesOrderId },
+        include: {
+          user: {
+            select: { name: true }, // Include the name of the person who uploaded it
+          },
+        },
+        orderBy: { createdAt: 'desc' }, // Show newest attachments first
+      });
+
+      return attachments;
+    } catch (err: any) {
+      throw new InternalServerErrorException(
+        'Failed to retrieve attachments.',
+        err.message,
+      );
+    }
+  }
+
+  async downloadAttachment(attachmentId: number, res: any) {
+    // 1. Find the attachment record in the DB
+    const attachment = await this.prisma.salesOrderAttachment.findUnique({
+      where: { id: attachmentId },
+    });
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment record not found.');
+    }
+
+    // 2. Verify the file actually exists on the SFTP server
+    const fileExists = await this.sftpService.exists(attachment.sftpPath);
+    if (!fileExists) {
+      throw new NotFoundException('File no longer exists on the SFTP server.');
+    }
+
+    try {
+      // 3. Set the correct headers so the browser downloads it with the right name and extension
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${attachment.fileName}"`,
+      );
+      res.setHeader(
+        'Content-Type',
+        attachment.mimeType || 'application/octet-stream',
+      );
+
+      // 4. Stream the file directly from SFTP to the user's browser
+      await this.sftpService.streamToResponse(attachment.sftpPath, res);
+    } catch (err: any) {
+      throw new InternalServerErrorException(
+        'Failed to download the file from the SFTP server.',
+        err.message,
+      );
+    }
+  }
 }

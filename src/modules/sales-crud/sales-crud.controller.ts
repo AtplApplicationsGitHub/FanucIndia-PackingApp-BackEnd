@@ -8,8 +8,12 @@ import {
   Delete,
   Query,
   Req,
+  Res,
   UseGuards,
   ParseIntPipe,
+  UploadedFiles,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import { SalesCrudService } from './sales-crud.service';
 import { CreateSalesCrudDto } from './dto/create-sales-crud.dto';
@@ -27,6 +31,8 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 
 @ApiTags('Sales Orders')
 @ApiBearerAuth()
@@ -180,5 +186,55 @@ export class SalesCrudController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.service.printCustomerLabel(id);
+  }
+
+  @Post('attachments')
+  @Roles('SALES', 'ADMIN')
+  @ApiOperation({ summary: 'Upload attachments for multiple sales orders' })
+  @UseInterceptors(FilesInterceptor('files'))
+  async uploadAttachments(
+    @Body('salesOrderIds') salesOrderIdsString: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Req() req,
+  ) {
+    if (!salesOrderIdsString) {
+      throw new BadRequestException('salesOrderIds must be provided');
+    }
+
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files uploaded');
+    }
+
+    let salesOrderIds: number[];
+    try {
+      if (salesOrderIdsString.startsWith('[')) {
+        salesOrderIds = JSON.parse(salesOrderIdsString).map(Number);
+      } else {
+        salesOrderIds = salesOrderIdsString.split(',').map(Number);
+      }
+    } catch (e) {
+      throw new BadRequestException('Invalid format for salesOrderIds. Expected comma-separated string or JSON array.');
+    }
+
+    return this.service.uploadAttachments(salesOrderIds, files, req.user.userId);
+  }
+
+  @Get(':id/attachments')
+  @Roles('SALES', 'ADMIN', 'USER') // Adjust roles based on who can view the search page
+  @ApiOperation({ summary: 'Get a list of attachments for a specific Sales Order' })
+  @ApiParam({ name: 'id', type: Number, description: 'The Sales Order ID' })
+  async getAttachments(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getAttachments(id);
+  }
+
+  @Get('attachments/download/:attachmentId')
+  @Roles('SALES', 'ADMIN', 'USER')
+  @ApiOperation({ summary: 'Download a specific attachment file' })
+  @ApiParam({ name: 'attachmentId', type: Number, description: 'The ID of the attachment' })
+  async downloadAttachment(
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @Res() res: Response,
+  ) {
+    return this.service.downloadAttachment(attachmentId, res);
   }
 }
