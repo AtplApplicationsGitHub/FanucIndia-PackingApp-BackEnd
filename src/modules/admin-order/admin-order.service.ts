@@ -631,13 +631,45 @@ export class AdminOrderService {
       for (let i = 2; i <= worksheet.rowCount; i++) {
         const row = worksheet.getRow(i);
 
-        const saleOrderNumberCell = row.getCell(colMap['SALE ORDER NUMBER']);
-        const saleOrderNumber = saleOrderNumberCell.value?.toString().trim();
+        // 1. Define getCellString FIRST so we can use it to find the OBD
+        const getCellString = (colName: string) => {
+          if (!colMap[colName]) return undefined;
+          let val = row.getCell(colMap[colName]).value;
+          
+          if (val === null || val === undefined) return undefined;
 
+          // Handle Rich Text
+          if (typeof val === 'object' && 'richText' in val) {
+            val = (val as any).richText.map((rt: any) => rt.text).join('');
+          }
+          // Handle Formulas (Extract the computed result)
+          else if (typeof val === 'object' && 'formula' in val) {
+            val = (val as any).result;
+            if (val && typeof val === 'object' && 'error' in val) return undefined;
+          }
+          // Handle Hyperlinks
+          else if (typeof val === 'object' && 'hyperlink' in val) {
+            val = (val as any).text;
+          }
+
+          if (val === null || val === undefined) return undefined;
+
+          // Force convert to string and aggressively strip ALL invisible/weird spaces (like \xA0)
+          return String(val).replace(/[\s\uFEFF\xA0]+/g, ' ').trim();
+        };
+
+        const saleOrderNumber = getCellString('SALE ORDER NUMBER');
         if (!saleOrderNumber) continue;
 
+        const excelOBD = getCellString('OUT BOUND DELIVERY');
+
+        // 2. Fetch the DB Order using BOTH SO Number AND Outbound Delivery
         const dbOrder = await tx.salesOrder.findFirst({
-          where: { saleOrderNumber },
+          where: { 
+            saleOrderNumber: saleOrderNumber,
+            // Prisma expects a string. If Excel OBD is undefined/empty, we strictly pass an empty string ''
+            outboundDelivery: excelOBD || '', 
+          },
           include: {
             product: true,
             transporter: true,
@@ -649,57 +681,37 @@ export class AdminOrderService {
 
         if (!dbOrder) {
           throw new BadRequestException(
-            `Row ${i}: Invalid SO. Sale Order Number '${saleOrderNumber}' does not exist in the database. Adding new Orders via Excel upload is not allowed.`
+            `Row ${i}: Invalid SO. Sale Order Number '${saleOrderNumber}' (OBD: '${excelOBD || ''}') does not exist in the database. Adding new Orders via Excel upload is not allowed.`
           );
         }
 
-        // Helper function to safely get string values from row
-        const getCellString = (colName: string) => {
-          if (!colMap[colName]) return undefined;
-          let val = row.getCell(colMap[colName]).value;
-          
-          // Handle ExcelJS rich text objects safely
-          if (val && typeof val === 'object' && 'richText' in val) {
-            val = (val as any).richText.map((rt: any) => rt.text).join('');
-          }
-          
-          return val ? val.toString().trim() : undefined;
-        };
+        // ----------------------------------------------------
+        // 3. VALIDATE READ-ONLY COLUMNS
+        // ----------------------------------------------------
+        const normalize = (str: string) => str.replace(/[\s\uFEFF\xA0]+/g, ' ').trim().toLowerCase();
 
-        // ----------------------------------------------------
-        // 1. VALIDATE READ-ONLY COLUMNS (Ensure no tampering)
-        // ----------------------------------------------------
         const rowProduct = getCellString('PRODUCT');
-        const dbProduct = (dbOrder.product?.name || '').trim();
+        const dbProduct = dbOrder.product?.name || '';
         
-        if (rowProduct && rowProduct.toLowerCase() !== dbProduct.toLowerCase()) {
+        if (rowProduct && normalize(rowProduct) !== normalize(dbProduct)) {
           throw new BadRequestException(
-            `Row ${i}: Modifying read-only column 'PRODUCT' is not allowed.`,
+            `Row ${i}: Modifying read-only column 'PRODUCT' is not allowed. (Found: '${rowProduct}', Expected: '${dbProduct}')`,
           );
         }
 
-        const rowOBD = getCellString('OUT BOUND DELIVERY');
-        const dbOBD = (dbOrder.outboundDelivery || '').trim();
-        
-        if (rowOBD !== undefined && rowOBD.toLowerCase() !== dbOBD.toLowerCase()) {
-          if (dbOrder.isErpImported === 1) {
-            throw new BadRequestException(
-              `Row ${i}: Modifying 'OUT BOUND DELIVERY' is not allowed because ERP Material Data has already been imported.`
-            );
-          }
-        }
+        // Note: We skip OBD validation here because we used it to fetch the order.
 
         const rowTO = getCellString('TRANSFER ORDER');
-        const dbTO = (dbOrder.transferOrder || '').trim();
+        const dbTO = dbOrder.transferOrder || '';
         
-        if (rowTO && rowTO.toLowerCase() !== dbTO.toLowerCase()) {
+        if (rowTO && normalize(rowTO) !== normalize(dbTO)) {
           throw new BadRequestException(
-            `Row ${i}: Modifying read-only column 'TRANSFER ORDER' is not allowed.`,
+            `Row ${i}: Modifying read-only column 'TRANSFER ORDER' is not allowed. (Found: '${rowTO}', Expected: '${dbTO}')`,
           );
         }
 
         // ----------------------------------------------------
-        // 2. RESOLVE MASTER TABLE ADDITIONS / DROPDOWNS
+        // 4. RESOLVE MASTER TABLE ADDITIONS / DROPDOWNS
         // ----------------------------------------------------
 
         // Transporter
@@ -775,7 +787,7 @@ export class AdminOrderService {
         }
 
         // ----------------------------------------------------
-        // 3. PARSE FORMATTED DATA (Date, Boolean, Number)
+        // 5. PARSE FORMATTED DATA (Date, Boolean, Number)
         // ----------------------------------------------------
 
         // Payment Clearance
@@ -825,7 +837,6 @@ export class AdminOrderService {
         await tx.salesOrder.update({
           where: { id: dbOrder.id },
           data: {
-            outboundDelivery: safeString(getCellString('OUT BOUND DELIVERY'), dbOrder.outboundDelivery),
             transporterId,
             packConfigId,
             assignedUserId,

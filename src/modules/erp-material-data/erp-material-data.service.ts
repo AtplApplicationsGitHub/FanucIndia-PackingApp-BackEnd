@@ -78,12 +78,15 @@ export class ErpMaterialDataService {
 
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true },
+      select: { saleOrderNumber: true, outboundDelivery: true }, // Added OBD
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
     const materials = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber: salesOrder.saleOrderNumber },
+      where: { 
+        saleOrderNumber: salesOrder.saleOrderNumber,
+        FG_OBD: salesOrder.outboundDelivery || '' // Filter by the correct DB column
+      },
       orderBy: { ID: 'asc' },
     });
 
@@ -99,13 +102,14 @@ export class ErpMaterialDataService {
     await verifyOrderAccess(this.prisma, orderId, userId, userRole);
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true, packingAssignedUserId: true },
+      select: { saleOrderNumber: true, outboundDelivery: true, packingAssignedUserId: true }, // Added OBD
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
     const materials = await this.prisma.eRP_Material_Data.findMany({
       where: {
         saleOrderNumber: salesOrder.saleOrderNumber,
+        FG_OBD: salesOrder.outboundDelivery || '', // Filter
         OR: [
           { Material_Code: { equals: materialCode, mode: 'insensitive' } },
           { Mapping_Barcode: { equals: materialCode, mode: 'insensitive' } },
@@ -144,7 +148,10 @@ export class ErpMaterialDataService {
     });
 
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber: salesOrder.saleOrderNumber },
+      where: { 
+        saleOrderNumber: salesOrder.saleOrderNumber,
+        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+      },
       select: { Issue_stage: true, Required_Qty: true },
     });
 
@@ -158,8 +165,6 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'W105',
-          // skipStage: null,
-          // assignedUserId: salesOrder.packingAssignedUserId || null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -196,7 +201,7 @@ export class ErpMaterialDataService {
 
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true, packingAssignedUserId: true },
+      select: { saleOrderNumber: true, outboundDelivery: true, packingAssignedUserId: true }, // Added OBD
     });
 
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
@@ -211,6 +216,7 @@ export class ErpMaterialDataService {
         where: {
           Material_Code: materialCode,
           saleOrderNumber: salesOrder.saleOrderNumber,
+          FG_OBD: salesOrder.outboundDelivery || '' // Filter
         },
       });
     }
@@ -249,7 +255,10 @@ export class ErpMaterialDataService {
     });
 
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber: salesOrder.saleOrderNumber },
+      where: { 
+        saleOrderNumber: salesOrder.saleOrderNumber,
+        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+      },
       select: { Issue_stage: true, Required_Qty: true },
     });
 
@@ -262,8 +271,6 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'W105',
-          // skipStage: null,
-          // assignedUserId: salesOrder.packingAssignedUserId || null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -297,13 +304,14 @@ export class ErpMaterialDataService {
     await verifyOrderAccess(this.prisma, orderId, userId, userRole);
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true },
+      select: { saleOrderNumber: true, outboundDelivery: true }, // Added OBD
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
     const materials = await this.prisma.eRP_Material_Data.findMany({
       where: {
         saleOrderNumber: salesOrder.saleOrderNumber,
+        FG_OBD: salesOrder.outboundDelivery || '', // Filter
         OR: [
           { Material_Code: { equals: materialCode, mode: 'insensitive' } },
           { Mapping_Barcode: { equals: materialCode, mode: 'insensitive' } },
@@ -343,7 +351,10 @@ export class ErpMaterialDataService {
     });
 
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber: salesOrder.saleOrderNumber },
+      where: { 
+        saleOrderNumber: salesOrder.saleOrderNumber,
+        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+      },
       select: { Packing_stage: true, Required_Qty: true },
     });
 
@@ -356,8 +367,6 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'F105',
-          // skipStage: null,
-          // assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -392,7 +401,7 @@ export class ErpMaterialDataService {
     await verifyOrderAccess(this.prisma, orderId, userId, userRole);
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true },
+      select: { saleOrderNumber: true, outboundDelivery: true }, // Added OBD
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
@@ -402,6 +411,7 @@ export class ErpMaterialDataService {
     const groupItems = await this.prisma.eRP_Material_Data.findMany({
       where: {
         saleOrderNumber: salesOrder.saleOrderNumber,
+        FG_OBD: salesOrder.outboundDelivery || '', // Filter
         Group: group,
       },
     });
@@ -448,6 +458,7 @@ export class ErpMaterialDataService {
 
     return this._checkOrderCompletion(
       salesOrder.saleOrderNumber,
+      salesOrder.outboundDelivery || '',
       orderId,
       userName,
     );
@@ -455,11 +466,15 @@ export class ErpMaterialDataService {
 
   private async _checkOrderCompletion(
     soNumber: string,
+    outboundDelivery: string,
     orderId: number,
     userName: string,
   ) {
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber: soNumber },
+      where: { 
+        saleOrderNumber: soNumber,
+        FG_OBD: outboundDelivery // Passed from calling functions
+      },
       select: { Issue_stage: true, Packing_stage: true, Required_Qty: true },
     });
 
@@ -484,8 +499,6 @@ export class ErpMaterialDataService {
           where: { id: orderId },
           data: {
             status: 'W105',
-            // skipStage: null,
-            // assignedUserId: current.packingAssignedUserId || null,
             UpdatedBy: userName,
             UpdatedDate: new Date(),
           },
@@ -507,8 +520,6 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'F105',
-          // skipStage: null,
-          // assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -542,7 +553,7 @@ export class ErpMaterialDataService {
 
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true },
+      select: { saleOrderNumber: true, outboundDelivery: true }, // Added OBD
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
@@ -556,6 +567,7 @@ export class ErpMaterialDataService {
         where: {
           Material_Code: materialCode,
           saleOrderNumber: salesOrder.saleOrderNumber,
+          FG_OBD: salesOrder.outboundDelivery || '' // Filter
         },
       });
     }
@@ -587,7 +599,10 @@ export class ErpMaterialDataService {
     });
 
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber: salesOrder.saleOrderNumber },
+      where: { 
+        saleOrderNumber: salesOrder.saleOrderNumber,
+        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+      },
       select: { Packing_stage: true, Required_Qty: true },
     });
 
@@ -600,8 +615,6 @@ export class ErpMaterialDataService {
         where: { id: orderId },
         data: {
           status: 'F105',
-          // skipStage: null,
-          // assignedUserId: null,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
@@ -663,7 +676,7 @@ export class ErpMaterialDataService {
     await verifyOrderAccess(this.prisma, orderId, userId, userRole);
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true },
+      select: { saleOrderNumber: true, outboundDelivery: true }, // Added OBD
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
@@ -671,7 +684,10 @@ export class ErpMaterialDataService {
     const now = new Date();
 
     const materials = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber: salesOrder.saleOrderNumber },
+      where: { 
+        saleOrderNumber: salesOrder.saleOrderNumber,
+        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+      },
     });
 
     if (materials.length === 0) {
@@ -697,6 +713,7 @@ export class ErpMaterialDataService {
 
     return this._checkOrderCompletion(
       salesOrder.saleOrderNumber,
+      salesOrder.outboundDelivery || '',
       orderId,
       userName,
     );
@@ -713,7 +730,6 @@ export class ErpMaterialDataService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user ? user.name : 'System';
 
-    // 1. Fetch the current ERP Material record
     const currentMaterial = await this.prisma.eRP_Material_Data.findUnique({
       where: { ID: dto.materialId },
     });
@@ -722,13 +738,9 @@ export class ErpMaterialDataService {
       throw new NotFoundException('Material not found');
     }
 
-    // --- NEW VALIDATION START ---
-    // If we are adding/updating a Mapping Barcode, check for duplicates
     if (dto.mappingBarcode) {
       const barcodeToCheck = dto.mappingBarcode;
 
-      // Check 1: Master Table (MaterialBarcode)
-      // The new barcode should not match any existing Material Code (erpCode) or Mapping Barcode
       const existsInMaster = await this.prisma.materialBarcode.findFirst({
         where: {
           OR: [
@@ -744,13 +756,12 @@ export class ErpMaterialDataService {
         );
       }
 
-      // Check 2: Transaction Table (ERP_Material_Data) for the SAME Sales Order
-      // The new barcode should not match any Material Code or Mapping Barcode in this SO
-      // Exclude the current row (ID) we are updating
+      // Check 2: Include FG_OBD so we only prevent duplicates within the same split
       const existsInCurrentSO = await this.prisma.eRP_Material_Data.findFirst({
         where: {
           saleOrderNumber: currentMaterial.saleOrderNumber,
-          ID: { not: dto.materialId }, // Exclude self
+          FG_OBD: currentMaterial.FG_OBD, // <--- Prevents split conflict
+          ID: { not: dto.materialId }, 
           OR: [
             { Material_Code: { equals: barcodeToCheck, mode: 'insensitive' } },
             {
@@ -766,9 +777,7 @@ export class ErpMaterialDataService {
         );
       }
     }
-    // --- NEW VALIDATION END ---
 
-    // 2. Update ERP_Material_Data table (Both Mapping Barcode and Group are updated)
     const updatedMaterial = await this.prisma.eRP_Material_Data.update({
       where: { ID: dto.materialId },
       data: {
@@ -779,14 +788,12 @@ export class ErpMaterialDataService {
       },
     });
 
-    // 3. Handle Master Table (MaterialBarcode) Logic
     const materialCode = currentMaterial.Material_Code;
     const existingMaster = await this.prisma.materialBarcode.findUnique({
       where: { erpCode: materialCode },
     });
 
     if (existingMaster) {
-      // Case 1: Exists in Master - Update ONLY Mapping Barcode (ignore Group)
       await this.prisma.materialBarcode.update({
         where: { id: existingMaster.id },
         data: {
@@ -794,14 +801,13 @@ export class ErpMaterialDataService {
         },
       });
     } else {
-      // Case 2: Does not exist in Master - Create new record with Mapping Barcode AND Group
       await this.prisma.materialBarcode.create({
         data: {
           erpCode: materialCode,
           mappingBarcode: dto.mappingBarcode || null,
           group: dto.group || null,
-          acceptBulkData: false, // Default
-          remarksRequired: false, // Default
+          acceptBulkData: false, 
+          remarksRequired: false, 
         },
       });
     }
