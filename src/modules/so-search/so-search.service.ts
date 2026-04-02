@@ -53,6 +53,7 @@ export class SoSearchService {
         user: { select: { name: true } },
         assignedUser: { select: { name: true } },
         statusStepper: true,
+        attachments: true,
       },
     });
 
