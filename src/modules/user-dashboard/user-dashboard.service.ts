@@ -71,14 +71,17 @@ export class UserDashboardService {
       if (order.materialData.length === 0) {
         return false;
       }
+
       const isComplete = order.materialData.every(
         (material) =>
           material.Required_Qty > 0 &&
           material.Required_Qty === material.Issue_stage &&
           material.Issue_stage === material.Packing_stage,
       );
+
       return !isComplete;
     });
+
     return incompleteOrders.map(({ materialData, _count, ...order }) => ({
       ...order,
       notificationCount: _count ? _count.soChatNotifications : 0,
@@ -94,7 +97,9 @@ export class UserDashboardService {
         },
       },
       select: {
+        id: true,
         saleOrderNumber: true,
+        outboundDelivery: true,
         priority: true,
         status: true,
         skipIssueStage: true,
@@ -118,8 +123,11 @@ export class UserDashboardService {
         (sum, material) => sum + material.Required_Qty,
         0,
       );
+
       return {
+        id: order.id,
         saleOrderNumber: order.saleOrderNumber,
+        outboundDelivery: order.outboundDelivery,
         priority: order.priority,
         status: order.status,
         skipIssueStage: order.skipIssueStage,
@@ -143,6 +151,7 @@ export class UserDashboardService {
       where: whereClause,
       include: {
         customer: true,
+        salesZone: true,
       },
     });
 
@@ -159,13 +168,17 @@ export class UserDashboardService {
     userRole: string,
   ) {
     const order = await this.findOrderById(orderId, userId, userRole);
-    if (!order) {
-      throw new NotFoundException('Sales order not found or access denied.');
-    }
+
     return this.getMaterialDetails(
       order.saleOrderNumber,
+      order.outboundDelivery,
       order.skipIssueStage ?? false,
-      order.skipPackingStage ?? false
+      order.skipPackingStage ?? false,
+      {
+        salesZone: order.salesZone?.name ?? null,
+        labelRemarks: order.labelRemarks ?? null,
+        customerName: order.customer?.name ?? order.customerNameText ?? null,
+      },
     );
   }
 
@@ -174,71 +187,41 @@ export class UserDashboardService {
     userId: number,
     userRole: string,
   ) {
-    await this.authorizeOrderAccess(saleOrderNumber, userId, userRole);
+    const order = await this.findUniqueAccessibleOrderBySoNumber(
+      saleOrderNumber,
+      userId,
+      userRole,
+    );
 
-    const order = await this.prisma.salesOrder.findFirst({
-      where: { saleOrderNumber },
-      select: {
-        labelRemarks: true,
-        customerNameText: true,
-        skipIssueStage: true,  
-        skipPackingStage: true,
-        customer: { select: { name: true } },
-        salesZone: { select: { name: true } },
+    return this.getMaterialDetails(
+      order.saleOrderNumber,
+      order.outboundDelivery,
+      order.skipIssueStage ?? false,
+      order.skipPackingStage ?? false,
+      {
+        salesZone: order.salesZone?.name ?? null,
+        labelRemarks: order.labelRemarks ?? null,
+        customerName: order.customer?.name ?? order.customerNameText ?? null,
       },
-    });
-
-    const materials = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber },
-      select: {
-        ID: true,
-        Material_Code: true,
-        Material_Description: true,
-        Batch_No: true,
-        SO_Donor_Batch: true,
-        Cert_No: true,
-        Bin_No: true,
-        A_D_F: true,
-        Required_Qty: true,
-        Issue_stage: true,
-        Packing_stage: true,
-        UpdatedDate: true,
-        Accept_Bulk_Data: true,
-        Classification: true,
-        Group: true,
-        Mapping_Barcode: true,
-        Remarks_Required: true,
-        Remarks: true,
-        CNC_Serial_No: true,
-      },
-    });
-
-    const salesZone = order?.salesZone?.name ?? null;
-    const labelRemarks = order?.labelRemarks ?? null;
-    const customerName =
-      order?.customer?.name ?? order?.customerNameText ?? null;
-
-    const skipIssueStage = order?.skipIssueStage ?? false;
-    const skipPackingStage = order?.skipPackingStage ?? false;
-
-    return materials.map((material) => ({
-      ...material,
-      ID: material.ID.toString(),
-      salesZone,
-      labelRemarks,
-      customerName,
-      skipIssueStage,
-      skipPackingStage,
-    }));
+    );
   }
 
   private async getMaterialDetails(
     saleOrderNumber: string,
+    outboundDelivery?: string | null,
     skipIssueStage?: boolean,
     skipPackingStage?: boolean,
+    meta?: {
+      salesZone?: string | null;
+      labelRemarks?: string | null;
+      customerName?: string | null;
+    },
   ) {
     const materials = await this.prisma.eRP_Material_Data.findMany({
-      where: { saleOrderNumber },
+      where: {
+        saleOrderNumber,
+        ...(outboundDelivery ? { FG_OBD: outboundDelivery } : {}),
+      },
       select: {
         ID: true,
         Material_Code: true,
@@ -261,9 +244,13 @@ export class UserDashboardService {
         CNC_Serial_No: true,
       },
     });
+
     return materials.map((material) => ({
       ...material,
       ID: material.ID.toString(),
+      salesZone: meta?.salesZone ?? null,
+      labelRemarks: meta?.labelRemarks ?? null,
+      customerName: meta?.customerName ?? null,
       skipIssueStage: !!skipIssueStage,
       skipPackingStage: !!skipPackingStage,
     }));
@@ -276,11 +263,10 @@ export class UserDashboardService {
     attachments: Express.Multer.File[],
   ) {
     const order = await this.findOrderById(orderId, user.userId, user.role);
-    if (!order) {
-      throw new NotFoundException('Sales order not found or access denied.');
-    }
+
     return this.processCombinedUpload(
       order.saleOrderNumber,
+      order.outboundDelivery,
       data,
       attachments,
       user.name,
@@ -293,9 +279,15 @@ export class UserDashboardService {
     data: UpdateMaterialDataDto,
     attachments: Express.Multer.File[],
   ) {
-    await this.authorizeOrderAccess(saleOrderNumber, user.userId, user.role);
-    return this.processCombinedUpload(
+    const order = await this.findUniqueAccessibleOrderBySoNumber(
       saleOrderNumber,
+      user.userId,
+      user.role,
+    );
+
+    return this.processCombinedUpload(
+      order.saleOrderNumber,
+      order.outboundDelivery,
       data,
       attachments,
       user.name,
@@ -308,10 +300,13 @@ export class UserDashboardService {
     data: UpdateMaterialDataDto,
   ) {
     const order = await this.findOrderById(orderId, user.userId, user.role);
-    if (!order) {
-      throw new NotFoundException('Sales order not found or access denied.');
-    }
-    return this.processDataUpdate(order.saleOrderNumber, data, user.name);
+
+    return this.processDataUpdate(
+      order.saleOrderNumber,
+      order.outboundDelivery,
+      data,
+      user.name,
+    );
   }
 
   async updateDataBySoNumber(
@@ -319,8 +314,18 @@ export class UserDashboardService {
     user: { userId: number; role: string; name: string },
     data: UpdateMaterialDataDto,
   ) {
-    await this.authorizeOrderAccess(saleOrderNumber, user.userId, user.role);
-    return this.processDataUpdate(saleOrderNumber, data, user.name);
+    const order = await this.findUniqueAccessibleOrderBySoNumber(
+      saleOrderNumber,
+      user.userId,
+      user.role,
+    );
+
+    return this.processDataUpdate(
+      order.saleOrderNumber,
+      order.outboundDelivery,
+      data,
+      user.name,
+    );
   }
 
   async uploadAttachmentsById(
@@ -329,10 +334,12 @@ export class UserDashboardService {
     attachments: Express.Multer.File[],
   ) {
     const order = await this.findOrderById(orderId, user.userId, user.role);
-    if (!order) {
-      throw new NotFoundException('Sales order not found or access denied.');
-    }
-    return this.processAttachmentsUpload(order.saleOrderNumber, attachments);
+
+    return this.processAttachmentsUpload(
+      order.saleOrderNumber,
+      order.outboundDelivery,
+      attachments,
+    );
   }
 
   async uploadAttachmentsBySoNumber(
@@ -340,21 +347,43 @@ export class UserDashboardService {
     user: { userId: number; role: string },
     attachments: Express.Multer.File[],
   ) {
-    await this.authorizeOrderAccess(saleOrderNumber, user.userId, user.role);
-    return this.processAttachmentsUpload(saleOrderNumber, attachments);
+    const order = await this.findUniqueAccessibleOrderBySoNumber(
+      saleOrderNumber,
+      user.userId,
+      user.role,
+    );
+
+    return this.processAttachmentsUpload(
+      order.saleOrderNumber,
+      order.outboundDelivery,
+      attachments,
+    );
   }
 
   private async processCombinedUpload(
     saleOrderNumber: string,
+    outboundDelivery: string | null | undefined,
     data: UpdateMaterialDataDto,
     attachments: Express.Multer.File[],
     userName: string,
   ) {
     try {
       await this.prisma.$transaction(async (tx) => {
-        await this.processDataUpdate(saleOrderNumber, data, userName, tx);
-        await this.processAttachmentsUpload(saleOrderNumber, attachments, tx);
+        await this.processDataUpdate(
+          saleOrderNumber,
+          outboundDelivery,
+          data,
+          userName,
+          tx,
+        );
+        await this.processAttachmentsUpload(
+          saleOrderNumber,
+          outboundDelivery,
+          attachments,
+          tx,
+        );
       });
+
       return { message: 'Data and attachments synchronized successfully.' };
     } catch (error) {
       console.error('ERROR during combined sync:', error);
@@ -366,12 +395,14 @@ export class UserDashboardService {
 
   private async processDataUpdate(
     saleOrderNumber: string,
+    outboundDelivery: string | null | undefined,
     data: UpdateMaterialDataDto,
     userName: string,
     tx?: Prisma.TransactionClient,
   ) {
     const prismaClient = tx || this.prisma;
     const { materials } = data;
+
     if (!materials || materials.length === 0) {
       throw new BadRequestException('No materials data provided.');
     }
@@ -384,17 +415,37 @@ export class UserDashboardService {
         const existing = await prismaClient.eRP_Material_Data.findUnique({
           where: { ID: BigInt(material.ID) },
         });
-        if (existing && existing.Issue_stage !== material.Issue_stage) issueChanged = true;
-        if (existing && existing.Packing_stage !== material.Packing_stage) packingChanged = true;
+
+        if (existing && existing.Issue_stage !== material.Issue_stage) {
+          issueChanged = true;
+        }
+
+        if (existing && existing.Packing_stage !== material.Packing_stage) {
+          packingChanged = true;
+        }
       } else {
         const existingList = await prismaClient.eRP_Material_Data.findMany({
-          where: { saleOrderNumber, Material_Code: material.Material_Code },
+          where: {
+            saleOrderNumber,
+            Material_Code: material.Material_Code,
+            ...(outboundDelivery ? { FG_OBD: outboundDelivery } : {}),
+          },
         });
-        if (existingList.some((e) => e.Issue_stage !== material.Issue_stage)) issueChanged = true;
-        if (existingList.some((e) => e.Packing_stage !== material.Packing_stage)) packingChanged = true;
+
+        if (existingList.some((e) => e.Issue_stage !== material.Issue_stage)) {
+          issueChanged = true;
+        }
+
+        if (
+          existingList.some((e) => e.Packing_stage !== material.Packing_stage)
+        ) {
+          packingChanged = true;
+        }
       }
 
-      const updatedDate = material.UpdatedDate ? new Date(material.UpdatedDate) : new Date();
+      const updatedDate = material.UpdatedDate
+        ? new Date(material.UpdatedDate)
+        : new Date();
 
       const updateData: Prisma.ERP_Material_DataUpdateInput = {
         Issue_stage: material.Issue_stage,
@@ -410,6 +461,7 @@ export class UserDashboardService {
         updateData.IssueUpdatedBy = userName;
         updateData.IssueUpdatedDate = updatedDate;
       }
+
       if (packingChanged) {
         updateData.PackingUpdatedBy = userName;
         updateData.PackingUpdatedDate = updatedDate;
@@ -423,8 +475,9 @@ export class UserDashboardService {
       } else {
         await prismaClient.eRP_Material_Data.updateMany({
           where: {
-            saleOrderNumber: saleOrderNumber,
+            saleOrderNumber,
             Material_Code: material.Material_Code,
+            ...(outboundDelivery ? { FG_OBD: outboundDelivery } : {}),
           },
           data: updateData,
         });
@@ -433,6 +486,7 @@ export class UserDashboardService {
 
     await this._checkAndUpdateOrderStatus(
       saleOrderNumber,
+      outboundDelivery,
       prismaClient,
       userName,
     );
@@ -442,10 +496,12 @@ export class UserDashboardService {
 
   private async processAttachmentsUpload(
     saleOrderNumber: string,
+    outboundDelivery: string | null | undefined,
     attachments: Express.Multer.File[],
     tx?: Prisma.TransactionClient,
   ) {
     const prismaClient = tx || this.prisma;
+
     if (!attachments || attachments.length === 0) {
       return;
     }
@@ -453,7 +509,9 @@ export class UserDashboardService {
     const remoteDir = path.posix.join(
       process.env.SFTP_BASE_DIR_ORDER || '',
       saleOrderNumber,
+      outboundDelivery || 'NO_OBD',
     );
+
     await this.sftpService.ensureDir(remoteDir);
 
     for (const file of attachments) {
@@ -462,7 +520,7 @@ export class UserDashboardService {
 
       await prismaClient.eRP_Material_File.create({
         data: {
-          saleOrderNumber: saleOrderNumber,
+          saleOrderNumber,
           fileName: file.originalname,
           sftpPath: remotePath,
           sftpDir: remoteDir,
@@ -470,57 +528,111 @@ export class UserDashboardService {
           mimeType: file.mimetype,
         },
       });
+
       fs.unlinkSync(file.path);
     }
+
     return { message: 'Attachments uploaded successfully.' };
   }
 
-  private async authorizeOrderAccess(
+  private async authorizeResolvedOrderAccess(
+    order: {
+      issueAssignedUserId: number | null;
+      packingAssignedUserId: number | null;
+      assignedUserId: number | null;
+      status: string | null;
+      skipIssueStage: boolean | null;
+    },
+    userId: number,
+    userRole: string,
+  ) {
+    if (userRole !== 'USER') {
+      return;
+    }
+
+    const isIssueUser = order.issueAssignedUserId === userId;
+    const isPackingUser = order.packingAssignedUserId === userId;
+    const isAssignedUser = order.assignedUserId === userId;
+
+    if (!isIssueUser && !isPackingUser && !isAssignedUser) {
+      throw new ForbiddenException(
+        'You are not authorized to modify this order.',
+      );
+    }
+
+    if (!isIssueUser && isPackingUser) {
+      const isIssueCompleted =
+        ['W105', 'F105'].includes(order.status ?? '') || order.skipIssueStage;
+
+      if (!isIssueCompleted) {
+        throw new ForbiddenException(
+          'Cannot access order: Issue stage is not completed yet.',
+        );
+      }
+    }
+  }
+
+  private async findUniqueAccessibleOrderBySoNumber(
     saleOrderNumber: string,
     userId: number,
     userRole: string,
   ) {
-    const order = await this.prisma.salesOrder.findFirst({
+    const orders = await this.prisma.salesOrder.findMany({
       where: { saleOrderNumber },
+      include: {
+        customer: true,
+        salesZone: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
-    if (!order) {
+
+    if (orders.length === 0) {
       throw new NotFoundException('Sales Order not found.');
     }
-    
-    if (userRole === 'USER') {
-      const isIssueUser = order.issueAssignedUserId === userId;
-      const isPackingUser = order.packingAssignedUserId === userId;
 
-      if (!isIssueUser && !isPackingUser) {
-        throw new ForbiddenException('You are not authorized to modify this order.');
-      }
-
-      if (!isIssueUser && isPackingUser) {
-        const isIssueCompleted = ['W105', 'F105'].includes(order.status ?? '') || order.skipIssueStage;
-        if (!isIssueCompleted) {
-          throw new ForbiddenException('Cannot access order: Issue stage is not completed yet.');
-        }
-      }
+    if (orders.length > 1) {
+      throw new BadRequestException(
+        'Multiple orders found for this SO Number. Please use order ID based APIs.',
+      );
     }
+
+    const order = orders[0];
+    await this.authorizeResolvedOrderAccess(order, userId, userRole);
+
+    return order;
   }
 
   private async _checkAndUpdateOrderStatus(
     saleOrderNumber: string,
+    outboundDelivery: string | null | undefined,
     prismaClient: Prisma.TransactionClient | PrismaService,
     userName: string,
   ) {
     const order = await prismaClient.salesOrder.findFirst({
-      where: { saleOrderNumber },
-      select: { id: true, status: true, packingAssignedUserId: true }, 
+      where: {
+        saleOrderNumber,
+        ...(outboundDelivery ? { outboundDelivery } : {}),
+      },
+      select: { id: true, status: true, packingAssignedUserId: true },
     });
-    if (!order) return;
+
+    if (!order) {
+      return;
+    }
 
     const allMaterials = await prismaClient.eRP_Material_Data.findMany({
-      where: { saleOrderNumber: saleOrderNumber },
+      where: {
+        saleOrderNumber,
+        ...(outboundDelivery ? { FG_OBD: outboundDelivery } : {}),
+      },
       select: { Issue_stage: true, Packing_stage: true, Required_Qty: true },
     });
 
-    if (allMaterials.length === 0) return;
+    if (allMaterials.length === 0) {
+      return;
+    }
 
     const issueStageCompleted = allMaterials.every(
       (m) => m.Required_Qty > 0 && m.Issue_stage >= m.Required_Qty,
@@ -535,8 +647,6 @@ export class UserDashboardService {
         where: { id: order.id },
         data: {
           status: 'W105',
-          // skipStage: null,
-          // assignedUserId: order.packingAssignedUserId || null, 
         },
       });
 
@@ -561,8 +671,6 @@ export class UserDashboardService {
         where: { id: order.id },
         data: {
           status: 'F105',
-          // skipStage: null,
-          // assignedUserId: null, 
         },
       });
 
@@ -581,7 +689,7 @@ export class UserDashboardService {
 
   async getDashboardStats(userId: number, dateStr?: string) {
     let completedOrdersCount = 0;
-    
+
     const assignedFilter: Prisma.SalesOrderWhereInput = {
       OR: this.getAssignedVisibilityFilter(userId),
       materialData: {
@@ -595,9 +703,9 @@ export class UserDashboardService {
 
       assignedFilter.updatedAt = { gte: startOfDay, lt: endOfDay };
 
-      const user = await this.prisma.user.findUnique({ 
-        where: { id: userId }, 
-        select: { name: true } 
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true },
       });
 
       if (user?.name) {
@@ -610,7 +718,7 @@ export class UserDashboardService {
           distinct: ['salesOrderNumber'],
           select: { salesOrderNumber: true },
         });
-        
+
         completedOrdersCount = completedOrders.length;
       }
     }
@@ -619,19 +727,27 @@ export class UserDashboardService {
       where: assignedFilter,
       select: {
         materialData: {
-          select: { Required_Qty: true, Issue_stage: true, Packing_stage: true },
+          select: {
+            Required_Qty: true,
+            Issue_stage: true,
+            Packing_stage: true,
+          },
         },
       },
     });
 
     const incompleteOrders = assignedOrders.filter((order) => {
-      if (order.materialData.length === 0) return false;
+      if (order.materialData.length === 0) {
+        return false;
+      }
+
       const isComplete = order.materialData.every(
         (material) =>
           material.Required_Qty > 0 &&
           material.Required_Qty === material.Issue_stage &&
           material.Issue_stage === material.Packing_stage,
       );
+
       return !isComplete;
     });
 
@@ -650,7 +766,7 @@ export class UserDashboardService {
     });
 
     const notifications = await this.prisma.soChatNotification.findMany({
-      where: { userId: userId },
+      where: { userId },
       include: {
         message: {
           select: {
@@ -684,26 +800,34 @@ export class UserDashboardService {
     return combinedActivity;
   }
 
-  private getAssignedVisibilityFilter(userId: number): Prisma.SalesOrderWhereInput['OR'] {
+  private getAssignedVisibilityFilter(
+    userId: number,
+  ): Prisma.SalesOrderWhereInput['OR'] {
     return [
       {
         AND: [
           { issueAssignedUserId: userId },
           {
-            OR: [
-              { status: 'R105' },
-              { status: null },
-              { status: '' }
-            ]
-          }
-        ]
+            OR: [{ status: 'R105' }, { status: null }, { status: '' }],
+          },
+        ],
+      },
+      {
+        AND: [{ packingAssignedUserId: userId }, { status: 'W105' }],
       },
       {
         AND: [
-          { packingAssignedUserId: userId },
-          { status: 'W105' }
-        ]
-      }
+          { assignedUserId: userId },
+          {
+            OR: [
+              { status: 'R105' },
+              { status: 'W105' },
+              { status: null },
+              { status: '' },
+            ],
+          },
+        ],
+      },
     ];
   }
 }
