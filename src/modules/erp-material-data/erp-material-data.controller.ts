@@ -38,6 +38,12 @@ export class ErpMaterialDataController {
     private readonly erpMaterialDataService: ErpMaterialDataService,
   ) {}
 
+  // Helper to safely extract user ID from the request
+  private extractUserId(req: AuthRequest): number {
+    const user = req.user as any;
+    return user.id || user.userId;
+  }
+
   @ApiOperation({ summary: 'Get ERP materials for a sales order' })
   @ApiParam({ name: 'orderId', type: Number, description: 'Sales Order ID' })
   @ApiResponse({
@@ -50,7 +56,8 @@ export class ErpMaterialDataController {
     @Param('orderId', ParseIntPipe) orderId: number,
     @Req() req: AuthRequest,
   ) {
-    const { userId, role } = req.user;
+    const userId = this.extractUserId(req);
+    const role = (req.user as any).role;
     return this.erpMaterialDataService.getMaterialsByOrderId(orderId, userId, role);
   }
 
@@ -68,7 +75,8 @@ export class ErpMaterialDataController {
     @Body() body: IncrementIssueStageDto,
     @Req() req: AuthRequest,
   ) {
-    const { userId, role } = req.user;
+    const userId = this.extractUserId(req);
+    const role = (req.user as any).role;
     return this.erpMaterialDataService.incrementIssueStage(
       orderId,
       body.materialCode,
@@ -87,7 +95,8 @@ export class ErpMaterialDataController {
     @Body() body: UpdateIssueStageDto,
     @Req() req: AuthRequest,
   ) {
-    const { userId, role } = req.user;
+    const userId = this.extractUserId(req);
+    const role = (req.user as any).role;
     return this.erpMaterialDataService.updateIssueStage(
       orderId,
       body.materialCode,
@@ -108,7 +117,8 @@ export class ErpMaterialDataController {
     @Body() body: IncrementPackingStageDto,
     @Req() req: AuthRequest,
   ) {
-    const { userId, role } = req.user;
+    const userId = this.extractUserId(req);
+    const role = (req.user as any).role;
     return this.erpMaterialDataService.incrementPackingStage(
       orderId,
       body.materialCode,
@@ -127,7 +137,8 @@ export class ErpMaterialDataController {
     @Body() body: UpdatePackingStageDto,
     @Req() req: AuthRequest,
   ) {
-    const { userId, role } = req.user;
+    const userId = this.extractUserId(req);
+    const role = (req.user as any).role;
     return this.erpMaterialDataService.updatePackingStage(
       orderId,
       body.materialCode,
@@ -148,7 +159,8 @@ export class ErpMaterialDataController {
     @Body() body: BulkAcceptGroupDto,
     @Req() req: AuthRequest,
   ) {
-    const { userId, role } = req.user;
+    const userId = this.extractUserId(req);
+    const role = (req.user as any).role;
     return this.erpMaterialDataService.bulkAcceptGroup(
       orderId,
       body.group,
@@ -170,7 +182,8 @@ export class ErpMaterialDataController {
     @Body() body: UpdateRemarksDto,
     @Req() req: AuthRequest,
   ) {
-    const { userId, role } = req.user;
+    const userId = this.extractUserId(req);
+    const role = (req.user as any).role;
     return this.erpMaterialDataService.updateRemarks(
       orderId,
       materialId,
@@ -188,7 +201,8 @@ export class ErpMaterialDataController {
     @Param('orderId', ParseIntPipe) orderId: number,
     @Req() req: AuthRequest,
   ) {
-    const { userId, role } = req.user;
+    const userId = this.extractUserId(req);
+    const role = (req.user as any).role;
     return this.erpMaterialDataService.acceptAllIssueStage(orderId, userId, role);
   }
 
@@ -202,7 +216,8 @@ export class ErpMaterialDataController {
     @Body() body: UpdateMappingDto,
     @Req() req: AuthRequest,
   ) {
-    const { userId, role } = req.user;
+    const userId = this.extractUserId(req);
+    const role = (req.user as any).role;
     return this.erpMaterialDataService.updateMapping(
       orderId,
       body,
