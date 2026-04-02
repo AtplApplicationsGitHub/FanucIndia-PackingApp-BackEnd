@@ -57,10 +57,22 @@ export class SoSearchService {
     });
 
     if (salesOrder) {
-      if (user.role === 'SALES' && salesOrder.userId !== user.userId) {
-        throw new ForbiddenException(
-          'You are not authorized to view this order.',
-        );
+      if (user.role === 'SALES') {
+        const loggedInUser = await this.prisma.user.findUnique({
+          where: { id: user.userId },
+          select: { salesZoneId: true },
+        });
+
+        const isCreator = salesOrder.userId === user.userId;
+        const isSameZone =
+          loggedInUser?.salesZoneId &&
+          loggedInUser.salesZoneId === salesOrder.salesZoneId;
+
+        if (!isCreator && !isSameZone) {
+          throw new ForbiddenException(
+            'You are not authorized to view this order.',
+          );
+        }
       }
 
       const canonicalSoNumber = salesOrder.saleOrderNumber;
@@ -154,6 +166,24 @@ export class SoSearchService {
     });
 
     if (archivedSalesOrder) {
+      if (user.role === 'SALES') {
+        const loggedInUser = await this.prisma.user.findUnique({
+          where: { id: user.userId },
+          select: { salesZoneId: true },
+        });
+
+        const isCreator = archivedSalesOrder.userId === user.userId;
+        const isSameZone =
+          loggedInUser?.salesZoneId &&
+          loggedInUser.salesZoneId === archivedSalesOrder.salesZoneId;
+
+        if (!isCreator && !isSameZone) {
+          throw new ForbiddenException(
+            'You are not authorized to view this order.',
+          );
+        }
+      }
+      
       const canonicalSoNumber = archivedSalesOrder.saleOrderNumber;
 
       const [
