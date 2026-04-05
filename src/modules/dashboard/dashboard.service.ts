@@ -54,20 +54,34 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
           some: { status: 'Dispatched', createdDateTime: { gte: startOfDay, lt: endOfDay } }
         }
       };
+      // Archival approximation for date-filtered dispatch
+      const archiveDispatchFilter = {
+        status: 'Dispatched',
+        UpdatedDate: { gte: startOfDay, lt: endOfDay }
+      }
+      
       const prevDispatchFilter = { 
         status: 'Dispatched', 
         statusStepper: {
           some: { status: 'Dispatched', createdDateTime: { gte: prevStart, lt: prevEnd } }
         }
       };
+      const archivePrevDispatchFilter = {
+        status: 'Dispatched',
+        UpdatedDate: { gte: prevStart, lt: prevEnd }
+      };
 
       const overdueFilter = { deliveryDate: { lt: startOfDay }, status: { not: 'Dispatched' } };
       const prevOverdueFilter = { deliveryDate: { lt: prevStart }, status: { not: 'Dispatched' } };
 
       const [
-        totalSoCount, prevTotalSoCount,
-        overdueCount, prevOverdueCount,
-        dispatchedTotalCount, prevDispatchedCount,
+        activeTotal, prevActiveTotal,
+        activeOverdue, prevActiveOverdue,
+        activeDispatched, prevActiveDispatched,
+        // Archival counts
+        archivedTotal, prevArchivedTotal,
+        archivedOverdue, prevArchivedOverdue,
+        archivedDispatched, prevArchivedDispatched
       ] = await Promise.all([
         this.prisma.salesOrder.count({ where: dateFilter }),
         this.prisma.salesOrder.count({ where: prevDateFilter }),
@@ -75,7 +89,21 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
         this.prisma.salesOrder.count({ where: prevOverdueFilter }),
         this.prisma.salesOrder.count({ where: dispatchFilter }),
         this.prisma.salesOrder.count({ where: prevDispatchFilter }),
+        
+        this.prisma.salesOrderArchive.count({ where: dateFilter }),
+        this.prisma.salesOrderArchive.count({ where: prevDateFilter }),
+        this.prisma.salesOrderArchive.count({ where: overdueFilter }),
+        this.prisma.salesOrderArchive.count({ where: prevOverdueFilter }),
+        this.prisma.salesOrderArchive.count({ where: archiveDispatchFilter }),
+        this.prisma.salesOrderArchive.count({ where: archivePrevDispatchFilter }),
       ]);
+
+      const totalSoCount = activeTotal + archivedTotal;
+      const prevTotalSoCount = prevActiveTotal + prevArchivedTotal;
+      const overdueCount = activeOverdue + archivedOverdue;
+      const prevOverdueCount = prevActiveOverdue + prevArchivedOverdue;
+      const dispatchedTotalCount = activeDispatched + archivedDispatched;
+      const prevDispatchedCount = prevActiveDispatched + prevArchivedDispatched;
 
       return {
         totalSoCount,
@@ -87,31 +115,64 @@ async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
       };
     } else {
       const now = new Date();
-
       const { startOfDay: todayStart } = getDayBoundariesIST(now);
-      
       const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const endOfLastMonthMTD = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate(), 23, 59, 59, 999);
 
-      const [totalSoCount, overdueCount, dispatchedTotalCount] = await Promise.all([
+      // 1. ALL TIME TOTALS (Active + Archive)
+      const [
+        activeTotal, activeOverdue, activeDispatched,
+        archivedTotal, archivedOverdue, archivedDispatched
+      ] = await Promise.all([
         this.prisma.salesOrder.count(),
         this.prisma.salesOrder.count({ where: { deliveryDate: { lt: todayStart }, status: { not: 'Dispatched' } } }),
-        this.prisma.salesOrder.count({ where: { status: 'Dispatched' } })
+        this.prisma.salesOrder.count({ where: { status: 'Dispatched' } }),
+        
+        this.prisma.salesOrderArchive.count(),
+        this.prisma.salesOrderArchive.count({ where: { deliveryDate: { lt: todayStart }, status: { not: 'Dispatched' } } }),
+        this.prisma.salesOrderArchive.count({ where: { status: 'Dispatched' } })
       ]);
 
-      const [currTotal, currOverdue, currDispatched] = await Promise.all([
+      const totalSoCount = activeTotal + archivedTotal;
+      const overdueCount = activeOverdue + archivedOverdue;
+      const dispatchedTotalCount = activeDispatched + archivedDispatched;
+
+      // 2. CURRENT MONTH TO DATE (Active + Archive)
+      const [
+        activeCurrTotal, activeCurrOverdue, activeCurrDispatched,
+        archivedCurrTotal, archivedCurrOverdue, archivedCurrDispatched
+      ] = await Promise.all([
         this.prisma.salesOrder.count({ where: { createdAt: { gte: startOfCurrentMonth } } }),
         this.prisma.salesOrder.count({ where: { deliveryDate: { lt: todayStart }, status: { not: 'Dispatched' }, createdAt: { gte: startOfCurrentMonth } } }),
-        this.prisma.salesOrder.count({ where: { status: 'Dispatched', statusStepper: { some: { status: 'Dispatched', createdDateTime: { gte: startOfCurrentMonth } } } } })
+        this.prisma.salesOrder.count({ where: { status: 'Dispatched', statusStepper: { some: { status: 'Dispatched', createdDateTime: { gte: startOfCurrentMonth } } } } }),
+        
+        this.prisma.salesOrderArchive.count({ where: { createdAt: { gte: startOfCurrentMonth } } }),
+        this.prisma.salesOrderArchive.count({ where: { deliveryDate: { lt: todayStart }, status: { not: 'Dispatched' }, createdAt: { gte: startOfCurrentMonth } } }),
+        this.prisma.salesOrderArchive.count({ where: { status: 'Dispatched', UpdatedDate: { gte: startOfCurrentMonth } } })
       ]);
 
-      const [prevTotal, prevOverdue, prevDispatched] = await Promise.all([
+      const currTotal = activeCurrTotal + archivedCurrTotal;
+      const currOverdue = activeCurrOverdue + archivedCurrOverdue;
+      const currDispatched = activeCurrDispatched + archivedCurrDispatched;
+
+      // 3. PREVIOUS MONTH TO DATE (Active + Archive)
+      const [
+        activePrevTotal, activePrevOverdue, activePrevDispatched,
+        archivedPrevTotal, archivedPrevOverdue, archivedPrevDispatched
+      ] = await Promise.all([
         this.prisma.salesOrder.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } }),
         this.prisma.salesOrder.count({ where: { deliveryDate: { lt: todayStart }, status: { not: 'Dispatched' }, createdAt: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } }),
-        this.prisma.salesOrder.count({ where: { status: 'Dispatched', statusStepper: { some: { status: 'Dispatched', createdDateTime: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } } } })
+        this.prisma.salesOrder.count({ where: { status: 'Dispatched', statusStepper: { some: { status: 'Dispatched', createdDateTime: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } } } }),
+        
+        this.prisma.salesOrderArchive.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } }),
+        this.prisma.salesOrderArchive.count({ where: { deliveryDate: { lt: todayStart }, status: { not: 'Dispatched' }, createdAt: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } }),
+        this.prisma.salesOrderArchive.count({ where: { status: 'Dispatched', UpdatedDate: { gte: startOfLastMonth, lte: endOfLastMonthMTD } } })
       ]);
+
+      const prevTotal = activePrevTotal + archivedPrevTotal;
+      const prevOverdue = activePrevOverdue + archivedPrevOverdue;
+      const prevDispatched = activePrevDispatched + archivedPrevDispatched;
 
       return {
         totalSoCount,

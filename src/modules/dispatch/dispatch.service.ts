@@ -190,10 +190,17 @@ export class DispatchService {
   }
 
   async findAttachmentsByDispatchId(dispatchId: number) {
-    const dispatch = await this.prisma.dispatch.findUnique({
+    let dispatch: any = await this.prisma.dispatch.findUnique({
       where: { id: dispatchId },
       select: { attachments: true },
     });
+
+    if (!dispatch) {
+      dispatch = await this.prisma.dispatchArchive.findUnique({
+        where: { id: dispatchId },
+        select: { attachments: true },
+      });
+    }
 
     if (!dispatch) {
       throw new NotFoundException(`Dispatch with ID ${dispatchId} not found.`);
@@ -391,21 +398,27 @@ export class DispatchService {
   }
 
   async findAll(startDate?: string, endDate?: string) {
-    const where: Prisma.DispatchWhereInput = {};
+    const activeWhere: Prisma.DispatchWhereInput = {};
+    const archiveWhere: any = {};
 
     if (startDate || endDate) {
       const start = startDate ? new Date(startDate) : new Date(0);
       const end = endDate ? new Date(endDate) : new Date();
       end.setHours(23, 59, 59, 999);
 
-      where.createdAt = {
+      activeWhere.createdAt = {
+        gte: start,
+        lte: end,
+      };
+      archiveWhere.createdAt = {
         gte: start,
         lte: end,
       };
     }
 
-    const dispatches = await this.prisma.dispatch.findMany({
-      where,
+    // 1. Fetch Active Dispatches
+    const activeDispatches = await this.prisma.dispatch.findMany({
+      where: activeWhere,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -425,10 +438,60 @@ export class DispatchService {
       },
     });
 
-    return dispatches.map((d) => ({
+    const mappedActive = activeDispatches.map((d) => ({
       ...d,
       soCount: d._count.dispatchSOs,
     }));
+
+    // 2. Fetch Archived Dispatches
+    const archivedDispatches = await this.prisma.dispatchArchive.findMany({
+      where: archiveWhere,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let mappedArchived: any[] = [];
+    if (archivedDispatches.length > 0) {
+      const archiveIds = archivedDispatches.map(a => a.id);
+      
+      // Get counts of SOs mapped to archived dispatches
+      const archivedSOCounts = await this.prisma.dispatch_SOArchive.groupBy({
+        by: ['dispatchId'],
+        where: { dispatchId: { in: archiveIds } },
+        _count: { id: true }
+      });
+      const archivedSOCountMap = new Map(archivedSOCounts.map(c => [c.dispatchId, c._count.id]));
+
+      // Map transporter names for archives
+      const transporterIds = [...new Set(archivedDispatches.map(a => a.transporterId).filter(Boolean))] as number[];
+      let transporterMap = new Map<number, string>();
+      
+      if (transporterIds.length > 0) {
+        const transporters = await this.prisma.transporter.findMany({
+          where: { id: { in: transporterIds } },
+          select: { id: true, name: true }
+        });
+        transporterMap = new Map(transporters.map(t => [t.id, t.name]));
+      }
+
+      mappedArchived = archivedDispatches.map(d => ({
+        id: d.id,
+        transporterId: d.transporterId,
+        transporterName: d.transporterName,
+        vehicleNumber: d.vehicleNumber,
+        attachments: d.attachments,
+        createdBy: d.createdBy,
+        createdAt: d.createdAt,
+        updatedAt: d.UpdatedDate || d.createdAt,
+        UpdatedBy: d.UpdatedBy,
+        UpdatedDate: d.UpdatedDate,
+        transporter: d.transporterId ? { name: transporterMap.get(d.transporterId) || d.transporterName } : null,
+        soCount: archivedSOCountMap.get(d.id) || 0,
+        isArchived: true // helps frontend know this is historical
+      }));
+    }
+
+    // 3. Combine and Sort
+    return [...mappedActive, ...mappedArchived].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async update(id: number, dto: UpdateDispatchDto, userId: number) {
@@ -501,7 +564,8 @@ export class DispatchService {
   }
 
   async findDispatchSOs(dispatchId: number) {
-    return this.prisma.dispatch_SO.findMany({
+    // 1. Check Active
+    const activeSOs = await this.prisma.dispatch_SO.findMany({
       where: { dispatchId },
       orderBy: { createdAt: 'asc' },
       include: {
@@ -515,6 +579,41 @@ export class DispatchService {
         }
       }
     });
+
+    if (activeSOs.length > 0) {
+      return activeSOs;
+    }
+
+    // 2. Check Archive
+    const archivedSOs = await this.prisma.dispatch_SOArchive.findMany({
+      where: { dispatchId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (archivedSOs.length > 0) {
+      const soIds = archivedSOs.map(so => so.salesOrderId);
+      
+      // Match archived SOs with customer details from either SalesOrder or SalesOrderArchive
+      const soArchives = await this.prisma.salesOrderArchive.findMany({
+        where: { id: { in: soIds } },
+        select: { id: true, customerNameText: true, customer: { select: { name: true } } }
+      });
+      
+      const activeSosForArchive = await this.prisma.salesOrder.findMany({
+          where: { id: { in: soIds } },
+          select: { id: true, customerNameText: true, customer: { select: { name: true } } }
+      });
+
+      const combinedSOs = [...soArchives, ...activeSosForArchive];
+      const soMap = new Map(combinedSOs.map(so => [so.id, so]));
+
+      return archivedSOs.map(so => ({
+        ...so,
+        salesOrder: soMap.get(so.salesOrderId) || null,
+      }));
+    }
+
+    return [];
   }
   
   async addDispatchSO(
@@ -633,7 +732,7 @@ export class DispatchService {
   }
 
   async generatePdf(dispatchId: number): Promise<Buffer> {
-    const dispatch = await this.prisma.dispatch.findUnique({
+    let dispatch: any = await this.prisma.dispatch.findUnique({
       where: { id: dispatchId },
       include: {
         dispatchSOs: {
@@ -643,6 +742,19 @@ export class DispatchService {
         },
       },
     });
+
+    if (!dispatch) {
+      const dispatchArch = await this.prisma.dispatchArchive.findUnique({
+        where: { id: dispatchId }
+      });
+      if (dispatchArch) {
+         const dispatchSOs = await this.prisma.dispatch_SOArchive.findMany({
+           where: { dispatchId },
+           select: { saleOrderNumber: true }
+         });
+         dispatch = { ...dispatchArch, dispatchSOs };
+      }
+    }
 
     if (!dispatch) {
       throw new NotFoundException('Dispatch not found');
@@ -671,7 +783,7 @@ export class DispatchService {
     
     doc.font('Helvetica');
 
-    dispatch.dispatchSOs.forEach((so, index) => {
+    dispatch.dispatchSOs.forEach((so: any, index: number) => {
       const y = tableTop + itemHeight + (index * itemHeight);
       
       const bgColor = index % 2 === 0 ? '#FFF4CC' : '#FFFFFF'; 
@@ -763,9 +875,16 @@ export class DispatchService {
   }
 
   async getAttachmentStream(dispatchId: number, fileName: string) {
-    const dispatch = await this.prisma.dispatch.findUnique({
+    let dispatch: any = await this.prisma.dispatch.findUnique({
       where: { id: dispatchId },
     });
+
+    if (!dispatch) {
+      dispatch = await this.prisma.dispatchArchive.findUnique({
+        where: { id: dispatchId },
+      });
+    }
+
     if (!dispatch) {
       throw new NotFoundException('Dispatch not found');
     }
