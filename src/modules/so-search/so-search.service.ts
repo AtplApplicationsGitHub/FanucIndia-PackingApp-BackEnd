@@ -34,6 +34,57 @@ export class SoSearchService {
     obd: string | undefined,
     user: { userId: number; role: string },
   ) {
+    // --- NEW LOGIC: Intercept when no OBD is provided to check for multiples ---
+    if (!obd) {
+      const activeMatches = await this.prisma.salesOrder.findMany({
+        where: { saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' } },
+        select: { id: true, saleOrderNumber: true, outboundDelivery: true, userId: true, salesZoneId: true }
+      });
+      const archiveMatches = await this.prisma.salesOrderArchive.findMany({
+        where: { saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' } },
+        select: { id: true, saleOrderNumber: true, outboundDelivery: true, userId: true, salesZoneId: true }
+      });
+
+      let allMatches = [...activeMatches, ...archiveMatches];
+
+      // Filter matches according to user role permissions
+      if (user.role === 'SALES') {
+        const loggedInUser = await this.prisma.user.findUnique({
+          where: { id: user.userId },
+          select: { salesZoneId: true },
+        });
+
+        allMatches = allMatches.filter(
+          (o) =>
+            o.userId === user.userId ||
+            (loggedInUser?.salesZoneId && loggedInUser.salesZoneId === o.salesZoneId)
+        );
+      }
+
+      if (allMatches.length === 0) {
+        throw new NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
+      }
+
+      // Deduplicate by OBD (to prevent listing duplicates if an order is moving states)
+      const uniqueMap = new Map();
+      for (const m of allMatches) {
+        uniqueMap.set(m.outboundDelivery, { saleOrderNumber: m.saleOrderNumber, outboundDelivery: m.outboundDelivery });
+      }
+      const uniqueOrders = Array.from(uniqueMap.values());
+
+      // If multiple OBDs exist, return a special payload back to the UI
+      if (uniqueOrders.length > 1) {
+        return {
+          multiple: true,
+          orders: uniqueOrders,
+        };
+      }
+
+      // If exactly 1 unique order exists, inject its OBD and proceed to fetch details normally
+      obd = uniqueOrders[0].outboundDelivery;
+    }
+
+    // --- EXISTING LOGIC: Fetch details for the exact SO + OBD combination ---
     const whereActive: any = {
       saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' },
     };
@@ -47,7 +98,6 @@ export class SoSearchService {
         customer: true,
         product: true,
         transporter: true,
-        // plantCode: true,
         salesZone: true,
         packConfig: true,
         user: { select: { name: true } },
@@ -199,11 +249,10 @@ export class SoSearchService {
         this.prisma.sO_Status_StepperArchive.findMany({ where: { salesOrderNumber: canonicalSoNumber } }), 
       ]);
 
-      const [product, customer, transporter, /*plantCode,*/ salesZone, packConfig] = await Promise.all([
+      const [product, customer, transporter, salesZone, packConfig] = await Promise.all([
         this.prisma.product.findUnique({ where: { id: archivedSalesOrder.productId } }),
         archivedSalesOrder.customerId ? this.prisma.customer.findUnique({ where: { id: archivedSalesOrder.customerId } }) : null,
         this.prisma.transporter.findUnique({ where: { id: archivedSalesOrder.transporterId } }),
-        // this.prisma.plantCode.findUnique({ where: { id: archivedSalesOrder.plantCodeId } }),
         this.prisma.salesZone.findUnique({ where: { id: archivedSalesOrder.salesZoneId } }),
         this.prisma.packConfig.findUnique({ where: { id: archivedSalesOrder.packConfigId } }),
       ]);
@@ -213,7 +262,6 @@ export class SoSearchService {
         product,
         customer,
         transporter,
-        // plantCode,
         salesZone,
         packConfig,
       };
