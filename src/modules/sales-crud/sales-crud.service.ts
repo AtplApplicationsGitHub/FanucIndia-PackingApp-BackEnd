@@ -1020,7 +1020,7 @@ export class SalesCrudService {
     }
 
     // 4. Define base path from env or use a default
-    const basePath = process.env.SFTP_BASE_DIR_SALESUSER_ORDER || 'uploads/fanuc/salesuser-order-attachments';
+    const basePath = process.env.SFTP_BASE_DIR_SALESUSER_ORDER || '';
     const attachmentRecords: Prisma.SalesOrderAttachmentCreateManyInput[] = [];
 
     // 5. Process each Sales Order
