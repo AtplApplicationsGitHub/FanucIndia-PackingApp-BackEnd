@@ -25,14 +25,18 @@ export class AppUpdateService {
   }
 
   private extractVersion(fileName: string): [number, number, number] {
-    const match = fileName.match(/Vr[:\s]*(\d+)\.(\d+)\.(\d+)/i);
-    if (!match) return [0, 0, 0];
+    const match = fileName.match(/V(?:r)?[:\s_]*(\d+)\.(\d+)\.(\d+)/i);
+    if (!match) {
+      return [0, 0, 0];
+    }
     return [Number(match[1]), Number(match[2]), Number(match[3])];
   }
 
   private formatVersion(fileName: string): string {
-    const match = fileName.match(/Vr[:\s]*(\d+\.\d+\.\d+)/i);
-    if (match) return `Vr: ${match[1]}`;
+    const match = fileName.match(/V(?:r)?[:\s_]*(\d+\.\d+\.\d+)/i);
+    if (match) {
+      return `V${match[1]}`;
+    }
     return fileName.replace(/\.apk$/i, '');
   }
 
