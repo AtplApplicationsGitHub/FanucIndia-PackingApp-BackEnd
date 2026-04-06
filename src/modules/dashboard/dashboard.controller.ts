@@ -12,7 +12,6 @@ import { DashboardService } from './dashboard.service';
 import { SalesKpiDto } from './dto/sales-kpi.dto';
 import { SalesActivityDto } from './dto/sales-activity.dto';
 import { AdminKpiDto } from './dto/admin-kpi.dto';
-import { SalesPaymentClearanceDto } from './dto/sales-payment-clearance.dto';
 import { AdminNewImportDto } from './dto/admin-new-imports.dto'; 
 import { AdminDispatchSummaryDto } from './dto/admin-dispatch-summary.dto'; 
 import { AdminOverallStatusDto } from './dto/admin-overall-status.dto'; 
@@ -107,12 +106,35 @@ export class DashboardController {
     return this.dashboardService.getSalesRecentActivity(req.user.userId);
   }
 
-  @Get('sales-payment-clearance')
+  @Get('sales-dispatch-summary')
   @Roles('SALES')
-  @ApiOperation({ summary: 'Get payment clearance counts by sales zone for the SALES user' })
-  @ApiResponse({ status: 200, type: [SalesPaymentClearanceDto] })
-  async getSalesPaymentClearance(@Req() req: AuthRequest): Promise<SalesPaymentClearanceDto[]> {
-    return this.dashboardService.getSalesPaymentClearanceByZone(req.user.userId);
+  @ApiOperation({ summary: "Get today's dispatch summary for Sales Zone" })
+  async getSalesDispatchSummary(@Req() req: AuthRequest, @Query('date') date?: string) {
+    return this.dashboardService.getSalesDispatchSummary(req.user.userId, date);
+  }
+
+  @Get('sales-new-imports')
+  @Roles('SALES')
+  async getSalesNewImports(@Req() req: AuthRequest) {
+    return this.dashboardService.getSalesNewImports(req.user.userId);
+  }
+
+  @Get('sales-upcoming-orders')
+  @Roles('SALES')
+  async getSalesUpcomingOrders(@Req() req: AuthRequest) {
+    return this.dashboardService.getSalesUpcomingOrders(req.user.userId);
+  }
+
+  @Get('sales-overall-status')
+  @Roles('SALES')
+  async getSalesOverallStatus(@Req() req: AuthRequest, @Query('date') date?: string) {
+    return this.dashboardService.getSalesOverallStatus(req.user.userId, date);
+  }
+
+  @Get('sales-payment-clearance')
+  @Roles('SALES') // Find this existing one and update it to accept the date Query
+  async getSalesPaymentClearance(@Req() req: AuthRequest, @Query('date') date?: string) {
+    return this.dashboardService.getSalesPaymentClearanceByZone(req.user.userId, date);
   }
 
   @Get('admin-upcoming-orders')
