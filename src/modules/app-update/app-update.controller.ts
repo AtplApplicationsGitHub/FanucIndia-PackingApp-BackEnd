@@ -10,76 +10,48 @@ export class AppUpdateController {
   constructor(private readonly appUpdateService: AppUpdateService) {}
 
   @Public()
-  @Get('app-a/latest-version')
-  @ApiOperation({ summary: 'Get the latest APK version info for App A' })
-  async getAppALatestVersion(@Req() req: Request) {
+  @Get('pick-pack/latest-version')
+  @ApiOperation({ summary: 'Get the latest APK version info for Pick & Pack App' })
+  async getPickPackLatestVersion(@Req() req: Request) {
     const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
     const hostUrl = `${protocol}://${req.get('host')}`;
-
-    return await this.appUpdateService.getLatestVersionInfo(
-      'app-a',
-      hostUrl,
-      '/app-update/app-a/download',
-    );
+    return await this.appUpdateService.getLatestVersionInfo('pick-pack', hostUrl, '/app-update/pick-pack/download');
   }
 
   @Public()
-  @Get('app-a/download')
-  @ApiOperation({ summary: 'Download the latest APK for App A' })
-  async downloadAppAApk(@Res() res: Response): Promise<void> {
-    const latestInfo = await this.appUpdateService.getLatestVersionInfo(
-      'app-a',
-      '',
-      '',
-    );
+  @Get('pick-pack/download')
+  @ApiOperation({ summary: 'Download the latest APK for Pick & Pack App' })
+  async downloadPickPackApk(@Res() res: Response): Promise<void> {
+    const latestInfo = await this.appUpdateService.getLatestVersionInfo('pick-pack', '', '');
+    this.setApkHeaders(res, latestInfo.fileName);
+    await this.appUpdateService.downloadApk('pick-pack', res);
+  }
 
+  @Public()
+  @Get('dispatch/latest-version')
+  @ApiOperation({ summary: 'Get the latest APK version info for Dispatch App' })
+  async getDispatchLatestVersion(@Req() req: Request) {
+    const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+    const hostUrl = `${protocol}://${req.get('host')}`;
+    return await this.appUpdateService.getLatestVersionInfo('dispatch', hostUrl, '/app-update/dispatch/download');
+  }
+
+  @Public()
+  @Get('dispatch/download')
+  @ApiOperation({ summary: 'Download the latest APK for Dispatch App' })
+  async downloadDispatchApk(@Res() res: Response): Promise<void> {
+    const latestInfo = await this.appUpdateService.getLatestVersionInfo('dispatch', '', '');
+    this.setApkHeaders(res, latestInfo.fileName);
+    await this.appUpdateService.downloadApk('dispatch', res);
+  }
+
+  // Helper method to keep code clean
+  private setApkHeaders(res: Response, fileName: string) {
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${latestInfo.fileName}"`,
-    );
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.setHeader('Content-Transfer-Encoding', 'binary');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-
-    await this.appUpdateService.downloadApk('app-a', res);
-  }
-
-  @Public()
-  @Get('app-b/latest-version')
-  @ApiOperation({ summary: 'Get the latest APK version info for App B' })
-  async getAppBLatestVersion(@Req() req: Request) {
-    const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
-    const hostUrl = `${protocol}://${req.get('host')}`;
-
-    return await this.appUpdateService.getLatestVersionInfo(
-      'app-b',
-      hostUrl,
-      '/app-update/app-b/download',
-    );
-  }
-
-  @Public()
-  @Get('app-b/download')
-  @ApiOperation({ summary: 'Download the latest APK for App B' })
-  async downloadAppBApk(@Res() res: Response): Promise<void> {
-    const latestInfo = await this.appUpdateService.getLatestVersionInfo(
-      'app-b',
-      '',
-      '',
-    );
-
-    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${latestInfo.fileName}"`,
-    );
-    res.setHeader('Content-Transfer-Encoding', 'binary');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-
-    await this.appUpdateService.downloadApk('app-b', res);
   }
 }

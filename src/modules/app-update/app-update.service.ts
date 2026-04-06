@@ -9,39 +9,30 @@ export class AppUpdateService {
   private readonly appPaths: Record<string, string>;
 
   constructor(private readonly sftpService: SftpService) {
-    const pathA = process.env.APK_PATH_APP_A;
-    const pathB = process.env.APK_PATH_APP_B;
+    const pathPickPack = process.env.APK_PATH_PICK_PACK;
+    const pathDispatch = process.env.APK_PATH_DISPATCH;
 
-    if (!pathA || !pathB) {
-      const errorMsg =
-        'APK_PATH_APP_A and APK_PATH_APP_B must be defined in the .env file';
+    if (!pathPickPack || !pathDispatch) {
+      const errorMsg = 'APK_PATH_PICK_PACK and APK_PATH_DISPATCH must be defined in the .env file';
       this.logger.error(errorMsg);
       throw new Error(errorMsg);
     }
 
     this.appPaths = {
-      'app-a': pathA,
-      'app-b': pathB,
+      'pick-pack': pathPickPack,
+      'dispatch': pathDispatch,
     };
   }
 
   private extractVersion(fileName: string): [number, number, number] {
     const match = fileName.match(/Vr[:\s]*(\d+)\.(\d+)\.(\d+)/i);
-
-    if (!match) {
-      return [0, 0, 0];
-    }
-
+    if (!match) return [0, 0, 0];
     return [Number(match[1]), Number(match[2]), Number(match[3])];
   }
 
   private formatVersion(fileName: string): string {
     const match = fileName.match(/Vr[:\s]*(\d+\.\d+\.\d+)/i);
-
-    if (match) {
-      return `Vr: ${match[1]}`;
-    }
-
+    if (match) return `Vr: ${match[1]}`;
     return fileName.replace(/\.apk$/i, '');
   }
 
@@ -66,66 +57,37 @@ export class AppUpdateService {
     const dirPath = this.appPaths[appName];
 
     if (!dirPath) {
-      throw new NotFoundException(
-        `Application path for '${appName}' not found.`,
-      );
+      throw new NotFoundException(`Application path for '${appName}' not found.`);
     }
 
-    const fileList = (await this.sftpService.list(dirPath)) as Array<{
-      type: string;
-      name: string;
-    }>;
-
+    const fileList = (await this.sftpService.list(dirPath)) as Array<{ type: string; name: string; }>;
     const files = fileList
-      .filter(
-        (file) => file.type === '-' && file.name.toLowerCase().endsWith('.apk'),
-      )
+      .filter((file) => file.type === '-' && file.name.toLowerCase().endsWith('.apk'))
       .map((file) => file.name);
 
     if (!files.length) {
-      throw new NotFoundException(
-        `No APK found for application '${appName}'.`,
-      );
+      throw new NotFoundException(`No APK found for application '${appName}'.`);
     }
 
     const latestApk = this.getLatestApk(files);
     const remotePath = path.posix.join(dirPath, latestApk);
 
-    return {
-      dirPath,
-      latestApk,
-      remotePath,
-    };
+    return { dirPath, latestApk, remotePath };
   }
 
-  async getLatestVersionInfo(
-    appName: string,
-    hostUrl: string,
-    downloadRoute: string,
-  ) {
+  async getLatestVersionInfo(appName: string, hostUrl: string, downloadRoute: string) {
     try {
       const { latestApk } = await this.getLatestApkFile(appName);
-
       return {
         appName,
         latestVersion: this.formatVersion(latestApk),
         fileName: latestApk,
-        downloadUrl:
-          hostUrl && downloadRoute ? `${hostUrl}${downloadRoute}` : '',
+        downloadUrl: hostUrl && downloadRoute ? `${hostUrl}${downloadRoute}` : '',
       };
     } catch (error: any) {
-      this.logger.error(
-        `Failed to get latest APK for ${appName}: ${error?.message || error}`,
-        error?.stack,
-      );
-
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
-      throw new NotFoundException(
-        `Failed to fetch latest APK details for '${appName}'.`,
-      );
+      this.logger.error(`Failed to get latest APK for ${appName}: ${error?.message || error}`, error?.stack);
+      if (error instanceof NotFoundException) throw error;
+      throw new NotFoundException(`Failed to fetch latest APK details for '${appName}'.`);
     }
   }
 
@@ -134,15 +96,9 @@ export class AppUpdateService {
       const { remotePath } = await this.getLatestApkFile(appName);
       await this.sftpService.streamToResponse(remotePath, res);
     } catch (error: any) {
-      this.logger.error(
-        `Failed to download APK for ${appName}: ${error?.message || error}`,
-        error?.stack,
-      );
-
+      this.logger.error(`Failed to download APK for ${appName}: ${error?.message || error}`, error?.stack);
       if (!res.headersSent) {
-        res.status(404).json({
-          message: `Failed to download APK for '${appName}'.`,
-        });
+        res.status(404).json({ message: `Failed to download APK for '${appName}'.` });
       }
     }
   }
