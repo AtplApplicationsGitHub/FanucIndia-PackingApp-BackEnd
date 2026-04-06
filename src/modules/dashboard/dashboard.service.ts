@@ -984,6 +984,64 @@ export class DashboardService {
     );
   }
 
+  async getSalesStatusByCustomer(
+    userId: number,
+    dateStr?: string,
+  ): Promise<AdminStatusByCustomerDto[]> {
+    const zoneId = await this.getUserZoneId(userId);
+    let dateFilter: any = { customerId: { not: null }, salesZoneId: zoneId };
+    
+    if (dateStr) {
+      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
+      dateFilter.createdAt = { gte: startOfDay, lt: endOfDay };
+    }
+
+    const statusCounts = await this.prisma.salesOrder.groupBy({
+      by: ['customerId', 'status'],
+      _count: { id: true },
+      where: dateFilter,
+    });
+
+    const customerIds = [
+      ...new Set(statusCounts.map((g) => g.customerId as number)),
+    ];
+    const customers = await this.prisma.customer.findMany({
+      where: { id: { in: customerIds } },
+      select: { id: true, name: true },
+    });
+
+    const resultsMap = new Map<number, AdminStatusByCustomerDto>();
+    for (const customer of customers) {
+      resultsMap.set(customer.id, {
+        customerName: customer.name,
+        toBeIssuedCount: 0,
+        r105Count: 0,
+        w105Count: 0,
+        f105Count: 0,
+        dispatchedCount: 0,
+      });
+    }
+
+    for (const group of statusCounts) {
+      const cust = resultsMap.get(group.customerId as number);
+      if (cust) {
+        if (group.status === null) cust.toBeIssuedCount = group._count.id;
+        else {
+          switch (group.status) {
+            case 'R105': cust.r105Count = group._count.id; break;
+            case 'W105': cust.w105Count = group._count.id; break;
+            case 'F105': cust.f105Count = group._count.id; break;
+            case 'Dispatched': cust.dispatchedCount = group._count.id; break;
+          }
+        }
+      }
+    }
+
+    return Array.from(resultsMap.values()).sort((a, b) =>
+      a.customerName.localeCompare(b.customerName),
+    );
+  }
+
   async getAdminPaymentByCustomer(
     dateStr?: string,
   ): Promise<AdminPaymentByCustomerDto[]> {

@@ -165,4 +165,11 @@ export class DashboardController {
   async getOperatorStats(@Query('date') date?: string) {
     return this.dashboardService.getOperatorStats(date);
   }
+
+  @Get('sales-status-by-customer')
+  @Roles('SALES')
+  @ApiOperation({ summary: 'Get order status counts by Customers for Sales Zone' })
+  async getSalesStatusByCustomer(@Req() req: AuthRequest, @Query('date') date?: string) {
+    return this.dashboardService.getSalesStatusByCustomer(req.user.userId, date);
+  }
 }
