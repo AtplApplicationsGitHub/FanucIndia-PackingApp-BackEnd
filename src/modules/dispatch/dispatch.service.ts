@@ -65,6 +65,22 @@ export class DispatchService {
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
+    const existingDispatchToday = await this.prisma.dispatch.findFirst({
+      where: {
+        vehicleNumber: vehicleNumber,
+        createdAt: {
+          gte: startOfToday,
+          lte: endOfToday,
+        },
+      },
+    });
+
+    if (existingDispatchToday) {
+      throw new BadRequestException(
+        `Vehicle Number '${vehicleNumber}' has already been used for a dispatch today. It can only be used again tomorrow.`
+      );
+    }
+
     const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
       where: { 
         vehicleNumber: vehicleNumber,
@@ -517,6 +533,30 @@ export class DispatchService {
     const existingDispatch = await this.prisma.dispatch.findUnique({ where: { id } });
     if (!existingDispatch) {
       throw new NotFoundException(`Dispatch with ID ${id} not found.`);
+    }
+
+    if (vehicleNumber) {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+
+      const existingDispatchToday = await this.prisma.dispatch.findFirst({
+        where: {
+          vehicleNumber: vehicleNumber,
+          id: { not: id },
+          createdAt: {
+            gte: startOfToday,
+            lte: endOfToday,
+          },
+        },
+      });
+
+      if (existingDispatchToday) {
+        throw new BadRequestException(
+          `Vehicle Number '${vehicleNumber}' is already assigned to another dispatch today. Please use a different vehicle.`
+        );
+      }
     }
 
     return this.prisma.dispatch.update({
