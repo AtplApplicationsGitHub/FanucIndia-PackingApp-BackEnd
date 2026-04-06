@@ -63,6 +63,9 @@ export class AuthService {
       where: { 
         email: { equals: email, mode: 'insensitive' } 
       },
+      include: {
+        salesZone: true
+      }
     })
 
     if (!user) {
@@ -107,7 +110,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
-        salesZoneId: user.salesZoneId,
+        salesZone: user.salesZone?.name || null,
       },
     }
   }
