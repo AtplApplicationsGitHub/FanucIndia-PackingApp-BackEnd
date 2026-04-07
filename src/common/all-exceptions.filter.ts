@@ -50,6 +50,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     res.status(status).json({
       code: responsePayload.code,
       message: responsePayload.message,
+      errors: responsePayload.errors ?? undefined,
       details: responsePayload.details ?? null,
     })
   }

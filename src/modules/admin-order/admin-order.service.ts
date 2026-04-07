@@ -750,18 +750,54 @@ export class AdminOrderService {
           packConfigId = p.id;
         }
 
-        // Assigned User
         let assignedUserId = dbOrder.assignedUserId;
         const rowAssignedUser = getCellString('ASSIGNED USER');
-        if (
-          rowAssignedUser &&
-          rowAssignedUser !== '' &&
-          rowAssignedUser !== 'Unassigned'
-        ) {
-          const u = await tx.user.findFirst({
-            where: { name: rowAssignedUser, role: 'USER' },
-          });
-          if (u) assignedUserId = u.id;
+        if (rowAssignedUser !== undefined) {
+          if (rowAssignedUser === '' || rowAssignedUser.toLowerCase() === 'unassigned' || rowAssignedUser === '-') {
+            assignedUserId = null;
+          } else {
+            const u = await tx.user.findFirst({
+              where: { 
+                name: { equals: rowAssignedUser.trim(), mode: 'insensitive' }, 
+                role: 'USER' 
+              },
+            });
+            if (u) assignedUserId = u.id;
+          }
+        }
+
+        // Issue Assigned User
+        let issueAssignedUserId = dbOrder.issueAssignedUserId;
+        const rowIssueUser = getCellString('ISSUE STAGE USER') || getCellString('ISSUE ASSIGNED USER');
+        if (rowIssueUser !== undefined) {
+          if (rowIssueUser === '' || rowIssueUser.toLowerCase() === 'unassigned' || rowIssueUser === '-') {
+            issueAssignedUserId = null;
+          } else {
+            const u = await tx.user.findFirst({
+              where: { 
+                name: { equals: rowIssueUser.trim(), mode: 'insensitive' }, 
+                role: 'USER' 
+              },
+            });
+            if (u) issueAssignedUserId = u.id;
+          }
+        }
+
+        // Packing Assigned User
+        let packingAssignedUserId = dbOrder.packingAssignedUserId;
+        const rowPackingUser = getCellString('PACK STAGE USER') || getCellString('PACKING ASSIGNED USER') || getCellString('PACKING STAGE USER');
+        if (rowPackingUser !== undefined) {
+          if (rowPackingUser === '' || rowPackingUser.toLowerCase() === 'unassigned' || rowPackingUser === '-') {
+            packingAssignedUserId = null;
+          } else {
+            const u = await tx.user.findFirst({
+              where: { 
+                name: { equals: rowPackingUser.trim(), mode: 'insensitive' }, 
+                role: 'USER' 
+              },
+            });
+            if (u) packingAssignedUserId = u.id;
+          }
         }
 
         let customerId = dbOrder.customerId;
@@ -840,6 +876,8 @@ export class AdminOrderService {
             transporterId,
             packConfigId,
             assignedUserId,
+            issueAssignedUserId,
+            packingAssignedUserId,
             customerId,
             customerNameText,
             paymentClearance,
