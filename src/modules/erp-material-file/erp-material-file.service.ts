@@ -42,9 +42,12 @@ async function verifyFileAccess(
     throw new NotFoundException('File not found.');
   }
 
+  const so = file.salesOrderByNumber;
   if (
-    !file.salesOrderByNumber ||
-    file.salesOrderByNumber.assignedUserId !== userId
+    !so ||
+    (so.assignedUserId !== userId &&
+      so.issueAssignedUserId !== userId &&
+      so.packingAssignedUserId !== userId)
   ) {
     throw new ForbiddenException(
       'You do not have permission to access this file.',
@@ -72,7 +75,11 @@ async function verifySaleOrderAccess(
   const order = await prisma.salesOrder.findFirst({
     where: {
       saleOrderNumber: saleOrderNumber,
-      assignedUserId: userId,
+      OR: [
+        { assignedUserId: userId },
+        { issueAssignedUserId: userId },
+        { packingAssignedUserId: userId },
+      ],
     },
   });
 
@@ -152,7 +159,11 @@ export class ErpMaterialFileService {
     if (userRole === 'USER') {
       where.salesOrderByNumber = {
         is: {
-          assignedUserId: userId,
+          OR: [
+            { assignedUserId: userId },
+            { issueAssignedUserId: userId },
+            { packingAssignedUserId: userId },
+          ],
         },
       };
     }

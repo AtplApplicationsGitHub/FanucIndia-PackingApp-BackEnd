@@ -16,25 +16,34 @@ export class SoChatService {
   private async getSalesOrderOrThrow(orderId: number) {
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId }, 
-      select: { id: true, userId: true, saleOrderNumber: true, assignedUserId: true },
+      select: { id: true, userId: true, saleOrderNumber: true, assignedUserId: true, salesZoneId: true },
     });
     if (!salesOrder) throw new NotFoundException('Sales order not found.');
     return salesOrder;
   }
 
   private enforceSoAccess(
-    user: { userId: number; role: string },
-    so: { userId: number; assignedUserId: number | null },
+    user: { userId: number; role: string; salesZoneId?: number }, 
+    so: { userId: number; assignedUserId: number | null; salesZoneId?: number }, 
   ) {
-    if (user.role === 'SALES' && user.userId !== so.userId) {
-      throw new ForbiddenException('You are not authorized for this order.');
+    if (user.role === 'SALES') {
+      const isCreator = user.userId === so.userId;
+      
+      const isSameZone = 
+        user.salesZoneId && 
+        so.salesZoneId && 
+        user.salesZoneId === so.salesZoneId;
+
+      if (!isCreator && !isSameZone) {
+        throw new ForbiddenException('You are not authorized for this order.');
+      }
     }
     if (user.role === 'USER' && user.userId !== so.assignedUserId) {
       throw new ForbiddenException('You are not authorized for this order (Not Assigned).');
     }
   }
 
-  async getMentionUsers(orderId: number, user: { userId: number; role: string }) {
+  async getMentionUsers(orderId: number, user: { userId: number; role: string; salesZoneId?: number }) {
     const so = await this.getSalesOrderOrThrow(orderId);
 
     this.enforceSoAccess(user, so);
@@ -43,22 +52,20 @@ export class SoChatService {
       const targetIds = [so.userId, so.assignedUserId].filter((id) => id !== null) as number[];
 
       return this.prisma.user.findMany({
-        where: {
-          id: { in: targetIds }
-        },
-        select: { id: true, name: true, role: true },
+        where: { id: { in: targetIds } },
+        select: { id: true, name: true, role: true, email: true },
         orderBy: { name: 'asc' },
       });
     } else {
       return this.prisma.user.findMany({
         where: { role: 'ADMIN' },
-        select: { id: true, name: true, role: true },
+        select: { id: true, name: true, role: true, email: true },
         orderBy: { name: 'asc' },
       });
     }
   }
 
-  async listMessages(orderId: number, user: { userId: number; role: string }) {
+  async listMessages(orderId: number, user: { userId: number; role: string; salesZoneId?: number }) {
     const so = await this.getSalesOrderOrThrow(orderId);
 
     this.enforceSoAccess(user, so);
@@ -74,15 +81,15 @@ export class SoChatService {
       where: { salesOrderId: so.id },
       orderBy: { createdAt: 'asc' },
       include: {
-        fromUser: { select: { id: true, name: true, role: true } },
-        toUser: { select: { id: true, name: true, role: true } },
+        fromUser: { select: { id: true, name: true, role: true, email: true } },
+        toUser: { select: { id: true, name: true, role: true, email: true } },
       },
     });
   }
 
   async sendMessage(
     orderId: number,
-    user: { userId: number; role: string },
+    user: { userId: number; role: string; salesZoneId?: number },
     body: { toUserId: number; message: string },
   ) {
     const so = await this.getSalesOrderOrThrow(orderId);
@@ -111,8 +118,8 @@ export class SoChatService {
         message,
       },
       include: {
-        fromUser: { select: { id: true, name: true, role: true } },
-        toUser: { select: { id: true, name: true, role: true } },
+        fromUser: { select: { id: true, name: true, role: true, email: true } },
+        toUser: { select: { id: true, name: true, role: true, email: true } },
       },
     });
 
