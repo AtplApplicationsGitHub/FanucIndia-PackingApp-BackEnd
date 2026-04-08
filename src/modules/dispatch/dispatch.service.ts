@@ -380,7 +380,8 @@ export class DispatchService {
         // User selected a specific order from the dropdown
         salesOrder = await tx.salesOrder.findUnique({
           where: { id: salesOrderId },
-          select: { id: true, saleOrderNumber: true },
+          // 1. ADD outboundDelivery to the select object here
+          select: { id: true, saleOrderNumber: true, outboundDelivery: true }, 
         });
         if (!salesOrder) throw new NotFoundException('Invalid SO Number / ID');
       } else {
@@ -392,7 +393,8 @@ export class DispatchService {
               mode: 'insensitive',
             },
           },
-          select: { id: true, saleOrderNumber: true, outboundDelivery: true },
+          // Note: outboundDelivery is already selected here
+          select: { id: true, saleOrderNumber: true, outboundDelivery: true }, 
         });
 
         if (salesOrders.length === 0) {
@@ -445,7 +447,11 @@ export class DispatchService {
         }
       });
 
-      return createdLink;
+      // 2. MODIFY the return statement to include the OBD number
+      return {
+        ...createdLink,
+        outboundDelivery: salesOrder.outboundDelivery,
+      };
     });
   }
 
