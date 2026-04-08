@@ -608,6 +608,8 @@ export class SalesOrderService {
           status: null,
           priority: null,
           assignedUserId: null,
+          issueAssignedUserId: null,
+          packingAssignedUserId: null,
           isErpImported: 0,
           skipStage: false,
           UpdatedBy: username,
