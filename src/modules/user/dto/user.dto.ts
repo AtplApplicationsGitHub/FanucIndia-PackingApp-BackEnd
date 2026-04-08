@@ -14,11 +14,11 @@ import { ApiProperty, PartialType } from '@nestjs/swagger';
 export class CreateUserDto {
   @ApiProperty({ example: 'John Doe' })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ example: 'john.doe@example.com or johndoe' })
   @IsString()
-  email: string;
+  email!: string;
 
   @ApiProperty({
     description: 'Password (min 8 chars for Admin/Sales, 4-digit PIN for User)',
@@ -30,7 +30,7 @@ export class CreateUserDto {
   @Matches(/^\d{4}$/, {
     message: 'Password must be a 4-digit PIN for the USER role',
   })
-  password: string;
+  password!: string;
 
   @ApiProperty({
     example: 'USER',
@@ -38,7 +38,7 @@ export class CreateUserDto {
   })
   @IsString()
   @IsIn(['ADMIN', 'SALES', 'USER'])
-  role: string;
+  role!: string;
 
   @ApiProperty({ description: 'Sales Zone ID (Required if role is SALES)', required: false })
   @ValidateIf((o) => o.role === 'SALES')
@@ -90,6 +90,11 @@ export class CreateUserDto {
   @IsOptional()
   @IsBoolean()
   accessErpBarcode?: boolean;
+
+  @ApiProperty({ description: 'Access to Attachment module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessAttachment?: boolean;
 }
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
@@ -112,15 +117,15 @@ export class ResetPasswordDto {
   @ApiProperty({ example: 'oldPassword123' })
   @IsString()
   @IsNotEmpty()
-  oldPassword: string;
+  oldPassword!: string;
 
   @ApiProperty({ description: 'New password/PIN' })
   @IsString()
   @IsNotEmpty()
-  newPassword: string;
+  newPassword!: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  confirmPassword: string;
+  confirmPassword!: string;
 }

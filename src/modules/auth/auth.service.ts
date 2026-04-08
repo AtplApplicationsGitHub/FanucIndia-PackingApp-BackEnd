@@ -200,6 +200,7 @@ export class AuthService {
         accessContentAccuracy: user.accessContentAccuracy,
         accessPutAway: user.accessPutAway,
         accessErpBarcode: user.accessErpBarcode,
+        accessAttachment: user.accessAttachment,
       },
     };
   }

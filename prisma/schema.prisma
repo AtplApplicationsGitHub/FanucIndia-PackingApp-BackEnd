@@ -32,6 +32,7 @@ model User {
   accessContentAccuracy    Boolean        @default(false)
   accessPutAway            Boolean        @default(false)
   accessErpBarcode         Boolean        @default(false)
+  accessAttachment         Boolean        @default(false)
 
   sentSoChatMessages     SalesOrderChatMessage[] @relation("SoChatFrom")
   receivedSoChatMessages SalesOrderChatMessage[] @relation("SoChatTo")

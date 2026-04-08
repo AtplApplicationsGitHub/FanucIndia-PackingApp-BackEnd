@@ -41,6 +41,7 @@ export class UserService {
         accessContentAccuracy: dto.accessContentAccuracy || false,
         accessPutAway: dto.accessPutAway || false,
         accessErpBarcode: dto.accessErpBarcode || false,
+        accessAttachment: dto.accessAttachment || false,
       },
       select: {
         id: true,
@@ -58,6 +59,7 @@ export class UserService {
         accessContentAccuracy: true,
         accessPutAway: true,
         accessErpBarcode: true,
+        accessAttachment: true,
         salesZoneId: true,
         salesZone: {
           select: {
@@ -93,6 +95,7 @@ export class UserService {
         accessContentAccuracy: true,
         accessPutAway: true,
         accessErpBarcode: true,
+        accessAttachment: true,
         salesZoneId: true,
         salesZone: {
           select: {
@@ -155,6 +158,7 @@ export class UserService {
         accessContentAccuracy: true,
         accessPutAway: true,
         accessErpBarcode: true,
+        accessAttachment: true,
         salesZoneId: true,
         salesZone: {
           select: {
@@ -226,6 +230,7 @@ export class UserService {
         accessContentAccuracy: true,
         accessPutAway: true,
         accessErpBarcode: true,
+        accessAttachment: true,
       },
     });
 
