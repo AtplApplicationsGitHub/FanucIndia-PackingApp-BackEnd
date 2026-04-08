@@ -276,38 +276,49 @@ export class ErpMaterialFileService {
     userRole: string,
   ) {
     if (opts.saleOrderNumber) {
-      await verifySaleOrderAccess(
-        this.prisma,
-        opts.saleOrderNumber,
-        userId,
-        userRole,
-      );
+      await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
     } else if (userRole === 'USER') {
-      throw new ForbiddenException(
-        'You must specify a Sale Order Number for an order assigned to you.',
-      );
+      throw new ForbiddenException('You must specify a Sale Order Number for an order assigned to you.');
     }
 
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
-    const soDir = opts.saleOrderNumber
-      ? sanitize(opts.saleOrderNumber)
-      : 'misc';
+    const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
     const remoteDir = path.posix.join(baseDir, soDir);
 
     const uploads: { localPath: string; remotePath: string }[] = [];
     const dbRecords: any[] = [];
 
     try {
+      // NEW: Fetch existing sftpPaths to guarantee uniqueness
+      const existingDbFiles = await this.prisma.eRP_Material_File.findMany({
+        where: { sftpDir: remoteDir },
+        select: { sftpPath: true },
+      });
+      const existingPaths = new Set(existingDbFiles.map((f) => f.sftpPath));
+
       for (const f of files) {
         const checksum = await sha256File(f.path);
-        const remoteName = f.originalname;
-        const remotePath = path.posix.join(remoteDir, remoteName);
+        
+        let finalName = f.originalname;
+        let remotePath = path.posix.join(remoteDir, finalName);
+
+        // Auto-increment filename if the path already exists
+        if (existingPaths.has(remotePath)) {
+          let counter = 1;
+          const { name, ext } = this.splitFileName(f.originalname);
+          do {
+            finalName = `${name}-${counter}${ext}`;
+            remotePath = path.posix.join(remoteDir, finalName);
+            counter++;
+          } while (existingPaths.has(remotePath));
+        }
+        existingPaths.add(remotePath);
 
         uploads.push({ localPath: f.path, remotePath });
 
         dbRecords.push({
           saleOrderNumber: opts.saleOrderNumber,
-          fileName: f.originalname,
+          fileName: finalName,
           description: opts.description,
           sftpPath: remotePath,
           sftpDir: remoteDir,
@@ -327,21 +338,17 @@ export class ErpMaterialFileService {
 
       return {
         success: true,
-        items: created.map((r) => ({
-          ...r,
-          fileSizeBytes: Number(r.fileSizeBytes),
-        })),
+        items: created.map((r) => ({ ...r, fileSizeBytes: Number(r.fileSizeBytes) })),
       };
     } catch (e: any) {
-      throw new InternalServerErrorException(
-        'Upload failed. ' + (e?.message || ''),
-      );
+      throw new InternalServerErrorException('Upload failed. ' + (e?.message || ''));
     } finally {
       for (const f of files) {
         this.safeUnlink(f.path);
       }
     }
   }
+
   async uploadAndCreateWithDescriptions(
     files: Express.Multer.File[],
     opts: { saleOrderNumber: string | null; descriptions: string },
@@ -349,16 +356,9 @@ export class ErpMaterialFileService {
     userRole: string,
   ) {
     if (opts.saleOrderNumber) {
-      await verifySaleOrderAccess(
-        this.prisma,
-        opts.saleOrderNumber,
-        userId,
-        userRole,
-      );
+      await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
     } else if (userRole === 'USER') {
-      throw new ForbiddenException(
-        'You must specify a Sale Order Number for an order assigned to you.',
-      );
+      throw new ForbiddenException('You must specify a Sale Order Number for an order assigned to you.');
     }
 
     let descriptionMap: { [key: string]: string };
@@ -369,39 +369,38 @@ export class ErpMaterialFileService {
     }
 
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
-    const soDir = opts.saleOrderNumber
-      ? sanitize(opts.saleOrderNumber)
-      : 'misc';
+    const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
     const remoteDir = path.posix.join(baseDir, soDir);
 
     const uploads: { localPath: string; remotePath: string }[] = [];
     const dbRecords: any[] = [];
 
     try {
-      const existingDbFiles = opts.saleOrderNumber
-        ? await this.prisma.eRP_Material_File.findMany({
-            where: { saleOrderNumber: opts.saleOrderNumber },
-            select: { fileName: true },
-          })
-        : [];
-      const existingFileNames = new Set(existingDbFiles.map((f) => f.fileName));
+      // NEW: Fetch existing sftpPaths
+      const existingDbFiles = await this.prisma.eRP_Material_File.findMany({
+        where: { sftpDir: remoteDir },
+        select: { sftpPath: true },
+      });
+      const existingPaths = new Set(existingDbFiles.map((f) => f.sftpPath));
 
       for (const f of files) {
         const checksum = await sha256File(f.path);
         const description = descriptionMap[f.originalname] || null;
 
         let finalDbFileName = f.originalname;
-        if (opts.saleOrderNumber && existingFileNames.has(finalDbFileName)) {
+        let remotePath = path.posix.join(remoteDir, finalDbFileName);
+
+        // Auto-increment filename if the path already exists
+        if (existingPaths.has(remotePath)) {
           let counter = 1;
           const { name, ext } = this.splitFileName(f.originalname);
           do {
             finalDbFileName = `${name}-${counter}${ext}`;
+            remotePath = path.posix.join(remoteDir, finalDbFileName);
             counter++;
-          } while (existingFileNames.has(finalDbFileName));
+          } while (existingPaths.has(remotePath));
         }
-        existingFileNames.add(finalDbFileName);
-
-        const remotePath = path.posix.join(remoteDir, finalDbFileName);
+        existingPaths.add(remotePath);
 
         uploads.push({ localPath: f.path, remotePath });
 
@@ -427,15 +426,10 @@ export class ErpMaterialFileService {
 
       return {
         success: true,
-        items: created.map((r) => ({
-          ...r,
-          fileSizeBytes: Number(r.fileSizeBytes),
-        })),
+        items: created.map((r) => ({ ...r, fileSizeBytes: Number(r.fileSizeBytes) })),
       };
     } catch (e: any) {
-      throw new InternalServerErrorException(
-        'Upload failed. ' + (e?.message || ''),
-      );
+      throw new InternalServerErrorException('Upload failed. ' + (e?.message || ''));
     } finally {
       for (const f of files) {
         this.safeUnlink(f.path);
@@ -475,28 +469,18 @@ export class ErpMaterialFileService {
     userId: number,
     userRole: string,
   ) {
-    // 1. Validate inputs early to maintain scope
     if (!opts.saleOrderNumber) {
       throw new BadRequestException('You must specify a Sale Order Number.');
     }
 
-    // 2. Fetch the specific Sales Order so we can grab its unique ID for strict OBD linking
     const orderExists = await this.prisma.salesOrder.findFirst({
-      where: {
-        saleOrderNumber: {
-          equals: opts.saleOrderNumber,
-          mode: 'insensitive',
-        },
-      },
+      where: { saleOrderNumber: { equals: opts.saleOrderNumber, mode: 'insensitive' } },
     });
 
     if (!orderExists) {
-      throw new NotFoundException(
-        `Sales Order ${opts.saleOrderNumber} not found in the system.`,
-      );
+      throw new NotFoundException(`Sales Order ${opts.saleOrderNumber} not found in the system.`);
     }
 
-    // 3. Parse file descriptions
     let descriptionMap: { [key: string]: string };
     try {
       descriptionMap = JSON.parse(opts.descriptions || '{}');
@@ -504,7 +488,6 @@ export class ErpMaterialFileService {
       throw new BadRequestException('Invalid descriptions JSON.');
     }
 
-    // 4. Setup SFTP remote directory paths
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
     const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
     const remoteDir = path.posix.join(baseDir, soDir);
@@ -513,41 +496,37 @@ export class ErpMaterialFileService {
     const dbRecords: any[] = [];
 
     try {
-      // 5. Fetch existing files to prevent duplicate name overwriting
+      // NEW: Fetch existing sftpPaths
       const existingDbFiles = await this.prisma.eRP_Material_File.findMany({
-        where: { saleOrderNumber: opts.saleOrderNumber },
-        select: { fileName: true },
+        where: { sftpDir: remoteDir },
+        select: { sftpPath: true },
       });
-      const existingFileNames = new Set(existingDbFiles.map((f) => f.fileName));
+      const existingPaths = new Set(existingDbFiles.map((f) => f.sftpPath));
 
-      // 6. Process each uploaded file
       for (const f of files) {
         const checksum = await sha256File(f.path);
         const description = descriptionMap[f.originalname] || null;
 
         const { name, ext } = this.splitFileName(f.originalname);
-
-        // Inject '-mobile' before the extension
         let finalDbFileName = `${name}-mobile${ext}`;
+        let remotePath = path.posix.join(remoteDir, finalDbFileName);
 
-        // Handle auto-incrementing if the same mobile file is uploaded twice
-        if (existingFileNames.has(finalDbFileName)) {
+        // Auto-increment filename if the path already exists
+        if (existingPaths.has(remotePath)) {
           let counter = 1;
           do {
             finalDbFileName = `${name}-mobile-${counter}${ext}`;
+            remotePath = path.posix.join(remoteDir, finalDbFileName);
             counter++;
-          } while (existingFileNames.has(finalDbFileName));
+          } while (existingPaths.has(remotePath));
         }
-
-        existingFileNames.add(finalDbFileName);
-
-        const remotePath = path.posix.join(remoteDir, finalDbFileName);
+        existingPaths.add(remotePath);
 
         uploads.push({ localPath: f.path, remotePath });
 
         dbRecords.push({
           saleOrderNumber: opts.saleOrderNumber,
-          salesOrderId: orderExists.id, // Strictly links to the specific SO-OBD record ID
+          salesOrderId: orderExists.id,
           fileName: finalDbFileName,
           description: description,
           sftpPath: remotePath,
@@ -558,30 +537,21 @@ export class ErpMaterialFileService {
         });
       }
 
-      // 7. Upload files to SFTP server
       await this.sftp.uploadBatch(uploads);
 
-      // 8. Save records to the database
       const created: any[] = [];
       for (const data of dbRecords) {
         const row = await this.prisma.eRP_Material_File.create({ data });
         created.push(row);
       }
 
-      // 9. Format response for the frontend/mobile client
       return {
         success: true,
-        items: created.map((r) => ({
-          ...r,
-          fileSizeBytes: Number(r.fileSizeBytes),
-        })),
+        items: created.map((r) => ({ ...r, fileSizeBytes: Number(r.fileSizeBytes) })),
       };
     } catch (e: any) {
-      throw new InternalServerErrorException(
-        'Upload failed. ' + (e?.message || ''),
-      );
+      throw new InternalServerErrorException('Upload failed. ' + (e?.message || ''));
     } finally {
-      // 10. Clean up temporary files stored by Multer
       for (const f of files) {
         this.safeUnlink(f.path);
       }
