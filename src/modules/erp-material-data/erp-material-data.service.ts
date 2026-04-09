@@ -180,6 +180,19 @@ export class ErpMaterialDataService {
           updatedBy: userName,
         },
       });
+      if (updatedOrder.packingAssignedUserId) {
+        await this.prisma.sO_Status_Stepper.updateMany({
+          where: {
+            salesOrderNumber: updatedOrder.saleOrderNumber,
+            status: 'Under Packing',
+            createdDateTime: null,
+          },
+          data: {
+            createdDateTime: new Date(),
+            updatedBy: userName,
+          },
+        });
+      }
     }
 
     return convertBigInts({
@@ -286,6 +299,20 @@ export class ErpMaterialDataService {
           updatedBy: userName,
         },
       });
+
+      if (updatedOrder.packingAssignedUserId) {
+        await this.prisma.sO_Status_Stepper.updateMany({
+          where: {
+            salesOrderNumber: updatedOrder.saleOrderNumber,
+            status: 'Under Packing',
+            createdDateTime: null,
+          },
+          data: {
+            createdDateTime: new Date(),
+            updatedBy: userName,
+          },
+        });
+      }
     }
 
     return convertBigInts({
@@ -508,6 +535,20 @@ export class ErpMaterialDataService {
           data: { createdDateTime: new Date(), updatedBy: userName },
         });
         isIssueComplete = true;
+
+        if (current.packingAssignedUserId) {
+          await this.prisma.sO_Status_Stepper.updateMany({
+            where: {
+              salesOrderNumber: soNumber,
+              status: 'Under Packing',
+              createdDateTime: null,
+            },
+            data: { 
+              createdDateTime: new Date(), 
+              updatedBy: userName 
+            },
+          });
+        }
       }
     }
 

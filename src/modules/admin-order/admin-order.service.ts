@@ -285,20 +285,30 @@ export class AdminOrderService {
 
     const now = new Date();
 
-    if (dto.assignedUserId && order.assignedUserId !== dto.assignedUserId) {
-      let targetStatus = '';
-
+    // 1. Handle Issue Assignment Stepper
+    if (dto.issueAssignedUserId && order.issueAssignedUserId !== dto.issueAssignedUserId) {
       if (order.status === 'R105' || !order.status) {
-        targetStatus = 'Under Issue';
-      } else if (order.status === 'W105') {
-        targetStatus = 'Under Packing';
-      }
-
-      if (targetStatus) {
         await this.prisma.sO_Status_Stepper.updateMany({
           where: {
             salesOrderNumber: order.saleOrderNumber,
-            status: targetStatus,
+            status: 'Under Issue',
+            createdDateTime: null,
+          },
+          data: {
+            createdDateTime: now,
+            updatedBy: user.name,
+          },
+        });
+      }
+    }
+
+    // 2. Handle Packing Assignment Stepper
+    if (dto.packingAssignedUserId && order.packingAssignedUserId !== dto.packingAssignedUserId) {
+      if (order.status === 'W105') {
+        await this.prisma.sO_Status_Stepper.updateMany({
+          where: {
+            salesOrderNumber: order.saleOrderNumber,
+            status: 'Under Packing',
             createdDateTime: null,
           },
           data: {
@@ -376,6 +386,8 @@ export class AdminOrderService {
         status: true,
         saleOrderNumber: true,
         assignedUserId: true,
+        issueAssignedUserId: true,
+        packingAssignedUserId: true,
       },
     });
 
@@ -385,65 +397,70 @@ export class AdminOrderService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const order of orders) {
-        
-        let newAssignedUserId = order.assignedUserId;
         const currentStatus = order.status || 'R105';
 
-        if (currentStatus === 'R105' || currentStatus === null) {
-          if (issueUserId !== undefined) newAssignedUserId = issueUserId;
-          else if (assignedUserId !== undefined) newAssignedUserId = assignedUserId;
-        } else if (currentStatus === 'W105') {
-          if (packingUserId !== undefined) newAssignedUserId = packingUserId;
-          else if (assignedUserId !== undefined) newAssignedUserId = assignedUserId;
+        // 1. Handle "Under Issue" Stepper Trigger
+        // Only trigger if we are at R105 and the Issue user is genuinely changing
+        const isIssueUserChanging = issueUserId !== undefined && order.issueAssignedUserId !== issueUserId;
+        
+        if (isIssueUserChanging && currentStatus === 'R105') {
+          await tx.sO_Status_Stepper.updateMany({
+            where: {
+              salesOrderNumber: order.saleOrderNumber,
+              status: 'Under Issue',
+              createdDateTime: null,
+            },
+            data: { createdDateTime: now, updatedBy: user.name },
+          });
         }
 
-        const isUserChanging = order.assignedUserId !== newAssignedUserId;
-
-        if (isUserChanging) {
-          let targetStatus = '';
-          if (order.status === 'R105' || !order.status) {
-            targetStatus = 'Under Issue';
-          } else if (order.status === 'W105') {
-            targetStatus = 'Under Packing';
-          }
-
-          if (targetStatus) {
-            await tx.sO_Status_Stepper.updateMany({
-              where: {
-                salesOrderNumber: order.saleOrderNumber,
-                status: targetStatus,
-                createdDateTime: null,
-              },
-              data: {
-                createdDateTime: now,
-                updatedBy: user.name,
-              },
-            });
-          }
+        // 2. Handle "Under Packing" Stepper Trigger
+        // Only trigger if we are already at W105 and the Packing user is genuinely changing
+        const isPackingUserChanging = packingUserId !== undefined && order.packingAssignedUserId !== packingUserId;
+        
+        if (isPackingUserChanging && currentStatus === 'W105') {
+          await tx.sO_Status_Stepper.updateMany({
+            where: {
+              salesOrderNumber: order.saleOrderNumber,
+              status: 'Under Packing',
+              createdDateTime: null,
+            },
+            data: { createdDateTime: now, updatedBy: user.name },
+          });
         }
+
+        // 3. Handle General assignedUserId change (if you are still using this for fallback)
+        const isGeneralUserChanging = assignedUserId !== undefined && order.assignedUserId !== assignedUserId;
+
+        // 4. Construct Data for Order Update
         const updateData: Prisma.SalesOrderUncheckedUpdateInput = {
           UpdatedBy: user.name,
           UpdatedDate: now,
         };
 
-        if (isUserChanging) {
-          updateData.assignedUserId = newAssignedUserId;
-        }
-
+        // Apply new user assignments
+        if (isGeneralUserChanging) updateData.assignedUserId = assignedUserId;
         if (issueUserId !== undefined) updateData.issueAssignedUserId = issueUserId;
         if (packingUserId !== undefined) updateData.packingAssignedUserId = packingUserId;
         
+        // Apply skip stages
         if (skipIssueStage !== undefined) updateData.skipIssueStage = skipIssueStage;
         if (skipPackingStage !== undefined) updateData.skipPackingStage = skipPackingStage;
 
+        // Apply priority
         if (priority !== undefined) {
           updateData.priority = priority;
         }
 
-        if (order.status === null && (isUserChanging || (priority !== undefined && priority !== null))) {
+        // 5. Update Status if it's currently null and an assignment/priority is made
+        if (
+          !order.status && 
+          (isIssueUserChanging || isPackingUserChanging || isGeneralUserChanging || (priority !== undefined && priority !== null))
+        ) {
           updateData.status = 'R105';
         }
 
+        // Finally, update the SalesOrder record
         await tx.salesOrder.update({
           where: { id: order.id },
           data: updateData,

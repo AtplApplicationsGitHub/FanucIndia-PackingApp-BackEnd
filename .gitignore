@@ -67,3 +67,10 @@ restore_list.txt
 # Alternatively, you can use wildcards to ignore ALL .sql and .dump files:
 *.sql
 *.dump
+
+*.csv
+verify-so-obd.ts
+verify-masters.ts
+verify-customers.ts
+check-duplicate-customers.ts
+insert-missing-orders.ts

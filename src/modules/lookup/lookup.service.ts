@@ -460,19 +460,28 @@ export class LookupService {
         const productSheet = workbook.getWorksheet('Products');
         if (productSheet) {
           const rows = extractRows(productSheet);
+          const uniqueItems = new Map();
+
           for (const row of rows) {
             const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
-
             if (name) {
-              if (id) {
-                promises.push(tx.product.update({ where: { id }, data: { name } }).catch(() => {}));
-              } else {
-                promises.push((async () => {
-                  const existing = await tx.product.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                  if (!existing) await tx.product.create({ data: { name } });
-                })().catch(() => {}));
+              const key = name.toLowerCase();
+              if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
+                uniqueItems.set(key, { id, name });
               }
+            }
+          }
+
+          for (const item of uniqueItems.values()) {
+            const { id, name } = item;
+            if (id) {
+              promises.push(tx.product.update({ where: { id }, data: { name } }).catch(() => {}));
+            } else {
+              promises.push((async () => {
+                const existing = await tx.product.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                if (!existing) await tx.product.create({ data: { name } });
+              })().catch(() => {}));
             }
           }
           results.push('Products processed');
@@ -482,18 +491,28 @@ export class LookupService {
         const transpSheet = workbook.getWorksheet('Transporters');
         if (transpSheet) {
           const rows = extractRows(transpSheet);
+          const uniqueItems = new Map();
+
           for (const row of rows) {
             const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
             if (name) {
-              if (id) {
-                promises.push(tx.transporter.update({ where: { id }, data: { name } }).catch(() => {}));
-              } else {
-                promises.push((async () => {
-                  const existing = await tx.transporter.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                  if (!existing) await tx.transporter.create({ data: { name } });
-                })().catch(() => {}));
+              const key = name.toLowerCase();
+              if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
+                uniqueItems.set(key, { id, name });
               }
+            }
+          }
+
+          for (const item of uniqueItems.values()) {
+            const { id, name } = item;
+            if (id) {
+              promises.push(tx.transporter.update({ where: { id }, data: { name } }).catch(() => {}));
+            } else {
+              promises.push((async () => {
+                const existing = await tx.transporter.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                if (!existing) await tx.transporter.create({ data: { name } });
+              })().catch(() => {}));
             }
           }
           results.push('Transporters processed');
@@ -503,19 +522,29 @@ export class LookupService {
         const plantSheet = workbook.getWorksheet('Plant Codes');
         if (plantSheet) {
           const rows = extractRows(plantSheet);
+          const uniqueItems = new Map();
+
           for (const row of rows) {
             const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const code = getVal(row, 2);
             const description = getVal(row, 3) || '';
             if (code) {
-              if (id) {
-                promises.push(tx.plantCode.update({ where: { id }, data: { code, description } }).catch(() => {}));
-              } else {
-                promises.push((async () => {
-                  const existing = await tx.plantCode.findFirst({ where: { code: { equals: code, mode: 'insensitive' } } });
-                  if (!existing) await tx.plantCode.create({ data: { code, description } });
-                })().catch(() => {}));
+              const key = code.toLowerCase();
+              if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
+                uniqueItems.set(key, { id, code, description });
               }
+            }
+          }
+
+          for (const item of uniqueItems.values()) {
+            const { id, code, description } = item;
+            if (id) {
+              promises.push(tx.plantCode.update({ where: { id }, data: { code, description } }).catch(() => {}));
+            } else {
+              promises.push((async () => {
+                const existing = await tx.plantCode.findFirst({ where: { code: { equals: code, mode: 'insensitive' } } });
+                if (!existing) await tx.plantCode.create({ data: { code, description } });
+              })().catch(() => {}));
             }
           }
           results.push('Plant Codes processed');
@@ -525,18 +554,28 @@ export class LookupService {
         const zoneSheet = workbook.getWorksheet('Sales Zones');
         if (zoneSheet) {
           const rows = extractRows(zoneSheet);
+          const uniqueItems = new Map();
+
           for (const row of rows) {
             const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
             if (name) {
-              if (id) {
-                promises.push(tx.salesZone.update({ where: { id }, data: { name } }).catch(() => {}));
-              } else {
-                promises.push((async () => {
-                  const existing = await tx.salesZone.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                  if (!existing) await tx.salesZone.create({ data: { name } });
-                })().catch(() => {}));
+              const key = name.toLowerCase();
+              if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
+                uniqueItems.set(key, { id, name });
               }
+            }
+          }
+
+          for (const item of uniqueItems.values()) {
+            const { id, name } = item;
+            if (id) {
+              promises.push(tx.salesZone.update({ where: { id }, data: { name } }).catch(() => {}));
+            } else {
+              promises.push((async () => {
+                const existing = await tx.salesZone.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                if (!existing) await tx.salesZone.create({ data: { name } });
+              })().catch(() => {}));
             }
           }
           results.push('Sales Zones processed');
@@ -546,18 +585,28 @@ export class LookupService {
         const packSheet = workbook.getWorksheet('Packing Configs');
         if (packSheet) {
           const rows = extractRows(packSheet);
+          const uniqueItems = new Map();
+
           for (const row of rows) {
             const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const configName = getVal(row, 2);
             if (configName) {
-              if (id) {
-                promises.push(tx.packConfig.update({ where: { id }, data: { configName } }).catch(() => {}));
-              } else {
-                promises.push((async () => {
-                  const existing = await tx.packConfig.findFirst({ where: { configName: { equals: configName, mode: 'insensitive' } } });
-                  if (!existing) await tx.packConfig.create({ data: { configName } });
-                })().catch(() => {}));
+              const key = configName.toLowerCase();
+              if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
+                uniqueItems.set(key, { id, configName });
               }
+            }
+          }
+
+          for (const item of uniqueItems.values()) {
+            const { id, configName } = item;
+            if (id) {
+              promises.push(tx.packConfig.update({ where: { id }, data: { configName } }).catch(() => {}));
+            } else {
+              promises.push((async () => {
+                const existing = await tx.packConfig.findFirst({ where: { configName: { equals: configName, mode: 'insensitive' } } });
+                if (!existing) await tx.packConfig.create({ data: { configName } });
+              })().catch(() => {}));
             }
           }
           results.push('Packing Configs processed');
@@ -567,21 +616,31 @@ export class LookupService {
         const custSheet = workbook.getWorksheet('Customers');
         if (custSheet) {
           const rows = extractRows(custSheet);
+          const uniqueItems = new Map();
+
           for (const row of rows) {
             const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
             const address = getVal(row, 3) || '';
             const contactNumber = getVal(row, 4);
             if (name) {
-              const data = { name, address, contactNumber };
-              if (id) {
-                promises.push(tx.customer.update({ where: { id }, data }).catch(() => {}));
-              } else {
-                promises.push((async () => {
-                  const existing = await tx.customer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                  if (!existing) await tx.customer.create({ data });
-                })().catch(() => {}));
+              const key = name.toLowerCase();
+              if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
+                uniqueItems.set(key, { id, name, address, contactNumber });
               }
+            }
+          }
+
+          for (const item of uniqueItems.values()) {
+            const { id, name, address, contactNumber } = item;
+            const data = { name, address, contactNumber };
+            if (id) {
+              promises.push(tx.customer.update({ where: { id }, data }).catch(() => {}));
+            } else {
+              promises.push((async () => {
+                const existing = await tx.customer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                if (!existing) await tx.customer.create({ data });
+              })().catch(() => {}));
             }
           }
           results.push('Customers processed');
@@ -591,18 +650,28 @@ export class LookupService {
         const printSheet = workbook.getWorksheet('Printers');
         if (printSheet) {
           const rows = extractRows(printSheet);
+          const uniqueItems = new Map();
+
           for (const row of rows) {
             const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
             const name = getVal(row, 2);
             if (name) {
-              if (id) {
-                promises.push(tx.printer.update({ where: { id }, data: { name } }).catch(() => {}));
-              } else {
-                promises.push((async () => {
-                  const existing = await tx.printer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                  if (!existing) await tx.printer.create({ data: { name } });
-                })().catch(() => {}));
+              const key = name.toLowerCase();
+              if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
+                uniqueItems.set(key, { id, name });
               }
+            }
+          }
+
+          for (const item of uniqueItems.values()) {
+            const { id, name } = item;
+            if (id) {
+              promises.push(tx.printer.update({ where: { id }, data: { name } }).catch(() => {}));
+            } else {
+              promises.push((async () => {
+                const existing = await tx.printer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+                if (!existing) await tx.printer.create({ data: { name } });
+              })().catch(() => {}));
             }
           }
           results.push('Printers processed');
@@ -611,8 +680,8 @@ export class LookupService {
         // 8. Material Barcodes
         const matSheet = workbook.getWorksheet('Material Barcodes');
         if (matSheet) {
-          const newBarcodesData: any[] = [];
           const rows = extractRows(matSheet);
+          const uniqueItems = new Map();
 
           for (const row of rows) {
             const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
@@ -624,25 +693,28 @@ export class LookupService {
             const classification = getVal(row, 7);
 
             if (erpCode) {
-              const data = {
-                erpCode,
-                mappingBarcode,
-                group,
-                acceptBulkData,
-                remarksRequired,
-                classification,
-              };
-              if (id) {
-                promises.push(
-                  tx.materialBarcode
-                    .update({ where: { id }, data })
-                    .catch((err) => {
-                      console.error(`Failed to update MaterialBarcode ID ${id}:`, err.message);
-                    }),
-                );
-              } else {
-                newBarcodesData.push(data);
+              const key = erpCode.toLowerCase();
+              if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
+                uniqueItems.set(key, { id, erpCode, mappingBarcode, group, acceptBulkData, remarksRequired, classification });
               }
+            }
+          }
+
+          const newBarcodesData: any[] = [];
+          for (const item of uniqueItems.values()) {
+            const { id, erpCode, mappingBarcode, group, acceptBulkData, remarksRequired, classification } = item;
+            const data = { erpCode, mappingBarcode, group, acceptBulkData, remarksRequired, classification };
+            
+            if (id) {
+              promises.push(
+                tx.materialBarcode
+                  .update({ where: { id }, data })
+                  .catch((err) => {
+                    console.error(`Failed to update MaterialBarcode ID ${id}:`, err.message);
+                  }),
+              );
+            } else {
+              newBarcodesData.push(data);
             }
           }
 
