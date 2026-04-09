@@ -15,7 +15,14 @@ export class AppUpdateController {
   async getPickPackLatestVersion(@Req() req: Request) {
     const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
     const hostUrl = `${protocol}://${req.get('host')}`;
-    return await this.appUpdateService.getLatestVersionInfo('pick-pack', hostUrl, '/app-update/pick-pack/download');
+    
+    const downloadRoute = req.originalUrl.replace('/latest-version', '/download');
+
+    return await this.appUpdateService.getLatestVersionInfo(
+      'pick-pack', 
+      hostUrl, 
+      downloadRoute
+    );
   }
 
   @Public()
@@ -33,7 +40,14 @@ export class AppUpdateController {
   async getDispatchLatestVersion(@Req() req: Request) {
     const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
     const hostUrl = `${protocol}://${req.get('host')}`;
-    return await this.appUpdateService.getLatestVersionInfo('dispatch', hostUrl, '/app-update/dispatch/download');
+    
+    const downloadRoute = req.originalUrl.replace('/latest-version', '/download');
+
+    return await this.appUpdateService.getLatestVersionInfo(
+      'dispatch', 
+      hostUrl, 
+      downloadRoute
+    );
   }
 
   @Public()
@@ -45,7 +59,6 @@ export class AppUpdateController {
     await this.appUpdateService.downloadApk('dispatch', res);
   }
 
-  // Helper method to keep code clean
   private setApkHeaders(res: Response, fileName: string) {
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);

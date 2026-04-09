@@ -363,6 +363,7 @@ export class DispatchService {
     dispatchId: number,
     saleOrderNumber: string,
     userId: number,
+    salesOrderId?: number,
   ) {
     const userName = await this.getUserEmail(userId);
     return this.prisma.$transaction(async (tx) => {
@@ -373,26 +374,47 @@ export class DispatchService {
         throw new NotFoundException('Dispatch record not found.');
       }
 
-      const salesOrder = await tx.salesOrder.findFirst({
-        where: {
-          saleOrderNumber: {
-            equals: saleOrderNumber,
-            mode: 'insensitive',
-          },
-        },
-      });
+      let salesOrder;
 
-      if (!salesOrder) {
-        throw new NotFoundException(
-          `Sales Order '${saleOrderNumber}' not found.`,
-        );
+      if (salesOrderId) {
+        // User selected a specific order from the dropdown
+        salesOrder = await tx.salesOrder.findUnique({
+          where: { id: salesOrderId },
+          // 1. ADD outboundDelivery to the select object here
+          select: { id: true, saleOrderNumber: true, outboundDelivery: true }, 
+        });
+        if (!salesOrder) throw new NotFoundException('Invalid SO Number / ID');
+      } else {
+        // Standard search if no dropdown was used yet
+        const salesOrders = await tx.salesOrder.findMany({
+          where: {
+            saleOrderNumber: {
+              equals: saleOrderNumber,
+              mode: 'insensitive',
+            },
+          },
+          // Note: outboundDelivery is already selected here
+          select: { id: true, saleOrderNumber: true, outboundDelivery: true }, 
+        });
+
+        if (salesOrders.length === 0) {
+          throw new NotFoundException(`Sales Order '${saleOrderNumber}' not found.`);
+        } else if (salesOrders.length > 1) {
+          throw new BadRequestException({
+            message: 'Multiple orders found for this SO number. Please select the specific OBD.',
+            multiple: true,
+            orders: salesOrders,
+          });
+        } else {
+          salesOrder = salesOrders[0];
+        }
       }
 
      const createdLink = await tx.dispatch_SO.create({
         data: { 
           dispatchId, 
           saleOrderNumber: salesOrder.saleOrderNumber,
-          salesOrderId: salesOrder.id // Fixed: passing the foreign key
+          salesOrderId: salesOrder.id
         },
       });
 
@@ -425,7 +447,11 @@ export class DispatchService {
         }
       });
 
-      return createdLink;
+      // 2. MODIFY the return statement to include the OBD number
+      return {
+        ...createdLink,
+        outboundDelivery: salesOrder.outboundDelivery,
+      };
     });
   }
 
@@ -700,6 +726,7 @@ export class DispatchService {
     dispatchId: number,
     saleOrderNumber: string,
     userId: number,
+    salesOrderId?: number,
   ) {
     const dispatch = await this.prisma.dispatch.findUnique({
       where: { id: dispatchId },
@@ -709,18 +736,38 @@ export class DispatchService {
       throw new NotFoundException('Dispatch record not found.');
     }
 
-    const salesOrder = await this.prisma.salesOrder.findFirst({
-      where: {
-        saleOrderNumber: {
-          equals: saleOrderNumber,
-          mode: 'insensitive',
-        },
-      },
-      select: { id: true, saleOrderNumber: true },
-    });
+    let salesOrder;
 
-    if (!salesOrder) {
-      throw new NotFoundException('Invalid SO Number');
+    if (salesOrderId) {
+      // User selected a specific order from the dropdown
+      salesOrder = await this.prisma.salesOrder.findUnique({
+        where: { id: salesOrderId },
+        select: { id: true, saleOrderNumber: true },
+      });
+      if (!salesOrder) throw new NotFoundException('Invalid SO Number / ID');
+    } else {
+      // Standard search if no dropdown was used yet
+      const salesOrders = await this.prisma.salesOrder.findMany({
+        where: {
+          saleOrderNumber: {
+            equals: saleOrderNumber,
+            mode: 'insensitive',
+          },
+        },
+        select: { id: true, saleOrderNumber: true, outboundDelivery: true },
+      });
+
+      if (salesOrders.length === 0) {
+        throw new NotFoundException('Invalid SO Number');
+      } else if (salesOrders.length > 1) {
+        throw new BadRequestException({
+          message: 'Multiple orders found for this SO number. Please select the specific OBD.',
+          multiple: true,
+          orders: salesOrders,
+        });
+      } else {
+        salesOrder = salesOrders[0];
+      }
     }
 
     const userName = await this.getUserEmail(userId);
@@ -992,5 +1039,20 @@ export class DispatchService {
       console.error('SFTP stream error:', error);
       throw new NotFoundException('File not found on storage server.');
     }
+  }
+
+  async searchSOForDispatch(soNumber: string) {
+    const orders = await this.prisma.salesOrder.findMany({
+      where: {
+        saleOrderNumber: { equals: soNumber, mode: 'insensitive' },
+      },
+      select: { id: true, saleOrderNumber: true, outboundDelivery: true },
+    });
+
+    if (orders.length === 0) {
+      throw new NotFoundException(`No orders found for SO Number '${soNumber}'`);
+    }
+
+    return orders;
   }
 }

@@ -93,13 +93,23 @@ export class DispatchController {
   @ApiOperation({ summary: 'Step 3 (Mobile): Link a Sales Order and update its status to Dispatched.' })
   addMobileDispatchSO(
     @Param('id', ParseIntPipe) id: number,
-    @Body('saleOrderNumber') saleOrderNumber: string,
+    @Body() body: { saleOrderNumber: string; salesOrderId?: number },
     @Req() req: AuthRequest,
   ) {
-    if (!saleOrderNumber) {
+    if (!body.saleOrderNumber) {
         throw new BadRequestException('saleOrderNumber is required.');
     }
-    return this.dispatchService.addMobileDispatchSO(id, saleOrderNumber, req.user.userId);
+    return this.dispatchService.addMobileDispatchSO(id, body.saleOrderNumber, req.user.userId, body.salesOrderId);
+  }
+
+  @Get('search-so/:soNumber')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({ summary: 'Search for SOs by number to handle duplicates (returns id, SO, OBD)' })
+  searchSOForDispatch(@Param('soNumber') soNumber: string) {
+    if (!soNumber) {
+      throw new BadRequestException('soNumber is required');
+    }
+    return this.dispatchService.searchSOForDispatch(soNumber);
   }
 
   @Get()
@@ -164,10 +174,13 @@ export class DispatchController {
   @Roles('ADMIN', 'USER')
   addDispatchSO(
     @Param('id', ParseIntPipe) id: number,
-    @Body('saleOrderNumber') saleOrderNumber: string,
+    @Body() body: { saleOrderNumber: string; salesOrderId?: number },
     @Req() req: AuthRequest,
   ) {
-    return this.dispatchService.addDispatchSO(id, saleOrderNumber, req.user.userId);
+    if (!body.saleOrderNumber) {
+      throw new BadRequestException('saleOrderNumber is required.');
+    }
+    return this.dispatchService.addDispatchSO(id, body.saleOrderNumber, req.user.userId, body.salesOrderId);
   }
   
   @Delete('so/:soId')

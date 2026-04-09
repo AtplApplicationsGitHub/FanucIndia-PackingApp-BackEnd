@@ -16,7 +16,15 @@ export class SoChatService {
   private async getSalesOrderOrThrow(orderId: number) {
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId }, 
-      select: { id: true, userId: true, saleOrderNumber: true, assignedUserId: true, salesZoneId: true },
+      select: { 
+        id: true, 
+        userId: true, 
+        saleOrderNumber: true, 
+        assignedUserId: true, 
+        issueAssignedUserId: true, 
+        packingAssignedUserId: true, 
+        salesZoneId: true 
+      },
     });
     if (!salesOrder) throw new NotFoundException('Sales order not found.');
     return salesOrder;
@@ -24,7 +32,13 @@ export class SoChatService {
 
   private enforceSoAccess(
     user: { userId: number; role: string; salesZoneId?: number }, 
-    so: { userId: number; assignedUserId: number | null; salesZoneId?: number }, 
+    so: { 
+      userId: number; 
+      assignedUserId: number | null; 
+      issueAssignedUserId: number | null;
+      packingAssignedUserId: number | null;
+      salesZoneId?: number 
+    }, 
   ) {
     if (user.role === 'SALES') {
       const isCreator = user.userId === so.userId;
@@ -38,7 +52,13 @@ export class SoChatService {
         throw new ForbiddenException('You are not authorized for this order.');
       }
     }
-    if (user.role === 'USER' && user.userId !== so.assignedUserId) {
+    
+    if (
+      user.role === 'USER' && 
+      user.userId !== so.assignedUserId &&
+      user.userId !== so.issueAssignedUserId &&
+      user.userId !== so.packingAssignedUserId
+    ) {
       throw new ForbiddenException('You are not authorized for this order (Not Assigned).');
     }
   }
@@ -49,7 +69,12 @@ export class SoChatService {
     this.enforceSoAccess(user, so);
 
     if (user.role === 'ADMIN') {
-      const targetIds = [so.userId, so.assignedUserId].filter((id) => id !== null) as number[];
+      const targetIds = [
+        so.userId, 
+        so.assignedUserId, 
+        so.issueAssignedUserId, 
+        so.packingAssignedUserId
+      ].filter((id) => id !== null) as number[];
 
       return this.prisma.user.findMany({
         where: { id: { in: targetIds } },
