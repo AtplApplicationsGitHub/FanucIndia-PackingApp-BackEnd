@@ -7,21 +7,18 @@ import { Prisma } from '@prisma/client';
 export class FgStorageService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async assignFgLocation(dto: UpdateFgLocationDto, user: { userId: number; role: string; name: string }) {
-    const { saleOrderNumber, fgLocation } = dto;
+  async assignFgLocation(dto: any, user: { userId: number; role: string; name: string }) {
+    const { salesOrderId, fgLocation } = dto;
 
-    const salesOrder = await this.prisma.salesOrder.findFirst({
+    const salesOrder = await this.prisma.salesOrder.findUnique({
       where: {
-        saleOrderNumber: {
-          equals: saleOrderNumber,
-          mode: 'insensitive',
-        },
+        id: salesOrderId,
       },
       select: { id: true, saleOrderNumber: true, fgLocation: true },
     });
 
     if (!salesOrder) {
-      throw new NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
+      throw new NotFoundException(`Sales Order with ID '${salesOrderId}' not found.`);
     }
 
     let currentLocations: string[] = [];
@@ -49,12 +46,21 @@ export class FgStorageService {
       },
     });
 
-    await this.prisma.sO_Status_Stepper.updateMany({
+    await this.prisma.sO_Status_Stepper.upsert({
       where: {
-        salesOrderNumber: updatedOrder.saleOrderNumber,
-        status: "WIP Storage"
+        salesOrderId_status: {
+          salesOrderId: updatedOrder.id,
+          status: "WIP Storage"
+        }
       },
-      data: {
+      update: {
+        createdDateTime: new Date(),
+        updatedBy: user.name,
+      },
+      create: {
+        salesOrderNumber: updatedOrder.saleOrderNumber,
+        salesOrderId: updatedOrder.id,
+        status: "WIP Storage",
         createdDateTime: new Date(),
         updatedBy: user.name,
       }

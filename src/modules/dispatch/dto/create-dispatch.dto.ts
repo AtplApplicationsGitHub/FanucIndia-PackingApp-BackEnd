@@ -17,5 +17,5 @@ export class CreateDispatchDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  saleOrderNumbers?: string[];
+  salesOrderIds?: number[];
 }

@@ -8,7 +8,7 @@ export class UpdateFgLocationDto {
   })
   @IsString()
   @IsNotEmpty()
-  saleOrderNumber: string;
+  salesOrderId: number;
 
   @ApiProperty({
     description: 'The new FG Location to assign to the order',

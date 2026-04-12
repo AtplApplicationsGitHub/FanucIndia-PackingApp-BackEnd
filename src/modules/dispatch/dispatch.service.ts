@@ -49,14 +49,14 @@ export class DispatchService {
   ) {}
 
   async create(
-    dto: CreateDispatchDto,
+    dto: any,
     files: Express.Multer.File[],
     userId: number,
   ) {
     const {
       transporterId: transporterIdString,
       vehicleNumber,
-      saleOrderNumbers,
+      salesOrderIds,
     } = dto;
 
     const startOfToday = new Date();
@@ -164,19 +164,21 @@ export class DispatchService {
         });
       }
 
-      if (saleOrderNumbers && saleOrderNumbers.length > 0) {
+      if (salesOrderIds && salesOrderIds.length > 0) {
         const dispatchSoData: { dispatchId: number; saleOrderNumber: string; salesOrderId: number }[] = [];
 
-        for (const so of saleOrderNumbers) {
-          const salesOrder = await tx.salesOrder.findFirst({
-            where: { saleOrderNumber: so },
-          });
-          if (!salesOrder)
-            throw new BadRequestException(`Sale Order ${so} not found.`);
-          
+        const salesOrders = await tx.salesOrder.findMany({
+            where: { id: { in: salesOrderIds } }
+        });
+
+        if (salesOrders.length !== salesOrderIds.length) {
+            throw new BadRequestException(`One or more specified Sale Orders could not be found.`);
+        }
+
+        for (const salesOrder of salesOrders) {
           dispatchSoData.push({
             dispatchId: newDispatch.id,
-            saleOrderNumber: so,
+            saleOrderNumber: salesOrder.saleOrderNumber,
             salesOrderId: salesOrder.id, 
           });
         }
@@ -185,17 +187,34 @@ export class DispatchService {
           data: dispatchSoData, 
         });
 
-        const salesOrderIdsToUpdate = dispatchSoData.map(d => d.salesOrderId);
-
         await tx.salesOrder.updateMany({
           where: {
-            id: { in: salesOrderIdsToUpdate },
+            id: { in: salesOrderIds },
           },
           data: {
             status: 'Dispatched',
             fgLocation: Prisma.DbNull,
           },
         });
+
+        for (const salesOrder of salesOrders) {
+          await tx.sO_Status_Stepper.upsert({
+            where: {
+              salesOrderId_status: {
+                 salesOrderId: salesOrder.id,
+                 status: "Dispatched"
+              }
+            },
+            update: { createdDateTime: new Date(), updatedBy: userName },
+            create: {
+                salesOrderNumber: salesOrder.saleOrderNumber,
+                salesOrderId: salesOrder.id,
+                status: "Dispatched",
+                createdDateTime: new Date(),
+                updatedBy: userName
+            }
+          });
+        }
       }
 
       return {
@@ -436,12 +455,22 @@ export class DispatchService {
         },
       });
 
-      await tx.sO_Status_Stepper.updateMany({
+      // FIX 3: Update stepper using specific salesOrderId
+      await tx.sO_Status_Stepper.upsert({
         where: {
-          salesOrderNumber: salesOrder.saleOrderNumber,
-          status: "Dispatched"
+          salesOrderId_status: {
+            salesOrderId: salesOrder.id,
+            status: "Dispatched"
+          }
         },
-        data: {
+        update: {
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
+        create: {
+          salesOrderNumber: salesOrder.saleOrderNumber,
+          salesOrderId: salesOrder.id,
+          status: "Dispatched",
           createdDateTime: new Date(),
           updatedBy: userName,
         }
@@ -800,16 +829,25 @@ export class DispatchService {
           },
         });
 
-        await tx.sO_Status_Stepper.updateMany({
-          where: {
-            salesOrderNumber: salesOrder.saleOrderNumber,
+      await tx.sO_Status_Stepper.upsert({
+        where: {
+          salesOrderId_status: {
+            salesOrderId: salesOrder.id,
             status: "Dispatched"
-          },
-          data: {
-            createdDateTime: new Date(),
-            updatedBy: userName,
           }
-        });
+        },
+        update: {
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
+        create: {
+          salesOrderNumber: salesOrder.saleOrderNumber,
+          salesOrderId: salesOrder.id,
+          status: "Dispatched",
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        }
+      });
 
         return newDispatchSO;
       } catch (error) {

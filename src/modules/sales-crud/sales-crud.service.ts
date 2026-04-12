@@ -653,7 +653,8 @@ export class SalesCrudService {
   }
 
   async processLabelPrint(dto: LabelPrintDto, userId: number) {
-    const { saleOrderNumbers, cncText, boxNN, quantity } = dto;
+    // 1. Extract salesOrderIds instead of saleOrderNumbers
+    const { salesOrderIds, cncText, boxNN, quantity } = dto as any; 
     const statusToSet = 'Ready for Dispatch';
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -664,11 +665,17 @@ export class SalesCrudService {
 
     try {
       const createdLabelPrint = await this.prisma.$transaction(async (tx) => {
+        // 2. Query using specific unique IDs
         const ordersToUpdate = await tx.salesOrder.findMany({
           where: {
-            saleOrderNumber: { in: saleOrderNumbers },
+            id: { in: salesOrderIds },
           },
         });
+
+        // Optional safety check:
+        if (ordersToUpdate.length !== salesOrderIds.length) {
+            throw new NotFoundException("One or more specific orders could not be found.");
+        }
 
         const orderIds = ordersToUpdate.map((o) => o.id);
 
@@ -678,14 +685,22 @@ export class SalesCrudService {
         });
 
         for (const order of ordersToUpdate) {
-          await tx.sO_Status_Stepper.update({
+          // 3. FIX: Update stepper using the unique salesOrderId to prevent affecting other OBDs
+          await tx.sO_Status_Stepper.upsert({
             where: {
               salesOrderId_status: {
                 salesOrderId: order.id,
                 status: statusToSet,
               },
             },
-            data: { createdDateTime: now, updatedBy: userName },
+            update: { createdDateTime: now, updatedBy: userName },
+            create: {
+                salesOrderNumber: order.saleOrderNumber,
+                salesOrderId: order.id,
+                status: statusToSet,
+                createdDateTime: now,
+                updatedBy: userName
+            }
           });
         }
 
@@ -699,7 +714,7 @@ export class SalesCrudService {
             entries: {
               create: ordersToUpdate.map((order) => ({
                 saleOrderNumber: order.saleOrderNumber,
-                salesOrderId: order.id,
+                salesOrderId: order.id, // Explicitly linking the specific order ID
               })),
             },
           },
@@ -724,7 +739,7 @@ export class SalesCrudService {
       return {
         message:
           'Status updated, history saved, and physical print job sent successfully.',
-        count: saleOrderNumbers.length,
+        count: salesOrderIds.length,
         printStatus: printResult,
       };
     } catch (err: any) {

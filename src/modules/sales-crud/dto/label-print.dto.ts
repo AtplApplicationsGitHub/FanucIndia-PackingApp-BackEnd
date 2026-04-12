@@ -10,7 +10,7 @@ export class LabelPrintDto {
   @IsArray()
   @IsString({ each: true })
   @IsNotEmpty()
-  saleOrderNumbers: string[];
+  salesOrderIds: number[];
 
   @ApiPropertyOptional({ example: 'CNC Package' })
   @IsOptional()
