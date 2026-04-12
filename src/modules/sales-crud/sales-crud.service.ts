@@ -158,7 +158,8 @@ export class SalesCrudService {
 
   async verifySoNumber(soNumber: string) {
     try {
-      const order = await this.prisma.salesOrder.findFirst({
+      // 1. Change from findFirst to findMany to catch all OBDs
+      const orders = await this.prisma.salesOrder.findMany({
         where: {
           saleOrderNumber: {
             equals: soNumber,
@@ -166,7 +167,9 @@ export class SalesCrudService {
           },
         },
         select: {
+          id: true,               // Added ID for the mobile developer
           saleOrderNumber: true,
+          outboundDelivery: true, // Added OBD for the popup display
           customerNameText: true,
           address: true,
           customer: {
@@ -178,16 +181,26 @@ export class SalesCrudService {
         },
       });
 
-      if (!order) {
-        throw new NotFoundException('Invalid SO Number');
+      // 2. Throw error if NO orders are found
+      if (!orders || orders.length === 0) {
+        throw new NotFoundException(`Sales Order '${soNumber}' not found.`);
       }
 
-      return {
-        valid: true,
+      // 3. Format the results into a clean array
+      const formattedOrders = orders.map((order) => ({
+        id: order.id,
         saleOrderNumber: order.saleOrderNumber,
+        outboundDelivery: order.outboundDelivery,
         customerName: order.customer?.name || order.customerNameText || '',
         contactNumber: order.customer?.contactNumber || null,
         address: order.address || '',
+      }));
+
+      // 4. Return the unified payload
+      return {
+        valid: true,
+        multiple: formattedOrders.length > 1, // Easy flag for mobile developer to check
+        orders: formattedOrders,
       };
     } catch (err) {
       if (err instanceof NotFoundException) {
