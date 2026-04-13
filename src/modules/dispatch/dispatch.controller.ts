@@ -93,13 +93,13 @@ export class DispatchController {
   @ApiOperation({ summary: 'Step 3 (Mobile): Link a Sales Order and update its status to Dispatched.' })
   addMobileDispatchSO(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { saleOrderNumber: string; salesOrderId?: number },
+    @Body() body: { id: number },
     @Req() req: AuthRequest,
   ) {
-    if (!body.saleOrderNumber) {
-        throw new BadRequestException('saleOrderNumber is required.');
+    if (!body.id) {
+        throw new BadRequestException('Sales Order ID (id) is required.');
     }
-    return this.dispatchService.addMobileDispatchSO(id, body.saleOrderNumber, req.user.userId, body.salesOrderId);
+    return this.dispatchService.addMobileDispatchSO(id, body.id, req.user.userId);
   }
 
   @Get('search-so/:soNumber')

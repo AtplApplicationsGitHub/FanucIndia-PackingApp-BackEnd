@@ -380,9 +380,8 @@ export class DispatchService {
 
   async addMobileDispatchSO(
     dispatchId: number,
-    saleOrderNumber: string,
+    salesOrderId: number,
     userId: number,
-    salesOrderId?: number,
   ) {
     const userName = await this.getUserEmail(userId);
     return this.prisma.$transaction(async (tx) => {
@@ -393,43 +392,16 @@ export class DispatchService {
         throw new NotFoundException('Dispatch record not found.');
       }
 
-      let salesOrder;
+      const salesOrder = await tx.salesOrder.findUnique({
+        where: { id: salesOrderId },
+        select: { id: true, saleOrderNumber: true, outboundDelivery: true }, 
+      });
 
-      if (salesOrderId) {
-        // User selected a specific order from the dropdown
-        salesOrder = await tx.salesOrder.findUnique({
-          where: { id: salesOrderId },
-          // 1. ADD outboundDelivery to the select object here
-          select: { id: true, saleOrderNumber: true, outboundDelivery: true }, 
-        });
-        if (!salesOrder) throw new NotFoundException('Invalid SO Number / ID');
-      } else {
-        // Standard search if no dropdown was used yet
-        const salesOrders = await tx.salesOrder.findMany({
-          where: {
-            saleOrderNumber: {
-              equals: saleOrderNumber,
-              mode: 'insensitive',
-            },
-          },
-          // Note: outboundDelivery is already selected here
-          select: { id: true, saleOrderNumber: true, outboundDelivery: true }, 
-        });
-
-        if (salesOrders.length === 0) {
-          throw new NotFoundException(`Sales Order '${saleOrderNumber}' not found.`);
-        } else if (salesOrders.length > 1) {
-          throw new BadRequestException({
-            message: 'Multiple orders found for this SO number. Please select the specific OBD.',
-            multiple: true,
-            orders: salesOrders,
-          });
-        } else {
-          salesOrder = salesOrders[0];
-        }
+      if (!salesOrder) {
+        throw new NotFoundException(`Sales Order with ID '${salesOrderId}' not found.`);
       }
 
-     const createdLink = await tx.dispatch_SO.create({
+      const createdLink = await tx.dispatch_SO.create({
         data: { 
           dispatchId, 
           saleOrderNumber: salesOrder.saleOrderNumber,
@@ -455,7 +427,6 @@ export class DispatchService {
         },
       });
 
-      // FIX 3: Update stepper using specific salesOrderId
       await tx.sO_Status_Stepper.upsert({
         where: {
           salesOrderId_status: {
@@ -476,7 +447,6 @@ export class DispatchService {
         }
       });
 
-      // 2. MODIFY the return statement to include the OBD number
       return {
         ...createdLink,
         outboundDelivery: salesOrder.outboundDelivery,
