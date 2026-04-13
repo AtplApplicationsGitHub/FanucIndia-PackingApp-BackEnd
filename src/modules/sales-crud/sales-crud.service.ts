@@ -666,8 +666,8 @@ export class SalesCrudService {
   }
 
   async processLabelPrint(dto: LabelPrintDto, userId: number) {
-    // 1. Extract salesOrderIds instead of saleOrderNumbers
-    const { salesOrderIds, cncText, boxNN, quantity } = dto as any; 
+    // 1. Extract 'id' instead of 'salesOrderIds' and alias it to 'inputIds' for clarity
+    const { id: inputIds, cncText, boxNN, quantity } = dto as any; 
     const statusToSet = 'Ready for Dispatch';
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -678,15 +678,15 @@ export class SalesCrudService {
 
     try {
       const createdLabelPrint = await this.prisma.$transaction(async (tx) => {
-        // 2. Query using specific unique IDs
+        // 2. Query using the new inputIds array
         const ordersToUpdate = await tx.salesOrder.findMany({
           where: {
-            id: { in: salesOrderIds },
+            id: { in: inputIds },
           },
         });
 
-        // Optional safety check:
-        if (ordersToUpdate.length !== salesOrderIds.length) {
+        // Safety check
+        if (ordersToUpdate.length !== inputIds.length) {
             throw new NotFoundException("One or more specific orders could not be found.");
         }
 
@@ -698,7 +698,6 @@ export class SalesCrudService {
         });
 
         for (const order of ordersToUpdate) {
-          // 3. FIX: Update stepper using the unique salesOrderId to prevent affecting other OBDs
           await tx.sO_Status_Stepper.upsert({
             where: {
               salesOrderId_status: {
@@ -727,7 +726,7 @@ export class SalesCrudService {
             entries: {
               create: ordersToUpdate.map((order) => ({
                 saleOrderNumber: order.saleOrderNumber,
-                salesOrderId: order.id, // Explicitly linking the specific order ID
+                salesOrderId: order.id, 
               })),
             },
           },
@@ -752,7 +751,7 @@ export class SalesCrudService {
       return {
         message:
           'Status updated, history saved, and physical print job sent successfully.',
-        count: salesOrderIds.length,
+        count: inputIds.length,
         printStatus: printResult,
       };
     } catch (err: any) {

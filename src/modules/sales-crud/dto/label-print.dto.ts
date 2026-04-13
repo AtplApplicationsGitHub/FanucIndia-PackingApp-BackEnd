@@ -8,9 +8,9 @@ export class LabelPrintDto {
     description: 'Array of Sale Order Numbers to update status for',
   })
   @IsArray()
-  @IsString({ each: true })
+  @IsNumber({}, { each: true })
   @IsNotEmpty()
-  salesOrderIds: number[];
+  id: number[];
 
   @ApiPropertyOptional({ example: 'CNC Package' })
   @IsOptional()
