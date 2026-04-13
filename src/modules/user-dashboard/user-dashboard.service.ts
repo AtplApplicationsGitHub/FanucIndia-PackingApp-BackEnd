@@ -650,16 +650,20 @@ export class UserDashboardService {
         },
       });
 
-      await prismaClient.sO_Status_Stepper.updateMany({
-        where: {
-          salesOrderNumber: saleOrderNumber,
-          status: 'Issued',
-        },
-        data: {
-          createdDateTime: new Date(),
-          updatedBy: userName,
-        },
+      // NEW CODE
+      await prismaClient.sO_Status_Stepper.upsert({
+        where: { salesOrderId_status: { salesOrderId: order.id, status: 'Issued' } },
+        update: { createdDateTime: new Date(), updatedBy: userName },
+        create: { salesOrderNumber: saleOrderNumber, salesOrderId: order.id, status: 'Issued', createdDateTime: new Date(), updatedBy: userName }
       });
+
+      if (order.packingAssignedUserId) {
+        await prismaClient.sO_Status_Stepper.upsert({
+          where: { salesOrderId_status: { salesOrderId: order.id, status: 'Under Packing' } },
+          update: { createdDateTime: new Date(), updatedBy: userName },
+          create: { salesOrderNumber: saleOrderNumber, salesOrderId: order.id, status: 'Under Packing', createdDateTime: new Date(), updatedBy: userName }
+        });
+      }
     }
 
     const packingStageCompleted = allMaterials.every(
@@ -674,15 +678,10 @@ export class UserDashboardService {
         },
       });
 
-      await prismaClient.sO_Status_Stepper.updateMany({
-        where: {
-          salesOrderNumber: saleOrderNumber,
-          status: 'Packed',
-        },
-        data: {
-          createdDateTime: new Date(),
-          updatedBy: userName,
-        },
+      await prismaClient.sO_Status_Stepper.upsert({
+        where: { salesOrderId_status: { salesOrderId: order.id, status: 'Packed' } },
+        update: { createdDateTime: new Date(), updatedBy: userName },
+        create: { salesOrderNumber: saleOrderNumber, salesOrderId: order.id, status: 'Packed', createdDateTime: new Date(), updatedBy: userName }
       });
     }
   }

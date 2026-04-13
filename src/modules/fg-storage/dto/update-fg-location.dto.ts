@@ -1,12 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsNumber } from 'class-validator';
 
 export class UpdateFgLocationDto {
   @ApiProperty({
-    description: 'The Sales Order number to update',
-    example: 'SO12345',
+    description: 'The Sales Order ID to update',
+    example: 101,
   })
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   id: number;
 

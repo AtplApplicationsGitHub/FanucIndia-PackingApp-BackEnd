@@ -465,38 +465,41 @@ export class ErpMaterialFileService {
 
   async uploadAndCreateMobile(
     files: Express.Multer.File[],
-    opts: { saleOrderNumber: string | null; descriptions: string },
+    salesOrderId: number, // <-- CHANGED: Now expects the unique ID
+    descriptions: string,
     userId: number,
     userRole: string,
   ) {
-    if (!opts.saleOrderNumber) {
-      throw new BadRequestException('You must specify a Sale Order Number.');
+    if (!salesOrderId) {
+      throw new BadRequestException('You must specify a Sales Order ID.');
     }
 
-    const orderExists = await this.prisma.salesOrder.findFirst({
-      where: { saleOrderNumber: { equals: opts.saleOrderNumber, mode: 'insensitive' } },
+    // <-- CHANGED: Query directly using the unique ID
+    const orderExists = await this.prisma.salesOrder.findUnique({
+      where: { id: salesOrderId }, 
     });
 
     if (!orderExists) {
-      throw new NotFoundException(`Sales Order ${opts.saleOrderNumber} not found in the system.`);
+      throw new NotFoundException(`Sales Order with ID ${salesOrderId} not found in the system.`);
     }
 
     let descriptionMap: { [key: string]: string };
     try {
-      descriptionMap = JSON.parse(opts.descriptions || '{}');
+      descriptionMap = JSON.parse(descriptions || '{}');
     } catch (error) {
       throw new BadRequestException('Invalid descriptions JSON.');
     }
 
+    // Extract the saleOrderNumber from the database record for folder structure
+    const saleOrderNumber = orderExists.saleOrderNumber;
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
-    const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
+    const soDir = saleOrderNumber ? sanitize(saleOrderNumber) : 'misc';
     const remoteDir = path.posix.join(baseDir, soDir);
 
     const uploads: { localPath: string; remotePath: string }[] = [];
     const dbRecords: any[] = [];
 
     try {
-      // NEW: Fetch existing sftpPaths
       const existingDbFiles = await this.prisma.eRP_Material_File.findMany({
         where: { sftpDir: remoteDir },
         select: { sftpPath: true },
@@ -525,8 +528,8 @@ export class ErpMaterialFileService {
         uploads.push({ localPath: f.path, remotePath });
 
         dbRecords.push({
-          saleOrderNumber: opts.saleOrderNumber,
-          salesOrderId: orderExists.id,
+          saleOrderNumber: saleOrderNumber, // From DB
+          salesOrderId: orderExists.id,     // From DB
           fileName: finalDbFileName,
           description: description,
           sftpPath: remotePath,

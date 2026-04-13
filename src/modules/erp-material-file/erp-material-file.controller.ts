@@ -288,33 +288,11 @@ export class ErpMaterialFileController {
     return this.service.getMobileAttachments(salesOrderId);
   }
 
-  @Post('mobile/upload')
+  @Post('mobile/attachments/:id') // <-- CHANGED: Matches the GET route
   @Roles('USER', 'SALES', 'ADMIN')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Mobile specific upload: Appends -mobile to filenames and stores them.',
-  })
-  @ApiBody({
-    type: UploadErpMaterialFileDto,
-    schema: {
-      type: 'object',
-      properties: {
-        files: {
-          type: 'array',
-          items: {
-            type: 'string',
-            format: 'binary',
-          },
-        },
-        saleOrderNumber: {
-          type: 'string',
-        },
-        descriptions: {
-          type: 'string',
-          description: 'JSON string mapping original filenames to their descriptions'
-        },
-      },
-    },
+    summary: 'Mobile specific upload: Appends -mobile to filenames and stores them using specific Order ID.',
   })
   @UseInterceptors(
     FilesInterceptor('files', 20, {
@@ -330,8 +308,9 @@ export class ErpMaterialFileController {
     }),
   )
   async uploadMobile(
+    @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],
-    @Body() body: UploadErpMaterialFileDto,
+    @Body('descriptions') descriptions: string,
     @Req() req?: AuthRequest,
   ) {
     if (!files || files.length === 0) {
@@ -346,10 +325,8 @@ export class ErpMaterialFileController {
 
     return this.service.uploadAndCreateMobile(
       files,
-      {
-        saleOrderNumber: body.saleOrderNumber?.trim() || null,
-        descriptions: body.descriptions,
-      },
+      id,
+      descriptions,
       userId,
       role,
     );
