@@ -8,7 +8,7 @@ export class FgStorageService {
   constructor(private readonly prisma: PrismaService) {}
 
   async assignFgLocation(dto: any, user: { userId: number; role: string; name: string }) {
-    const { salesOrderId, fgLocation } = dto;
+    const { id: salesOrderId, fgLocation } = dto;
 
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: {
@@ -19,8 +19,7 @@ export class FgStorageService {
 
     if (!salesOrder) {
       throw new NotFoundException(`Sales Order with ID '${salesOrderId}' not found.`);
-    }
-
+    }    
     let currentLocations: string[] = [];
 
     if (salesOrder.fgLocation) {

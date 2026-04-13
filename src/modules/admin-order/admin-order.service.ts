@@ -267,13 +267,20 @@ export class AdminOrderService {
       ...(addressToSave !== undefined && { address: addressToSave }),
     };
 
-    if (customerNameText !== undefined && customerNameText !== null) {
-      data.customerNameText = customerNameText;
-      data.customerId = null;
-    } else if (customerId !== undefined && customerId !== null) {
-      data.customerId = customerId;
-      data.customerNameText = null;
-    }
+    // Check if there is an explicit intent to update customer fields from the DTO
+if (customerNameText !== undefined || customerId !== undefined) {
+  if (customerNameText !== undefined && customerNameText !== null) {
+    data.customerNameText = customerNameText;
+    data.customerId = null;
+  } else if (customerId !== undefined && customerId !== null) {
+    data.customerId = customerId;
+    data.customerNameText = null;
+  } else {
+    // Both are explicitly null, meaning the user cleared the customer input entirely.
+    data.customerId = null;
+    data.customerNameText = null;
+  }
+}
 
     if (
       dto.priority !== undefined &&
@@ -819,12 +826,14 @@ export class AdminOrderService {
 
         let customerId = dbOrder.customerId;
         let customerNameText = dbOrder.customerNameText;
+        let address = dbOrder.address; // Added address tracking
         const rowCustomer = getCellString('CUSTOMER NAME');
 
         if (rowCustomer !== undefined) {
           if (rowCustomer === '') {
             customerId = null;
             customerNameText = null;
+            address = null;
           } else {
             const c = await tx.customer.findFirst({
               where: { name: rowCustomer },
@@ -832,9 +841,14 @@ export class AdminOrderService {
             if (c) {
               customerId = c.id;
               customerNameText = null;
+              address = c.address; // Fix: Dynamically update address from the DB
             } else {
               customerId = null;
               customerNameText = rowCustomer;
+              // Fix: Clear old address if a completely new name is typed
+              if (dbOrder.customer?.name !== rowCustomer && dbOrder.customerNameText !== rowCustomer) {
+                  address = null; 
+              }
             }
           }
         }
@@ -897,6 +911,7 @@ export class AdminOrderService {
             packingAssignedUserId,
             customerId,
             customerNameText,
+            address,
             paymentClearance,
             priority,
             skipStage,

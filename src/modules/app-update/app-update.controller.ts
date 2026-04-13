@@ -14,13 +14,13 @@ export class AppUpdateController {
   @ApiOperation({ summary: 'Get the latest APK version info for Pick & Pack App' })
   async getPickPackLatestVersion(@Req() req: Request) {
     const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
-    const hostUrl = `${protocol}://${req.get('host')}`;
+    const baseUrl = process.env.API_BASE_URL || `${protocol}://${req.get('host')}`;
     
-    const downloadRoute = req.originalUrl.replace('/latest-version', '/download');
+    const downloadRoute = '/app-update/pick-pack/download';
 
     return await this.appUpdateService.getLatestVersionInfo(
       'pick-pack', 
-      hostUrl, 
+      baseUrl, 
       downloadRoute
     );
   }
@@ -39,13 +39,13 @@ export class AppUpdateController {
   @ApiOperation({ summary: 'Get the latest APK version info for Dispatch App' })
   async getDispatchLatestVersion(@Req() req: Request) {
     const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
-    const hostUrl = `${protocol}://${req.get('host')}`;
+    const baseUrl = process.env.API_BASE_URL || `${protocol}://${req.get('host')}`;
     
-    const downloadRoute = req.originalUrl.replace('/latest-version', '/download');
+    const downloadRoute = '/app-update/dispatch/download';
 
     return await this.appUpdateService.getLatestVersionInfo(
       'dispatch', 
-      hostUrl, 
+      baseUrl, 
       downloadRoute
     );
   }

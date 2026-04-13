@@ -75,3 +75,5 @@ verify-customers.ts
 check-duplicate-customers.ts
 insert-missing-orders.ts
 fix-steppers.ts
+
+db-scripts
