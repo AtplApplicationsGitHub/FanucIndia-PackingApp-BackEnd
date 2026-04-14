@@ -562,3 +562,9 @@ model ERP_Data_Cron_Logs {
   message         String?
   createdAt       DateTime @default(now())
 }
+
+model SystemConfig {
+  key       String   @id @db.VarChar(100)
+  value     String   @db.VarChar(500)
+  updatedAt DateTime @updatedAt @default(now())
+}

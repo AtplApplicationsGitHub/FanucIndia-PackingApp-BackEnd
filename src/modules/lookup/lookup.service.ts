@@ -790,4 +790,17 @@ export class LookupService {
       data: results,
     };
   }
+
+  async getSystemConfig(key: string) {
+    const config = await this.prisma.systemConfig.findUnique({ where: { key } });
+    return config ? config : { key, value: "" }; 
+  }
+
+  async upsertSystemConfig(key: string, value: string) {
+    return this.prisma.systemConfig.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    });
+  }
 }

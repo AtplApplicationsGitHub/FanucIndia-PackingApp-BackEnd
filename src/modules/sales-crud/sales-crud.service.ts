@@ -969,10 +969,14 @@ export class SalesCrudService {
     prn = prn.replace(/@@ContactNumber@@/g, contactNumber);
     prn = prn.replace(/@@PinCode@@/g, pinCode);
 
-    const printerIp = process.env.CUSTOMER_LABEL_PRINTER_IP;
+    const configRecord = await this.prisma.systemConfig.findUnique({
+      where: { key: 'CUSTOMER_LABEL_PRINTER_IP' }
+    });
+    const printerIp = configRecord?.value;
+
     if (!printerIp) {
       throw new InternalServerErrorException(
-        'Printer IP not configured in .env (CUSTOMER_LABEL_PRINTER_IP)',
+        'Customer Label Printer IP is not configured in the database. Please set it in the Master View -> Printers tab.',
       );
     }
 

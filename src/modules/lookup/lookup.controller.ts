@@ -308,4 +308,17 @@ export class LookupController {
   ) {
     return this.lookupService.syncMaterialBarcodes(dtos);
   }
+
+  @Get('config/:key')
+  @ApiOperation({ summary: 'Get system config by key' })
+  getConfig(@Param('key') key: string) {
+    return this.lookupService.getSystemConfig(key);
+  }
+
+  @Patch('config/:key')
+  @ApiOperation({ summary: 'Update system config by key' })
+  @ApiBody({ schema: { properties: { value: { type: 'string' } } } })
+  updateConfig(@Param('key') key: string, @Body('value') value: string) {
+    return this.lookupService.upsertSystemConfig(key, value);
+  }
 }
