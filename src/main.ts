@@ -6,14 +6,24 @@ import { PinoLogger } from './common/pino-logger.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
+import helmet from 'helmet';
+import compression from 'compression';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Security headers
+  app.use(helmet());
+
+  // Response compression for large JSON payloads
+  app.use(compression());
+
   app.set('trust proxy', 1);
 
-  app.use(json({ limit: '200mb' }));
-  app.use(urlencoded({ extended: true, limit: '200mb' }));
+  // Reduced global limits to prevent OOM crashes.
+  // Use Multer streams in specific controllers for large ERP file uploads.
+  app.use(json({ limit: '2mb' }));
+  app.use(urlencoded({ extended: true, limit: '2mb' }));
 
   const pinoAdapter = new PinoLogger();
   app.useLogger(pinoAdapter);
@@ -24,7 +34,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
     }),
-  ); 
+  );
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Fanuc Packing App API')
@@ -44,7 +54,10 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3011;
   const server = await app.listen(port, '0.0.0.0');
-  server.setTimeout(600000);
+  
+  // Reduced timeout to 60 seconds to prevent resource starvation & slow-loris attacks
+  server.setTimeout(60000); 
+  
   pinoAdapter.log(`Application is listening on port ${port}`, 'bootstrap');
   pinoAdapter.log('Application started', 'bootstrap');
 }

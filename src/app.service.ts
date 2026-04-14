@@ -6,7 +6,7 @@ export class AppService {
     return 'Hello World!';
   }
 
-  getDummy() {
+  getDummy(): Record<string, unknown> {
     return {
       message: 'This is a dummy API response',
       status: 'success',

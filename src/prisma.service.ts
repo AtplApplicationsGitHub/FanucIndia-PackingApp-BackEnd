@@ -4,7 +4,7 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient
@@ -13,8 +13,13 @@ export class PrismaService extends PrismaClient
 
   constructor() {
     super({
+      // Log queries in dev mode to catch performance issues early
+      log:
+        process.env.NODE_ENV === 'development'
+          ? ['query', 'info', 'warn', 'error']
+          : ['error'],
       transactionOptions: {
-        maxWait: 10000, 
+        maxWait: 10000,
         timeout: 30000,
       },
     });
