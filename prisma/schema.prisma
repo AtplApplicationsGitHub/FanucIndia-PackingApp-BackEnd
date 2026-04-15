@@ -15,6 +15,7 @@ model User {
   role                     String         @default("SALES")
   salesZoneId              Int?           
   salesZone                SalesZone?     @relation(fields: [salesZoneId], references: [id])
+  currentSessionId         String?
   createdAt                DateTime       @default(now())
   updatedAt                DateTime       @updatedAt
   salesOrders              SalesOrder[]   @relation("CreatedOrders")

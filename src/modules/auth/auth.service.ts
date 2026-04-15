@@ -10,6 +10,7 @@ import * as bcrypt from 'bcryptjs'
 import { JwtService } from '@nestjs/jwt'
 import { Request } from 'express'
 import { logAuthFailure } from '../../common/logger'
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
@@ -96,12 +97,20 @@ export class AuthService {
       })
     }
 
+    const sessionId = uuidv4();
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { currentSessionId: sessionId },
+    });
+
     const token = await this.jwtService.signAsync({
       sub: user.id,
       email: user.email,
       role: user.role,
       name: user.name,
       salesZoneId: user.salesZoneId,
+      sessionId: sessionId,
+      isWeb: true,
     })
 
     return {
