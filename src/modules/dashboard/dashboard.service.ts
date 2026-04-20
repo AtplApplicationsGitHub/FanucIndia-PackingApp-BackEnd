@@ -1238,13 +1238,28 @@ export class DashboardService {
       });
     }
 
-    const finalData = stats.map(({ operatorId, ...rest }) => ({
-      ...rest,
-      issueAssignedCount: rest.issueAssigned.length,
-      issueCompletedCount: rest.issueCompleted.length,
-      packingAssignedCount: rest.packingAssigned.length,
-      packingCompletedCount: rest.packingCompleted.length,
-    }));
+    const finalData = stats.map(({ operatorId, ...rest }) => {
+      const filteredIssueAssigned = rest.issueAssigned.filter(
+        (a) => !rest.issueCompleted.some(
+          (c) => c.saleOrderNumber === a.saleOrderNumber && c.outboundDelivery === a.outboundDelivery
+        )
+      );
+      const filteredPackingAssigned = rest.packingAssigned.filter(
+        (a) => !rest.packingCompleted.some(
+          (c) => c.saleOrderNumber === a.saleOrderNumber && c.outboundDelivery === a.outboundDelivery
+        )
+      );
+
+      return {
+        ...rest,
+        issueAssigned: filteredIssueAssigned,
+        packingAssigned: filteredPackingAssigned,
+        issueAssignedCount: filteredIssueAssigned.length,
+        issueCompletedCount: rest.issueCompleted.length,
+        packingAssignedCount: filteredPackingAssigned.length,
+        packingCompletedCount: rest.packingCompleted.length,
+      };
+    });
 
     finalData.sort(
       (a, b) =>
