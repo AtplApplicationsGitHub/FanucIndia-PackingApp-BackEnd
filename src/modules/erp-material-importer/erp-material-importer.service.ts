@@ -11,7 +11,7 @@ import { Prisma } from '@prisma/client';
 import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import { Response } from 'express';
-import { Interval, Cron } from '@nestjs/schedule';
+import { Interval } from '@nestjs/schedule';
 
 const columnMapping = {
   'SO Number': 'saleOrderNumber',
@@ -149,51 +149,6 @@ export class ErpMaterialImporterService {
       }
     } catch (error) {
       this.logger.error('Failed to execute automated SFTP folder scan.', error);
-    }
-  }
-
-  // NEW: Explicitly set the timezone so 21:00 means 9:00 PM IST
-  @Cron(process.env.ERP_LOG_EXPORT_CRON || '0 21 * * *', { timeZone: 'Asia/Kolkata' })
-  async exportDailyCronLogs() {
-    this.logger.log('Running daily export of ERP Cron Logs...');
-    
-    // Safely calculate 12:00 AM today in IST, mapped to UTC for the database query
-    const nowUtc = new Date();
-    const istTime = new Date(nowUtc.getTime() + 5.5 * 60 * 60 * 1000);
-    
-    const startOfTodayIst = new Date(istTime);
-    startOfTodayIst.setUTCHours(0, 0, 0, 0);
-    const startOfDayUtc = new Date(startOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000);
-
-    try {
-      const logs = await this.prisma.eRP_Data_Cron_Logs.findMany({
-        where: { createdAt: { gte: startOfDayUtc } },
-        orderBy: { createdAt: 'asc' },
-      });
-
-      const dateStr = startOfTodayIst.toISOString().split('T')[0];
-      let fileContent = `ERP Data Automated Import Logs - ${dateStr}\n`;
-      fileContent += `==========================================================================\n\n`;
-
-      if (logs.length === 0) {
-        fileContent += `[System Status] No failed or processed auto-imports found for today.\n`;
-      } else {
-        logs.forEach((log) => {
-          const logTimeIst = new Date(log.createdAt.getTime() + 5.5 * 60 * 60 * 1000);
-          const timeStr = logTimeIst.toISOString().replace('T', ' ').substring(0, 19);
-          fileContent += `[${timeStr}] SO Number: ${log.saleOrderNumber.padEnd(15)} | Status: ${log.status.padEnd(10)} | Message: ${log.message || 'N/A'}\n`;
-        });
-      }
-
-      const buffer = Buffer.from(fileContent, 'utf-8');
-      const logDir = process.env.ERP_CRON_LOGS || 'uploads/fanuc/logs/';
-      const filename = `ERP_Cron_Logs_${dateStr.replace(/-/g, '')}.txt`;
-      const remotePath = path.posix.join(logDir, filename);
-
-      await this.sftpService.put(buffer, remotePath);
-      this.logger.log(`Successfully exported daily logs to SFTP: ${remotePath}`);
-    } catch (error) {
-      this.logger.error('Failed to export daily ERP logs to SFTP.', error);
     }
   }
 

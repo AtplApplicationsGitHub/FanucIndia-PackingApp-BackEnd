@@ -131,12 +131,13 @@ export class ErpMaterialFileService {
     } catch (e) {}
   }
 
-  async list(query: QueryErpMaterialFileDto, userId: number, userRole: string) {
+  async list(query: any, userId: number, userRole: string) {
     const {
       page = 1,
       limit = 20,
       search,
       saleOrderNumber,
+      salesOrderId,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = query;
@@ -145,6 +146,12 @@ export class ErpMaterialFileService {
 
     const where: Prisma.ERP_Material_FileWhereInput = {
       ...(saleOrderNumber ? { saleOrderNumber } : {}),
+      ...(salesOrderId ? { 
+        OR: [
+          { salesOrderId: parseInt(salesOrderId, 10) },
+          { salesOrderId: null }
+        ] 
+      } : {}),
       ...(search
         ? {
             OR: [
@@ -194,10 +201,18 @@ export class ErpMaterialFileService {
 
   async listBySaleOrderNumber(
     soNumber: string,
+    salesOrderId: string | undefined,
     userId: number,
     userRole: string,
   ) {
     await verifySaleOrderAccess(this.prisma, soNumber, userId, userRole);
+    const whereClause: Prisma.ERP_Material_FileWhereInput = { saleOrderNumber: soNumber };
+    if (salesOrderId) {
+      whereClause.OR = [
+        { salesOrderId: parseInt(salesOrderId, 10) },
+        { salesOrderId: null }
+      ];
+    }
     const items = await this.prisma.eRP_Material_File.findMany({
       where: { saleOrderNumber: soNumber },
       orderBy: { ID: 'desc' },
@@ -492,8 +507,11 @@ export class ErpMaterialFileService {
 
     // Extract the saleOrderNumber from the database record for folder structure
     const saleOrderNumber = orderExists.saleOrderNumber;
+    const obd = orderExists.outboundDelivery;
     const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
-    const soDir = saleOrderNumber ? sanitize(saleOrderNumber) : 'misc';
+    
+    const folderName = obd ? `${saleOrderNumber}_${obd}` : saleOrderNumber;
+    const soDir = folderName ? sanitize(folderName) : 'misc';
     const remoteDir = path.posix.join(baseDir, soDir);
 
     const uploads: { localPath: string; remotePath: string }[] = [];

@@ -69,9 +69,19 @@ export class ErpMaterialFileController {
   @ApiOperation({
     summary: 'List ERP material files with pagination, search & filters',
   })
-  async list(@Query() query: QueryErpMaterialFileDto, @Req() req: AuthRequest) {
+  async list(
+    @Query() query: QueryErpMaterialFileDto, 
+    @Query('salesOrderId') salesOrderId: string, 
+    @Req() req: AuthRequest
+  ) {
     const { userId, role } = req.user;
-    return this.service.list(query, userId, role);
+    
+    const finalQuery = { ...query };
+    if (salesOrderId) {
+      (finalQuery as any).salesOrderId = salesOrderId;
+    }
+
+    return this.service.list(finalQuery as any, userId, role);
   }
 
   @Get('by-sale-order/:saleOrderNumber')
@@ -80,10 +90,11 @@ export class ErpMaterialFileController {
   @ApiParam({ name: 'saleOrderNumber', type: String })
   async listBySaleOrder(
     @Param('saleOrderNumber') saleOrderNumber: string,
+    @Query('salesOrderId') salesOrderId: string,
     @Req() req: AuthRequest,
   ) {
     const { userId, role } = req.user;
-    return this.service.listBySaleOrderNumber(saleOrderNumber, userId, role);
+    return this.service.listBySaleOrderNumber(saleOrderNumber, salesOrderId, userId, role);
   }
 
   @Get(':id')
