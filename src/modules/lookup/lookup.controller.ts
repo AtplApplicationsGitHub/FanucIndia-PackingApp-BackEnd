@@ -8,10 +8,11 @@ import {
   Body,
   UseGuards,
   ParseIntPipe,
-  UploadedFile, 
-  UseInterceptors, 
+  UploadedFile,
+  UseInterceptors,
   Res,
   ParseArrayPipe,
+  Query,
 } from '@nestjs/common';
 import { LookupService } from './lookup.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -278,8 +279,8 @@ export class LookupController {
 
   @Get('bulk-template')
   @ApiOperation({ summary: 'Download Excel template with all master data' })
-  async downloadBulkTemplate(@Res() res: Response) {
-    return this.lookupService.generateBulkTemplate(res);
+  async downloadBulkTemplate(@Res() res: Response,@Query('type') type?:string) {
+    return this.lookupService.generateBulkTemplate(res, type);
   }
 
   @Post('bulk-import')
