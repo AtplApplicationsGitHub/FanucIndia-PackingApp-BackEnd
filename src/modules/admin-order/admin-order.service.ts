@@ -655,30 +655,28 @@ if (customerNameText !== undefined || customerId !== undefined) {
       for (let i = 2; i <= worksheet.rowCount; i++) {
         const row = worksheet.getRow(i);
 
-        // 1. Define getCellString FIRST so we can use it to find the OBD
         const getCellString = (colName: string) => {
           if (!colMap[colName]) return undefined;
           let val = row.getCell(colMap[colName]).value;
           
           if (val === null || val === undefined) return undefined;
 
-          // Handle Rich Text
-          if (typeof val === 'object' && 'richText' in val) {
-            val = (val as any).richText.map((rt: any) => rt.text).join('');
-          }
-          // Handle Formulas (Extract the computed result)
-          else if (typeof val === 'object' && 'formula' in val) {
-            val = (val as any).result;
-            if (val && typeof val === 'object' && 'error' in val) return undefined;
-          }
-          // Handle Hyperlinks
-          else if (typeof val === 'object' && 'hyperlink' in val) {
-            val = (val as any).text;
+          if (typeof val === 'object') {
+            if ('richText' in val) {
+              val = (val as any).richText.map((rt: any) => rt.text).join('');
+            } else if ('formula' in val) {
+              val = (val as any).result;
+              if (val && typeof val === 'object' && 'error' in val) return undefined;
+            } else if ('text' in val) { 
+              val = (val as any).text;
+            } else if (val instanceof Date) {
+            } else {
+              val = ''; 
+            }
           }
 
-          if (val === null || val === undefined) return undefined;
+          if (val === null || val === undefined || val === '') return undefined;
 
-          // Force convert to string and aggressively strip ALL invisible/weird spaces (like \xA0)
           return String(val).replace(/[\s\uFEFF\xA0]+/g, ' ').trim();
         };
 

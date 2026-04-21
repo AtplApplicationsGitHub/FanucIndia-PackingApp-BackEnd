@@ -307,34 +307,33 @@ export class SalesOrderService {
 
       const rowErrors: string[] = [];
 
-      let productNameRaw = (product || '').toString().trim();
+      let productNameRaw = extractText(product).trim();
       if (!productNameRaw) productNameRaw = 'FA';
       
-      const transporterNameRaw = (transporter || '').toString().trim();
-      const rawPlantCode = (plantCode || '').toString().trim();
+      const transporterNameRaw = extractText(transporter).trim();
+      const rawPlantCode = plantCode.trim();
       const plantCodeString = rawPlantCode === '' ? null : rawPlantCode;
       
-      const salesZoneNameRaw = (salesZone || '').toString().trim().toLowerCase();
+      const salesZoneNameRaw = extractText(salesZone).trim().toLowerCase();
       let salesZoneId: number | null = null;
       if (salesZoneNameRaw) {
         const foundId = maps.salesZone.get(salesZoneNameRaw);
         if (foundId) {
           salesZoneId = foundId;
         } else {
-          rowErrors.push(`Invalid salesZone: ${salesZone}`);
+          rowErrors.push(`Invalid salesZone: ${salesZoneNameRaw}`);
         }
       }
 
-      // 2. Zone Security & Auto-assignment
       if (userZoneId) {
         if (!salesZoneId) {
-          salesZoneId = userZoneId; // Auto-assign user's zone if left blank in excel
+          salesZoneId = userZoneId;
         } else if (salesZoneId !== userZoneId) {
           rowErrors.push(`Access Denied: You cannot import/assign orders to a different zone.`);
         }
       }
 
-      const packConfigName = (packConfig || '').toString().trim();
+      const packConfigName = extractText(packConfig).trim();
       let packConfigId: number | null = null;
       if (packConfigName) {
         const foundId = maps.packConfig.get(packConfigName.toLowerCase());
@@ -345,7 +344,7 @@ export class SalesOrderService {
         }
       }
 
-      const customerNameRaw = (customer || '').toString().trim();
+      const customerNameRaw = extractText(customer).trim();
       let customerId: number | null = null;
       let customerAddress: string | null = null;
       if (customerNameRaw) {
@@ -386,9 +385,9 @@ export class SalesOrderService {
         ordersToUpsert.push({
           rowNumber,
           productName: productNameRaw,
-          saleOrderNumber: saleOrderNumber.toString().trim(),
-          outboundDelivery: outboundDelivery ? outboundDelivery.toString().trim() : '',
-          transferOrder: transferOrder ? transferOrder.toString().trim() : null,
+          saleOrderNumber: saleOrderNumber.trim(),
+          outboundDelivery: outboundDelivery ? outboundDelivery.trim() : '',
+          transferOrder: transferOrder ? transferOrder.trim() : null,
           plantCode: plantCodeString,
           packConfigId: packConfigId,
           deliveryDate: deliveryDateObj,
@@ -397,10 +396,10 @@ export class SalesOrderService {
           paymentClearance: paymentClearanceVal,
           salesZoneId,
           customerId,
-          customerName: customerNameRaw,
-          specialRemarks: specialRemarks?.toString() || null,
-          additionalRemarks: additionalRemarks?.toString() || null,
-          labelRemarks: labelRemarks?.toString() || null,
+          customerName: customerNameRaw,          
+          specialRemarks: extractText(specialRemarks) || null,
+          additionalRemarks: extractText(additionalRemarks) || null,
+          labelRemarks: extractText(labelRemarks) || null,
           address: customerAddress,
           userId,
         });
