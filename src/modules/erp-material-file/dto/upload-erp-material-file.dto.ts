@@ -1,22 +1,19 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty } from 'class-validator';
 
 export class UploadErpMaterialFileDto {
-  @ApiPropertyOptional({
-    description: 'Sales order number this file belongs to (nullable in DB)',
-    maxLength: 500,
-    example: 'SO-2025-000123',
+  @ApiProperty({
+    description: 'The unique Sales Order ID to bind this file to a specific variant',
   })
-  @IsOptional()
   @IsString()
-  @MaxLength(500)
-  saleOrderNumber?: string | null;
+  @IsNotEmpty()
+  id: string;
 
   @ApiProperty({
-    description:
-      'A JSON string mapping each original filename to its description.',
-    example: '{"photo1.jpg": "Picture of the packed items", "doc1.pdf": "Shipping manifest"}',
+    description: 'A JSON string mapping each original filename to its description.',
+    example: '{"photo1.jpg": "Picture of the packed items"}',
   })
   @IsString()
+  @IsNotEmpty()
   descriptions: string;
 }

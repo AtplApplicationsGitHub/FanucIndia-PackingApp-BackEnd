@@ -366,15 +366,21 @@ export class ErpMaterialFileService {
 
   async uploadAndCreateWithDescriptions(
     files: Express.Multer.File[],
-    opts: { saleOrderNumber: string | null; descriptions: string },
+    opts: { descriptions: string; salesOrderId: number },
     userId: number,
     userRole: string,
   ) {
-    if (opts.saleOrderNumber) {
-      await verifySaleOrderAccess(this.prisma, opts.saleOrderNumber, userId, userRole);
-    } else if (userRole === 'USER') {
-      throw new ForbiddenException('You must specify a Sale Order Number for an order assigned to you.');
-    }
+    // 1. Fetch the exact order using the ID
+    const order = await this.prisma.salesOrder.findUnique({ where: { id: opts.salesOrderId } });
+    if (!order) throw new NotFoundException(`Sales Order ID ${opts.salesOrderId} not found.`);
+
+    // 2. Verify access using the DB's actual SO number
+    await verifySaleOrderAccess(this.prisma, order.saleOrderNumber, userId, userRole);
+
+    // 3. Set up folder structure based on DB values
+    const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
+    const folderName = order.outboundDelivery ? `${order.saleOrderNumber}_${order.outboundDelivery}` : order.saleOrderNumber;
+    const remoteDir = path.posix.join(baseDir, sanitize(folderName));
 
     let descriptionMap: { [key: string]: string };
     try {
@@ -383,15 +389,10 @@ export class ErpMaterialFileService {
       throw new BadRequestException('Invalid descriptions JSON.');
     }
 
-    const baseDir = process.env.SFTP_BASE_DIR_ORDER || '';
-    const soDir = opts.saleOrderNumber ? sanitize(opts.saleOrderNumber) : 'misc';
-    const remoteDir = path.posix.join(baseDir, soDir);
-
     const uploads: { localPath: string; remotePath: string }[] = [];
     const dbRecords: any[] = [];
 
     try {
-      // NEW: Fetch existing sftpPaths
       const existingDbFiles = await this.prisma.eRP_Material_File.findMany({
         where: { sftpDir: remoteDir },
         select: { sftpPath: true },
@@ -405,7 +406,6 @@ export class ErpMaterialFileService {
         let finalDbFileName = f.originalname;
         let remotePath = path.posix.join(remoteDir, finalDbFileName);
 
-        // Auto-increment filename if the path already exists
         if (existingPaths.has(remotePath)) {
           let counter = 1;
           const { name, ext } = this.splitFileName(f.originalname);
@@ -420,7 +420,8 @@ export class ErpMaterialFileService {
         uploads.push({ localPath: f.path, remotePath });
 
         dbRecords.push({
-          saleOrderNumber: opts.saleOrderNumber,
+          saleOrderNumber: order.saleOrderNumber, // Securely grabbed from the database
+          salesOrderId: opts.salesOrderId,        // Bound strictly to the ID
           fileName: finalDbFileName,
           description: description,
           sftpPath: remotePath,

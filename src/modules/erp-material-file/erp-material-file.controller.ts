@@ -214,29 +214,7 @@ export class ErpMaterialFileController {
   @Roles('SALES', 'ADMIN', 'USER')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary:
-      'Upload one or more files with individual descriptions to SFTP and create DB rows',
-  })
-  @ApiBody({
-    type: UploadErpMaterialFileDto,
-    schema: {
-      type: 'object',
-      properties: {
-        files: {
-          type: 'array',
-          items: {
-            type: 'string',
-            format: 'binary',
-          },
-        },
-        saleOrderNumber: {
-          type: 'string',
-        },
-        descriptions: {
-          type: 'string',
-        },
-      },
-    },
+    summary: 'Upload files and link them strictly to a Sales Order ID',
   })
   @UseInterceptors(
     FilesInterceptor('files', 20, {
@@ -264,13 +242,18 @@ export class ErpMaterialFileController {
       throw new BadRequestException('User information not available');
     }
 
+    if (!body.id) {
+      throw new BadRequestException('The Sales Order ID (id) is required');
+    }
+
     const { userId, role } = req.user;
 
+    // Send strictly the ID and descriptions to the service
     return this.service.uploadAndCreateWithDescriptions(
       files,
       {
-        saleOrderNumber: body.saleOrderNumber?.trim() || null,
         descriptions: body.descriptions,
+        salesOrderId: parseInt(body.id, 10),
       },
       userId,
       role,
