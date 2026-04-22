@@ -447,7 +447,7 @@ export class DashboardService {
     let dateFilter: any = {};
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
+      dateFilter = { deliveryDate: { gte: startOfDay, lt: endOfDay } };
     }
 
     const [statusCounts, totalOrders] = await Promise.all([
@@ -498,7 +498,7 @@ export class DashboardService {
     let dateFilter: any = {};
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
+      dateFilter = { deliveryDate: { gte: startOfDay, lt: endOfDay } };
     }
 
     const allZones = await this.prisma.salesZone.findMany({
@@ -555,7 +555,7 @@ export class DashboardService {
     let dateFilter: any = {};
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
+      dateFilter = { deliveryDate: { gte: startOfDay, lt: endOfDay } };
     }
 
     const allZones = await this.prisma.salesZone.findMany({
@@ -836,7 +836,7 @@ export class DashboardService {
     let dateFilter: any = { salesZoneId: zoneId };
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.createdAt = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
     }
 
     const [statusCounts, totalOrders] = await Promise.all([
@@ -887,7 +887,7 @@ export class DashboardService {
     let dateFilter: any = { salesZoneId: zoneId };
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.createdAt = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
     }
 
     const rawCounts = await this.prisma.salesOrder.groupBy({
@@ -920,7 +920,7 @@ export class DashboardService {
     let dateFilter: any = { customerId: { not: null } };
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.createdAt = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
     }
 
     const statusCounts = await this.prisma.salesOrder.groupBy({
@@ -993,7 +993,7 @@ export class DashboardService {
     
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.createdAt = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
     }
 
     const statusCounts = await this.prisma.salesOrder.groupBy({
@@ -1048,7 +1048,7 @@ export class DashboardService {
     let dateFilter: any = { customerId: { not: null } };
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.createdAt = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
     }
 
     const paymentCounts = await this.prisma.salesOrder.groupBy({

@@ -12,6 +12,7 @@ import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import { Response } from 'express';
 import { Interval } from '@nestjs/schedule';
+import AdmZip from 'adm-zip';
 
 const columnMapping = {
   'SO Number': 'saleOrderNumber',
@@ -55,16 +56,71 @@ export class ErpMaterialImporterService {
     private sftpService: SftpService, 
   ) {}
 
+  /**
+   * Helper method to unzip an xlsx buffer, repair malformed XML (e.g., unescaped &, <, >),
+   * and return a repaired xlsx buffer.
+   */
+  private repairCorruptedExcelBuffer(buffer: Buffer): Buffer {
+    try {
+      const zip = new AdmZip(buffer);
+      const zipEntries = zip.getEntries();
+      let repairedCount = 0;
+
+      zipEntries.forEach((zipEntry) => {
+        // Only process XML files inside the zipped xlsx (usually xl/sharedStrings.xml causes this)
+        if (zipEntry.entryName.endsWith('.xml')) {
+          let originalContent = zipEntry.getData().toString('utf8');
+          let repairedContent = originalContent;
+          
+          // STEP 1: Fix unescaped Ampersands (&) globally. 
+          // Safe because we use a lookahead to ignore already valid XML entities.
+          repairedContent = repairedContent.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[a-fA-F\d]+);)/g, '&amp;');
+          
+          // STEP 2: Fix unescaped Less-Than (<) and Greater-Than (>) 
+          // We target ONLY the data sitting inside Excel text tags: <t> ... </t>
+          // The 's' flag allows the regex to match across multiple lines if needed.
+          repairedContent = repairedContent.replace(/<t([^>]*)>(.*?)<\/t>/gs, (match, attributes, innerText) => {
+            
+            // Sanitize the actual text content by escaping dangerous characters
+            const sanitizedText = innerText
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&apos;');
+              
+            // Reconstruct the XML tag with the clean text
+            return `<t${attributes}>${sanitizedText}</t>`;
+          });
+
+          if (originalContent !== repairedContent) {
+            // Update the file in the zip archive if changes were made
+            zip.updateFile(zipEntry.entryName, Buffer.from(repairedContent, 'utf8'));
+            repairedCount++;
+          }
+        }
+      });
+
+      if (repairedCount > 0) {
+        this.logger.log(`Repaired XML special characters in ${repairedCount} internal file(s).`);
+      }
+
+      // Return the newly packed zip buffer
+      return zip.toBuffer();
+    } catch (e) {
+      this.logger.error('Failed to execute buffer repair logic', e);
+      // If our repair logic fails, return the original buffer so standard errors can surface
+      return buffer;
+    }
+  }
+
   @Interval(parseInt(process.env.SFTP_SCAN_INTERVAL_MS || '300000'))
   async autoProcessActiveFolder() {
-    // 1. Calculate current time in IST (UTC + 5:30)
     const nowUtc = new Date();
     const istTime = new Date(nowUtc.getTime() + 5.5 * 60 * 60 * 1000);
     const currentHourIst = istTime.getUTCHours();
 
-    // 2. Schedule Check: Run ONLY between 7 AM and 9 PM (21:00)
-    if (currentHourIst < 7 || currentHourIst >= 21) {
-      return; // Exit silently if outside operational hours
+    if (currentHourIst < 7 || currentHourIst >= 24) {
+      return; 
     }
 
     this.logger.log('Running automated scheduled scan of SFTP active folder...');
@@ -76,7 +132,6 @@ export class ErpMaterialImporterService {
       const files = (await this.sftpService.list(activeDir)) as Array<{ type: string; name: string }>;
       const soNumbersFromFiles: string[] = [];
 
-      // 3. Extract all potential SO Numbers from the files
       for (const file of files) {
         if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
           continue; 
@@ -92,60 +147,58 @@ export class ErpMaterialImporterService {
         soNumbersFromFiles.push(nameParts[0]);
       }
 
-      if (soNumbersFromFiles.length > 0) {
-        // 4. Calculate exactly what "Today" means using foolproof IST string parsing
-        const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
-        const todayIstString = formatter.format(new Date()); // Formats exactly as "YYYY-MM-DD" in IST
-        
-        // The "+05:30" explicitly locks it to IST, bypassing the server's local timezone completely
-        const startOfTodayUtc = new Date(`${todayIstString}T00:00:00.000+05:30`);
-        const endOfTodayUtc = new Date(`${todayIstString}T23:59:59.999+05:30`);
+      const istOffsetMs = 5.5 * 60 * 60 * 1000;
+      
+      const year = istTime.getUTCFullYear();
+      const month = istTime.getUTCMonth();
+      const date = istTime.getUTCDate();
 
-        // 5. Query DB to filter ONLY orders created today matching those files
-        const todayOrders = await this.prisma.salesOrder.findMany({
-          where: {
-            saleOrderNumber: { in: soNumbersFromFiles },
-            createdAt: {
-              gte: startOfTodayUtc,
-              lte: endOfTodayUtc
-            }
+      const startOfTodayUtc = new Date(Date.UTC(year, month, date) - istOffsetMs);
+      const startOfTomorrowUtc = new Date(Date.UTC(year, month, date + 1) - istOffsetMs);
+
+      const todayOrders = await this.prisma.salesOrder.findMany({
+        where: {
+          deliveryDate: {
+            gte: startOfTodayUtc,
+            lt: startOfTomorrowUtc
           },
-          select: { saleOrderNumber: true }
-        });
+          OR: [
+            { saleOrderNumber: { in: soNumbersFromFiles } },
+            { isErpImported: 0 }
+          ]
+        },
+        select: { saleOrderNumber: true }
+      });
 
-        // 6. Get unique valid SO numbers
-        const validSoNumbers = [...new Set(todayOrders.map(o => o.saleOrderNumber))];
+      const validSoNumbers = [...new Set(todayOrders.map(o => o.saleOrderNumber))];
 
-        if (validSoNumbers.length > 0) {
-          this.logger.log(`Auto-scan found ${validSoNumbers.length} valid files for today's orders. Delegating to bulk import...`);
-          
-          // 7. Pass the strict date boundaries into the bulk import method
-          const result = await this.bulkImportFromDrive(
-            validSoNumbers, 
-            'System Auto Job',
-            { gte: startOfTodayUtc, lte: endOfTodayUtc }
-          );
-          
-          // 8. Filter out 'Skipped' items before logging to DB
-          const logsToInsert = result.summary
-            .filter((s: any) => s.status !== 'Skipped')
-            .map((s: any) => ({
-              saleOrderNumber: s.soNumber,
-              status: s.status, 
-              message: s.reason,
-              createdAt: new Date(),
-            }));
+      if (validSoNumbers.length > 0) {
+        this.logger.log(`Auto-scan found ${validSoNumbers.length} eligible orders for today (Pending or matched). Delegating to bulk import...`);
+        
+        const result = await this.bulkImportFromDrive(
+          validSoNumbers, 
+          'System Auto Job',
+          { gte: startOfTodayUtc, lt: startOfTomorrowUtc }
+        );
+        
+        const logsToInsert = result.summary
+          .filter((s: any) => s.status !== 'Skipped')
+          .map((s: any) => ({
+            saleOrderNumber: s.soNumber,
+            status: s.status, 
+            message: s.reason,
+            createdAt: new Date(),
+          }));
 
-          if (logsToInsert.length > 0) {
-            await this.prisma.eRP_Data_Cron_Logs.createMany({
-              data: logsToInsert,
-            });
-          }
-          
-          this.logger.log(`Auto-scan bulk import completed. Summary: ${JSON.stringify(result.summary)}`);
-        } else {
-          this.logger.log('Files found, but none correspond to Orders created today. Skipping import.');
+        if (logsToInsert.length > 0) {
+          await this.prisma.eRP_Data_Cron_Logs.createMany({
+            data: logsToInsert,
+          });
         }
+        
+        this.logger.log(`Auto-scan bulk import completed. Summary: ${JSON.stringify(result.summary)}`);
+      } else {
+        this.logger.log('No eligible orders found for today (neither files matching nor pending ERP imports). Skipping import.');
       }
     } catch (error) {
       this.logger.error('Failed to execute automated SFTP folder scan.', error);
@@ -295,7 +348,7 @@ export class ErpMaterialImporterService {
   async bulkImportFromDrive(
     saleOrderNumbers: string[], 
     username: string, 
-    dateRange?: { gte: Date; lte: Date; }
+    dateRange?: { gte: Date; lt?: Date; lte?: Date; }
   ) {
     this.logger.log(`Initiating Bulk Drive Import for ${saleOrderNumbers.length} SOs`);
 
@@ -312,9 +365,10 @@ export class ErpMaterialImporterService {
     };
 
     if (dateRange) {
-      whereClause.createdAt = {
+      whereClause.deliveryDate = {
         gte: dateRange.gte,
-        lte: dateRange.lte,
+        ...(dateRange.lt ? { lt: dateRange.lt } : {}),
+        ...(dateRange.lte ? { lte: dateRange.lte } : {}),
       };
     }
 
@@ -404,9 +458,26 @@ export class ErpMaterialImporterService {
   }
 
   private async readFile(file: Express.Multer.File): Promise<any[]> {
+    const workbook = new Workbook();
+    
     try {
-      const workbook = new Workbook();
       await workbook.xlsx.load(file.buffer as any);
+    } catch (error) {
+      this.logger.warn(`Initial parse failed for ${file.originalname}. Attempting XML repair for invalid characters...`);
+      
+      try {
+        const repairedBuffer = this.repairCorruptedExcelBuffer(file.buffer);
+        await workbook.xlsx.load(repairedBuffer as any);
+        this.logger.log(`Successfully repaired and parsed ${file.originalname}`);
+      } catch (repairError) {
+        this.logger.error('Failed to read or parse the Excel file even after repair attempt.', repairError);
+        throw new BadRequestException(
+          'Invalid or corrupted file. Even fallback repair failed. Please upload a valid .xlsx file.',
+        );
+      }
+    }
+
+    try {
       const worksheet = workbook.worksheets[0];
 
       if (!worksheet) return [];
@@ -465,9 +536,9 @@ export class ErpMaterialImporterService {
 
       return jsonData;
     } catch (error) {
-      this.logger.error('Failed to read or parse the Excel file.', error);
+      this.logger.error('Failed to map rows after parsing the Excel file.', error);
       throw new BadRequestException(
-        'Invalid or corrupted file. Please upload a valid .xlsx file.',
+        'Failed to extract data from the file. Please check row and column structures.',
       );
     }
   }

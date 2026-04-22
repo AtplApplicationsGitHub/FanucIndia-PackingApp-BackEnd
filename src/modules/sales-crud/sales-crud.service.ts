@@ -36,9 +36,7 @@ export class SalesCrudService {
     });
 
     if (existingComposite) {
-      throw new ConflictException(
-        `An order with Sale Order '${saleOrderNumber}' and Outbound Delivery '${outboundDelivery}' already exists.`,
-      );
+      return this.update(existingComposite.id, dto as any, userId);
     }
 
     try {
@@ -316,14 +314,11 @@ export class SalesCrudService {
     }
 
     const restrictedStatuses = [
-      'Packed',
-      'WIP Storage',
-      'Ready for Dispatch',
       'Dispatched',
     ];
     if (existing.status && restrictedStatuses.includes(existing.status)) {
       throw new ForbiddenException(
-        `Cannot modify order. The packing stage is already completed (Current Status: ${existing.status}).`,
+        `Cannot modify order. The order is already ${existing.status}.`,
       );
     }
 

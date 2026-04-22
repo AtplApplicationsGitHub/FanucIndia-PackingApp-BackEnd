@@ -21,7 +21,10 @@ export class SoArchiveService {
 
   async archive(saleOrderNumber: string) {
     const so = await this.prisma.salesOrder.findFirst({
-      where: { saleOrderNumber },
+      where: { 
+        saleOrderNumber,
+        status: 'Dispatched'
+      },
       include: {
         materialData: true,
         materialFilesByNumber: true,
@@ -184,6 +187,9 @@ export class SoArchiveService {
           data: Dispatch_SO.map(({ id, dispatch, ...dso }) => dso),
         });
       }
+
+      await tx.eRP_Material_File.deleteMany({ where: { salesOrderId: so.id } });
+      await tx.eRP_Material_Data.deleteMany({ where: { salesOrderId: so.id } });
 
       if (remainingActiveOrders === 0) {
         await tx.eRP_Material_File.deleteMany({ where: { saleOrderNumber } });

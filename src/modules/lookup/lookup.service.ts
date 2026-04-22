@@ -318,7 +318,7 @@ export class LookupService {
     return await this.prisma.materialBarcode.delete({ where: { id } });
   }
 
-  async generateBulkTemplate(res: Response) {
+  async generateBulkTemplate(res: Response, type?: string) {
     const workbook = new Workbook();
 
     const sheets = [
@@ -404,7 +404,11 @@ export class LookupService {
       },
     ];
 
-    for (const sheetDef of sheets) {
+   const sheetsToRender = type
+      ? sheets.filter((s) => s.name === type)
+      : sheets;
+
+    for (const sheetDef of sheetsToRender) {
       const sheet = workbook.addWorksheet(sheetDef.name);
       sheet.columns = sheetDef.columns;
       sheet.addRows(sheetDef.data);
@@ -416,7 +420,7 @@ export class LookupService {
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename="master_data_bulk.xlsx"',
+      `attachment; filename="${type ? type + '_data' : 'master_data_bulk'}.xlsx"`,
     );
 
     await workbook.xlsx.write(res);
