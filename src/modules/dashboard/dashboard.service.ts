@@ -37,7 +37,7 @@ function getDayBoundariesIST(date: Date) {
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
     if (dateStr) {
@@ -728,6 +728,7 @@ export class DashboardService {
           where: {
             salesZoneId: zoneId,
             deliveryDate: { gte: startOfDay, lt: endOfDay },
+            OR: [{ status: null }, { status: { not: 'Dispatched' } }],
           },
         }),
         this.prisma.salesOrder.count({
@@ -747,7 +748,7 @@ export class DashboardService {
           where: {
             salesZoneId: zoneId,
             deliveryDate: { gte: startOfDay, lt: endOfDay },
-            OR: [{ status: null }, { status: { not: 'Dispatched' } }],
+            status: 'Dispatched',
           },
         }),
       ]);
@@ -807,7 +808,6 @@ export class DashboardService {
         where: {
           salesZoneId: zoneId,
           deliveryDate: { gte: startOfDay, lt: endOfDay },
-          OR: [{ status: null }, { status: { not: 'Dispatched' } }],
         },
       });
 
