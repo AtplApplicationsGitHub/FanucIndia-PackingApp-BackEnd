@@ -380,7 +380,6 @@ export class DashboardService {
       const count = await this.prisma.salesOrder.count({
         where: {
           deliveryDate: { gte: startOfDay, lt: endOfDay },
-          OR: [{ status: null }, { status: { not: 'Dispatched' } }],
         },
       });
 
@@ -403,8 +402,9 @@ export class DashboardService {
     return results;
   }
 
-  async getAdminDispatchSummary(): Promise<AdminDispatchSummaryDto> {
-    const { startOfDay, endOfDay } = getDayBoundariesIST(new Date());
+  async getAdminDispatchSummary(dateStr?: string): Promise<AdminDispatchSummaryDto> {
+    const targetDate = dateStr ? new Date(dateStr) : new Date();
+    const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
 
     const [ordersToBeDispatched, readyForDispatchToday, ordersDispatchedToday] =
       await this.prisma.$transaction([
@@ -426,10 +426,10 @@ export class DashboardService {
             },
           },
         }),
-        this.prisma.sO_Status_Stepper.count({
+        this.prisma.salesOrder.count({
           where: {
+            deliveryDate: { gte: startOfDay, lt: endOfDay },
             status: 'Dispatched',
-            createdDateTime: { gte: startOfDay, lt: endOfDay },
           },
         }),
       ]);
@@ -784,9 +784,9 @@ export class DashboardService {
           : i === 1
             ? `Yesterday (${targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
             : targetDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              });
+              month: 'short',
+              day: 'numeric',
+            });
       results.push({ dayLabel, date: formattedDate, count });
     }
     return results;
@@ -818,10 +818,10 @@ export class DashboardService {
           : i === 1
             ? `Tomorrow (${targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
             : targetDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                weekday: 'short',
-              });
+              month: 'short',
+              day: 'numeric',
+              weekday: 'short',
+            });
       results.push({ dayLabel, date: formattedDate, count });
     }
     return results;
@@ -990,7 +990,7 @@ export class DashboardService {
   ): Promise<AdminStatusByCustomerDto[]> {
     const zoneId = await this.getUserZoneId(userId);
     let dateFilter: any = { customerId: { not: null }, salesZoneId: zoneId };
-    
+
     if (dateStr) {
       const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
       dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };

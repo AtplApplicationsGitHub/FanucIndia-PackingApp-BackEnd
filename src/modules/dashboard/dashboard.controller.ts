@@ -12,9 +12,9 @@ import { DashboardService } from './dashboard.service';
 import { SalesKpiDto } from './dto/sales-kpi.dto';
 import { SalesActivityDto } from './dto/sales-activity.dto';
 import { AdminKpiDto } from './dto/admin-kpi.dto';
-import { AdminNewImportDto } from './dto/admin-new-imports.dto'; 
-import { AdminDispatchSummaryDto } from './dto/admin-dispatch-summary.dto'; 
-import { AdminOverallStatusDto } from './dto/admin-overall-status.dto'; 
+import { AdminNewImportDto } from './dto/admin-new-imports.dto';
+import { AdminDispatchSummaryDto } from './dto/admin-dispatch-summary.dto';
+import { AdminOverallStatusDto } from './dto/admin-overall-status.dto';
 import { AdminStatusByZoneDto } from './dto/admin-status-by-zone.dto';
 import { AdminPaymentByZoneDto } from './dto/admin-payment-by-zone.dto';
 import { AdminCountByEntityDto } from './dto/admin-count-by-entity.dto';
@@ -24,7 +24,7 @@ import { AdminCountByEntityDto } from './dto/admin-count-by-entity.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(private readonly dashboardService: DashboardService) { }
 
   @Get('admin-kpis')
   @Roles('ADMIN', 'USER')
@@ -46,8 +46,8 @@ export class DashboardController {
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: "Get today's dispatch summary" })
   @ApiResponse({ status: 200, type: AdminDispatchSummaryDto })
-  async getAdminDispatchSummary(): Promise<AdminDispatchSummaryDto> {
-    return this.dashboardService.getAdminDispatchSummary();
+  async getAdminDispatchSummary(@Query('date') date?: string): Promise<AdminDispatchSummaryDto> {
+    return this.dashboardService.getAdminDispatchSummary(date);
   }
 
   @Get('admin-overall-status')
@@ -140,7 +140,7 @@ export class DashboardController {
   @Get('admin-upcoming-orders')
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: 'Get upcoming material order counts for the next 5 days' })
-  @ApiResponse({ status: 200, type: [AdminNewImportDto] }) 
+  @ApiResponse({ status: 200, type: [AdminNewImportDto] })
   async getAdminUpcomingOrders(): Promise<AdminNewImportDto[]> {
     return this.dashboardService.getAdminUpcomingOrders();
   }
