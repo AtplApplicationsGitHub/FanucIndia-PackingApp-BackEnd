@@ -7,5 +7,6 @@ import { SftpModule } from '../sftp/sftp.module';
   imports: [SftpModule],
   controllers: [SambaController],
   providers: [SambaService],
+  exports: [SambaService],
 })
 export class SambaModule {}

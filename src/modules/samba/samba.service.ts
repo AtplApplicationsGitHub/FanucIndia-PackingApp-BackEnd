@@ -95,19 +95,7 @@ export class SambaService {
   }
 
   async getDbLogs(dateStr?: string) {
-    const whereClause: any = {};
-    
-    if (dateStr) {
-      const startOfTodayIst = new Date(`${dateStr}T00:00:00.000+05:30`);
-      const endOfTodayIst = new Date(`${dateStr}T23:59:59.999+05:30`);
-      whereClause.createdAt = {
-        gte: new Date(startOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000),
-        lte: new Date(endOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000),
-      };
-    } else {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      whereClause.createdAt = { gte: sevenDaysAgo };
-    }
+    const whereClause = this.buildLogWhereClause(dateStr);
 
     const logs = await this.prisma.eRP_Data_Cron_Logs.findMany({
       where: whereClause,
@@ -122,5 +110,38 @@ export class SambaService {
     });
 
     return logs;
+  }
+
+  async getErpImportFailedCount(dateStr?: string) {
+    const whereClause = this.buildLogWhereClause(dateStr);
+
+    const failedCount = await this.prisma.eRP_Data_Cron_Logs.count({
+      where: {
+        ...whereClause,
+        status: {
+          in: ['Failed', 'FAILED', 'failed'],
+        },
+      },
+    });
+
+    return failedCount;
+  }
+
+  private buildLogWhereClause(dateStr?: string) {
+    const whereClause: any = {};
+
+    if (dateStr) {
+      const startOfTodayIst = new Date(`${dateStr}T00:00:00.000+05:30`);
+      const endOfTodayIst = new Date(`${dateStr}T23:59:59.999+05:30`);
+      whereClause.createdAt = {
+        gte: new Date(startOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000),
+        lte: new Date(endOfTodayIst.getTime() - 5.5 * 60 * 60 * 1000),
+      };
+    } else {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      whereClause.createdAt = { gte: sevenDaysAgo };
+    }
+
+    return whereClause;
   }
 }

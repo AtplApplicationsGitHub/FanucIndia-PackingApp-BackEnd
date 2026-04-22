@@ -2,14 +2,18 @@ import { Controller, Get, Param, NotFoundException, ParseIntPipe, UseGuards, Que
 import { PrismaService } from '../../prisma.service';
 import { Roles } from '../auth/roles.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { SambaService } from '../samba/samba.service';
 
 @ApiTags('Admin Orders')
 @ApiBearerAuth()
 @Controller('admin/sales-orders')
 @UseGuards(JwtAuthGuard) 
 export class AdminSalesOrdersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sambaService: SambaService,
+  ) {}
 
   @Get('counts/dynamic')
   @Roles('ADMIN')
@@ -114,6 +118,20 @@ export class AdminSalesOrdersController {
     return counts;
   }
 
+  @Get('counts/erp-import-failed')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get failed ERP import count from cron logs' })
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    description: 'Optional date in YYYY-MM-DD format (IST). Defaults to last 7 days if not provided.',
+  })
+  @ApiResponse({ status: 200, description: 'Failed ERP import count returned successfully.' })
+  async getErpImportFailedCount(@Query('date') date?: string) {
+    const failedCount = await this.sambaService.getErpImportFailedCount(date);
+    return { ErpImportFailed: failedCount };
+  }
+
   @Get(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Get a specific sales order by its ID' })
@@ -133,4 +151,5 @@ export class AdminSalesOrdersController {
 
     return order;
   }
+
 }
