@@ -57,7 +57,7 @@ export class ErpMaterialImporterService {
   ) {}
 
   /**
-   * Helper method to unzip an xlsx buffer, repair malformed XML (e.g., unescaped &),
+   * Helper method to unzip an xlsx buffer, repair malformed XML (e.g., unescaped &, <, >),
    * and return a repaired xlsx buffer.
    */
   private repairCorruptedExcelBuffer(buffer: Buffer): Buffer {
@@ -69,12 +69,29 @@ export class ErpMaterialImporterService {
       zipEntries.forEach((zipEntry) => {
         // Only process XML files inside the zipped xlsx (usually xl/sharedStrings.xml causes this)
         if (zipEntry.entryName.endsWith('.xml')) {
-          const originalContent = zipEntry.getData().toString('utf8');
+          let originalContent = zipEntry.getData().toString('utf8');
+          let repairedContent = originalContent;
           
-          // Regex magic: Find '&' that are NOT already followed by standard XML entity codes
-          // e.g., ignores &amp;, &lt;, &gt;, &quot;, &apos; and &#123;
-          const repairedContent = originalContent.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[a-fA-F\d]+);)/g, '&amp;');
+          // STEP 1: Fix unescaped Ampersands (&) globally. 
+          // Safe because we use a lookahead to ignore already valid XML entities.
+          repairedContent = repairedContent.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[a-fA-F\d]+);)/g, '&amp;');
           
+          // STEP 2: Fix unescaped Less-Than (<) and Greater-Than (>) 
+          // We target ONLY the data sitting inside Excel text tags: <t> ... </t>
+          // The 's' flag allows the regex to match across multiple lines if needed.
+          repairedContent = repairedContent.replace(/<t([^>]*)>(.*?)<\/t>/gs, (match, attributes, innerText) => {
+            
+            // Sanitize the actual text content by escaping dangerous characters
+            const sanitizedText = innerText
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&apos;');
+              
+            // Reconstruct the XML tag with the clean text
+            return `<t${attributes}>${sanitizedText}</t>`;
+          });
+
           if (originalContent !== repairedContent) {
             // Update the file in the zip archive if changes were made
             zip.updateFile(zipEntry.entryName, Buffer.from(repairedContent, 'utf8'));
@@ -84,7 +101,7 @@ export class ErpMaterialImporterService {
       });
 
       if (repairedCount > 0) {
-        this.logger.log(`Repaired XML formatting in ${repairedCount} internal file(s).`);
+        this.logger.log(`Repaired XML special characters in ${repairedCount} internal file(s).`);
       }
 
       // Return the newly packed zip buffer
