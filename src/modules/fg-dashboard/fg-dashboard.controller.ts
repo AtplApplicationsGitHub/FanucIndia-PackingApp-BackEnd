@@ -1,4 +1,5 @@
-import { Controller, Get, UseGuards, Req, Query } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req, Query, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -36,5 +37,27 @@ export class FgDashboardController {
     const page = query.page ? parseInt(query.page, 10) : 1;
     const limit = query.limit ? parseInt(query.limit, 10) : 10;
     return this.fgDashboardService.getFgDashboardData(req.user, { ...query, page, limit });
+  }
+
+  @Get('export')
+  @Roles('ADMIN', 'USER')
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'date', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'payment', required: false, type: String, description: 'true/false' })
+  @ApiQuery({ name: 'zone', required: false, type: String, description: 'Sales Zone ID' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Status string' })
+  async exportFgDashboardData(
+    @Req() req: AuthRequest,
+    @Res() res: Response,
+    @Query()
+    query: {
+      search?: string;
+      date?: string;
+      payment?: string;
+      zone?: string;
+      status?: string;
+    },
+  ) {
+    await this.fgDashboardService.exportFgDashboardData(req.user, query, res);
   }
 }

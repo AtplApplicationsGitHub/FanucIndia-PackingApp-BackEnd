@@ -27,16 +27,77 @@ export class SambaService {
     } else {
       targetDir = `${this.baseDir}/${folder.toLowerCase()}`;
     }
+
     try {
       const files = await this.sftpService.list(targetDir);
-      return files
+      
+      // 1. Initially map files with standard SFTP modifyTime
+      let mappedFiles = files
         .filter((f) => f.type !== 'd')
         .map((f, index) => ({
           id: index + 1,
           filename: f.name,
           size: f.size,
-          createdDatetime: f.modifyTime,
+          createdDatetime: f.modifyTime, // Fallback to SFTP modified time
         }));
+
+      // 2. Cross-reference ARCHIVE files with the Database
+      if (folder.toLowerCase() === 'archive' && mappedFiles.length > 0) {
+        const filenames = mappedFiles.map((f) => f.filename);
+        
+        // Fetch the archivedAt time from the database
+        const archiveLogs = await this.prisma.eRP_Material_FileArchive.findMany({
+          where: { fileName: { in: filenames } },
+          select: { fileName: true, archivedAt: true },
+          orderBy: { archivedAt: 'desc' } // Get the most recent archive event
+        });
+
+        const archiveMap = new Map();
+        archiveLogs.forEach((log) => {
+          if (!archiveMap.has(log.fileName)) {
+            archiveMap.set(log.fileName, log.archivedAt.getTime());
+          }
+        });
+
+        // Override the SFTP time with the DB archive time
+        mappedFiles = mappedFiles.map((f) => ({
+          ...f,
+          createdDatetime: archiveMap.get(f.filename) || f.createdDatetime,
+        }));
+      } 
+      
+      // 3. Cross-reference ERROR files with the Database
+      else if (folder.toLowerCase() === 'error' && mappedFiles.length > 0) {
+        // Filenames in error folder are usually named like <SO_NUMBER>.xlsx
+        // We strip the extension to match the saleOrderNumber in the DB
+        const soNumbers = mappedFiles.map((f) => f.filename.replace(/\.[^/.]+$/, ""));
+        
+        // Fetch the failure time from the ERP Cron Logs
+        const errorLogs = await this.prisma.eRP_Data_Cron_Logs.findMany({
+          where: { saleOrderNumber: { in: soNumbers }, status: 'Failed' },
+          select: { saleOrderNumber: true, createdAt: true },
+          orderBy: { createdAt: 'desc' } // Get the most recent failure event
+        });
+
+        const errorMap = new Map();
+        errorLogs.forEach((log) => {
+          if (!errorMap.has(log.saleOrderNumber)) {
+            errorMap.set(log.saleOrderNumber, log.createdAt.getTime());
+          }
+        });
+
+        // Override the SFTP time with the DB failure time
+        mappedFiles = mappedFiles.map((f) => {
+          const soNo = f.filename.replace(/\.[^/.]+$/, "");
+          return {
+            ...f,
+            createdDatetime: errorMap.get(soNo) || f.createdDatetime,
+          };
+        });
+      }
+
+      return mappedFiles;
+
     } catch (error) {
       this.logger.warn(`Could not read directory ${targetDir}. It might be empty or missing.`);
       return [];
