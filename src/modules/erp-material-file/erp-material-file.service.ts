@@ -214,7 +214,7 @@ export class ErpMaterialFileService {
       ];
     }
     const items = await this.prisma.eRP_Material_File.findMany({
-      where: { saleOrderNumber: soNumber },
+      where: whereClause,
       orderBy: { ID: 'desc' },
     });
     return normalizeBigInt(items);

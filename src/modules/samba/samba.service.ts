@@ -1,8 +1,9 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { SftpService } from '../sftp/sftp.service';
 import { Response } from 'express';
 import * as archiver from 'archiver';
 import { PrismaService } from '../../prisma.service';
+import { PassThrough } from 'stream';
 
 @Injectable()
 export class SambaService {
@@ -112,19 +113,83 @@ export class SambaService {
     return logs;
   }
 
-  async getErpImportFailedCount(dateStr?: string) {
-    const whereClause = this.buildLogWhereClause(dateStr);
+  async getErpImportFailedCount(dateStr?: string): Promise<number> {
+    const where: any = { status: 'Failed' };
 
-    const failedCount = await this.prisma.eRP_Data_Cron_Logs.count({
-      where: {
-        ...whereClause,
-        status: {
-          in: ['Failed', 'FAILED', 'failed'],
-        },
-      },
+    // Apply date filter if provided, otherwise default to the last 7 days
+    if (dateStr) {
+      const start = new Date(dateStr);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(dateStr);
+      end.setHours(23, 59, 59, 999);
+      where.createdAt = { gte: start, lte: end };
+    } else {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      where.createdAt = { gte: sevenDaysAgo };
+    }
+
+    // Count distinct sale order numbers that failed
+    const failedLogs = await this.prisma.eRP_Data_Cron_Logs.findMany({
+      where,
+      distinct: ['saleOrderNumber'],
+      select: { saleOrderNumber: true }
     });
 
-    return failedCount;
+    return failedLogs.length;
+  }
+
+  async downloadFailedErpData(saleOrderNumbers: string[]): Promise<{ stream: any, missing: string[] }> {
+    const targetDir = `${this.baseDir}/error`;
+    const missing: string[] = [];
+    const filesToDownload: string[] = [];
+
+    // 1. Fetch the list of files actually present in the error folder
+    let existingFiles: any[] = [];
+    try {
+      existingFiles = await this.sftpService.list(targetDir);
+    } catch (error) {
+      this.logger.warn(`Could not read directory ${targetDir}.`);
+    }
+    const existingFileNames = existingFiles.map(f => f.name);
+
+    // 2. Cross-check requested SOs against existing files
+    for (const soNumber of saleOrderNumbers) {
+      const expectedFileName = `${soNumber}.xlsx`; // Change to .xls or .csv if needed
+      
+      if (existingFileNames.includes(expectedFileName)) {
+        filesToDownload.push(expectedFileName);
+      } else {
+        missing.push(soNumber);
+      }
+    }
+
+    if (filesToDownload.length === 0) {
+      throw new NotFoundException('No failed ERP files found for the selected orders in the ERROR folder.');
+    }
+
+    // 3. Create a zip stream using your archiver and PassThrough
+    const archive = archiver.create('zip', { zlib: { level: 9 } });
+    const stream = new PassThrough();
+    
+    // Pipe archive data to the stream which gets returned to the controller
+    archive.pipe(stream);
+
+    // Append files to the archive
+    for (const filename of filesToDownload) {
+      const remotePath = `${targetDir}/${filename}`;
+      try {
+        const buffer = await this.sftpService.getBuffer(remotePath);
+        archive.append(buffer, { name: filename });
+      } catch (error) {
+        this.logger.error(`Skipping missing file: ${filename}`);
+      }
+    }
+    
+    // Finalize the archive (this tells the stream no more data is coming)
+    archive.finalize();
+    
+    return { stream, missing };
   }
 
   private buildLogWhereClause(dateStr?: string) {

@@ -533,6 +533,21 @@ if (customerNameText !== undefined || customerId !== undefined) {
       },
     });
 
+    const saleOrderNumbers = data.map(o => o.saleOrderNumber).filter(Boolean) as string[];
+    const failedSoNumbers = new Set<string>();
+
+    if (saleOrderNumbers.length > 0) {
+      const failedLogs = await this.prisma.eRP_Data_Cron_Logs.findMany({
+        where: {
+          saleOrderNumber: { in: saleOrderNumbers },
+          status: 'Failed'
+        },
+        distinct: ['saleOrderNumber'],
+        select: { saleOrderNumber: true }
+      });
+      failedLogs.forEach(log => failedSoNumbers.add(log.saleOrderNumber));
+    }
+
     return data.map((order) => ({
       id: order.id,
       userName: order.user?.name,
@@ -556,6 +571,7 @@ if (customerNameText !== undefined || customerId !== undefined) {
       skipPackingStage: order.skipPackingStage,
       skipStage: order.skipStage,
       hasMaterialData: order.isErpImported === 1,
+      hasFailedImport: failedSoNumbers.has(order.saleOrderNumber || ''),
       plantCode: order.plantCode,
       specialRemarks: order.specialRemarks,
       additionalRemarks: order.additionalRemarks,
