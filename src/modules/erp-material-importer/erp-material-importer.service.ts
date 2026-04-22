@@ -57,14 +57,12 @@ export class ErpMaterialImporterService {
 
   @Interval(parseInt(process.env.SFTP_SCAN_INTERVAL_MS || '300000'))
   async autoProcessActiveFolder() {
-    // 1. Calculate current time in IST (UTC + 5:30)
     const nowUtc = new Date();
     const istTime = new Date(nowUtc.getTime() + 5.5 * 60 * 60 * 1000);
     const currentHourIst = istTime.getUTCHours();
 
-    // 2. Schedule Check: Run ONLY between 7 AM and 9 PM (21:00)
-    if (currentHourIst < 7 || currentHourIst >= 21) {
-      return; // Exit silently if outside operational hours
+    if (currentHourIst < 7 || currentHourIst >= 24) {
+      return; 
     }
 
     this.logger.log('Running automated scheduled scan of SFTP active folder...');
@@ -76,7 +74,6 @@ export class ErpMaterialImporterService {
       const files = (await this.sftpService.list(activeDir)) as Array<{ type: string; name: string }>;
       const soNumbersFromFiles: string[] = [];
 
-      // 3. Extract all potential SO Numbers from the files
       for (const file of files) {
         if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
           continue; 
@@ -93,21 +90,27 @@ export class ErpMaterialImporterService {
       }
 
       if (soNumbersFromFiles.length > 0) {
-        // 4. Calculate exactly what "Today" means using foolproof IST string parsing
-        const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
-        const todayIstString = formatter.format(new Date()); // Formats exactly as "YYYY-MM-DD" in IST
+        // 4. Calculate exactly what "Today" and "Tomorrow" mean using robust math
+        const nowUtc = new Date();
+        const istOffsetMs = 5.5 * 60 * 60 * 1000;
         
-        // The "+05:30" explicitly locks it to IST, bypassing the server's local timezone completely
-        const startOfTodayUtc = new Date(`${todayIstString}T00:00:00.000+05:30`);
-        const endOfTodayUtc = new Date(`${todayIstString}T23:59:59.999+05:30`);
+        // Shift time by IST offset to get the local IST year, month, and date
+        const istTime = new Date(nowUtc.getTime() + istOffsetMs);
+        const year = istTime.getUTCFullYear();
+        const month = istTime.getUTCMonth();
+        const date = istTime.getUTCDate();
+
+        // Construct absolute UTC start of today and tomorrow in IST
+        const startOfTodayUtc = new Date(Date.UTC(year, month, date) - istOffsetMs);
+        const startOfTomorrowUtc = new Date(Date.UTC(year, month, date + 1) - istOffsetMs);
 
         // 5. Query DB to filter ONLY orders created today matching those files
         const todayOrders = await this.prisma.salesOrder.findMany({
           where: {
             saleOrderNumber: { in: soNumbersFromFiles },
-            createdAt: {
+            deliveryDate: {
               gte: startOfTodayUtc,
-              lte: endOfTodayUtc
+              lt: startOfTomorrowUtc // 🔴 Strictly Less Than Tomorrow
             }
           },
           select: { saleOrderNumber: true }
@@ -123,7 +126,7 @@ export class ErpMaterialImporterService {
           const result = await this.bulkImportFromDrive(
             validSoNumbers, 
             'System Auto Job',
-            { gte: startOfTodayUtc, lte: endOfTodayUtc }
+            { gte: startOfTodayUtc, lt: startOfTomorrowUtc } // 🔴 Pass 'lt' instead of 'lte'
           );
           
           // 8. Filter out 'Skipped' items before logging to DB
@@ -295,7 +298,7 @@ export class ErpMaterialImporterService {
   async bulkImportFromDrive(
     saleOrderNumbers: string[], 
     username: string, 
-    dateRange?: { gte: Date; lte: Date; }
+    dateRange?: { gte: Date; lt?: Date; lte?: Date; }
   ) {
     this.logger.log(`Initiating Bulk Drive Import for ${saleOrderNumbers.length} SOs`);
 
@@ -312,9 +315,10 @@ export class ErpMaterialImporterService {
     };
 
     if (dateRange) {
-      whereClause.createdAt = {
+      whereClause.deliveryDate = {
         gte: dateRange.gte,
-        lte: dateRange.lte,
+        ...(dateRange.lt ? { lt: dateRange.lt } : {}),
+        ...(dateRange.lte ? { lte: dateRange.lte } : {}),
       };
     }
 

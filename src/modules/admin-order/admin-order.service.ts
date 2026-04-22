@@ -459,10 +459,10 @@ if (customerNameText !== undefined || customerId !== undefined) {
           updateData.priority = priority;
         }
 
-        // 5. Update Status if it's currently null and an assignment/priority is made
+        // 5. Update Status to R105 ONLY if it's currently null AND a priority is explicitly set
         if (
           !order.status && 
-          (isIssueUserChanging || isPackingUserChanging || isGeneralUserChanging || (priority !== undefined && priority !== null))
+          (priority !== undefined && priority !== null)
         ) {
           updateData.status = 'R105';
         }
