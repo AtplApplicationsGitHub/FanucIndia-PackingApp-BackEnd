@@ -91,6 +91,7 @@ export class AdminSalesOrdersController {
 
     // 2. Apply it to the main where clause if the filter is currently active
     if (failedImportFilter === 'true') {
+      where.isErpImported = 0; // Add this line to enforce pending only
       if (failedSoNumbers.length > 0) {
         where.saleOrderNumber = { in: failedSoNumbers };
       } else {
@@ -134,6 +135,7 @@ export class AdminSalesOrdersController {
     const erpImportFailedCount = await this.prisma.salesOrder.count({
       where: {
         ...failedImportWhere,
+        isErpImported: 0, // Add this line to enforce pending only
         saleOrderNumber: { in: failedSoNumbers.length > 0 ? failedSoNumbers : ['__NONE__'] }
       }
     });

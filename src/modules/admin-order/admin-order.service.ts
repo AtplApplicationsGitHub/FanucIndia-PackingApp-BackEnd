@@ -571,7 +571,7 @@ if (customerNameText !== undefined || customerId !== undefined) {
       skipPackingStage: order.skipPackingStage,
       skipStage: order.skipStage,
       hasMaterialData: order.isErpImported === 1,
-      hasFailedImport: failedSoNumbers.has(order.saleOrderNumber || ''),
+      hasFailedImport: order.isErpImported === 0 && failedSoNumbers.has(order.saleOrderNumber || ''),
       plantCode: order.plantCode,
       specialRemarks: order.specialRemarks,
       additionalRemarks: order.additionalRemarks,
