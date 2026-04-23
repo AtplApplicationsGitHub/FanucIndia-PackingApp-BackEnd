@@ -96,7 +96,8 @@ export class AdminOrderService {
       const lower = search.toLowerCase();
       const num = Number(search);
 
-      const isValidInt = Number.isInteger(num) && num <= 2147483647 && num >= -2147483648;
+      const isValidInt =
+        Number.isInteger(num) && num <= 2147483647 && num >= -2147483648;
 
       where.OR = [
         {
@@ -178,7 +179,9 @@ export class AdminOrderService {
           packConfig: { select: { id: true, configName: true } },
           assignedUser: { select: { id: true, name: true, email: true } },
           issueAssignedUser: { select: { id: true, name: true, email: true } },
-          packingAssignedUser: { select: { id: true, name: true, email: true } },
+          packingAssignedUser: {
+            select: { id: true, name: true, email: true },
+          },
           materialData: {
             select: { A_D_F: true },
             take: 1,
@@ -221,7 +224,7 @@ export class AdminOrderService {
     }
 
     if (
-      user.role === 'USER' && 
+      user.role === 'USER' &&
       order.assignedUserId !== user.userId &&
       order.issueAssignedUserId !== user.userId &&
       order.packingAssignedUserId !== user.userId
@@ -268,19 +271,19 @@ export class AdminOrderService {
     };
 
     // Check if there is an explicit intent to update customer fields from the DTO
-if (customerNameText !== undefined || customerId !== undefined) {
-  if (customerNameText !== undefined && customerNameText !== null) {
-    data.customerNameText = customerNameText;
-    data.customerId = null;
-  } else if (customerId !== undefined && customerId !== null) {
-    data.customerId = customerId;
-    data.customerNameText = null;
-  } else {
-    // Both are explicitly null, meaning the user cleared the customer input entirely.
-    data.customerId = null;
-    data.customerNameText = null;
-  }
-}
+    if (customerNameText !== undefined || customerId !== undefined) {
+      if (customerNameText !== undefined && customerNameText !== null) {
+        data.customerNameText = customerNameText;
+        data.customerId = null;
+      } else if (customerId !== undefined && customerId !== null) {
+        data.customerId = customerId;
+        data.customerNameText = null;
+      } else {
+        // Both are explicitly null, meaning the user cleared the customer input entirely.
+        data.customerId = null;
+        data.customerNameText = null;
+      }
+    }
 
     if (
       dto.priority !== undefined &&
@@ -293,7 +296,10 @@ if (customerNameText !== undefined || customerId !== undefined) {
     const now = new Date();
 
     // 1. Handle Issue Assignment Stepper
-    if (dto.issueAssignedUserId && order.issueAssignedUserId !== dto.issueAssignedUserId) {
+    if (
+      dto.issueAssignedUserId &&
+      order.issueAssignedUserId !== dto.issueAssignedUserId
+    ) {
       if (order.status === 'R105' || !order.status) {
         await this.prisma.sO_Status_Stepper.updateMany({
           where: {
@@ -310,7 +316,10 @@ if (customerNameText !== undefined || customerId !== undefined) {
     }
 
     // 2. Handle Packing Assignment Stepper
-    if (dto.packingAssignedUserId && order.packingAssignedUserId !== dto.packingAssignedUserId) {
+    if (
+      dto.packingAssignedUserId &&
+      order.packingAssignedUserId !== dto.packingAssignedUserId
+    ) {
       if (order.status === 'W105') {
         await this.prisma.sO_Status_Stepper.updateMany({
           where: {
@@ -408,8 +417,10 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
         // 1. Handle "Under Issue" Stepper Trigger
         // Only trigger if we are at R105 and the Issue user is genuinely changing
-        const isIssueUserChanging = issueUserId !== undefined && order.issueAssignedUserId !== issueUserId;
-        
+        const isIssueUserChanging =
+          issueUserId !== undefined &&
+          order.issueAssignedUserId !== issueUserId;
+
         if (isIssueUserChanging && currentStatus === 'R105') {
           await tx.sO_Status_Stepper.updateMany({
             where: {
@@ -423,8 +434,10 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
         // 2. Handle "Under Packing" Stepper Trigger
         // Only trigger if we are already at W105 and the Packing user is genuinely changing
-        const isPackingUserChanging = packingUserId !== undefined && order.packingAssignedUserId !== packingUserId;
-        
+        const isPackingUserChanging =
+          packingUserId !== undefined &&
+          order.packingAssignedUserId !== packingUserId;
+
         if (isPackingUserChanging && currentStatus === 'W105') {
           await tx.sO_Status_Stepper.updateMany({
             where: {
@@ -437,7 +450,9 @@ if (customerNameText !== undefined || customerId !== undefined) {
         }
 
         // 3. Handle General assignedUserId change (if you are still using this for fallback)
-        const isGeneralUserChanging = assignedUserId !== undefined && order.assignedUserId !== assignedUserId;
+        const isGeneralUserChanging =
+          assignedUserId !== undefined &&
+          order.assignedUserId !== assignedUserId;
 
         // 4. Construct Data for Order Update
         const updateData: Prisma.SalesOrderUncheckedUpdateInput = {
@@ -447,12 +462,16 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
         // Apply new user assignments
         if (isGeneralUserChanging) updateData.assignedUserId = assignedUserId;
-        if (issueUserId !== undefined) updateData.issueAssignedUserId = issueUserId;
-        if (packingUserId !== undefined) updateData.packingAssignedUserId = packingUserId;
-        
+        if (issueUserId !== undefined)
+          updateData.issueAssignedUserId = issueUserId;
+        if (packingUserId !== undefined)
+          updateData.packingAssignedUserId = packingUserId;
+
         // Apply skip stages
-        if (skipIssueStage !== undefined) updateData.skipIssueStage = skipIssueStage;
-        if (skipPackingStage !== undefined) updateData.skipPackingStage = skipPackingStage;
+        if (skipIssueStage !== undefined)
+          updateData.skipIssueStage = skipIssueStage;
+        if (skipPackingStage !== undefined)
+          updateData.skipPackingStage = skipPackingStage;
 
         // Apply priority
         if (priority !== undefined) {
@@ -460,10 +479,7 @@ if (customerNameText !== undefined || customerId !== undefined) {
         }
 
         // 5. Update Status to R105 ONLY if it's currently null AND a priority is explicitly set
-        if (
-          !order.status && 
-          (priority !== undefined && priority !== null)
-        ) {
+        if (!order.status && priority !== undefined && priority !== null) {
           updateData.status = 'R105';
         }
 
@@ -525,7 +541,7 @@ if (customerNameText !== undefined || customerId !== undefined) {
         customerNameText: true,
         materialData: {
           select: { A_D_F: true },
-          take: 1, 
+          take: 1,
         },
       },
       orderBy: {
@@ -533,19 +549,23 @@ if (customerNameText !== undefined || customerId !== undefined) {
       },
     });
 
-    const saleOrderNumbers = data.map(o => o.saleOrderNumber).filter(Boolean) as string[];
-    const failedSoNumbers = new Set<string>();
+    const failedLogKeys = new Set<string>();
 
-    if (saleOrderNumbers.length > 0) {
+    const orderKeys = data
+      .filter((o) => o.saleOrderNumber && o.outboundDelivery)
+      .map((o) => `${o.saleOrderNumber}_${o.outboundDelivery}`);
+
+    if (orderKeys.length > 0) {
       const failedLogs = await this.prisma.eRP_Data_Cron_Logs.findMany({
         where: {
-          saleOrderNumber: { in: saleOrderNumbers },
-          status: 'Failed'
+          status: 'Failed',
+          saleOrderNumber: { in: orderKeys },
         },
         distinct: ['saleOrderNumber'],
-        select: { saleOrderNumber: true }
+        select: { saleOrderNumber: true },
       });
-      failedLogs.forEach(log => failedSoNumbers.add(log.saleOrderNumber));
+
+      failedLogs.forEach((log) => failedLogKeys.add(log.saleOrderNumber));
     }
 
     return data.map((order) => ({
@@ -571,7 +591,11 @@ if (customerNameText !== undefined || customerId !== undefined) {
       skipPackingStage: order.skipPackingStage,
       skipStage: order.skipStage,
       hasMaterialData: order.isErpImported === 1,
-      hasFailedImport: order.isErpImported === 0 && failedSoNumbers.has(order.saleOrderNumber || ''),
+      hasFailedImport:
+        order.isErpImported === 0 &&
+        !!order.saleOrderNumber &&
+        !!order.outboundDelivery &&
+        failedLogKeys.has(`${order.saleOrderNumber}_${order.outboundDelivery}`),
       plantCode: order.plantCode,
       specialRemarks: order.specialRemarks,
       additionalRemarks: order.additionalRemarks,
@@ -591,7 +615,12 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
     const orders = await this.prisma.salesOrder.findMany({
       where: { id: { in: salesOrderIds } },
-      select: { id: true, saleOrderNumber: true, isErpImported: true, status: true },
+      select: {
+        id: true,
+        saleOrderNumber: true,
+        isErpImported: true,
+        status: true,
+      },
     });
 
     if (orders.length === 0) {
@@ -615,8 +644,8 @@ if (customerNameText !== undefined || customerId !== undefined) {
           }
         }
       } else {
-         // If un-skipping (false or null), allow it for all selected
-         validOrderIds.push(order.id);
+        // If un-skipping (false or null), allow it for all selected
+        validOrderIds.push(order.id);
       }
     }
 
@@ -628,8 +657,8 @@ if (customerNameText !== undefined || customerId !== undefined) {
     }
 
     let message = skipStage
-       ? `Successfully updated skip stage for ${validOrderIds.length} order(s).`
-       : `Canceled skip stage for ${validOrderIds.length} order(s).`;
+      ? `Successfully updated skip stage for ${validOrderIds.length} order(s).`
+      : `Canceled skip stage for ${validOrderIds.length} order(s).`;
 
     if (invalidOrderNumbers.length > 0) {
       message += ` Material Data Pending: ${invalidOrderNumbers.join(', ')}.`;
@@ -674,7 +703,7 @@ if (customerNameText !== undefined || customerId !== undefined) {
         const getCellString = (colName: string) => {
           if (!colMap[colName]) return undefined;
           let val = row.getCell(colMap[colName]).value;
-          
+
           if (val === null || val === undefined) return undefined;
 
           if (typeof val === 'object') {
@@ -682,18 +711,21 @@ if (customerNameText !== undefined || customerId !== undefined) {
               val = (val as any).richText.map((rt: any) => rt.text).join('');
             } else if ('formula' in val) {
               val = (val as any).result;
-              if (val && typeof val === 'object' && 'error' in val) return undefined;
-            } else if ('text' in val) { 
+              if (val && typeof val === 'object' && 'error' in val)
+                return undefined;
+            } else if ('text' in val) {
               val = (val as any).text;
             } else if (val instanceof Date) {
             } else {
-              val = ''; 
+              val = '';
             }
           }
 
           if (val === null || val === undefined || val === '') return undefined;
 
-          return String(val).replace(/[\s\uFEFF\xA0]+/g, ' ').trim();
+          return String(val)
+            .replace(/[\s\uFEFF\xA0]+/g, ' ')
+            .trim();
         };
 
         const saleOrderNumber = getCellString('SALE ORDER NUMBER');
@@ -703,10 +735,10 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
         // 2. Fetch the DB Order using BOTH SO Number AND Outbound Delivery
         const dbOrder = await tx.salesOrder.findFirst({
-          where: { 
+          where: {
             saleOrderNumber: saleOrderNumber,
             // Prisma expects a string. If Excel OBD is undefined/empty, we strictly pass an empty string ''
-            outboundDelivery: excelOBD || '', 
+            outboundDelivery: excelOBD || '',
           },
           include: {
             product: true,
@@ -719,18 +751,22 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
         if (!dbOrder) {
           throw new BadRequestException(
-            `Row ${i}: Invalid SO. Sale Order Number '${saleOrderNumber}' (OBD: '${excelOBD || ''}') does not exist in the database. Adding new Orders via Excel upload is not allowed.`
+            `Row ${i}: Invalid SO. Sale Order Number '${saleOrderNumber}' (OBD: '${excelOBD || ''}') does not exist in the database. Adding new Orders via Excel upload is not allowed.`,
           );
         }
 
         // ----------------------------------------------------
         // 3. VALIDATE READ-ONLY COLUMNS
         // ----------------------------------------------------
-        const normalize = (str: string) => str.replace(/[\s\uFEFF\xA0]+/g, ' ').trim().toLowerCase();
+        const normalize = (str: string) =>
+          str
+            .replace(/[\s\uFEFF\xA0]+/g, ' ')
+            .trim()
+            .toLowerCase();
 
         const rowProduct = getCellString('PRODUCT');
         const dbProduct = dbOrder.product?.name || '';
-        
+
         if (rowProduct && normalize(rowProduct) !== normalize(dbProduct)) {
           throw new BadRequestException(
             `Row ${i}: Modifying read-only column 'PRODUCT' is not allowed. (Found: '${rowProduct}', Expected: '${dbProduct}')`,
@@ -741,7 +777,7 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
         const rowTO = getCellString('TRANSFER ORDER');
         const dbTO = dbOrder.transferOrder || '';
-        
+
         if (rowTO && normalize(rowTO) !== normalize(dbTO)) {
           throw new BadRequestException(
             `Row ${i}: Modifying read-only column 'TRANSFER ORDER' is not allowed. (Found: '${rowTO}', Expected: '${dbTO}')`,
@@ -791,13 +827,17 @@ if (customerNameText !== undefined || customerId !== undefined) {
         let assignedUserId = dbOrder.assignedUserId;
         const rowAssignedUser = getCellString('ASSIGNED USER');
         if (rowAssignedUser !== undefined) {
-          if (rowAssignedUser === '' || rowAssignedUser.toLowerCase() === 'unassigned' || rowAssignedUser === '-') {
+          if (
+            rowAssignedUser === '' ||
+            rowAssignedUser.toLowerCase() === 'unassigned' ||
+            rowAssignedUser === '-'
+          ) {
             assignedUserId = null;
           } else {
             const u = await tx.user.findFirst({
-              where: { 
-                name: { equals: rowAssignedUser.trim(), mode: 'insensitive' }, 
-                role: 'USER' 
+              where: {
+                name: { equals: rowAssignedUser.trim(), mode: 'insensitive' },
+                role: 'USER',
               },
             });
             if (u) assignedUserId = u.id;
@@ -806,15 +846,21 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
         // Issue Assigned User
         let issueAssignedUserId = dbOrder.issueAssignedUserId;
-        const rowIssueUser = getCellString('ISSUE STAGE USER') || getCellString('ISSUE ASSIGNED USER');
+        const rowIssueUser =
+          getCellString('ISSUE STAGE USER') ||
+          getCellString('ISSUE ASSIGNED USER');
         if (rowIssueUser !== undefined) {
-          if (rowIssueUser === '' || rowIssueUser.toLowerCase() === 'unassigned' || rowIssueUser === '-') {
+          if (
+            rowIssueUser === '' ||
+            rowIssueUser.toLowerCase() === 'unassigned' ||
+            rowIssueUser === '-'
+          ) {
             issueAssignedUserId = null;
           } else {
             const u = await tx.user.findFirst({
-              where: { 
-                name: { equals: rowIssueUser.trim(), mode: 'insensitive' }, 
-                role: 'USER' 
+              where: {
+                name: { equals: rowIssueUser.trim(), mode: 'insensitive' },
+                role: 'USER',
               },
             });
             if (u) issueAssignedUserId = u.id;
@@ -823,15 +869,22 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
         // Packing Assigned User
         let packingAssignedUserId = dbOrder.packingAssignedUserId;
-        const rowPackingUser = getCellString('PACK STAGE USER') || getCellString('PACKING ASSIGNED USER') || getCellString('PACKING STAGE USER');
+        const rowPackingUser =
+          getCellString('PACK STAGE USER') ||
+          getCellString('PACKING ASSIGNED USER') ||
+          getCellString('PACKING STAGE USER');
         if (rowPackingUser !== undefined) {
-          if (rowPackingUser === '' || rowPackingUser.toLowerCase() === 'unassigned' || rowPackingUser === '-') {
+          if (
+            rowPackingUser === '' ||
+            rowPackingUser.toLowerCase() === 'unassigned' ||
+            rowPackingUser === '-'
+          ) {
             packingAssignedUserId = null;
           } else {
             const u = await tx.user.findFirst({
-              where: { 
-                name: { equals: rowPackingUser.trim(), mode: 'insensitive' }, 
-                role: 'USER' 
+              where: {
+                name: { equals: rowPackingUser.trim(), mode: 'insensitive' },
+                role: 'USER',
               },
             });
             if (u) packingAssignedUserId = u.id;
@@ -860,8 +913,11 @@ if (customerNameText !== undefined || customerId !== undefined) {
               customerId = null;
               customerNameText = rowCustomer;
               // Fix: Clear old address if a completely new name is typed
-              if (dbOrder.customer?.name !== rowCustomer && dbOrder.customerNameText !== rowCustomer) {
-                  address = null; 
+              if (
+                dbOrder.customer?.name !== rowCustomer &&
+                dbOrder.customerNameText !== rowCustomer
+              ) {
+                address = null;
               }
             }
           }
@@ -891,7 +947,7 @@ if (customerNameText !== undefined || customerId !== undefined) {
         if (rowSkipIssue !== undefined || rowSkipPacking !== undefined) {
           const isIssueSkip = rowSkipIssue?.toLowerCase() === 'yes';
           const isPackingSkip = rowSkipPacking?.toLowerCase() === 'yes';
-          
+
           skipStage = isIssueSkip || isPackingSkip;
         }
 
@@ -913,7 +969,7 @@ if (customerNameText !== undefined || customerId !== undefined) {
         }
 
         const safeString = (val: string | undefined, fallback: any) =>
-          (val !== undefined && val !== "") ? val : fallback;
+          val !== undefined && val !== '' ? val : fallback;
 
         await tx.salesOrder.update({
           where: { id: dbOrder.id },
@@ -958,7 +1014,7 @@ if (customerNameText !== undefined || customerId !== undefined) {
 
   async bulkUpdatePriority(
     dto: { salesOrderIds: number[]; priority?: number | null },
-    user: { name: string }
+    user: { name: string },
   ) {
     const { salesOrderIds, priority } = dto;
     const now = new Date();
@@ -987,31 +1043,29 @@ if (customerNameText !== undefined || customerId !== undefined) {
       });
     }
 
-    return { 
-      message: 'Bulk priority update successful', 
+    return {
+      message: 'Bulk priority update successful',
       updatedCount: validOrderIds.length,
-      skippedCount: orders.length - validOrderIds.length
+      skippedCount: orders.length - validOrderIds.length,
     };
   }
 
   async getUsedCustomers() {
     const orders = await this.prisma.salesOrder.findMany({
       where: {
-        OR: [
-          { customerId: { not: null } },
-        ]
+        OR: [{ customerId: { not: null } }],
       },
       select: {
         customer: {
           select: {
             id: true,
             name: true,
-          }
+          },
         },
       },
       distinct: ['customerId'],
     });
 
-    return orders.map(order => order.customer).filter(Boolean);
+    return orders.map((order) => order.customer).filter(Boolean);
   }
 }
