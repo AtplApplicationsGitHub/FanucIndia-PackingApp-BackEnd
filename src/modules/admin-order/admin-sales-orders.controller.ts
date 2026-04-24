@@ -32,7 +32,7 @@ export class AdminSalesOrdersController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sambaService: SambaService,
-  ) {}
+  ) { }
 
   @Get('counts/dynamic')
   @Roles('ADMIN')
@@ -213,12 +213,18 @@ export class AdminSalesOrdersController {
       .map((order) => order.id);
 
     const erpImportFailedCount = failedOrderIds.length;
-
+    const erpSuccessUploadCount = await this.prisma.salesOrder.count({
+      where: {
+        ...pendingImportWhere,
+        isErpImported: 1,   
+      },
+    });
     const counts = {
       R105: 0,
       W105: 0,
       PendingImport: pendingImportCount,
       ErpImportFailed: erpImportFailedCount,
+      ErpSuccessUpload: erpSuccessUploadCount,
     };
     results.forEach((r) => {
       if (r.status === 'R105') counts.R105 = r._count.status;
