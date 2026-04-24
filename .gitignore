@@ -69,11 +69,7 @@ restore_list.txt
 *.dump
 
 *.csv
-verify-so-obd.ts
-verify-masters.ts
-verify-customers.ts
-check-duplicate-customers.ts
-insert-missing-orders.ts
-fix-steppers.ts
 
-db-scripts
+db-scripts/*
+
+.vscode/*
