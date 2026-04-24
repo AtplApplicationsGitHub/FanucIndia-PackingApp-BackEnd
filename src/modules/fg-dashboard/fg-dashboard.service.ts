@@ -231,6 +231,19 @@ export class FgDashboardService {
           customer: { select: { name: true } },
           salesZone: { select: { name: true } },
           transporter: { select: { name: true } },
+          attachments: {
+            select: {
+              id: true,
+              fileName: true,
+              saleOrderNumber: true,
+              outboundDelivery: true,
+              user: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
         },
         orderBy: {
           id: 'desc',
@@ -265,6 +278,7 @@ export class FgDashboardService {
         salesZone: order.salesZone?.name,
         transporter: order.transporter?.name,
         payment: order.paymentClearance,
+        attachments: order.attachments || [],
         status: order.status,
         fgLocation: order.fgLocation,
         specialRemarks: order.specialRemarks,
