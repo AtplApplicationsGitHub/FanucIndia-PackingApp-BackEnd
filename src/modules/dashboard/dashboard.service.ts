@@ -1238,4 +1238,73 @@ export class DashboardService {
 
     return { success: true, data: finalData };
   }
+
+  async getAdminErpImportCounts(dateStr?: string) {
+    const where: any = {};
+
+    if (dateStr) {
+      const targetDate = new Date(dateStr);
+      const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+
+      // Same behavior as Assign SO date filter: deliveryDate based
+      where.deliveryDate = {
+        gte: startOfDay,
+        lt: endOfDay,
+      };
+    }
+
+    const failedLogs = await this.prisma.eRP_Data_Cron_Logs.findMany({
+      where: { status: 'Failed' },
+      select: { saleOrderNumber: true },
+      distinct: ['saleOrderNumber'],
+    });
+
+    const failedLogKeySet = new Set(
+      failedLogs.map((log) => log.saleOrderNumber),
+    );
+
+    const [pendingImportCount, erpSuccessUploadCount, failedCandidates] =
+      await Promise.all([
+        this.prisma.salesOrder.count({
+          where: {
+            ...where,
+            isErpImported: 0,
+          },
+        }),
+
+        this.prisma.salesOrder.count({
+          where: {
+            ...where,
+            isErpImported: 1,
+          },
+        }),
+
+        this.prisma.salesOrder.findMany({
+          where: {
+            ...where,
+            isErpImported: 0,
+          },
+          select: {
+            id: true,
+            saleOrderNumber: true,
+            outboundDelivery: true,
+          },
+        }),
+      ]);
+
+    const erpImportFailedCount = failedCandidates.filter(
+      (order) =>
+        !!order.saleOrderNumber &&
+        !!order.outboundDelivery &&
+        failedLogKeySet.has(
+          `${order.saleOrderNumber}_${order.outboundDelivery}`,
+        ),
+    ).length;
+
+    return {
+      PendingImport: pendingImportCount,
+      ErpSuccessUpload: erpSuccessUploadCount,
+      ErpImportFailed: erpImportFailedCount,
+    };
+  }
 }

@@ -18,13 +18,14 @@ import { AdminOverallStatusDto } from './dto/admin-overall-status.dto';
 import { AdminStatusByZoneDto } from './dto/admin-status-by-zone.dto';
 import { AdminPaymentByZoneDto } from './dto/admin-payment-by-zone.dto';
 import { AdminCountByEntityDto } from './dto/admin-count-by-entity.dto';
+import { AdminErpImportCountsDto } from './dto/admin-erp-import-counts.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) { }
+  constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('admin-kpis')
   @Roles('ADMIN', 'USER')
@@ -36,7 +37,9 @@ export class DashboardController {
 
   @Get('admin-new-imports')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Get new material import counts for the last 5 days' })
+  @ApiOperation({
+    summary: 'Get new material import counts for the last 5 days',
+  })
   @ApiResponse({ status: 200, type: [AdminNewImportDto] })
   async getAdminNewImports(): Promise<AdminNewImportDto[]> {
     return this.dashboardService.getAdminNewImports();
@@ -46,7 +49,9 @@ export class DashboardController {
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: "Get today's dispatch summary" })
   @ApiResponse({ status: 200, type: AdminDispatchSummaryDto })
-  async getAdminDispatchSummary(@Query('date') date?: string): Promise<AdminDispatchSummaryDto> {
+  async getAdminDispatchSummary(
+    @Query('date') date?: string,
+  ): Promise<AdminDispatchSummaryDto> {
     return this.dashboardService.getAdminDispatchSummary(date);
   }
 
@@ -54,23 +59,33 @@ export class DashboardController {
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: 'Get system-wide counts of orders by status' })
   @ApiResponse({ status: 200, type: AdminOverallStatusDto })
-  async getAdminOverallStatus(@Query('date') date?: string): Promise<AdminOverallStatusDto> {
+  async getAdminOverallStatus(
+    @Query('date') date?: string,
+  ): Promise<AdminOverallStatusDto> {
     return this.dashboardService.getAdminOverallStatus(date);
   }
 
   @Get('admin-status-by-zone')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get system-wide order status counts by sales zone (Row 3)' })
+  @ApiOperation({
+    summary: 'Get system-wide order status counts by sales zone (Row 3)',
+  })
   @ApiResponse({ status: 200, type: [AdminStatusByZoneDto] })
-  async getAdminStatusByZone(@Query('date') date?: string): Promise<AdminStatusByZoneDto[]> {
+  async getAdminStatusByZone(
+    @Query('date') date?: string,
+  ): Promise<AdminStatusByZoneDto[]> {
     return this.dashboardService.getAdminStatusByZone(date);
   }
 
   @Get('admin-payment-by-zone')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get system-wide payment clearance counts by sales zone (Row 4)' })
+  @ApiOperation({
+    summary: 'Get system-wide payment clearance counts by sales zone (Row 4)',
+  })
   @ApiResponse({ status: 200, type: [AdminPaymentByZoneDto] })
-  async getAdminPaymentByZone(@Query('date') date?: string): Promise<AdminPaymentByZoneDto[]> {
+  async getAdminPaymentByZone(
+    @Query('date') date?: string,
+  ): Promise<AdminPaymentByZoneDto[]> {
     return this.dashboardService.getAdminPaymentByZone(date);
   }
 
@@ -102,14 +117,19 @@ export class DashboardController {
   @Roles('SALES')
   @ApiOperation({ summary: 'Get recent activity feed for the SALES dashboard' })
   @ApiResponse({ status: 200, type: [SalesActivityDto] })
-  async getSalesRecentActivity(@Req() req: AuthRequest): Promise<SalesActivityDto[]> {
+  async getSalesRecentActivity(
+    @Req() req: AuthRequest,
+  ): Promise<SalesActivityDto[]> {
     return this.dashboardService.getSalesRecentActivity(req.user.userId);
   }
 
   @Get('sales-dispatch-summary')
   @Roles('SALES')
   @ApiOperation({ summary: "Get today's dispatch summary for Sales Zone" })
-  async getSalesDispatchSummary(@Req() req: AuthRequest, @Query('date') date?: string) {
+  async getSalesDispatchSummary(
+    @Req() req: AuthRequest,
+    @Query('date') date?: string,
+  ) {
     return this.dashboardService.getSalesDispatchSummary(req.user.userId, date);
   }
 
@@ -127,19 +147,30 @@ export class DashboardController {
 
   @Get('sales-overall-status')
   @Roles('SALES')
-  async getSalesOverallStatus(@Req() req: AuthRequest, @Query('date') date?: string) {
+  async getSalesOverallStatus(
+    @Req() req: AuthRequest,
+    @Query('date') date?: string,
+  ) {
     return this.dashboardService.getSalesOverallStatus(req.user.userId, date);
   }
 
   @Get('sales-payment-clearance')
   @Roles('SALES') // Find this existing one and update it to accept the date Query
-  async getSalesPaymentClearance(@Req() req: AuthRequest, @Query('date') date?: string) {
-    return this.dashboardService.getSalesPaymentClearanceByZone(req.user.userId, date);
+  async getSalesPaymentClearance(
+    @Req() req: AuthRequest,
+    @Query('date') date?: string,
+  ) {
+    return this.dashboardService.getSalesPaymentClearanceByZone(
+      req.user.userId,
+      date,
+    );
   }
 
   @Get('admin-upcoming-orders')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Get upcoming material order counts for the next 5 days' })
+  @ApiOperation({
+    summary: 'Get upcoming material order counts for the next 5 days',
+  })
   @ApiResponse({ status: 200, type: [AdminNewImportDto] })
   async getAdminUpcomingOrders(): Promise<AdminNewImportDto[]> {
     return this.dashboardService.getAdminUpcomingOrders();
@@ -147,7 +178,9 @@ export class DashboardController {
 
   @Get('admin-status-by-customer')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get system-wide order status counts by Top 15 Customers' })
+  @ApiOperation({
+    summary: 'Get system-wide order status counts by Top 15 Customers',
+  })
   async getAdminStatusByCustomer(@Query('date') date?: string) {
     return this.dashboardService.getAdminStatusByCustomer(date);
   }
@@ -168,8 +201,28 @@ export class DashboardController {
 
   @Get('sales-status-by-customer')
   @Roles('SALES')
-  @ApiOperation({ summary: 'Get order status counts by Customers for Sales Zone' })
-  async getSalesStatusByCustomer(@Req() req: AuthRequest, @Query('date') date?: string) {
-    return this.dashboardService.getSalesStatusByCustomer(req.user.userId, date);
+  @ApiOperation({
+    summary: 'Get order status counts by Customers for Sales Zone',
+  })
+  async getSalesStatusByCustomer(
+    @Req() req: AuthRequest,
+    @Query('date') date?: string,
+  ) {
+    return this.dashboardService.getSalesStatusByCustomer(
+      req.user.userId,
+      date,
+    );
+  }
+
+  @Get('admin-erp-import-counts')
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary: 'Get ERP import counts for ADMIN dashboard based on date filter',
+  })
+  @ApiResponse({ status: 200, type: AdminErpImportCountsDto })
+  async getAdminErpImportCounts(
+    @Query('date') date?: string,
+  ): Promise<AdminErpImportCountsDto> {
+    return this.dashboardService.getAdminErpImportCounts(date);
   }
 }
