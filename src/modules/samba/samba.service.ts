@@ -223,9 +223,12 @@ export class SambaService {
     return failedLogs.length;
   }
 
-  async downloadFailedErpData(
-    orderIds: number[],
-  ): Promise<{ stream: any; missing: string[] }> {
+  async downloadFailedErpData(orderIds: number[]): Promise<{
+    type: 'file' | 'zip';
+    stream: any;
+    filename: string;
+    missing: string[];
+  }> {
     const targetDir = `${this.baseDir}/error`;
     const missing: string[] = [];
     const filesToDownload: string[] = [];
@@ -275,6 +278,23 @@ export class SambaService {
       );
     }
 
+    // Single file -> return direct xlsx
+    if (filesToDownload.length === 1) {
+      const filename = filesToDownload[0];
+      const remotePath = `${targetDir}/${filename}`;
+      const buffer = await this.sftpService.getBuffer(remotePath);
+      const stream = new PassThrough();
+      stream.end(buffer);
+
+      return {
+        type: 'file',
+        stream,
+        filename,
+        missing,
+      };
+    }
+
+    // Multiple files -> return zip
     const archive = archiver.create('zip', { zlib: { level: 9 } });
     const stream = new PassThrough();
 
@@ -292,7 +312,12 @@ export class SambaService {
 
     archive.finalize();
 
-    return { stream, missing };
+    return {
+      type: 'zip',
+      stream,
+      filename: 'Failed_ERP_Data.zip',
+      missing,
+    };
   }
 
   private buildLogWhereClause(dateStr?: string) {

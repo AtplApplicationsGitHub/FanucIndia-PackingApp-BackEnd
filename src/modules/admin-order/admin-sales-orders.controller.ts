@@ -278,26 +278,37 @@ export class AdminSalesOrdersController {
 
   @Post('download-failed-erp')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Download failed ERP data Excel files as a zip' })
+  @ApiOperation({ summary: 'Download failed ERP data Excel files' })
   async downloadFailedErp(
     @Body() body: { orderIds: number[] },
     @Res() res: Response,
   ) {
     try {
-      const { stream, missing } = await this.sambaService.downloadFailedErpData(
-        body.orderIds,
-      );
+      const { type, stream, filename, missing } =
+        await this.sambaService.downloadFailedErpData(body.orderIds);
 
-      res.setHeader('Content-Type', 'application/zip');
+      if (type === 'file') {
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+      } else {
+        res.setHeader('Content-Type', 'application/zip');
+      }
+
       res.setHeader(
         'Content-Disposition',
-        'attachment; filename="Failed_ERP_Data.zip"',
+        `attachment; filename="${filename}"`,
       );
 
       if (missing && missing.length > 0) {
         res.setHeader('X-Missing-Orders', missing.join(','));
-        res.setHeader('Access-Control-Expose-Headers', 'X-Missing-Orders');
       }
+
+      res.setHeader(
+        'Access-Control-Expose-Headers',
+        'Content-Disposition, X-Missing-Orders',
+      );
 
       stream.pipe(res);
     } catch (error: any) {

@@ -4,21 +4,95 @@ import { Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
 
+type StepLabel =
+  | 'To be Issued'
+  | 'Under Issue'
+  | 'Issued'
+  | 'Under Packing'
+  | 'Packed'
+  | 'WIP Storage'
+  | 'Ready for Dispatch'
+  | 'Dispatched';
+
+const PROGRESS_CONFIG: Record<StepLabel, { next: string }> = {
+  'To be Issued': { next: 'Under Issue' },
+  'Under Issue': { next: 'Issued' },
+  Issued: { next: 'Under Packing' },
+  'Under Packing': { next: 'Packed' },
+  Packed: { next: 'WIP Storage' },
+  'WIP Storage': { next: 'Ready for Dispatch' },
+  'Ready for Dispatch': { next: 'Dispatched' },
+  Dispatched: { next: '' },
+};
+
+function getStageStatusInfo(order: {
+  status?: string | null;
+  assignedUserId?: number | null;
+  fgLocation?: any;
+  statusStepper?: { status: string; createdDateTime?: Date | null }[];
+}) {
+  const s = (order.status || '').toUpperCase();
+
+  const isReadyForDispatch =
+    order.statusStepper?.some((x) => x.status === 'Ready for Dispatch') ??
+    false;
+
+  const isWipStorage =
+    order.statusStepper?.some((x) => x.status === 'WIP Storage') ?? false;
+
+  const fgLocation = order.fgLocation;
+
+  const hasFgLocation =
+    fgLocation &&
+    ((typeof fgLocation === 'string' && fgLocation.trim() !== '') ||
+      (Array.isArray(fgLocation) && fgLocation.length > 0) ||
+      (typeof fgLocation === 'object' &&
+        !Array.isArray(fgLocation) &&
+        Object.keys(fgLocation).length > 0));
+
+  let step: StepLabel;
+
+  if (s === 'DISPATCHED') {
+    step = 'Dispatched';
+  } else if (isReadyForDispatch || s.includes('READY FOR DISPATCH')) {
+    step = 'Ready for Dispatch';
+  } else if (hasFgLocation || isWipStorage) {
+    step = 'WIP Storage';
+  } else if (s.includes('F105')) {
+    step = 'Packed';
+  } else if (s.includes('W105')) {
+    if (order.assignedUserId) {
+      step = 'Under Packing';
+    } else {
+      step = 'Issued';
+    }
+  } else if (s.includes('R105')) {
+    step = 'Under Issue';
+  } else {
+    step = 'To be Issued';
+  }
+
+  return {
+    current: step,
+    next: PROGRESS_CONFIG[step].next,
+  };
+}
+
 @Injectable()
 export class FgDashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getFgDashboardData(
     user: { userId: number; role: string },
-    query: { 
-      search?: string; 
-      date?: string; 
+    query: {
+      search?: string;
+      date?: string;
       payment?: string;
       zone?: string;
       status?: string;
-      page?: number; 
-      limit?: number 
-    }
+      page?: number;
+      limit?: number;
+    },
   ) {
     const { search, date, payment, zone, status, page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
@@ -38,11 +112,13 @@ export class FgDashboardService {
       const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
       const { y, m, d } = parseYMD(date);
       const startIST = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
-      const endISTExclusive = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
+      const endISTExclusive = new Date(
+        Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS,
+      );
 
       where.deliveryDate = {
-        gte: startIST,         
-        lt: endISTExclusive,   
+        gte: startIST,
+        lt: endISTExclusive,
       };
     }
 
@@ -56,12 +132,9 @@ export class FgDashboardService {
 
     if (status) {
       // delete where.OR;
-      
+
       if (status === 'None') {
-         where.OR = [
-           { status: { equals: null } },
-           { status: { equals: '' } }
-         ];
+        where.OR = [{ status: { equals: null } }, { status: { equals: '' } }];
       } else {
         where.status = { equals: status, mode: 'insensitive' };
       }
@@ -69,7 +142,7 @@ export class FgDashboardService {
 
     if (search) {
       const lowerSearch = search.toLowerCase();
-       let paymentBoolean: boolean | undefined = undefined;
+      let paymentBoolean: boolean | undefined = undefined;
 
       if (lowerSearch === 'yes') {
         paymentBoolean = true;
@@ -91,16 +164,28 @@ export class FgDashboardService {
         { additionalRemarks: { contains: search, mode: 'insensitive' } },
         { UpdatedBy: { contains: search, mode: 'insensitive' } },
         { user: { name: { contains: search, mode: 'insensitive' } } }, // Added Creator Username
-        { Dispatch_SO: { some: { dispatch: { vehicleNumber: { contains: search, mode: 'insensitive' } } } } },
+        {
+          Dispatch_SO: {
+            some: {
+              dispatch: {
+                vehicleNumber: { contains: search, mode: 'insensitive' },
+              },
+            },
+          },
+        },
       ];
 
       if (paymentBoolean !== undefined) {
-         searchConditions.push({ paymentClearance: { equals: paymentBoolean } });
+        searchConditions.push({ paymentClearance: { equals: paymentBoolean } });
       }
 
       where.AND = [
-        ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
-        { OR: searchConditions }
+        ...(where.AND
+          ? Array.isArray(where.AND)
+            ? where.AND
+            : [where.AND]
+          : []),
+        { OR: searchConditions },
       ];
     }
 
@@ -123,7 +208,7 @@ export class FgDashboardService {
           assignedUserId: true,
           customerNameText: true,
           user: { select: { name: true, email: true } },
-          Dispatch_SO: { 
+          Dispatch_SO: {
             select: {
               dispatch: {
                 select: {
@@ -135,11 +220,11 @@ export class FgDashboardService {
           statusStepper: {
             where: {
               status: { in: ['Ready for Dispatch', 'WIP Storage'] },
-              createdDateTime: { not: null }, 
+              createdDateTime: { not: null },
             },
             select: {
               status: true,
-              createdDateTime: true,                 
+              createdDateTime: true,
             },
           },
           product: { select: { name: true } },
@@ -157,11 +242,17 @@ export class FgDashboardService {
     ]);
 
     const fgData = salesOrders.map((order) => {
-      const isReadyForDispatch = order.statusStepper.some(s => s.status === 'Ready for Dispatch');
-      const isWipStorage = order.statusStepper.some(s => s.status === 'WIP Storage');
-      const vehicleNumber = order.Dispatch_SO?.length > 0 
-        ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch?.vehicleNumber 
-        : null;
+      const isReadyForDispatch = order.statusStepper.some(
+        (s) => s.status === 'Ready for Dispatch',
+      );
+      const isWipStorage = order.statusStepper.some(
+        (s) => s.status === 'WIP Storage',
+      );
+      const vehicleNumber =
+        order.Dispatch_SO?.length > 0
+          ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch
+              ?.vehicleNumber
+          : null;
 
       return {
         id: order.id,
@@ -178,14 +269,14 @@ export class FgDashboardService {
         fgLocation: order.fgLocation,
         specialRemarks: order.specialRemarks,
         additionalRemarks: order.additionalRemarks,
-        createdBy: order.user?.name, 
+        createdBy: order.user?.name,
         createdByEmail: order.user?.email,
         vehicleNumber: vehicleNumber,
         updatedBy: order.UpdatedBy,
         updatedDate: order.UpdatedDate,
-        assignedUserId: order.assignedUserId, 
-        isReadyForDispatch, 
-        isWipStorage, 
+        assignedUserId: order.assignedUserId,
+        isReadyForDispatch,
+        isWipStorage,
       };
     });
 
@@ -303,6 +394,7 @@ export class FgDashboardService {
         fgLocation: true,
         specialRemarks: true,
         additionalRemarks: true,
+        assignedUserId: true,
         customerNameText: true,
         user: { select: { email: true } },
         Dispatch_SO: {
@@ -312,6 +404,16 @@ export class FgDashboardService {
                 vehicleNumber: true,
               },
             },
+          },
+        },
+        statusStepper: {
+          where: {
+            status: { in: ['Ready for Dispatch', 'WIP Storage'] },
+            createdDateTime: { not: null },
+          },
+          select: {
+            status: true,
+            createdDateTime: true,
           },
         },
         product: { select: { name: true } },
@@ -333,7 +435,8 @@ export class FgDashboardService {
       { header: 'CUSTOMER NAME', key: 'customer', width: 30 },
       { header: 'SALES ZONE', key: 'zone', width: 15 },
       { header: 'REQUIRED DATE', key: 'date', width: 15 },
-      { header: 'STATUS', key: 'status', width: 20 },
+      { header: 'COMPLETED STATUS', key: 'completedStatus', width: 22 },
+      { header: 'NEXT STATUS', key: 'nextStatus', width: 22 },
       { header: 'PAYMENT', key: 'payment', width: 15 },
       { header: 'TRANSPORTER', key: 'transporter', width: 20 },
       { header: 'VEHICLE NUMBER', key: 'vehicle', width: 20 },
@@ -350,7 +453,8 @@ export class FgDashboardService {
     salesOrders.forEach((order) => {
       const vehicleNumber =
         order.Dispatch_SO?.length > 0
-          ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch?.vehicleNumber
+          ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch
+              ?.vehicleNumber
           : null;
 
       let fgLocString = '-';
@@ -364,6 +468,8 @@ export class FgDashboardService {
         }
       }
 
+      const stageInfo = getStageStatusInfo(order);
+
       worksheet.addRow({
         so: order.saleOrderNumber || '-',
         obd: order.outboundDelivery || '-',
@@ -372,7 +478,8 @@ export class FgDashboardService {
         date: order.deliveryDate
           ? new Date(order.deliveryDate).toLocaleDateString('en-GB')
           : '-',
-        status: order.status || 'To be Issued', // Or leave blank if preferred
+        completedStatus: stageInfo.current || '-',
+        nextStatus: stageInfo.next || '-',
         payment: order.paymentClearance ? 'Yes' : 'No',
         transporter: order.transporter?.name || '-',
         vehicle: vehicleNumber || '-',

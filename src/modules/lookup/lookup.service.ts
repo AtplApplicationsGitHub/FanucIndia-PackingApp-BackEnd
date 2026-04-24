@@ -32,17 +32,22 @@ export class LookupService {
     const existing = await this.prisma.product.findFirst({
       where: { name: { equals: dto.name, mode: 'insensitive' } },
     });
-    if (existing) throw new BadRequestException(`Product "${dto.name}" already exists.`);
-    
+    if (existing)
+      throw new BadRequestException(`Product "${dto.name}" already exists.`);
+
     return this.prisma.product.create({ data: dto });
   }
 
   async updateProduct(id: number, dto: UpdateProductDto) {
     if (dto.name) {
       const existing = await this.prisma.product.findFirst({
-        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+        where: {
+          name: { equals: dto.name, mode: 'insensitive' },
+          id: { not: id },
+        },
       });
-      if (existing) throw new BadRequestException(`Product "${dto.name}" already exists.`);
+      if (existing)
+        throw new BadRequestException(`Product "${dto.name}" already exists.`);
     }
     return this.prisma.product.update({ where: { id }, data: dto });
   }
@@ -69,7 +74,10 @@ export class LookupService {
     const existing = await this.prisma.transporter.findFirst({
       where: { name: { equals: dto.name, mode: 'insensitive' } },
     });
-    if (existing) throw new BadRequestException(`Transporter "${dto.name}" already exists.`);
+    if (existing)
+      throw new BadRequestException(
+        `Transporter "${dto.name}" already exists.`,
+      );
 
     return this.prisma.transporter.create({ data: dto });
   }
@@ -77,9 +85,15 @@ export class LookupService {
   async updateTransporter(id: number, dto: UpdateTransporterDto) {
     if (dto.name) {
       const existing = await this.prisma.transporter.findFirst({
-        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+        where: {
+          name: { equals: dto.name, mode: 'insensitive' },
+          id: { not: id },
+        },
       });
-      if (existing) throw new BadRequestException(`Transporter "${dto.name}" already exists.`);
+      if (existing)
+        throw new BadRequestException(
+          `Transporter "${dto.name}" already exists.`,
+        );
     }
     return this.prisma.transporter.update({ where: { id }, data: dto });
   }
@@ -105,7 +119,8 @@ export class LookupService {
     const existing = await this.prisma.plantCode.findFirst({
       where: { code: { equals: dto.code, mode: 'insensitive' } },
     });
-    if (existing) throw new BadRequestException(`Plant Code "${dto.code}" already exists.`);
+    if (existing)
+      throw new BadRequestException(`Plant Code "${dto.code}" already exists.`);
 
     return this.prisma.plantCode.create({ data: dto });
   }
@@ -113,9 +128,15 @@ export class LookupService {
   async updatePlantCode(id: number, dto: UpdatePlantCodeDto) {
     if (dto.code) {
       const existing = await this.prisma.plantCode.findFirst({
-        where: { code: { equals: dto.code, mode: 'insensitive' }, id: { not: id } },
+        where: {
+          code: { equals: dto.code, mode: 'insensitive' },
+          id: { not: id },
+        },
       });
-      if (existing) throw new BadRequestException(`Plant Code "${dto.code}" already exists.`);
+      if (existing)
+        throw new BadRequestException(
+          `Plant Code "${dto.code}" already exists.`,
+        );
     }
     return this.prisma.plantCode.update({ where: { id }, data: dto });
   }
@@ -141,7 +162,8 @@ export class LookupService {
     const existing = await this.prisma.salesZone.findFirst({
       where: { name: { equals: dto.name, mode: 'insensitive' } },
     });
-    if (existing) throw new BadRequestException(`Sales Zone "${dto.name}" already exists.`);
+    if (existing)
+      throw new BadRequestException(`Sales Zone "${dto.name}" already exists.`);
 
     return this.prisma.salesZone.create({ data: dto });
   }
@@ -149,9 +171,15 @@ export class LookupService {
   async updateSalesZone(id: number, dto: UpdateSalesZoneDto) {
     if (dto.name) {
       const existing = await this.prisma.salesZone.findFirst({
-        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+        where: {
+          name: { equals: dto.name, mode: 'insensitive' },
+          id: { not: id },
+        },
       });
-      if (existing) throw new BadRequestException(`Sales Zone "${dto.name}" already exists.`);
+      if (existing)
+        throw new BadRequestException(
+          `Sales Zone "${dto.name}" already exists.`,
+        );
     }
     return this.prisma.salesZone.update({ where: { id }, data: dto });
   }
@@ -177,7 +205,10 @@ export class LookupService {
     const existing = await this.prisma.packConfig.findFirst({
       where: { configName: { equals: dto.configName, mode: 'insensitive' } },
     });
-    if (existing) throw new BadRequestException(`Pack Config "${dto.configName}" already exists.`);
+    if (existing)
+      throw new BadRequestException(
+        `Pack Config "${dto.configName}" already exists.`,
+      );
 
     return this.prisma.packConfig.create({ data: dto });
   }
@@ -185,9 +216,15 @@ export class LookupService {
   async updatePackConfig(id: number, dto: UpdatePackConfigDto) {
     if (dto.configName) {
       const existing = await this.prisma.packConfig.findFirst({
-        where: { configName: { equals: dto.configName, mode: 'insensitive' }, id: { not: id } },
+        where: {
+          configName: { equals: dto.configName, mode: 'insensitive' },
+          id: { not: id },
+        },
       });
-      if (existing) throw new BadRequestException(`Pack Config "${dto.configName}" already exists.`);
+      if (existing)
+        throw new BadRequestException(
+          `Pack Config "${dto.configName}" already exists.`,
+        );
     }
     return this.prisma.packConfig.update({ where: { id }, data: dto });
   }
@@ -213,7 +250,8 @@ export class LookupService {
     const existing = await this.prisma.customer.findFirst({
       where: { name: { equals: dto.name, mode: 'insensitive' } },
     });
-    if (existing) throw new BadRequestException(`Customer "${dto.name}" already exists.`);
+    if (existing)
+      throw new BadRequestException(`Customer "${dto.name}" already exists.`);
 
     return this.prisma.customer.create({ data: dto });
   }
@@ -221,9 +259,13 @@ export class LookupService {
   async updateCustomer(id: number, dto: UpdateCustomerDto) {
     if (dto.name) {
       const existing = await this.prisma.customer.findFirst({
-        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+        where: {
+          name: { equals: dto.name, mode: 'insensitive' },
+          id: { not: id },
+        },
       });
-      if (existing) throw new BadRequestException(`Customer "${dto.name}" already exists.`);
+      if (existing)
+        throw new BadRequestException(`Customer "${dto.name}" already exists.`);
     }
     return this.prisma.customer.update({ where: { id }, data: dto });
   }
@@ -249,7 +291,8 @@ export class LookupService {
     const existing = await this.prisma.printer.findFirst({
       where: { name: { equals: dto.name, mode: 'insensitive' } },
     });
-    if (existing) throw new BadRequestException(`Printer "${dto.name}" already exists.`);
+    if (existing)
+      throw new BadRequestException(`Printer "${dto.name}" already exists.`);
 
     return this.prisma.printer.create({ data: dto });
   }
@@ -257,9 +300,13 @@ export class LookupService {
   async updatePrinter(id: number, dto: UpdatePrinterDto) {
     if (dto.name) {
       const existing = await this.prisma.printer.findFirst({
-        where: { name: { equals: dto.name, mode: 'insensitive' }, id: { not: id } },
+        where: {
+          name: { equals: dto.name, mode: 'insensitive' },
+          id: { not: id },
+        },
       });
-      if (existing) throw new BadRequestException(`Printer "${dto.name}" already exists.`);
+      if (existing)
+        throw new BadRequestException(`Printer "${dto.name}" already exists.`);
     }
     return this.prisma.printer.update({ where: { id }, data: dto });
   }
@@ -404,7 +451,7 @@ export class LookupService {
       },
     ];
 
-   const sheetsToRender = type
+    const sheetsToRender = type
       ? sheets.filter((s) => s.name === type)
       : sheets;
 
@@ -435,13 +482,54 @@ export class LookupService {
 
     const getVal = (row, colIdx) => {
       const val = row.getCell(colIdx).value;
-      return val ? String(val).trim() : null;
+
+      if (val === null || val === undefined) return null;
+
+      if (typeof val === 'string' || typeof val === 'number') {
+        const s = String(val).trim();
+        return s || null;
+      }
+
+      if (
+        typeof val === 'object' &&
+        'richText' in val &&
+        Array.isArray((val as any).richText)
+      ) {
+        const s = (val as any).richText
+          .map((part: any) => part.text || '')
+          .join('')
+          .trim();
+        return s || null;
+      }
+
+      if (typeof val === 'object' && 'text' in val) {
+        const s = String((val as any).text).trim();
+        return s || null;
+      }
+
+      if (typeof val === 'object' && 'result' in val) {
+        const result = (val as any).result;
+        if (result === null || result === undefined) return null;
+        const s = String(result).trim();
+        return s || null;
+      }
+
+      if (val instanceof Date) {
+        return val.toISOString();
+      }
+
+      const s = String(val).trim();
+      return s || null;
     };
 
     const getBool = (row, colIdx) => {
-      const val = row.getCell(colIdx).value;
-      if (typeof val === 'boolean') return val;
-      const s = String(val).toLowerCase().trim();
+      const raw = row.getCell(colIdx).value;
+      if (typeof raw === 'boolean') return raw;
+
+      const val = getVal(row, colIdx);
+      if (!val) return false;
+
+      const s = val.toLowerCase().trim();
       return s === 'true' || s === 'yes' || s === '1';
     };
 
@@ -467,7 +555,9 @@ export class LookupService {
           const uniqueItems = new Map();
 
           for (const row of rows) {
-            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
             const name = getVal(row, 2);
             if (name) {
               const key = name.toLowerCase();
@@ -480,12 +570,20 @@ export class LookupService {
           for (const item of uniqueItems.values()) {
             const { id, name } = item;
             if (id) {
-              promises.push(tx.product.update({ where: { id }, data: { name } }).catch(() => {}));
+              promises.push(
+                tx.product
+                  .update({ where: { id }, data: { name } })
+                  .catch(() => {}),
+              );
             } else {
-              promises.push((async () => {
-                const existing = await tx.product.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                if (!existing) await tx.product.create({ data: { name } });
-              })().catch(() => {}));
+              promises.push(
+                (async () => {
+                  const existing = await tx.product.findFirst({
+                    where: { name: { equals: name, mode: 'insensitive' } },
+                  });
+                  if (!existing) await tx.product.create({ data: { name } });
+                })().catch(() => {}),
+              );
             }
           }
           results.push('Products processed');
@@ -498,7 +596,9 @@ export class LookupService {
           const uniqueItems = new Map();
 
           for (const row of rows) {
-            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
             const name = getVal(row, 2);
             if (name) {
               const key = name.toLowerCase();
@@ -511,12 +611,21 @@ export class LookupService {
           for (const item of uniqueItems.values()) {
             const { id, name } = item;
             if (id) {
-              promises.push(tx.transporter.update({ where: { id }, data: { name } }).catch(() => {}));
+              promises.push(
+                tx.transporter
+                  .update({ where: { id }, data: { name } })
+                  .catch(() => {}),
+              );
             } else {
-              promises.push((async () => {
-                const existing = await tx.transporter.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                if (!existing) await tx.transporter.create({ data: { name } });
-              })().catch(() => {}));
+              promises.push(
+                (async () => {
+                  const existing = await tx.transporter.findFirst({
+                    where: { name: { equals: name, mode: 'insensitive' } },
+                  });
+                  if (!existing)
+                    await tx.transporter.create({ data: { name } });
+                })().catch(() => {}),
+              );
             }
           }
           results.push('Transporters processed');
@@ -529,7 +638,9 @@ export class LookupService {
           const uniqueItems = new Map();
 
           for (const row of rows) {
-            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
             const code = getVal(row, 2);
             const description = getVal(row, 3) || '';
             if (code) {
@@ -543,12 +654,21 @@ export class LookupService {
           for (const item of uniqueItems.values()) {
             const { id, code, description } = item;
             if (id) {
-              promises.push(tx.plantCode.update({ where: { id }, data: { code, description } }).catch(() => {}));
+              promises.push(
+                tx.plantCode
+                  .update({ where: { id }, data: { code, description } })
+                  .catch(() => {}),
+              );
             } else {
-              promises.push((async () => {
-                const existing = await tx.plantCode.findFirst({ where: { code: { equals: code, mode: 'insensitive' } } });
-                if (!existing) await tx.plantCode.create({ data: { code, description } });
-              })().catch(() => {}));
+              promises.push(
+                (async () => {
+                  const existing = await tx.plantCode.findFirst({
+                    where: { code: { equals: code, mode: 'insensitive' } },
+                  });
+                  if (!existing)
+                    await tx.plantCode.create({ data: { code, description } });
+                })().catch(() => {}),
+              );
             }
           }
           results.push('Plant Codes processed');
@@ -561,7 +681,9 @@ export class LookupService {
           const uniqueItems = new Map();
 
           for (const row of rows) {
-            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
             const name = getVal(row, 2);
             if (name) {
               const key = name.toLowerCase();
@@ -574,12 +696,20 @@ export class LookupService {
           for (const item of uniqueItems.values()) {
             const { id, name } = item;
             if (id) {
-              promises.push(tx.salesZone.update({ where: { id }, data: { name } }).catch(() => {}));
+              promises.push(
+                tx.salesZone
+                  .update({ where: { id }, data: { name } })
+                  .catch(() => {}),
+              );
             } else {
-              promises.push((async () => {
-                const existing = await tx.salesZone.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                if (!existing) await tx.salesZone.create({ data: { name } });
-              })().catch(() => {}));
+              promises.push(
+                (async () => {
+                  const existing = await tx.salesZone.findFirst({
+                    where: { name: { equals: name, mode: 'insensitive' } },
+                  });
+                  if (!existing) await tx.salesZone.create({ data: { name } });
+                })().catch(() => {}),
+              );
             }
           }
           results.push('Sales Zones processed');
@@ -592,7 +722,9 @@ export class LookupService {
           const uniqueItems = new Map();
 
           for (const row of rows) {
-            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
             const configName = getVal(row, 2);
             if (configName) {
               const key = configName.toLowerCase();
@@ -605,12 +737,23 @@ export class LookupService {
           for (const item of uniqueItems.values()) {
             const { id, configName } = item;
             if (id) {
-              promises.push(tx.packConfig.update({ where: { id }, data: { configName } }).catch(() => {}));
+              promises.push(
+                tx.packConfig
+                  .update({ where: { id }, data: { configName } })
+                  .catch(() => {}),
+              );
             } else {
-              promises.push((async () => {
-                const existing = await tx.packConfig.findFirst({ where: { configName: { equals: configName, mode: 'insensitive' } } });
-                if (!existing) await tx.packConfig.create({ data: { configName } });
-              })().catch(() => {}));
+              promises.push(
+                (async () => {
+                  const existing = await tx.packConfig.findFirst({
+                    where: {
+                      configName: { equals: configName, mode: 'insensitive' },
+                    },
+                  });
+                  if (!existing)
+                    await tx.packConfig.create({ data: { configName } });
+                })().catch(() => {}),
+              );
             }
           }
           results.push('Packing Configs processed');
@@ -623,7 +766,9 @@ export class LookupService {
           const uniqueItems = new Map();
 
           for (const row of rows) {
-            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
             const name = getVal(row, 2);
             const address = getVal(row, 3) || '';
             const contactNumber = getVal(row, 4);
@@ -639,12 +784,18 @@ export class LookupService {
             const { id, name, address, contactNumber } = item;
             const data = { name, address, contactNumber };
             if (id) {
-              promises.push(tx.customer.update({ where: { id }, data }).catch(() => {}));
+              promises.push(
+                tx.customer.update({ where: { id }, data }).catch(() => {}),
+              );
             } else {
-              promises.push((async () => {
-                const existing = await tx.customer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                if (!existing) await tx.customer.create({ data });
-              })().catch(() => {}));
+              promises.push(
+                (async () => {
+                  const existing = await tx.customer.findFirst({
+                    where: { name: { equals: name, mode: 'insensitive' } },
+                  });
+                  if (!existing) await tx.customer.create({ data });
+                })().catch(() => {}),
+              );
             }
           }
           results.push('Customers processed');
@@ -657,7 +808,9 @@ export class LookupService {
           const uniqueItems = new Map();
 
           for (const row of rows) {
-            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
             const name = getVal(row, 2);
             if (name) {
               const key = name.toLowerCase();
@@ -670,12 +823,20 @@ export class LookupService {
           for (const item of uniqueItems.values()) {
             const { id, name } = item;
             if (id) {
-              promises.push(tx.printer.update({ where: { id }, data: { name } }).catch(() => {}));
+              promises.push(
+                tx.printer
+                  .update({ where: { id }, data: { name } })
+                  .catch(() => {}),
+              );
             } else {
-              promises.push((async () => {
-                const existing = await tx.printer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-                if (!existing) await tx.printer.create({ data: { name } });
-              })().catch(() => {}));
+              promises.push(
+                (async () => {
+                  const existing = await tx.printer.findFirst({
+                    where: { name: { equals: name, mode: 'insensitive' } },
+                  });
+                  if (!existing) await tx.printer.create({ data: { name } });
+                })().catch(() => {}),
+              );
             }
           }
           results.push('Printers processed');
@@ -688,7 +849,9 @@ export class LookupService {
           const uniqueItems = new Map();
 
           for (const row of rows) {
-            const id = row.getCell(1).value ? Number(row.getCell(1).value) : null;
+            const id = row.getCell(1).value
+              ? Number(row.getCell(1).value)
+              : null;
             const erpCode = getVal(row, 2);
             const mappingBarcode = getVal(row, 3);
             const group = getVal(row, 4);
@@ -699,22 +862,48 @@ export class LookupService {
             if (erpCode) {
               const key = erpCode.toLowerCase();
               if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
-                uniqueItems.set(key, { id, erpCode, mappingBarcode, group, acceptBulkData, remarksRequired, classification });
+                uniqueItems.set(key, {
+                  id,
+                  erpCode,
+                  mappingBarcode,
+                  group,
+                  acceptBulkData,
+                  remarksRequired,
+                  classification,
+                });
               }
             }
           }
 
           const newBarcodesData: any[] = [];
           for (const item of uniqueItems.values()) {
-            const { id, erpCode, mappingBarcode, group, acceptBulkData, remarksRequired, classification } = item;
-            const data = { erpCode, mappingBarcode, group, acceptBulkData, remarksRequired, classification };
-            
+            const {
+              id,
+              erpCode,
+              mappingBarcode,
+              group,
+              acceptBulkData,
+              remarksRequired,
+              classification,
+            } = item;
+            const data = {
+              erpCode,
+              mappingBarcode,
+              group,
+              acceptBulkData,
+              remarksRequired,
+              classification,
+            };
+
             if (id) {
               promises.push(
                 tx.materialBarcode
                   .update({ where: { id }, data })
                   .catch((err) => {
-                    console.error(`Failed to update MaterialBarcode ID ${id}:`, err.message);
+                    console.error(
+                      `Failed to update MaterialBarcode ID ${id}:`,
+                      err.message,
+                    );
                   }),
               );
             } else {
@@ -730,7 +919,10 @@ export class LookupService {
                   skipDuplicates: true, // Prisma handles exact duplicates natively here
                 })
                 .catch((err) => {
-                  console.error('Failed to bulk insert Material Barcodes:', err);
+                  console.error(
+                    'Failed to bulk insert Material Barcodes:',
+                    err,
+                  );
                   throw new BadRequestException(
                     'Bulk import failed for new Material Barcodes. Check logs for details.',
                   );
@@ -796,8 +988,10 @@ export class LookupService {
   }
 
   async getSystemConfig(key: string) {
-    const config = await this.prisma.systemConfig.findUnique({ where: { key } });
-    return config ? config : { key, value: "" }; 
+    const config = await this.prisma.systemConfig.findUnique({
+      where: { key },
+    });
+    return config ? config : { key, value: '' };
   }
 
   async upsertSystemConfig(key: string, value: string) {

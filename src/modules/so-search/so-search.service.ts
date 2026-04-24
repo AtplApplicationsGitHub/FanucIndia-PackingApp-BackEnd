@@ -37,12 +37,28 @@ export class SoSearchService {
     // --- NEW LOGIC: Intercept when no OBD is provided to check for multiples ---
     if (!obd) {
       const activeMatches = await this.prisma.salesOrder.findMany({
-        where: { saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' } },
-        select: { id: true, saleOrderNumber: true, outboundDelivery: true, userId: true, salesZoneId: true }
+        where: {
+          saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' },
+        },
+        select: {
+          id: true,
+          saleOrderNumber: true,
+          outboundDelivery: true,
+          userId: true,
+          salesZoneId: true,
+        },
       });
       const archiveMatches = await this.prisma.salesOrderArchive.findMany({
-        where: { saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' } },
-        select: { id: true, saleOrderNumber: true, outboundDelivery: true, userId: true, salesZoneId: true }
+        where: {
+          saleOrderNumber: { equals: saleOrderNumber, mode: 'insensitive' },
+        },
+        select: {
+          id: true,
+          saleOrderNumber: true,
+          outboundDelivery: true,
+          userId: true,
+          salesZoneId: true,
+        },
       });
 
       let allMatches = [...activeMatches, ...archiveMatches];
@@ -57,18 +73,24 @@ export class SoSearchService {
         allMatches = allMatches.filter(
           (o) =>
             o.userId === user.userId ||
-            (loggedInUser?.salesZoneId && loggedInUser.salesZoneId === o.salesZoneId)
+            (loggedInUser?.salesZoneId &&
+              loggedInUser.salesZoneId === o.salesZoneId),
         );
       }
 
       if (allMatches.length === 0) {
-        throw new NotFoundException(`Sales Order with number '${saleOrderNumber}' not found.`);
+        throw new NotFoundException(
+          `Sales Order with number '${saleOrderNumber}' not found.`,
+        );
       }
 
       // Deduplicate by OBD (to prevent listing duplicates if an order is moving states)
       const uniqueMap = new Map();
       for (const m of allMatches) {
-        uniqueMap.set(m.outboundDelivery, { saleOrderNumber: m.saleOrderNumber, outboundDelivery: m.outboundDelivery });
+        uniqueMap.set(m.outboundDelivery, {
+          saleOrderNumber: m.saleOrderNumber,
+          outboundDelivery: m.outboundDelivery,
+        });
       }
       const uniqueOrders = Array.from(uniqueMap.values());
 
@@ -128,7 +150,7 @@ export class SoSearchService {
 
       const canonicalSoNumber = salesOrder.saleOrderNumber;
 
-      const [dispatchSOs, materialDetails] = await Promise.all([
+      let [dispatchSOs, materialDetails] = await Promise.all([
         this.prisma.dispatch_SO.findMany({
           where: { salesOrderId: salesOrder.id },
           select: { dispatchId: true },
@@ -138,6 +160,9 @@ export class SoSearchService {
           orderBy: { ID: 'asc' },
         }),
       ]);
+
+      materialDetails =
+        await this.mapMaterialUserNamesToEmails(materialDetails);
 
       const dispatchIds = dispatchSOs.map((dso) => dso.dispatchId);
 
@@ -149,14 +174,14 @@ export class SoSearchService {
           attachments: true,
           UpdatedBy: true,
           UpdatedDate: true,
-          transporterName: true, 
+          transporterName: true,
           transporterId: true,
           transporter: { select: { name: true } },
           vehicleEntry: {
             select: {
               id: true,
-              attachments: true 
-            }
+              attachments: true,
+            },
           },
         },
       });
@@ -234,28 +259,50 @@ export class SoSearchService {
           );
         }
       }
-      
+
       const canonicalSoNumber = archivedSalesOrder.saleOrderNumber;
 
-      const [
-        dispatchSOArchives,
-        materialDetails,
-        materialFiles,
-        statusStepper,
-      ] = await Promise.all([
-        this.prisma.dispatch_SOArchive.findMany({ where: { saleOrderNumber: canonicalSoNumber }, select: { dispatchId: true } }), 
-        this.prisma.eRP_Material_DataArchive.findMany({ where: { saleOrderNumber: canonicalSoNumber }, orderBy: { ID: 'asc' } }), 
-        this.prisma.eRP_Material_FileArchive.findMany({ where: { saleOrderNumber: canonicalSoNumber } }), 
-        this.prisma.sO_Status_StepperArchive.findMany({ where: { salesOrderNumber: canonicalSoNumber } }), 
-      ]);
+      let [dispatchSOArchives, materialDetails, materialFiles, statusStepper] =
+        await Promise.all([
+          this.prisma.dispatch_SOArchive.findMany({
+            where: { saleOrderNumber: canonicalSoNumber },
+            select: { dispatchId: true },
+          }),
+          this.prisma.eRP_Material_DataArchive.findMany({
+            where: { saleOrderNumber: canonicalSoNumber },
+            orderBy: { ID: 'asc' },
+          }),
+          this.prisma.eRP_Material_FileArchive.findMany({
+            where: { saleOrderNumber: canonicalSoNumber },
+          }),
+          this.prisma.sO_Status_StepperArchive.findMany({
+            where: { salesOrderNumber: canonicalSoNumber },
+          }),
+        ]);
 
-      const [product, customer, transporter, salesZone, packConfig] = await Promise.all([
-        this.prisma.product.findUnique({ where: { id: archivedSalesOrder.productId } }),
-        archivedSalesOrder.customerId ? this.prisma.customer.findUnique({ where: { id: archivedSalesOrder.customerId } }) : null,
-        this.prisma.transporter.findUnique({ where: { id: archivedSalesOrder.transporterId } }),
-        this.prisma.salesZone.findUnique({ where: { id: archivedSalesOrder.salesZoneId } }),
-        this.prisma.packConfig.findUnique({ where: { id: archivedSalesOrder.packConfigId } }),
-      ]);
+      materialDetails =
+        await this.mapMaterialUserNamesToEmails(materialDetails);
+
+      const [product, customer, transporter, salesZone, packConfig] =
+        await Promise.all([
+          this.prisma.product.findUnique({
+            where: { id: archivedSalesOrder.productId },
+          }),
+          archivedSalesOrder.customerId
+            ? this.prisma.customer.findUnique({
+                where: { id: archivedSalesOrder.customerId },
+              })
+            : null,
+          this.prisma.transporter.findUnique({
+            where: { id: archivedSalesOrder.transporterId },
+          }),
+          this.prisma.salesZone.findUnique({
+            where: { id: archivedSalesOrder.salesZoneId },
+          }),
+          this.prisma.packConfig.findUnique({
+            where: { id: archivedSalesOrder.packConfigId },
+          }),
+        ]);
 
       const salesOrderWithDetails = {
         ...archivedSalesOrder,
@@ -268,7 +315,7 @@ export class SoSearchService {
 
       const dispatchIds = dispatchSOArchives.map((d) => d.dispatchId);
 
-      const archivedDispatchesRaw = await this.prisma.dispatchArchive.findMany({ 
+      const archivedDispatchesRaw = await this.prisma.dispatchArchive.findMany({
         where: { id: { in: dispatchIds } },
         select: {
           id: true,
@@ -279,27 +326,43 @@ export class SoSearchService {
           transporterName: true,
           transporterId: true,
           vehicleEntryId: true,
-        }
+        },
       });
-      
-      const dispatchTransporterIds = [...new Set(archivedDispatchesRaw.map(d => d.transporterId).filter(Boolean))] as number[];
-      const vehicleEntryIds = [...new Set(archivedDispatchesRaw.map(d => d.vehicleEntryId).filter(Boolean))] as number[];
+
+      const dispatchTransporterIds = [
+        ...new Set(
+          archivedDispatchesRaw.map((d) => d.transporterId).filter(Boolean),
+        ),
+      ] as number[];
+      const vehicleEntryIds = [
+        ...new Set(
+          archivedDispatchesRaw.map((d) => d.vehicleEntryId).filter(Boolean),
+        ),
+      ] as number[];
 
       const [dispatchTransporters, vehicleEntries] = await Promise.all([
-        this.prisma.transporter.findMany({ where: { id: { in: dispatchTransporterIds } } }),
-        this.prisma.vehicleEntryArchive.findMany({ 
+        this.prisma.transporter.findMany({
+          where: { id: { in: dispatchTransporterIds } },
+        }),
+        this.prisma.vehicleEntryArchive.findMany({
           where: { id: { in: vehicleEntryIds } },
-          select: { id: true, attachments: true } 
+          select: { id: true, attachments: true },
         }),
       ]);
-      
-      const transporterMap = new Map(dispatchTransporters.map(t => [t.id, t]));
-      const vehicleEntryMap = new Map(vehicleEntries.map(ve => [ve.id, ve]));
 
-      const dispatchInfo = archivedDispatchesRaw.map(dispatch => ({
+      const transporterMap = new Map(
+        dispatchTransporters.map((t) => [t.id, t]),
+      );
+      const vehicleEntryMap = new Map(vehicleEntries.map((ve) => [ve.id, ve]));
+
+      const dispatchInfo = archivedDispatchesRaw.map((dispatch) => ({
         ...dispatch,
-        transporter: dispatch.transporterId ? transporterMap.get(dispatch.transporterId) : null,
-        vehicleEntry: dispatch.vehicleEntryId ? vehicleEntryMap.get(dispatch.vehicleEntryId) : null,
+        transporter: dispatch.transporterId
+          ? transporterMap.get(dispatch.transporterId)
+          : null,
+        vehicleEntry: dispatch.vehicleEntryId
+          ? vehicleEntryMap.get(dispatch.vehicleEntryId)
+          : null,
       }));
 
       const result = {
@@ -315,5 +378,44 @@ export class SoSearchService {
     throw new NotFoundException(
       `Sales Order with number '${saleOrderNumber}' not found.`,
     );
+  }
+
+  private async mapMaterialUserNamesToEmails(materialDetails: any[]) {
+    if (!materialDetails || materialDetails.length === 0)
+      return materialDetails;
+
+    const userNames = Array.from(
+      new Set(
+        materialDetails
+          .flatMap((m) => [m.IssueUpdatedBy, m.PackingUpdatedBy])
+          .filter((v): v is string => !!v && typeof v === 'string')
+          .map((v) => v.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (userNames.length === 0) return materialDetails;
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        name: { in: userNames },
+      },
+      select: {
+        name: true,
+        email: true,
+      },
+    });
+
+    const emailMap = new Map(users.map((u) => [u.name, u.email || u.name]));
+
+    return materialDetails.map((m) => ({
+      ...m,
+      IssueUpdatedBy: m.IssueUpdatedBy
+        ? emailMap.get(m.IssueUpdatedBy) || m.IssueUpdatedBy
+        : m.IssueUpdatedBy,
+      PackingUpdatedBy: m.PackingUpdatedBy
+        ? emailMap.get(m.PackingUpdatedBy) || m.PackingUpdatedBy
+        : m.PackingUpdatedBy,
+    }));
   }
 }
