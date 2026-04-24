@@ -37,7 +37,7 @@ function getDayBoundariesIST(date: Date) {
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async getAdminKpis(dateStr?: string): Promise<AdminKpiDto> {
     if (dateStr) {
@@ -402,7 +402,9 @@ export class DashboardService {
     return results;
   }
 
-  async getAdminDispatchSummary(dateStr?: string): Promise<AdminDispatchSummaryDto> {
+  async getAdminDispatchSummary(
+    dateStr?: string,
+  ): Promise<AdminDispatchSummaryDto> {
     const targetDate = dateStr ? new Date(dateStr) : new Date();
     const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
 
@@ -785,9 +787,9 @@ export class DashboardService {
           : i === 1
             ? `Yesterday (${targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
             : targetDate.toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-            });
+                month: 'short',
+                day: 'numeric',
+              });
       results.push({ dayLabel, date: formattedDate, count });
     }
     return results;
@@ -818,10 +820,10 @@ export class DashboardService {
           : i === 1
             ? `Tomorrow (${targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
             : targetDate.toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              weekday: 'short',
-            });
+                month: 'short',
+                day: 'numeric',
+                weekday: 'short',
+              });
       results.push({ dayLabel, date: formattedDate, count });
     }
     return results;
@@ -1028,10 +1030,18 @@ export class DashboardService {
         if (group.status === null) cust.toBeIssuedCount = group._count.id;
         else {
           switch (group.status) {
-            case 'R105': cust.r105Count = group._count.id; break;
-            case 'W105': cust.w105Count = group._count.id; break;
-            case 'F105': cust.f105Count = group._count.id; break;
-            case 'Dispatched': cust.dispatchedCount = group._count.id; break;
+            case 'R105':
+              cust.r105Count = group._count.id;
+              break;
+            case 'W105':
+              cust.w105Count = group._count.id;
+              break;
+            case 'F105':
+              cust.f105Count = group._count.id;
+              break;
+            case 'Dispatched':
+              cust.dispatchedCount = group._count.id;
+              break;
           }
         }
       }
@@ -1092,9 +1102,11 @@ export class DashboardService {
   }
 
   async getOperatorStats(dateStr?: string) {
+    const targetDate = dateStr ? new Date(dateStr) : new Date();
+    const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
 
     const operators = await this.prisma.user.findMany({
-      where: { role: "USER" },
+      where: { role: 'USER' },
       select: { id: true, name: true, email: true },
     });
 
@@ -1109,12 +1121,13 @@ export class DashboardService {
     }));
 
     const addOrder = (array: any[], orderData: any) => {
-      const obd = orderData.outboundDelivery || "-";
+      const obd = orderData.outboundDelivery || '-';
+
       if (
-        !array.find(
+        !array.some(
           (o) =>
             o.saleOrderNumber === orderData.saleOrderNumber &&
-            o.outboundDelivery === obd
+            o.outboundDelivery === obd,
         )
       ) {
         array.push({
@@ -1124,151 +1137,105 @@ export class DashboardService {
       }
     };
 
-    // Default to today if dateStr is not provided
-    const targetDate = dateStr ? new Date(dateStr) : new Date();
-    const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
-    const isToday = targetDate.toDateString() === new Date().toDateString();
+    const issueCompletedStatuses = [
+      'W105',
+      'F105',
+      'Packed',
+      'WIP Storage',
+      'Ready for Dispatch',
+      'Dispatched',
+    ];
 
-    // 1. Fetch all status transitions for the date range (Work done on that specific day)
-    const transitions = await this.prisma.sO_Status_Stepper.findMany({
+    const packingCompletedStatuses = [
+      'F105',
+      'Packed',
+      'WIP Storage',
+      'Ready for Dispatch',
+      'Dispatched',
+    ];
+
+    const orders = await this.prisma.salesOrder.findMany({
       where: {
-        createdDateTime: { gte: startOfDay, lt: endOfDay },
-        status: { in: ["Under Issue", "Under Packing", "Issued", "Packed"] },
+        deliveryDate: {
+          gte: startOfDay,
+          lt: endOfDay,
+        },
+        OR: [
+          { issueAssignedUserId: { not: null } },
+          { packingAssignedUserId: { not: null } },
+        ],
       },
       select: {
+        saleOrderNumber: true,
+        outboundDelivery: true,
         status: true,
-        salesOrderNumber: true,
-        salesOrder: {
-          select: {
-            outboundDelivery: true,
-            issueAssignedUserId: true,
-            packingAssignedUserId: true,
-          },
+        issueAssignedUserId: true,
+        packingAssignedUserId: true,
+        issueAssignedUser: {
+          select: { role: true },
+        },
+        packingAssignedUser: {
+          select: { role: true },
         },
       },
     });
 
-    transitions.forEach((st) => {
-      const orderData = {
-        saleOrderNumber: st.salesOrderNumber,
-        outboundDelivery: st.salesOrder?.outboundDelivery || "-",
-      };
-
-      // Handle Issue Stage
-      if (st.salesOrder?.issueAssignedUserId) {
+    orders.forEach((order) => {
+      if (
+        order.issueAssignedUserId &&
+        order.issueAssignedUser?.role === 'USER'
+      ) {
         const stat = stats.find(
-          (s) => s.operatorId === st.salesOrder.issueAssignedUserId
+          (s) => s.operatorId === order.issueAssignedUserId,
         );
+
         if (stat) {
-          if (st.status === "Under Issue" || st.status === "Issued") {
-            addOrder(stat.issueAssigned, orderData);
-          }
-          if (st.status === "Issued") {
-            addOrder(stat.issueCompleted, orderData);
+          if (issueCompletedStatuses.includes(order.status || '')) {
+            addOrder(stat.issueCompleted, order);
+          } else {
+            addOrder(stat.issueAssigned, order);
           }
         }
       }
 
-      // Handle Packing Stage
-      if (st.salesOrder?.packingAssignedUserId) {
+      if (
+        order.packingAssignedUserId &&
+        order.packingAssignedUser?.role === 'USER'
+      ) {
         const stat = stats.find(
-          (s) => s.operatorId === st.salesOrder.packingAssignedUserId
+          (s) => s.operatorId === order.packingAssignedUserId,
         );
+
         if (stat) {
-          if (st.status === "Under Packing" || st.status === "Packed") {
-            addOrder(stat.packingAssigned, orderData);
-          }
-          if (st.status === "Packed") {
-            addOrder(stat.packingCompleted, orderData);
+          if (packingCompletedStatuses.includes(order.status || '')) {
+            addOrder(stat.packingCompleted, order);
+          } else {
+            addOrder(stat.packingAssigned, order);
           }
         }
       }
     });
 
-    // 2. If it's TODAY, also include CURRENTLY assigned orders that are not yet completed
-    if (isToday) {
-      const activeOrders = await this.prisma.salesOrder.findMany({
-        where: {
-          OR: [
-            { issueAssignedUserId: { not: null } },
-            { packingAssignedUserId: { not: null } },
-          ],
-          status: { not: "Dispatched" },
-        },
-        select: {
-          issueAssignedUserId: true,
-          packingAssignedUserId: true,
-          status: true,
-          saleOrderNumber: true,
-          outboundDelivery: true,
-        },
-      });
-
-      const issueCompStatuses = [
-        "W105",
-        "F105",
-        "Packed",
-        "WIP Storage",
-        "Ready for Dispatch",
-        "Dispatched",
-      ];
-      const packingCompStatuses = [
-        "F105",
-        "Packed",
-        "WIP Storage",
-        "Ready for Dispatch",
-        "Dispatched",
-      ];
-
-      activeOrders.forEach((o) => {
-        if (o.issueAssignedUserId) {
-          const stat = stats.find((s) => s.operatorId === o.issueAssignedUserId);
-          if (stat && !issueCompStatuses.includes(o.status || "")) {
-            addOrder(stat.issueAssigned, o);
-          }
-        }
-        if (o.packingAssignedUserId) {
-          const stat = stats.find(
-            (s) => s.operatorId === o.packingAssignedUserId
-          );
-          if (stat && !packingCompStatuses.includes(o.status || "")) {
-            addOrder(stat.packingAssigned, o);
-          }
-        }
-      });
-    }
-
-    const finalData = stats.map(({ operatorId, ...rest }) => {
-      const filteredIssueAssigned = rest.issueAssigned.filter(
-        (a) => !rest.issueCompleted.some(
-          (c) => c.saleOrderNumber === a.saleOrderNumber && c.outboundDelivery === a.outboundDelivery
-        )
-      );
-      const filteredPackingAssigned = rest.packingAssigned.filter(
-        (a) => !rest.packingCompleted.some(
-          (c) => c.saleOrderNumber === a.saleOrderNumber && c.outboundDelivery === a.outboundDelivery
-        )
-      );
-
-      return {
-        ...rest,
-        issueAssigned: filteredIssueAssigned,
-        packingAssigned: filteredPackingAssigned,
-        issueAssignedCount: filteredIssueAssigned.length,
-        issueCompletedCount: rest.issueCompleted.length,
-        packingAssignedCount: filteredPackingAssigned.length,
-        packingCompletedCount: rest.packingCompleted.length,
-      };
-    });
+    const finalData = stats.map(({ operatorId, ...rest }) => ({
+      ...rest,
+      issueAssignedCount: rest.issueAssigned.length,
+      issueCompletedCount: rest.issueCompleted.length,
+      packingAssignedCount: rest.packingAssigned.length,
+      packingCompletedCount: rest.packingCompleted.length,
+    }));
 
     finalData.sort(
       (a, b) =>
         b.issueAssignedCount +
-        b.packingAssignedCount -
-        (a.issueAssignedCount + a.packingAssignedCount)
+        b.issueCompletedCount +
+        b.packingAssignedCount +
+        b.packingCompletedCount -
+        (a.issueAssignedCount +
+          a.issueCompletedCount +
+          a.packingAssignedCount +
+          a.packingCompletedCount),
     );
 
     return { success: true, data: finalData };
   }
 }
-
