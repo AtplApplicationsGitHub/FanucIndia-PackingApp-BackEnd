@@ -238,8 +238,8 @@ export class ErpMaterialImporterService {
     }
   }
 
-  @Cron('0 12 * * *', {
-    timeZone: 'Asia/Kolkata',
+  @Cron(process.env.ARCHIVE_CLEANUP_CRON || '0 12 * * *', {
+    timeZone: process.env.ARCHIVE_CLEANUP_TIMEZONE || 'Asia/Kolkata',
   })
   async cleanupOldArchiveFiles() {
     this.logger.log('Running scheduled cleanup of SFTP archive folder...');
@@ -248,8 +248,9 @@ export class ErpMaterialImporterService {
       process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
     const archiveDir = path.posix.join(baseDir, 'archive');
 
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    const cutoffTime = Date.now() - thirtyDaysMs;
+    const cleanupDays = parseInt(process.env.ARCHIVE_CLEANUP_DAYS || '30', 10);
+    const cleanupDaysMs = cleanupDays * 24 * 60 * 60 * 1000;
+    const cutoffTime = Date.now() - cleanupDaysMs;
 
     try {
       const files = (await this.sftpService.list(archiveDir)) as Array<{
@@ -289,13 +290,13 @@ export class ErpMaterialImporterService {
           deletedCount++;
 
           this.logger.log(
-            `Deleted archive file older than 30 days: ${file.name}`,
+            `Deleted archive file older than ${cleanupDays} days: ${file.name}`,
           );
         }
       }
 
       this.logger.log(
-        `Archive cleanup completed. Deleted ${deletedCount} old file(s).`,
+        `Archive cleanup completed. Deleted ${deletedCount} file(s) older than ${cleanupDays} days.`,
       );
     } catch (error) {
       this.logger.error('Failed to cleanup old archive files.', error);
