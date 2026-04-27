@@ -137,31 +137,31 @@ export class ErpMaterialImporterService {
       'Running automated scheduled scan of SFTP active folder...',
     );
 
-    // const baseDir =
-    //   process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
-    // const activeDir = path.posix.join(baseDir, 'active');
+    const baseDir =
+      process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    const activeDir = path.posix.join(baseDir, 'active');
 
     try {
-      // const files = (await this.sftpService.list(activeDir)) as Array<{
-      //   type: string;
-      //   name: string;
-      // }>;
-      // const soNumbersFromFiles: string[] = [];
+      const files = (await this.sftpService.list(activeDir)) as Array<{
+        type: string;
+        name: string;
+      }>;
+      const soNumbersFromFiles: string[] = [];
 
-      // for (const file of files) {
-      //   if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
-      //     continue;
-      //   }
+      for (const file of files) {
+        if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
+          continue;
+        }
 
-      //   const baseName = file.name.replace('.xlsx', '');
-      //   const nameParts = baseName.split('_');
+        const baseName = file.name.replace('.xlsx', '');
+        const nameParts = baseName.split('_');
 
-      //   if (nameParts.length !== 2) {
-      //     continue;
-      //   }
+        if (nameParts.length !== 2) {
+          continue;
+        }
 
-      //   soNumbersFromFiles.push(nameParts[0]);
-      // }
+        soNumbersFromFiles.push(nameParts[0]);
+      }
 
       const istOffsetMs = 5.5 * 60 * 60 * 1000;
 
