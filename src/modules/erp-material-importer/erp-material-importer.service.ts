@@ -185,12 +185,12 @@ export class ErpMaterialImporterService {
                 lt: startOfTomorrowUtc,
               },
             },
-            {
-              deliveryDate: {
-                lt: startOfTodayUtc,
-              },
-              isErpImported: 0,
-            },
+            // {
+            //   deliveryDate: {
+            //     lt: startOfTodayUtc,
+            //   },
+            //   isErpImported: 0,
+            // },
           ],
         },
         select: { saleOrderNumber: true },
@@ -202,7 +202,7 @@ export class ErpMaterialImporterService {
 
       if (validSoNumbers.length > 0) {
         this.logger.log(
-          `Auto-scan found ${validSoNumbers.length} eligible orders: today's delivery orders and old pending ERP imports. Delegating to bulk import...`,
+          `Auto-scan found ${validSoNumbers.length} eligible orders for today's delivery date.`,
         );
 
         const result = await this.bulkImportFromDrive(
@@ -230,7 +230,7 @@ export class ErpMaterialImporterService {
         );
       } else {
         this.logger.log(
-          `No eligible orders found for today's delivery date or old pending ERP imports. Skipping import.`,
+          `No eligible orders found for today's delivery date.`,
         );
       }
     } catch (error) {
