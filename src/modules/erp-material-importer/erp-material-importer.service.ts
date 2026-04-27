@@ -11,7 +11,7 @@ import { Prisma } from '@prisma/client';
 import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import { Response } from 'express';
-import { Interval } from '@nestjs/schedule';
+import { Cron, Interval } from '@nestjs/schedule';
 import AdmZip from 'adm-zip';
 
 const columnMapping = {
@@ -235,6 +235,70 @@ export class ErpMaterialImporterService {
       }
     } catch (error) {
       this.logger.error('Failed to execute automated SFTP folder scan.', error);
+    }
+  }
+
+  @Cron('0 12 * * *', {
+    timeZone: 'Asia/Kolkata',
+  })
+  async cleanupOldArchiveFiles() {
+    this.logger.log('Running scheduled cleanup of SFTP archive folder...');
+
+    const baseDir =
+      process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    const archiveDir = path.posix.join(baseDir, 'archive');
+
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const cutoffTime = Date.now() - thirtyDaysMs;
+
+    try {
+      const files = (await this.sftpService.list(archiveDir)) as Array<{
+        type: string;
+        name: string;
+        modifyTime?: number;
+        accessTime?: number;
+        mtime?: number;
+        modifyTimeMs?: number;
+        mtimeMs?: number;
+      }>;
+
+      let deletedCount = 0;
+
+      for (const file of files) {
+        if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
+          continue;
+        }
+
+        const fileTime =
+          file.modifyTime ||
+          file.accessTime ||
+          (file as any).mtime ||
+          (file as any).modifyTimeMs ||
+          (file as any).mtimeMs;
+
+        if (!fileTime) {
+          this.logger.warn(
+            `Skipping archive cleanup for ${file.name}: no valid timestamp found.`,
+          );
+          continue;
+        }
+
+        if (fileTime <= cutoffTime) {
+          const filePath = path.posix.join(archiveDir, file.name);
+          await this.sftpService.delete(filePath);
+          deletedCount++;
+
+          this.logger.log(
+            `Deleted archive file older than 30 days: ${file.name}`,
+          );
+        }
+      }
+
+      this.logger.log(
+        `Archive cleanup completed. Deleted ${deletedCount} old file(s).`,
+      );
+    } catch (error) {
+      this.logger.error('Failed to cleanup old archive files.', error);
     }
   }
 
