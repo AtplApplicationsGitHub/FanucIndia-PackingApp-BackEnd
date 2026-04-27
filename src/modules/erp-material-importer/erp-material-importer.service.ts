@@ -53,7 +53,7 @@ export class ErpMaterialImporterService {
 
   constructor(
     private prisma: PrismaService,
-    private sftpService: SftpService, 
+    private sftpService: SftpService,
   ) {}
 
   /**
@@ -71,37 +71,47 @@ export class ErpMaterialImporterService {
         if (zipEntry.entryName.endsWith('.xml')) {
           let originalContent = zipEntry.getData().toString('utf8');
           let repairedContent = originalContent;
-          
-          // STEP 1: Fix unescaped Ampersands (&) globally. 
+
+          // STEP 1: Fix unescaped Ampersands (&) globally.
           // Safe because we use a lookahead to ignore already valid XML entities.
-          repairedContent = repairedContent.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[a-fA-F\d]+);)/g, '&amp;');
-          
-          // STEP 2: Fix unescaped Less-Than (<) and Greater-Than (>) 
+          repairedContent = repairedContent.replace(
+            /&(?!(amp|lt|gt|quot|apos|#\d+|#x[a-fA-F\d]+);)/g,
+            '&amp;',
+          );
+
+          // STEP 2: Fix unescaped Less-Than (<) and Greater-Than (>)
           // We target ONLY the data sitting inside Excel text tags: <t> ... </t>
           // The 's' flag allows the regex to match across multiple lines if needed.
-          repairedContent = repairedContent.replace(/<t([^>]*)>(.*?)<\/t>/gs, (match, attributes, innerText) => {
-            
-            // Sanitize the actual text content by escaping dangerous characters
-            const sanitizedText = innerText
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;')
-              .replace(/'/g, '&apos;');
-              
-            // Reconstruct the XML tag with the clean text
-            return `<t${attributes}>${sanitizedText}</t>`;
-          });
+          repairedContent = repairedContent.replace(
+            /<t([^>]*)>(.*?)<\/t>/gs,
+            (match, attributes, innerText) => {
+              // Sanitize the actual text content by escaping dangerous characters
+              const sanitizedText = innerText
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+
+              // Reconstruct the XML tag with the clean text
+              return `<t${attributes}>${sanitizedText}</t>`;
+            },
+          );
 
           if (originalContent !== repairedContent) {
             // Update the file in the zip archive if changes were made
-            zip.updateFile(zipEntry.entryName, Buffer.from(repairedContent, 'utf8'));
+            zip.updateFile(
+              zipEntry.entryName,
+              Buffer.from(repairedContent, 'utf8'),
+            );
             repairedCount++;
           }
         }
       });
 
       if (repairedCount > 0) {
-        this.logger.log(`Repaired XML special characters in ${repairedCount} internal file(s).`);
+        this.logger.log(
+          `Repaired XML special characters in ${repairedCount} internal file(s).`,
+        );
       }
 
       // Return the newly packed zip buffer
@@ -120,72 +130,91 @@ export class ErpMaterialImporterService {
     const currentHourIst = istTime.getUTCHours();
 
     if (currentHourIst < 7 || currentHourIst >= 24) {
-      return; 
+      return;
     }
 
-    this.logger.log('Running automated scheduled scan of SFTP active folder...');
+    this.logger.log(
+      'Running automated scheduled scan of SFTP active folder...',
+    );
 
-    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
-    const activeDir = path.posix.join(baseDir, 'active');
+    // const baseDir =
+    //   process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    // const activeDir = path.posix.join(baseDir, 'active');
 
     try {
-      const files = (await this.sftpService.list(activeDir)) as Array<{ type: string; name: string }>;
-      const soNumbersFromFiles: string[] = [];
+      // const files = (await this.sftpService.list(activeDir)) as Array<{
+      //   type: string;
+      //   name: string;
+      // }>;
+      // const soNumbersFromFiles: string[] = [];
 
-      for (const file of files) {
-        if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
-          continue; 
-        }
+      // for (const file of files) {
+      //   if (file.type !== '-' || !file.name.endsWith('.xlsx')) {
+      //     continue;
+      //   }
 
-        const baseName = file.name.replace('.xlsx', '');
-        const nameParts = baseName.split('_');
+      //   const baseName = file.name.replace('.xlsx', '');
+      //   const nameParts = baseName.split('_');
 
-        if (nameParts.length !== 2) {
-          continue; 
-        }
+      //   if (nameParts.length !== 2) {
+      //     continue;
+      //   }
 
-        soNumbersFromFiles.push(nameParts[0]);
-      }
+      //   soNumbersFromFiles.push(nameParts[0]);
+      // }
 
       const istOffsetMs = 5.5 * 60 * 60 * 1000;
-      
+
       const year = istTime.getUTCFullYear();
       const month = istTime.getUTCMonth();
       const date = istTime.getUTCDate();
 
-      const startOfTodayUtc = new Date(Date.UTC(year, month, date) - istOffsetMs);
-      const startOfTomorrowUtc = new Date(Date.UTC(year, month, date + 1) - istOffsetMs);
+      const startOfTodayUtc = new Date(
+        Date.UTC(year, month, date) - istOffsetMs,
+      );
+      const startOfTomorrowUtc = new Date(
+        Date.UTC(year, month, date + 1) - istOffsetMs,
+      );
 
-      const todayOrders = await this.prisma.salesOrder.findMany({
+      const eligibleOrders = await this.prisma.salesOrder.findMany({
         where: {
-          deliveryDate: {
-            gte: startOfTodayUtc,
-            lt: startOfTomorrowUtc
-          },
           OR: [
-            { saleOrderNumber: { in: soNumbersFromFiles } },
-            { isErpImported: 0 }
-          ]
+            {
+              deliveryDate: {
+                gte: startOfTodayUtc,
+                lt: startOfTomorrowUtc,
+              },
+            },
+            {
+              deliveryDate: {
+                lt: startOfTodayUtc,
+              },
+              isErpImported: 0,
+            },
+          ],
         },
-        select: { saleOrderNumber: true }
+        select: { saleOrderNumber: true },
       });
 
-      const validSoNumbers = [...new Set(todayOrders.map(o => o.saleOrderNumber))];
+      const validSoNumbers = [
+        ...new Set(eligibleOrders.map((o) => o.saleOrderNumber)),
+      ];
 
       if (validSoNumbers.length > 0) {
-        this.logger.log(`Auto-scan found ${validSoNumbers.length} eligible orders for today (Pending or matched). Delegating to bulk import...`);
-        
-        const result = await this.bulkImportFromDrive(
-          validSoNumbers, 
-          'System Auto Job',
-          { gte: startOfTodayUtc, lt: startOfTomorrowUtc }
+        this.logger.log(
+          `Auto-scan found ${validSoNumbers.length} eligible orders: today's delivery orders and old pending ERP imports. Delegating to bulk import...`,
         );
-        
+
+        const result = await this.bulkImportFromDrive(
+          validSoNumbers,
+          'System Auto Job',
+        );
+
         const logsToInsert = result.summary
           .filter((s: any) => s.status !== 'Skipped')
           .map((s: any) => ({
             saleOrderNumber: s.soNumber,
-            status: s.status, 
+            status: s.status,
             message: s.reason,
             createdAt: new Date(),
           }));
@@ -195,10 +224,14 @@ export class ErpMaterialImporterService {
             data: logsToInsert,
           });
         }
-        
-        this.logger.log(`Auto-scan bulk import completed. Summary: ${JSON.stringify(result.summary)}`);
+
+        this.logger.log(
+          `Auto-scan bulk import completed. Summary: ${JSON.stringify(result.summary)}`,
+        );
       } else {
-        this.logger.log('No eligible orders found for today (neither files matching nor pending ERP imports). Skipping import.');
+        this.logger.log(
+          `No eligible orders found for today's delivery date or old pending ERP imports. Skipping import.`,
+        );
       }
     } catch (error) {
       this.logger.error('Failed to execute automated SFTP folder scan.', error);
@@ -219,8 +252,9 @@ export class ErpMaterialImporterService {
       );
     }
 
-    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
-    
+    const baseDir =
+      process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+
     // Ensure we use POSIX paths for SFTP
     const activeDir = path.posix.join(baseDir, 'active');
     const archivedDir = path.posix.join(baseDir, 'archive');
@@ -244,14 +278,17 @@ export class ErpMaterialImporterService {
       fileBuffer = await this.sftpService.getBuffer(filePath);
     } catch (err) {
       this.logger.error(`Failed to read file from SFTP: ${filePath}`, err);
-      throw new InternalServerErrorException('Failed to read the file from drive.');
+      throw new InternalServerErrorException(
+        'Failed to read the file from drive.',
+      );
     }
 
     const mockFile: Express.Multer.File = {
       fieldname: 'file',
       originalname: filename,
       encoding: '7bit',
-      mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      mimetype:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       buffer: fileBuffer,
       size: fileBuffer.length,
       destination: activeDir,
@@ -261,16 +298,31 @@ export class ErpMaterialImporterService {
     };
 
     try {
-      const result = await this.processFile(mockFile, saleOrderNumber, username);
+      const result = await this.processFile(
+        mockFile,
+        saleOrderNumber,
+        username,
+      );
+
+      await this.prisma.eRP_Data_Cron_Logs.create({
+        data: {
+          saleOrderNumber: `${saleOrderNumber}_${so.outboundDelivery}`,
+          status: 'Success',
+          message: 'Imported successfully - MANUAL',
+          createdAt: new Date(),
+        },
+      });
 
       const archivePath = path.posix.join(archivedDir, filename);
-      
+
       if (await this.sftpService.exists(archivePath)) {
         await this.sftpService.delete(archivePath);
       }
-      
+
       await this.sftpService.rename(filePath, archivePath);
-      this.logger.log(`Moved file to SFTP Archive (Overwrite allowed): ${archivePath}`);
+      this.logger.log(
+        `Moved file to SFTP Archive (Overwrite allowed): ${archivePath}`,
+      );
 
       return result;
     } catch (error) {
@@ -280,13 +332,15 @@ export class ErpMaterialImporterService {
       );
       try {
         const errorPath = path.posix.join(errorDir, filename);
-        
+
         if (await this.sftpService.exists(errorPath)) {
           await this.sftpService.delete(errorPath);
         }
 
         await this.sftpService.rename(filePath, errorPath);
-        this.logger.log(`Moved file to SFTP Error (Overwrite allowed): ${errorPath}`);
+        this.logger.log(
+          `Moved file to SFTP Error (Overwrite allowed): ${errorPath}`,
+        );
       } catch (moveErr) {
         this.logger.error(
           `Failed to move file ${filename} to Error folder on SFTP`,
@@ -300,7 +354,8 @@ export class ErpMaterialImporterService {
   async processFile(
     file: Express.Multer.File,
     expectedSaleOrderNumber?: string,
-    username: string = 'ERP Import'
+    username: string = 'ERP Import',
+    logToCronTable: boolean = false,
   ) {
     this.logger.log(`Starting to process file: ${file.originalname}`);
 
@@ -331,6 +386,20 @@ export class ErpMaterialImporterService {
           noOfFilesExecuted: 1,
         },
       });
+
+      if (logToCronTable) {
+        const obd = String(records[0]['FG OBD']);
+
+        await this.prisma.eRP_Data_Cron_Logs.create({
+          data: {
+            saleOrderNumber: `${soNumber}_${obd}`,
+            status: 'Success',
+            message: 'Imported successfully - MANUAL',
+            createdAt: new Date(),
+          },
+        });
+      }
+
       this.logger.log(`Successfully logged import for SO: ${soNumber}`);
     } catch (logError) {
       this.logger.error(
@@ -346,14 +415,18 @@ export class ErpMaterialImporterService {
   }
 
   async bulkImportFromDrive(
-    saleOrderNumbers: string[], 
-    username: string, 
-    dateRange?: { gte: Date; lt?: Date; lte?: Date; }
+    saleOrderNumbers: string[],
+    username: string,
+    dateRange?: { gte: Date; lt?: Date; lte?: Date },
+    logManualToCronTable: boolean = false,
   ) {
-    this.logger.log(`Initiating Bulk Drive Import for ${saleOrderNumbers.length} SOs`);
+    this.logger.log(
+      `Initiating Bulk Drive Import for ${saleOrderNumbers.length} SOs`,
+    );
 
     const results: { soNumber: string; status: string; reason: string }[] = [];
-    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    const baseDir =
+      process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
     const activeDir = path.posix.join(baseDir, 'active');
     const archivedDir = path.posix.join(baseDir, 'archive');
     const errorDir = path.posix.join(baseDir, 'error');
@@ -374,27 +447,35 @@ export class ErpMaterialImporterService {
 
     const salesOrders = await this.prisma.salesOrder.findMany({
       where: whereClause,
-      select: { 
-        saleOrderNumber: true, 
+      select: {
+        saleOrderNumber: true,
         outboundDelivery: true,
         isErpImported: true,
-        _count: { select: { materialData: true } } 
+        _count: { select: { materialData: true } },
       },
     });
 
     for (const so of salesOrders) {
       const soNumber = so.saleOrderNumber;
       const obd = so.outboundDelivery;
-      
+
       const displayId = obd ? `${soNumber}_${obd}` : soNumber;
 
       if (so.isErpImported === 1 || so._count.materialData > 0) {
-        results.push({ soNumber: displayId, status: 'Skipped', reason: 'Data already imported' });
+        results.push({
+          soNumber: displayId,
+          status: 'Skipped',
+          reason: 'Data already imported',
+        });
         continue;
       }
 
       if (!obd) {
-        results.push({ soNumber: displayId, status: 'Skipped', reason: 'Outbound Delivery (OBD) missing in system' });
+        results.push({
+          soNumber: displayId,
+          status: 'Skipped',
+          reason: 'Outbound Delivery (OBD) missing in system',
+        });
         continue;
       }
 
@@ -404,15 +485,20 @@ export class ErpMaterialImporterService {
       try {
         const exists = await this.sftpService.exists(filePath);
         if (!exists) {
-          results.push({ soNumber: displayId, status: 'Skipped', reason: `File not found: ${filename}` });
+          results.push({
+            soNumber: displayId,
+            status: 'Skipped',
+            reason: `File not found: ${filename}`,
+          });
           continue;
-        }        
+        }
         const fileBuffer = await this.sftpService.getBuffer(filePath);
         const mockFile: Express.Multer.File = {
           fieldname: 'file',
           originalname: filename,
           encoding: '7bit',
-          mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          mimetype:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           buffer: fileBuffer,
           size: fileBuffer.length,
           destination: activeDir,
@@ -428,12 +514,25 @@ export class ErpMaterialImporterService {
           await this.sftpService.delete(archivePath);
         }
         await this.sftpService.rename(filePath, archivePath);
-        
-        results.push({ soNumber: displayId, status: 'Success', reason: 'Imported successfully' });
 
+        results.push({
+          soNumber: displayId,
+          status: 'Success',
+          reason: 'Imported successfully',
+        });
+        if (logManualToCronTable) {
+          await this.prisma.eRP_Data_Cron_Logs.create({
+            data: {
+              saleOrderNumber: displayId,
+              status: 'Success',
+              message: 'Imported successfully - MANUAL',
+              createdAt: new Date(),
+            },
+          });
+        }
       } catch (error) {
         this.logger.error(`Bulk import error for ${displayId}`, error);
-        
+
         try {
           const exists = await this.sftpService.exists(filePath);
           if (exists) {
@@ -444,33 +543,47 @@ export class ErpMaterialImporterService {
             await this.sftpService.rename(filePath, errorPath);
           }
         } catch (moveErr) {
-          this.logger.error(`Failed to move file ${filename} to Error folder`, moveErr);
+          this.logger.error(
+            `Failed to move file ${filename} to Error folder`,
+            moveErr,
+          );
         }
 
-        results.push({ soNumber: displayId, status: 'Failed', reason: error.message || 'Processing failed' });
+        results.push({
+          soNumber: displayId,
+          status: 'Failed',
+          reason: error.message || 'Processing failed',
+        });
       }
     }
 
     return {
       message: 'Bulk import process completed',
-      summary: results
+      summary: results,
     };
   }
 
   private async readFile(file: Express.Multer.File): Promise<any[]> {
     const workbook = new Workbook();
-    
+
     try {
       await workbook.xlsx.load(file.buffer as any);
     } catch (error) {
-      this.logger.warn(`Initial parse failed for ${file.originalname}. Attempting XML repair for invalid characters...`);
-      
+      this.logger.warn(
+        `Initial parse failed for ${file.originalname}. Attempting XML repair for invalid characters...`,
+      );
+
       try {
         const repairedBuffer = this.repairCorruptedExcelBuffer(file.buffer);
         await workbook.xlsx.load(repairedBuffer as any);
-        this.logger.log(`Successfully repaired and parsed ${file.originalname}`);
+        this.logger.log(
+          `Successfully repaired and parsed ${file.originalname}`,
+        );
       } catch (repairError) {
-        this.logger.error('Failed to read or parse the Excel file even after repair attempt.', repairError);
+        this.logger.error(
+          'Failed to read or parse the Excel file even after repair attempt.',
+          repairError,
+        );
         throw new BadRequestException(
           'Invalid or corrupted file. Even fallback repair failed. Please upload a valid .xlsx file.',
         );
@@ -536,7 +649,10 @@ export class ErpMaterialImporterService {
 
       return jsonData;
     } catch (error) {
-      this.logger.error('Failed to map rows after parsing the Excel file.', error);
+      this.logger.error(
+        'Failed to map rows after parsing the Excel file.',
+        error,
+      );
       throw new BadRequestException(
         'Failed to extract data from the file. Please check row and column structures.',
       );
@@ -551,11 +667,21 @@ export class ErpMaterialImporterService {
       return 'File is empty.';
     }
 
-    const optionalHeaders = new Set<string>(['STATUS', 'Status', 'COUNTRY', 'Remarks', 'REMARKS']);
-    const expectedHeaders = Object.keys(columnMapping).filter((h) => !optionalHeaders.has(h));
+    const optionalHeaders = new Set<string>([
+      'STATUS',
+      'Status',
+      'COUNTRY',
+      'Remarks',
+      'REMARKS',
+    ]);
+    const expectedHeaders = Object.keys(columnMapping).filter(
+      (h) => !optionalHeaders.has(h),
+    );
     const actualHeaders = Object.keys(records[0]);
 
-    const missingHeaders = expectedHeaders.filter((h) => !actualHeaders.includes(h));
+    const missingHeaders = expectedHeaders.filter(
+      (h) => !actualHeaders.includes(h),
+    );
     if (missingHeaders.length > 0) {
       return `Header mismatch. Missing columns: ${missingHeaders.join(', ')}`;
     }
@@ -568,7 +694,9 @@ export class ErpMaterialImporterService {
     }
 
     const soNumberHeader = 'SO Number';
-    const soNumbers = new Set(records.map((r) => r[soNumberHeader]).filter(Boolean));
+    const soNumbers = new Set(
+      records.map((r) => r[soNumberHeader]).filter(Boolean),
+    );
     if (soNumbers.size > 1) {
       return 'Inconsistent SO Numbers found in the file. All records must belong to the same SO Number.';
     }
@@ -583,7 +711,7 @@ export class ErpMaterialImporterService {
       return `The SO Number in the file ('${soNumber}') does not match the expected SO Number ('${expectedSaleOrderNumber}').`;
     }
 
-    const obdHeader = 'FG OBD'; 
+    const obdHeader = 'FG OBD';
     const obds = new Set(records.map((r) => r[obdHeader]).filter(Boolean));
     if (obds.size > 1) {
       return 'Inconsistent FG OBD found in the file. All records must belong to the same Outbound Delivery.';
@@ -621,16 +749,20 @@ export class ErpMaterialImporterService {
 
     const soNumber = String(records[0].saleOrderNumber);
     const obd = String(records[0].FG_OBD);
-    
-    this.logger.log(`Upserting ${records.length} records for SO: ${soNumber}, OBD: ${obd}`);
+
+    this.logger.log(
+      `Upserting ${records.length} records for SO: ${soNumber}, OBD: ${obd}`,
+    );
 
     const exactSo = await this.prisma.salesOrder.findFirst({
-       where: { saleOrderNumber: soNumber, outboundDelivery: obd },
-       select: { id: true }
+      where: { saleOrderNumber: soNumber, outboundDelivery: obd },
+      select: { id: true },
     });
 
     if (!exactSo) {
-        throw new BadRequestException(`Sales Order '${soNumber}' with OBD '${obd}' does not exist.`);
+      throw new BadRequestException(
+        `Sales Order '${soNumber}' with OBD '${obd}' does not exist.`,
+      );
     }
 
     const safeParseInt = (
@@ -745,69 +877,76 @@ export class ErpMaterialImporterService {
     const uniqueBins = new Set(
       recordsToCreate
         .map((r) => r.Bin_No)
-        .filter((bin) => bin !== null && bin !== undefined && bin.trim() !== '')
+        .filter(
+          (bin) => bin !== null && bin !== undefined && bin.trim() !== '',
+        ),
     );
     const binCount = uniqueBins.size;
 
     try {
       await this.prisma.$transaction(async (tx) => {
-                
         const so = await tx.salesOrder.findFirst({
-            where: { id: exactSo.id },
-            select: { id: true },
+          where: { id: exactSo.id },
+          select: { id: true },
         });
 
         if (!so) {
-            throw new BadRequestException(
-                `Sales Order Number '${soNumber}' does not exist in the system.`,
-            );
+          throw new BadRequestException(
+            `Sales Order Number '${soNumber}' does not exist in the system.`,
+          );
         }
 
         const updateData: Prisma.SalesOrderUpdateInput = {
-            UpdatedBy: username, 
-            UpdatedDate: new Date(),
-            isErpImported: 1,
-            binCount: binCount,    
+          UpdatedBy: username,
+          UpdatedDate: new Date(),
+          isErpImported: 1,
+          binCount: binCount,
         };
 
         if (computedCustomerName) {
-            let existingCustomer = await tx.customer.findFirst({
-                where: { name: { equals: computedCustomerName, mode: 'insensitive' } },
+          let existingCustomer = await tx.customer.findFirst({
+            where: {
+              name: { equals: computedCustomerName, mode: 'insensitive' },
+            },
+          });
+
+          if (!existingCustomer) {
+            existingCustomer = await tx.customer.create({
+              data: {
+                name: computedCustomerName,
+                address: computedCustomerAddress || null,
+              },
             });
+          } else if (computedCustomerAddress) {
+            existingCustomer = await tx.customer.update({
+              where: { id: existingCustomer.id },
+              data: { address: computedCustomerAddress },
+            });
+          }
 
-            if (!existingCustomer) {
-                existingCustomer = await tx.customer.create({
-                    data: { 
-                        name: computedCustomerName,
-                        address: computedCustomerAddress || null
-                    },
-                });
-            } else if (computedCustomerAddress) {
-                existingCustomer = await tx.customer.update({
-                    where: { id: existingCustomer.id },
-                    data: { address: computedCustomerAddress }
-                });
-            }
-
-            updateData.customer = { connect: { id: existingCustomer.id } };
-            updateData.customerNameText = null;
+          updateData.customer = { connect: { id: existingCustomer.id } };
+          updateData.customerNameText = null;
         }
 
         if (computedCustomerAddress) {
-            updateData.address = computedCustomerAddress;
+          updateData.address = computedCustomerAddress;
         }
 
         await tx.salesOrder.update({
-            where: { id: so.id },
-            data: updateData,
+          where: { id: so.id },
+          data: updateData,
         });
 
-        this.logger.log(`Deleting existing records for SO: ${soNumber}, OBD: ${obd}`);
+        this.logger.log(
+          `Deleting existing records for SO: ${soNumber}, OBD: ${obd}`,
+        );
         await tx.eRP_Material_Data.deleteMany({
           where: { salesOrderId: exactSo.id },
         });
 
-        this.logger.log(`Inserting new records for SO: ${soNumber}, OBD: ${obd}`);
+        this.logger.log(
+          `Inserting new records for SO: ${soNumber}, OBD: ${obd}`,
+        );
         await tx.eRP_Material_Data.createMany({
           data: recordsToCreate,
         });
@@ -826,7 +965,9 @@ export class ErpMaterialImporterService {
   }
 
   async bulkDownloadFromDrive(saleOrderNumbers: string[], res: Response) {
-    this.logger.log(`Initiating Bulk Download for ${saleOrderNumbers.length} SOs`);
+    this.logger.log(
+      `Initiating Bulk Download for ${saleOrderNumbers.length} SOs`,
+    );
 
     // 1. Deduplicate the input array
     const uniqueSoNumbers = [...new Set(saleOrderNumbers)];
@@ -834,10 +975,15 @@ export class ErpMaterialImporterService {
     // 2. Fetch all matching orders from DB to handle multiple OBDs for the same SO number
     const salesOrders = await this.prisma.salesOrder.findMany({
       where: { saleOrderNumber: { in: uniqueSoNumbers } },
-      select: { saleOrderNumber: true, outboundDelivery: true, isErpImported: true }
+      select: {
+        saleOrderNumber: true,
+        outboundDelivery: true,
+        isErpImported: true,
+      },
     });
 
-    const baseDir = process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    const baseDir =
+      process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
     const activeDir = path.posix.join(baseDir, 'active');
     const errorDir = path.posix.join(baseDir, 'error');
 
@@ -846,7 +992,7 @@ export class ErpMaterialImporterService {
 
     // 3. Iterate over the DB results (so we catch ANI001 and ANI002 separately)
     for (const so of salesOrders) {
-      // If it's already imported (like ANI001), skip it. 
+      // If it's already imported (like ANI001), skip it.
       // We only want to download the missing ones.
       if (so.isErpImported === 1) {
         continue;
@@ -854,7 +1000,7 @@ export class ErpMaterialImporterService {
 
       const soNumber = so.saleOrderNumber;
       const obd = so.outboundDelivery;
-      
+
       if (!obd) {
         missingSOs.push(soNumber);
         continue;
@@ -888,9 +1034,9 @@ export class ErpMaterialImporterService {
     }
 
     if (filesToZip.length === 0) {
-      return res.status(404).json({ 
-        message: `Data not available for the following SO(s): ${missingSOs.join(', ')}`, 
-        missing: missingSOs 
+      return res.status(404).json({
+        message: `Data not available for the following SO(s): ${missingSOs.join(', ')}`,
+        missing: missingSOs,
       });
     }
 
@@ -909,7 +1055,9 @@ export class ErpMaterialImporterService {
     }
 
     const archive = archiver('zip', { zlib: { level: 9 } });
-    archive.on('error', (err: any) => { throw err; });
+    archive.on('error', (err: any) => {
+      throw err;
+    });
     archive.pipe(res);
 
     for (const file of filesToZip) {

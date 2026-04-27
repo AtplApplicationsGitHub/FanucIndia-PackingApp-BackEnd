@@ -7,7 +7,7 @@ import {
   BadRequestException,
   Body,
   Req,
-  Res
+  Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ErpMaterialImporterService } from './erp-material-importer.service';
@@ -32,7 +32,7 @@ export class ErpMaterialImporterController {
   constructor(private readonly service: ErpMaterialImporterService) {}
 
   @Post('upload')
-  @Roles('ADMIN','USER')
+  @Roles('ADMIN', 'USER')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload and process an ERP material file' })
   @ApiConsumes('multipart/form-data')
@@ -46,37 +46,50 @@ export class ErpMaterialImporterController {
         },
         saleOrderNumber: {
           type: 'string',
-          description: 'The expected Sale Order Number to validate against the file content.',
+          description:
+            'The expected Sale Order Number to validate against the file content.',
           nullable: true,
-        }
+        },
       },
     },
   })
   async uploadFile(
-    @UploadedFile() file: Express.Multer.File, 
+    @UploadedFile() file: Express.Multer.File,
     @Req() req: AuthRequest,
-    @Body('saleOrderNumber') saleOrderNumber?: string
+    @Body('saleOrderNumber') saleOrderNumber?: string,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded.');
     }
-    return this.service.processFile(file, saleOrderNumber, req.user.name);
+    return this.service.processFile(file, saleOrderNumber, req.user.name, true);
   }
 
   @Post('bulk-import-from-drive')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Bulk import ERP material files from drive for multiple SOs' })
+  @ApiOperation({
+    summary: 'Bulk import ERP material files from drive for multiple SOs',
+  })
   @ApiBody({ type: BulkImportDriveDto })
-  async bulkImportFromDrive(@Body() dto: BulkImportDriveDto, @Req() req: AuthRequest) {
+  async bulkImportFromDrive(
+    @Body() dto: BulkImportDriveDto,
+    @Req() req: AuthRequest,
+  ) {
     if (!dto.saleOrderNumbers || dto.saleOrderNumbers.length === 0) {
       throw new BadRequestException('Sale Order Numbers list is required.');
     }
-    return this.service.bulkImportFromDrive(dto.saleOrderNumbers, req.user.name);
+    return this.service.bulkImportFromDrive(
+      dto.saleOrderNumbers,
+      req.user.name,
+      undefined,
+      true,
+    );
   }
 
   @Post('import-from-drive')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Import ERP material file automatically from configured drive' })
+  @ApiOperation({
+    summary: 'Import ERP material file automatically from configured drive',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -89,18 +102,26 @@ export class ErpMaterialImporterController {
       required: ['saleOrderNumber'],
     },
   })
-  async importFromDrive(@Body('saleOrderNumber') saleOrderNumber: string, @Req() req: AuthRequest) {
+  async importFromDrive(
+    @Body('saleOrderNumber') saleOrderNumber: string,
+    @Req() req: AuthRequest,
+  ) {
     if (!saleOrderNumber) {
       throw new BadRequestException('Sale Order Number is required.');
     }
     return this.service.importFromDrive(saleOrderNumber, req.user.name);
   }
-  
+
   @Post('bulk-download-drive')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Download ERP material files as ZIP for multiple SOs' })
+  @ApiOperation({
+    summary: 'Download ERP material files as ZIP for multiple SOs',
+  })
   @ApiBody({ type: BulkImportDriveDto })
-  async bulkDownloadFromDrive(@Body() dto: BulkImportDriveDto, @Res() res: Response) {
+  async bulkDownloadFromDrive(
+    @Body() dto: BulkImportDriveDto,
+    @Res() res: Response,
+  ) {
     if (!dto.saleOrderNumbers || dto.saleOrderNumbers.length === 0) {
       throw new BadRequestException('Sale Order Numbers list is required.');
     }
