@@ -48,11 +48,7 @@ export class DispatchService {
     private readonly sftpService: SftpService,
   ) {}
 
-  async create(
-    dto: any,
-    files: Express.Multer.File[],
-    userId: number,
-  ) {
+  async create(dto: any, files: Express.Multer.File[], userId: number) {
     const {
       transporterId: transporterIdString,
       vehicleNumber,
@@ -77,29 +73,28 @@ export class DispatchService {
 
     if (existingDispatchToday) {
       throw new BadRequestException(
-        `Vehicle Number '${vehicleNumber}' has already been used for a dispatch today. It can only be used again tomorrow.`
+        `Vehicle Number '${vehicleNumber}' has already been used for a dispatch today. It can only be used again tomorrow.`,
       );
     }
 
     const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
-      where: { 
+      where: {
         vehicleNumber: vehicleNumber,
-        createdAt: { 
+        createdAt: {
           gte: startOfToday,
-          lte: endOfToday 
-        } 
+          lte: endOfToday,
+        },
       },
-      orderBy: { createdAt: 'desc' }, 
+      orderBy: { createdAt: 'desc' },
     });
 
     if (!vehicleEntry) {
       throw new BadRequestException(
-        `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`
+        `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`,
       );
     }
 
     return this.prisma.$transaction(async (tx) => {
-
       const user = await tx.user.findUnique({ where: { id: userId } });
       const userName = user?.email || 'System';
 
@@ -165,26 +160,32 @@ export class DispatchService {
       }
 
       if (salesOrderIds && salesOrderIds.length > 0) {
-        const dispatchSoData: { dispatchId: number; saleOrderNumber: string; salesOrderId: number }[] = [];
+        const dispatchSoData: {
+          dispatchId: number;
+          saleOrderNumber: string;
+          salesOrderId: number;
+        }[] = [];
 
         const salesOrders = await tx.salesOrder.findMany({
-            where: { id: { in: salesOrderIds } }
+          where: { id: { in: salesOrderIds } },
         });
 
         if (salesOrders.length !== salesOrderIds.length) {
-            throw new BadRequestException(`One or more specified Sale Orders could not be found.`);
+          throw new BadRequestException(
+            `One or more specified Sale Orders could not be found.`,
+          );
         }
 
         for (const salesOrder of salesOrders) {
           dispatchSoData.push({
             dispatchId: newDispatch.id,
             saleOrderNumber: salesOrder.saleOrderNumber,
-            salesOrderId: salesOrder.id, 
+            salesOrderId: salesOrder.id,
           });
         }
 
         await tx.dispatch_SO.createMany({
-          data: dispatchSoData, 
+          data: dispatchSoData,
         });
 
         await tx.salesOrder.updateMany({
@@ -201,18 +202,18 @@ export class DispatchService {
           await tx.sO_Status_Stepper.upsert({
             where: {
               salesOrderId_status: {
-                 salesOrderId: salesOrder.id,
-                 status: "Dispatched"
-              }
+                salesOrderId: salesOrder.id,
+                status: 'Dispatched',
+              },
             },
             update: { createdDateTime: new Date(), updatedBy: userName },
             create: {
-                salesOrderNumber: salesOrder.saleOrderNumber,
-                salesOrderId: salesOrder.id,
-                status: "Dispatched",
-                createdDateTime: new Date(),
-                updatedBy: userName
-            }
+              salesOrderNumber: salesOrder.saleOrderNumber,
+              salesOrderId: salesOrder.id,
+              status: 'Dispatched',
+              createdDateTime: new Date(),
+              updatedBy: userName,
+            },
           });
         }
       }
@@ -248,11 +249,7 @@ export class DispatchService {
     dto: CreateMobileDispatchDto,
     userId: number,
   ) {
-    const {
-      transporterId,
-      transporterName,
-      vehicleNumber,
-    } = dto;
+    const { transporterId, transporterName, vehicleNumber } = dto;
 
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -272,29 +269,28 @@ export class DispatchService {
 
     if (existingDispatchToday) {
       throw new BadRequestException(
-        `Vehicle Number '${vehicleNumber}' has already been used for a dispatch today. It can only be used again tomorrow.`
+        `Vehicle Number '${vehicleNumber}' has already been used for a dispatch today. It can only be used again tomorrow.`,
       );
     }
 
     const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
-      where: { 
+      where: {
         vehicleNumber: vehicleNumber,
         createdAt: {
           gte: startOfToday,
-          lte: endOfToday
-        }
+          lte: endOfToday,
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     if (!vehicleEntry) {
       throw new BadRequestException(
-        `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`
+        `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`,
       );
     }
 
     return this.prisma.$transaction(async (tx) => {
-
       let finalTransporterId: number | null = null;
       let finalTransporterName: string | null = null;
 
@@ -394,18 +390,20 @@ export class DispatchService {
 
       const salesOrder = await tx.salesOrder.findUnique({
         where: { id: salesOrderId },
-        select: { id: true, saleOrderNumber: true, outboundDelivery: true }, 
+        select: { id: true, saleOrderNumber: true, outboundDelivery: true },
       });
 
       if (!salesOrder) {
-        throw new NotFoundException(`Sales Order with ID '${salesOrderId}' not found.`);
+        throw new NotFoundException(
+          `Sales Order with ID '${salesOrderId}' not found.`,
+        );
       }
 
       const createdLink = await tx.dispatch_SO.create({
-        data: { 
-          dispatchId, 
+        data: {
+          dispatchId,
           saleOrderNumber: salesOrder.saleOrderNumber,
-          salesOrderId: salesOrder.id
+          salesOrderId: salesOrder.id,
         },
       });
 
@@ -416,7 +414,7 @@ export class DispatchService {
         },
       });
 
-      await tx.salesOrder.update({ 
+      await tx.salesOrder.update({
         where: { id: salesOrder.id },
         data: {
           assignedUserId: null,
@@ -431,8 +429,8 @@ export class DispatchService {
         where: {
           salesOrderId_status: {
             salesOrderId: salesOrder.id,
-            status: "Dispatched"
-          }
+            status: 'Dispatched',
+          },
         },
         update: {
           createdDateTime: new Date(),
@@ -441,10 +439,10 @@ export class DispatchService {
         create: {
           salesOrderNumber: salesOrder.saleOrderNumber,
           salesOrderId: salesOrder.id,
-          status: "Dispatched",
+          status: 'Dispatched',
           createdDateTime: new Date(),
           updatedBy: userName,
-        }
+        },
       });
 
       return {
@@ -508,29 +506,35 @@ export class DispatchService {
 
     let mappedArchived: any[] = [];
     if (archivedDispatches.length > 0) {
-      const archiveIds = archivedDispatches.map(a => a.id);
-      
+      const archiveIds = archivedDispatches.map((a) => a.id);
+
       // Get counts of SOs mapped to archived dispatches
       const archivedSOCounts = await this.prisma.dispatch_SOArchive.groupBy({
         by: ['dispatchId'],
         where: { dispatchId: { in: archiveIds } },
-        _count: { id: true }
+        _count: { id: true },
       });
-      const archivedSOCountMap = new Map(archivedSOCounts.map(c => [c.dispatchId, c._count.id]));
+      const archivedSOCountMap = new Map(
+        archivedSOCounts.map((c) => [c.dispatchId, c._count.id]),
+      );
 
       // Map transporter names for archives
-      const transporterIds = [...new Set(archivedDispatches.map(a => a.transporterId).filter(Boolean))] as number[];
+      const transporterIds = [
+        ...new Set(
+          archivedDispatches.map((a) => a.transporterId).filter(Boolean),
+        ),
+      ] as number[];
       let transporterMap = new Map<number, string>();
-      
+
       if (transporterIds.length > 0) {
         const transporters = await this.prisma.transporter.findMany({
           where: { id: { in: transporterIds } },
-          select: { id: true, name: true }
+          select: { id: true, name: true },
         });
-        transporterMap = new Map(transporters.map(t => [t.id, t.name]));
+        transporterMap = new Map(transporters.map((t) => [t.id, t.name]));
       }
 
-      mappedArchived = archivedDispatches.map(d => ({
+      mappedArchived = archivedDispatches.map((d) => ({
         id: d.id,
         transporterId: d.transporterId,
         transporterName: d.transporterName,
@@ -541,21 +545,27 @@ export class DispatchService {
         updatedAt: d.UpdatedDate || d.createdAt,
         UpdatedBy: d.UpdatedBy,
         UpdatedDate: d.UpdatedDate,
-        transporter: d.transporterId ? { name: transporterMap.get(d.transporterId) || d.transporterName } : null,
+        transporter: d.transporterId
+          ? { name: transporterMap.get(d.transporterId) || d.transporterName }
+          : null,
         soCount: archivedSOCountMap.get(d.id) || 0,
-        isArchived: true // helps frontend know this is historical
+        isArchived: true, // helps frontend know this is historical
       }));
     }
 
     // 3. Combine and Sort
-    return [...mappedActive, ...mappedArchived].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return [...mappedActive, ...mappedArchived].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
   }
 
   async update(id: number, dto: UpdateDispatchDto, userId: number) {
     const { transporterId, vehicleNumber } = dto;
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
-    const existingDispatch = await this.prisma.dispatch.findUnique({ where: { id } });
+    const existingDispatch = await this.prisma.dispatch.findUnique({
+      where: { id },
+    });
     if (!existingDispatch) {
       throw new NotFoundException(`Dispatch with ID ${id} not found.`);
     }
@@ -579,7 +589,7 @@ export class DispatchService {
 
       if (existingDispatchToday) {
         throw new BadRequestException(
-          `Vehicle Number '${vehicleNumber}' is already assigned to another dispatch today. Please use a different vehicle.`
+          `Vehicle Number '${vehicleNumber}' is already assigned to another dispatch today. Please use a different vehicle.`,
         );
       }
     }
@@ -595,12 +605,12 @@ export class DispatchService {
     });
   }
 
-  async updateMobileDispatch(dispatchId: number, dto: UpdateMobileDispatchDto, userId: number) {
-    const {
-      transporterId,
-      transporterName,
-      vehicleNumber,
-    } = dto;
+  async updateMobileDispatch(
+    dispatchId: number,
+    dto: UpdateMobileDispatchDto,
+    userId: number,
+  ) {
+    const { transporterId, transporterName, vehicleNumber } = dto;
 
     if (vehicleNumber) {
       const startOfToday = new Date();
@@ -621,15 +631,19 @@ export class DispatchService {
 
       if (existingDispatchToday) {
         throw new BadRequestException(
-          `Vehicle Number '${vehicleNumber}' is already assigned to another dispatch today. Please use a different vehicle.`
+          `Vehicle Number '${vehicleNumber}' is already assigned to another dispatch today. Please use a different vehicle.`,
         );
       }
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const dispatch = await tx.dispatch.findUnique({ where: { id: dispatchId } });
+      const dispatch = await tx.dispatch.findUnique({
+        where: { id: dispatchId },
+      });
       if (!dispatch) {
-        throw new NotFoundException(`Dispatch with ID ${dispatchId} not found.`);
+        throw new NotFoundException(
+          `Dispatch with ID ${dispatchId} not found.`,
+        );
       }
 
       let finalTransporterId: number | null = null;
@@ -637,9 +651,13 @@ export class DispatchService {
 
       if (transporterId) {
         finalTransporterId = Number(transporterId);
-        const transporterExists = await tx.transporter.findUnique({ where: { id: finalTransporterId } });
+        const transporterExists = await tx.transporter.findUnique({
+          where: { id: finalTransporterId },
+        });
         if (!transporterExists) {
-          throw new BadRequestException(`Transporter with ID ${transporterId} not found.`);
+          throw new BadRequestException(
+            `Transporter with ID ${transporterId} not found.`,
+          );
         }
       } else if (transporterName) {
         finalTransporterName = transporterName;
@@ -653,15 +671,15 @@ export class DispatchService {
       const updatedDispatch = await tx.dispatch.update({
         where: { id: dispatchId },
         data: {
-          transporterId: finalTransporterId, 
+          transporterId: finalTransporterId,
           transporterName: finalTransporterName,
           vehicleNumber: vehicleNumber,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },
-        include: { 
+        include: {
           transporter: true,
-        }
+        },
       });
 
       return updatedDispatch;
@@ -669,7 +687,6 @@ export class DispatchService {
   }
 
   async findDispatchSOs(dispatchId: number) {
-    // 1. Check Active
     const activeSOs = await this.prisma.dispatch_SO.findMany({
       where: { dispatchId },
       orderBy: { createdAt: 'asc' },
@@ -678,49 +695,72 @@ export class DispatchService {
           select: {
             customerNameText: true,
             customer: {
-              select: { name: true }
-            }
-          }
-        }
-      }
+              select: { name: true },
+            },
+          },
+        },
+      },
     });
 
     if (activeSOs.length > 0) {
       return activeSOs;
     }
 
-    // 2. Check Archive
     const archivedSOs = await this.prisma.dispatch_SOArchive.findMany({
       where: { dispatchId },
       orderBy: { createdAt: 'asc' },
     });
 
-    if (archivedSOs.length > 0) {
-      const soIds = archivedSOs.map(so => so.salesOrderId);
-      
-      // Match archived SOs with customer details from either SalesOrder or SalesOrderArchive
-      const soArchives = await this.prisma.salesOrderArchive.findMany({
-        where: { id: { in: soIds } },
-        select: { id: true, customerNameText: true, customer: { select: { name: true } } }
-      });
-      
-      const activeSosForArchive = await this.prisma.salesOrder.findMany({
-          where: { id: { in: soIds } },
-          select: { id: true, customerNameText: true, customer: { select: { name: true } } }
-      });
-
-      const combinedSOs = [...soArchives, ...activeSosForArchive];
-      const soMap = new Map(combinedSOs.map(so => [so.id, so]));
-
-      return archivedSOs.map(so => ({
-        ...so,
-        salesOrder: soMap.get(so.salesOrderId) || null,
-      }));
+    if (archivedSOs.length === 0) {
+      return [];
     }
 
-    return [];
+    const soIds = archivedSOs.map((so) => so.salesOrderId);
+    const soNumbers = archivedSOs.map((so) => so.saleOrderNumber);
+
+    const soArchives = await this.prisma.salesOrderArchive.findMany({
+      where: {
+        OR: [{ id: { in: soIds } }, { saleOrderNumber: { in: soNumbers } }],
+      },
+      select: {
+        id: true,
+        saleOrderNumber: true,
+        customerNameText: true,
+        customer: {
+          select: { name: true },
+        },
+      },
+    });
+
+    const activeSosForArchive = await this.prisma.salesOrder.findMany({
+      where: {
+        id: { in: soIds },
+      },
+      select: {
+        id: true,
+        saleOrderNumber: true,
+        customerNameText: true,
+        customer: {
+          select: { name: true },
+        },
+      },
+    });
+
+    const byId = new Map(
+      [...soArchives, ...activeSosForArchive].map((so) => [so.id, so]),
+    );
+
+    const bySoNumber = new Map(
+      soArchives.map((so) => [so.saleOrderNumber, so]),
+    );
+
+    return archivedSOs.map((so) => ({
+      ...so,
+      salesOrder:
+        byId.get(so.salesOrderId) || bySoNumber.get(so.saleOrderNumber) || null,
+    }));
   }
-  
+
   async addDispatchSO(
     dispatchId: number,
     saleOrderNumber: string,
@@ -760,7 +800,8 @@ export class DispatchService {
         throw new NotFoundException('Invalid SO Number');
       } else if (salesOrders.length > 1) {
         throw new BadRequestException({
-          message: 'Multiple orders found for this SO number. Please select the specific OBD.',
+          message:
+            'Multiple orders found for this SO number. Please select the specific OBD.',
           multiple: true,
           orders: salesOrders,
         });
@@ -793,31 +834,31 @@ export class DispatchService {
           data: {
             assignedUserId: null,
             status: 'Dispatched',
-            fgLocation: Prisma.DbNull, 
+            fgLocation: Prisma.DbNull,
             UpdatedBy: userName,
             UpdatedDate: new Date(),
           },
         });
 
-      await tx.sO_Status_Stepper.upsert({
-        where: {
-          salesOrderId_status: {
+        await tx.sO_Status_Stepper.upsert({
+          where: {
+            salesOrderId_status: {
+              salesOrderId: salesOrder.id,
+              status: 'Dispatched',
+            },
+          },
+          update: {
+            createdDateTime: new Date(),
+            updatedBy: userName,
+          },
+          create: {
+            salesOrderNumber: salesOrder.saleOrderNumber,
             salesOrderId: salesOrder.id,
-            status: "Dispatched"
-          }
-        },
-        update: {
-          createdDateTime: new Date(),
-          updatedBy: userName,
-        },
-        create: {
-          salesOrderNumber: salesOrder.saleOrderNumber,
-          salesOrderId: salesOrder.id,
-          status: "Dispatched",
-          createdDateTime: new Date(),
-          updatedBy: userName,
-        }
-      });
+            status: 'Dispatched',
+            createdDateTime: new Date(),
+            updatedBy: userName,
+          },
+        });
 
         return newDispatchSO;
       } catch (error) {
@@ -846,7 +887,7 @@ export class DispatchService {
     await this.prisma.$transaction(async (tx) => {
       await tx.dispatch_SO.delete({ where: { id: soId } });
 
-      await tx.salesOrder.update({ 
+      await tx.salesOrder.update({
         where: { id: dispatchSoLink.salesOrderId },
         data: {
           status: 'F105',
@@ -880,14 +921,14 @@ export class DispatchService {
 
     if (!dispatch) {
       const dispatchArch = await this.prisma.dispatchArchive.findUnique({
-        where: { id: dispatchId }
+        where: { id: dispatchId },
       });
       if (dispatchArch) {
-         const dispatchSOs = await this.prisma.dispatch_SOArchive.findMany({
-           where: { dispatchId },
-           select: { saleOrderNumber: true }
-         });
-         dispatch = { ...dispatchArch, dispatchSOs };
+        const dispatchSOs = await this.prisma.dispatch_SOArchive.findMany({
+          where: { dispatchId },
+          select: { saleOrderNumber: true },
+        });
+        dispatch = { ...dispatchArch, dispatchSOs };
       }
     }
 
@@ -904,27 +945,29 @@ export class DispatchService {
 
     const tableTop = doc.y;
     const itemHeight = 25;
-    const col1X = 50; 
+    const col1X = 50;
     const col2X = 150;
     const col1Width = 100;
     const col2Width = 200;
 
-    doc.rect(col1X, tableTop, col1Width + col2Width, itemHeight)
-       .fillAndStroke('#FFD200', '#000000'); 
+    doc
+      .rect(col1X, tableTop, col1Width + col2Width, itemHeight)
+      .fillAndStroke('#FFD200', '#000000');
 
     doc.fillColor('#000000').font('Helvetica-Bold');
     doc.text('S.No', col1X + 10, tableTop + 8);
     doc.text('Sale Order Number', col2X + 10, tableTop + 8);
-    
+
     doc.font('Helvetica');
 
     dispatch.dispatchSOs.forEach((so: any, index: number) => {
-      const y = tableTop + itemHeight + (index * itemHeight);
-      
-      const bgColor = index % 2 === 0 ? '#FFF4CC' : '#FFFFFF'; 
-      
-      doc.rect(col1X, y, col1Width + col2Width, itemHeight)
-         .fillAndStroke(bgColor, '#000000');
+      const y = tableTop + itemHeight + index * itemHeight;
+
+      const bgColor = index % 2 === 0 ? '#FFF4CC' : '#FFFFFF';
+
+      doc
+        .rect(col1X, y, col1Width + col2Width, itemHeight)
+        .fillAndStroke(bgColor, '#000000');
 
       doc.fillColor('#000000');
       doc.text(String(index + 1), col1X + 10, y + 8);
@@ -1058,7 +1101,9 @@ export class DispatchService {
     });
 
     if (orders.length === 0) {
-      throw new NotFoundException(`No orders found for SO Number '${soNumber}'`);
+      throw new NotFoundException(
+        `No orders found for SO Number '${soNumber}'`,
+      );
     }
 
     return orders;

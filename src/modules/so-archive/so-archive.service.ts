@@ -21,9 +21,9 @@ export class SoArchiveService {
 
   async archive(saleOrderNumber: string) {
     const so = await this.prisma.salesOrder.findFirst({
-      where: { 
+      where: {
         saleOrderNumber,
-        status: 'Dispatched'
+        status: 'Dispatched',
       },
       include: {
         materialData: true,
@@ -38,7 +38,7 @@ export class SoArchiveService {
                 _count: {
                   select: { dispatchSOs: true },
                 },
-                vehicleEntry: true, 
+                vehicleEntry: true,
               },
             },
           },
@@ -80,13 +80,14 @@ export class SoArchiveService {
         ...soData
       } = so;
 
-      await tx.salesOrderArchive.create({ 
+      await tx.salesOrderArchive.create({
         data: {
+          id: so.id,
           ...soData,
           transferOrder: soData.transferOrder ?? '',
           packConfigId: soData.packConfigId ?? 0,
-          fgLocation: soData.fgLocation ?? Prisma.DbNull
-        } 
+          fgLocation: soData.fgLocation ?? Prisma.DbNull,
+        },
       });
 
       if (materialLogs.length > 0) {
@@ -120,8 +121,8 @@ export class SoArchiveService {
       if (chatMessages && chatMessages.length > 0) {
         await tx.salesOrderChatMessageArchive.createMany({
           data: chatMessages.map((msg) => ({
-            id: msg.id, 
-            salesOrderNumber: so.saleOrderNumber, 
+            id: msg.id,
+            salesOrderNumber: so.saleOrderNumber,
             salesOrderId: so.id, // Fix: Added missing required field
             fromUserId: msg.fromUserId,
             toUserId: msg.toUserId,
@@ -146,13 +147,13 @@ export class SoArchiveService {
       }
 
       const dispatches = Dispatch_SO.map((dso) => dso.dispatch);
-      
+
       const vehicleEntries = [
         ...new Map(
           dispatches
             .map((d) => d.vehicleEntry)
             .filter((ve): ve is NonNullable<typeof ve> => !!ve)
-            .map((ve) => [ve.id, ve])
+            .map((ve) => [ve.id, ve]),
         ).values(),
       ];
 
@@ -206,9 +207,11 @@ export class SoArchiveService {
             const activeUsageCount = await tx.dispatch.count({
               where: { vehicleEntryId: dispatch.vehicleEntryId },
             });
-            
+
             if (activeUsageCount === 0) {
-              await tx.vehicleEntry.delete({ where: { id: dispatch.vehicleEntryId } });
+              await tx.vehicleEntry.delete({
+                where: { id: dispatch.vehicleEntryId },
+              });
             }
           }
         }
@@ -261,8 +264,12 @@ export class SoArchiveService {
       ...new Set(dispatchSOArchives.map((d) => d.dispatchId)),
     ];
 
-    const dispatchesToDelete: { id: number; attachments: Prisma.JsonValue; vehicleEntryId: number | null }[] = [];
-    
+    const dispatchesToDelete: {
+      id: number;
+      attachments: Prisma.JsonValue;
+      vehicleEntryId: number | null;
+    }[] = [];
+
     for (const dispatchId of dispatchIds) {
       const remainingLinks = await this.prisma.dispatch_SOArchive.count({
         where: {
@@ -290,25 +297,36 @@ export class SoArchiveService {
         sftpDir: att.path.substring(0, att.path.lastIndexOf('/')),
       }));
 
-    const vehicleEntriesToDelete: { id: number; attachments: Prisma.JsonValue }[] = [];
-    const uniqueVehicleEntryIds = [...new Set(dispatchesToDelete.map(d => d.vehicleEntryId).filter((id): id is number => !!id))];
+    const vehicleEntriesToDelete: {
+      id: number;
+      attachments: Prisma.JsonValue;
+    }[] = [];
+    const uniqueVehicleEntryIds = [
+      ...new Set(
+        dispatchesToDelete
+          .map((d) => d.vehicleEntryId)
+          .filter((id): id is number => !!id),
+      ),
+    ];
 
     for (const veId of uniqueVehicleEntryIds) {
-        const totalUsages = await this.prisma.dispatchArchive.count({
-            where: { vehicleEntryId: veId }
+      const totalUsages = await this.prisma.dispatchArchive.count({
+        where: { vehicleEntryId: veId },
+      });
+
+      const usagesBeingDeleted = dispatchesToDelete.filter(
+        (d) => d.vehicleEntryId === veId,
+      ).length;
+
+      if (totalUsages === usagesBeingDeleted) {
+        const veArchive = await this.prisma.vehicleEntryArchive.findUnique({
+          where: { id: veId },
+          select: { id: true, attachments: true },
         });
-
-        const usagesBeingDeleted = dispatchesToDelete.filter(d => d.vehicleEntryId === veId).length;
-
-        if (totalUsages === usagesBeingDeleted) {
-            const veArchive = await this.prisma.vehicleEntryArchive.findUnique({
-                where: { id: veId },
-                select: { id: true, attachments: true }
-            });
-            if (veArchive) {
-                vehicleEntriesToDelete.push(veArchive);
-            }
+        if (veArchive) {
+          vehicleEntriesToDelete.push(veArchive);
         }
+      }
     }
 
     const vehicleFiles = vehicleEntriesToDelete
@@ -319,18 +337,22 @@ export class SoArchiveService {
         sftpDir: att.path.substring(0, att.path.lastIndexOf('/')),
       }));
 
-    const allFilesToDelete = [...materialFiles, ...dispatchFiles, ...vehicleFiles];
+    const allFilesToDelete = [
+      ...materialFiles,
+      ...dispatchFiles,
+      ...vehicleFiles,
+    ];
     const uniqueDirectoriesToDelete = [
       ...new Set(allFilesToDelete.map((f) => f.sftpDir).filter(Boolean)),
     ];
 
     await this.prisma.$transaction(async (tx) => {
       for (const d of dispatchesToDelete) {
-         await tx.dispatchArchive.delete({ where: { id: d.id } });
+        await tx.dispatchArchive.delete({ where: { id: d.id } });
       }
 
       for (const ve of vehicleEntriesToDelete) {
-         await tx.vehicleEntryArchive.delete({ where: { id: ve.id } });
+        await tx.vehicleEntryArchive.delete({ where: { id: ve.id } });
       }
 
       await tx.eRPMaterialLogArchive.deleteMany({
@@ -358,11 +380,11 @@ export class SoArchiveService {
 
     const orderBaseDir = process.env.SFTP_BASE_DIR_ORDER || '';
     const dispatchBaseDir = process.env.SFTP_BASE_DIR_DISPATCH || '';
-    const vehicleBaseDir = process.env.SFTP_BASE_DIR_VEHICLE_ENTRY || ''; 
+    const vehicleBaseDir = process.env.SFTP_BASE_DIR_VEHICLE_ENTRY || '';
 
     const resolvedOrderBase = path.posix.resolve(orderBaseDir);
     const resolvedDispatchBase = path.posix.resolve(dispatchBaseDir);
-    const resolvedVehicleBase = path.posix.resolve(vehicleBaseDir); 
+    const resolvedVehicleBase = path.posix.resolve(vehicleBaseDir);
 
     for (const file of allFilesToDelete) {
       try {
@@ -392,14 +414,23 @@ export class SoArchiveService {
         if (dir) {
           const resolvedDir = path.posix.resolve(dir);
 
-          const orderBasePrefix = resolvedOrderBase.endsWith('/') ? resolvedOrderBase : resolvedOrderBase + '/';
-          const dispatchBasePrefix = resolvedDispatchBase.endsWith('/') ? resolvedDispatchBase : resolvedDispatchBase + '/';
-          const vehicleBasePrefix = resolvedVehicleBase.endsWith('/') ? resolvedVehicleBase : resolvedVehicleBase + '/';
+          const orderBasePrefix = resolvedOrderBase.endsWith('/')
+            ? resolvedOrderBase
+            : resolvedOrderBase + '/';
+          const dispatchBasePrefix = resolvedDispatchBase.endsWith('/')
+            ? resolvedDispatchBase
+            : resolvedDispatchBase + '/';
+          const vehicleBasePrefix = resolvedVehicleBase.endsWith('/')
+            ? resolvedVehicleBase
+            : resolvedVehicleBase + '/';
 
           if (
-            resolvedDir !== resolvedOrderBase && !resolvedDir.startsWith(orderBasePrefix) &&
-            resolvedDir !== resolvedDispatchBase && !resolvedDir.startsWith(dispatchBasePrefix) &&
-            resolvedDir !== resolvedVehicleBase && !resolvedDir.startsWith(vehicleBasePrefix)
+            resolvedDir !== resolvedOrderBase &&
+            !resolvedDir.startsWith(orderBasePrefix) &&
+            resolvedDir !== resolvedDispatchBase &&
+            !resolvedDir.startsWith(dispatchBasePrefix) &&
+            resolvedDir !== resolvedVehicleBase &&
+            !resolvedDir.startsWith(vehicleBasePrefix)
           ) {
             console.warn(
               `Skipping rmdir: Path ${dir} is outside of configured base directories.`,
@@ -435,12 +466,12 @@ export class SoArchiveService {
         'Content-Type',
         file.mimeType ?? 'application/octet-stream',
       );
-      
+
       res.setHeader(
         'Content-Disposition',
         `attachment; filename="${file.fileName}"`,
       );
-      
+
       if (file.fileSizeBytes) {
         res.setHeader('Content-Length', String(file.fileSizeBytes));
       }
@@ -455,7 +486,11 @@ export class SoArchiveService {
     }
   }
 
-  async downloadDispatchFile(dispatchId: number, fileName: string, res: Response) {
+  async downloadDispatchFile(
+    dispatchId: number,
+    fileName: string,
+    res: Response,
+  ) {
     const dispatch = await this.prisma.dispatchArchive.findUnique({
       where: { id: dispatchId },
     });
@@ -474,7 +509,11 @@ export class SoArchiveService {
     return this.streamFile(file, res);
   }
 
-  async downloadVehicleFile(vehicleId: number, fileName: string, res: Response) {
+  async downloadVehicleFile(
+    vehicleId: number,
+    fileName: string,
+    res: Response,
+  ) {
     const entry = await this.prisma.vehicleEntryArchive.findUnique({
       where: { id: vehicleId },
     });
@@ -499,10 +538,16 @@ export class SoArchiveService {
       const fileSize = file.size || file.fileSizeBytes;
 
       const data = await this.sftp.getStream(filePath);
-      
-      res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
-      
+
+      res.setHeader(
+        'Content-Type',
+        file.mimeType || 'application/octet-stream',
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${file.fileName}"`,
+      );
+
       if (fileSize) {
         res.setHeader('Content-Length', String(fileSize));
       }
@@ -542,11 +587,15 @@ export class SoArchiveService {
       });
 
       if (eligibleOrders.length === 0) {
-        this.logger.log('No eligible Dispatched orders found for archiving today.');
+        this.logger.log(
+          'No eligible Dispatched orders found for archiving today.',
+        );
         return;
       }
 
-      this.logger.log(`Found ${eligibleOrders.length} order(s) eligible for auto-archival.`);
+      this.logger.log(
+        `Found ${eligibleOrders.length} order(s) eligible for auto-archival.`,
+      );
 
       let successCount = 0;
       let failCount = 0;
@@ -555,14 +604,21 @@ export class SoArchiveService {
         try {
           await this.archive(order.saleOrderNumber);
           successCount++;
-          this.logger.log(`Successfully auto-archived SO: ${order.saleOrderNumber}`);
+          this.logger.log(
+            `Successfully auto-archived SO: ${order.saleOrderNumber}`,
+          );
         } catch (err) {
           failCount++;
-          this.logger.error(`Failed to auto-archive SO: ${order.saleOrderNumber}`, err);
+          this.logger.error(
+            `Failed to auto-archive SO: ${order.saleOrderNumber}`,
+            err,
+          );
         }
       }
 
-      this.logger.log(`Auto-archival complete. Success: ${successCount}, Failed: ${failCount}`);
+      this.logger.log(
+        `Auto-archival complete. Success: ${successCount}, Failed: ${failCount}`,
+      );
     } catch (error) {
       this.logger.error('Failed to execute automated archival job.', error);
     }
