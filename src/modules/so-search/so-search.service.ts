@@ -126,6 +126,8 @@ export class SoSearchService {
         assignedUser: { select: { name: true } },
         statusStepper: true,
         attachments: true,
+        issueAssignedUser: { select: { name: true, email: true } },
+        packingAssignedUser: { select: { name: true, email: true } },
       },
     });
 
@@ -150,7 +152,7 @@ export class SoSearchService {
 
       const canonicalSoNumber = salesOrder.saleOrderNumber;
 
-      let [dispatchSOs, materialDetails] = await Promise.all([
+      let [dispatchSOs, materialDetails, erpImportLogs] = await Promise.all([
         this.prisma.dispatch_SO.findMany({
           where: { salesOrderId: salesOrder.id },
           select: { dispatchId: true },
@@ -158,6 +160,11 @@ export class SoSearchService {
         this.prisma.eRP_Material_Data.findMany({
           where: { salesOrderId: salesOrder.id },
           orderBy: { ID: 'asc' },
+        }),
+        // --- ADD THIS NEW QUERY ---
+        this.prisma.eRP_Data_Cron_Logs.findMany({
+          where: { saleOrderNumber: canonicalSoNumber },
+          orderBy: { createdAt: 'desc' },
         }),
       ]);
 
@@ -225,6 +232,7 @@ export class SoSearchService {
         salesOrder,
         dispatchInfo,
         materialDetails,
+        erpImportLogs,
         isArchived: false,
       };
       return convertBigInts(result);
@@ -262,7 +270,7 @@ export class SoSearchService {
 
       const canonicalSoNumber = archivedSalesOrder.saleOrderNumber;
 
-      let [dispatchSOArchives, materialDetails, materialFiles, statusStepper] =
+      let [dispatchSOArchives, materialDetails, materialFiles, statusStepper, erpImportLogs] =
         await Promise.all([
           this.prisma.dispatch_SOArchive.findMany({
             where: { saleOrderNumber: canonicalSoNumber },
@@ -278,12 +286,17 @@ export class SoSearchService {
           this.prisma.sO_Status_StepperArchive.findMany({
             where: { salesOrderNumber: canonicalSoNumber },
           }),
+          // --- ADD THIS NEW QUERY ---
+          this.prisma.eRP_Data_Cron_Logs.findMany({
+            where: { saleOrderNumber: canonicalSoNumber },
+            orderBy: { createdAt: 'desc' },
+          }),
         ]);
 
       materialDetails =
         await this.mapMaterialUserNamesToEmails(materialDetails);
 
-      const [product, customer, transporter, salesZone, packConfig] =
+      const [product, customer, transporter, salesZone, packConfig, issueAssignedUser, packingAssignedUser] =
         await Promise.all([
           this.prisma.product.findUnique({
             where: { id: archivedSalesOrder.productId },
@@ -302,6 +315,18 @@ export class SoSearchService {
           this.prisma.packConfig.findUnique({
             where: { id: archivedSalesOrder.packConfigId },
           }),
+          archivedSalesOrder.issueAssignedUserId
+            ? this.prisma.user.findUnique({
+                where: { id: archivedSalesOrder.issueAssignedUserId },
+                select: { name: true, email: true },
+              })
+            : null,
+          archivedSalesOrder.packingAssignedUserId
+            ? this.prisma.user.findUnique({
+                where: { id: archivedSalesOrder.packingAssignedUserId },
+                select: { name: true, email: true },
+              })
+            : null,
         ]);
 
       const salesOrderWithDetails = {
@@ -311,6 +336,8 @@ export class SoSearchService {
         transporter,
         salesZone,
         packConfig,
+        issueAssignedUser,
+        packingAssignedUser,
       };
 
       const dispatchIds = dispatchSOArchives.map((d) => d.dispatchId);
@@ -370,6 +397,7 @@ export class SoSearchService {
         dispatchInfo,
         materialDetails,
         materialFiles,
+        erpImportLogs,
         isArchived: true,
       };
       return convertBigInts(result);
