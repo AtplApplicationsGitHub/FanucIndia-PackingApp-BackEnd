@@ -29,6 +29,23 @@ function convertBigInts(obj: any): any {
 export class SoSearchService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private buildErpImportLogWhereClause(
+    saleOrderNumber: string,
+    outboundDelivery?: string | null,
+  ) {
+    const searchKeys = [saleOrderNumber];
+
+    if (outboundDelivery) {
+      searchKeys.push(`${saleOrderNumber}_${outboundDelivery}`);
+    }
+
+    return {
+      OR: searchKeys.map((key) => ({
+        saleOrderNumber: { equals: key, mode: 'insensitive' as const },
+      })),
+    };
+  }
+
   async findDetailsBySoNumber(
     saleOrderNumber: string,
     obd: string | undefined,
@@ -151,6 +168,10 @@ export class SoSearchService {
       }
 
       const canonicalSoNumber = salesOrder.saleOrderNumber;
+      const erpImportLogWhereClause = this.buildErpImportLogWhereClause(
+        canonicalSoNumber,
+        salesOrder.outboundDelivery,
+      );
 
       let [dispatchSOs, materialDetails, erpImportLogs] = await Promise.all([
         this.prisma.dispatch_SO.findMany({
@@ -163,7 +184,7 @@ export class SoSearchService {
         }),
         // --- ADD THIS NEW QUERY ---
         this.prisma.eRP_Data_Cron_Logs.findMany({
-          where: { saleOrderNumber: canonicalSoNumber },
+          where: erpImportLogWhereClause,
           orderBy: { createdAt: 'desc' },
         }),
       ]);
@@ -269,6 +290,10 @@ export class SoSearchService {
       }
 
       const canonicalSoNumber = archivedSalesOrder.saleOrderNumber;
+      const erpImportLogWhereClause = this.buildErpImportLogWhereClause(
+        canonicalSoNumber,
+        archivedSalesOrder.outboundDelivery,
+      );
 
       let [dispatchSOArchives, materialDetails, materialFiles, statusStepper, erpImportLogs] =
         await Promise.all([
@@ -288,7 +313,7 @@ export class SoSearchService {
           }),
           // --- ADD THIS NEW QUERY ---
           this.prisma.eRP_Data_Cron_Logs.findMany({
-            where: { saleOrderNumber: canonicalSoNumber },
+            where: erpImportLogWhereClause,
             orderBy: { createdAt: 'desc' },
           }),
         ]);
