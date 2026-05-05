@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { calculateStatusHubTimeline } from '../../common/utils/status-timeline.util';
 
 @Injectable()
 export class ReportsSalesOrderService {
@@ -86,10 +85,8 @@ export class ReportsSalesOrderService {
     if (filters.customerId) {
       where.customerId = parseInt(filters.customerId, 10);
     }
-    
     const totalOrdersCount = await this.prisma.salesOrder.count({ where });
-    
-    // --- 1. FETCH ALL MATCHING ORDERS ---
+    // --- 1. FETCH ALL MATCHING ORDERS (No Skip/Take here) ---
     const orders = await this.prisma.salesOrder.findMany({
       where,
       skip,
@@ -104,10 +101,6 @@ export class ReportsSalesOrderService {
         isErpImported: true,
         fgLocation: true,
         createdAt: true,
-        // --- NEW FIELDS REQUIRED FOR TIMELINE LOGIC ---
-        priority: true, 
-        statusStepper: { select: { status: true } },
-        // ----------------------------------------------
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
       },
@@ -128,14 +121,26 @@ export class ReportsSalesOrderService {
     const printedOrderIds = new Set(printedEntries.map((e) => e.salesOrderId));
 
     const formattedOrders = orders.map((order) => {
-      // Inject the explicit label printed flag for the utility to read
-      const orderWithLabelFlag = {
-        ...order,
-        isCustomerLabelPrinted: printedOrderIds.has(order.id)
-      };
+      const isDispatched = order.status === 'Dispatched';
+      const fgLocationValue = order.fgLocation as unknown;
+      const isStored =
+        fgLocationValue !== null &&
+        fgLocationValue !== undefined &&
+        (
+          (typeof fgLocationValue === 'string' && fgLocationValue.trim().length > 0) ||
+          (Array.isArray(fgLocationValue) && fgLocationValue.length > 0) ||
+          (typeof fgLocationValue !== 'string' && !Array.isArray(fgLocationValue))
+        );
 
-      // Calculate the new 7-step timeline array
-      const statusHubTimeline = calculateStatusHubTimeline(orderWithLabelFlag);
+      const statusObj = {
+        isErpImported: order.isErpImported === 1,
+        isR105: ['R105', 'W105', 'F105'].includes(order.status ?? ''),
+        isW105: ['W105', 'F105'].includes(order.status ?? ''),
+        isF105: order.status === 'F105',
+        isStored: isStored,
+        isCustomerLabelPrinted: printedOrderIds.has(order.id),
+        isDispatched: isDispatched,
+      };
 
       return {
         id: order.id,
@@ -145,8 +150,7 @@ export class ReportsSalesOrderService {
         salesZone: order.salesZone?.name || '-',
         paymentClearance: order.paymentClearance,
         createdAt: order.createdAt,
-        status: order.status || '-',
-        statusHubTimeline: statusHubTimeline, // Replaces old statusObj
+        statusObj: statusObj,
       };
     });
 

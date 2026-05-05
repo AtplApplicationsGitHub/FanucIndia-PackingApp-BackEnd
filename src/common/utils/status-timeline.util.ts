@@ -49,7 +49,7 @@ export function calculateStatusHubTimeline(order: any): TimelineNode[] {
     ? 'completed' 
     : (storageCompleted ? 'pending' : 'upcoming');
 
-  // 7. Dispatched Timeline
+  // 7. Dispatched Timeline   
   const dispatchedState: TimelineState = isDispatched 
     ? 'completed' 
     : (labelPrintCompleted ? 'pending' : 'upcoming');
