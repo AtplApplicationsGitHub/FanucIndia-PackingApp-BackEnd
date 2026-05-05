@@ -14,18 +14,18 @@ export class ReportsSalesOrderService {
 
     if (filters.date) {
       const gte = new Date(filters.date);
-      gte.setHours(0, 0, 0, 0);
-
+      gte.setHours(0, 0, 0, 0); 
+      
       const lt = new Date(gte);
       lt.setDate(lt.getDate() + 1);
-
+      
       where.deliveryDate = { gte, lt };
     } else if (filters.startDate || filters.endDate) {
       const gte = filters.startDate ? new Date(filters.startDate) : undefined;
       const lt = filters.endDate ? new Date(filters.endDate) : undefined;
-
+      
       where.deliveryDate = {};
-
+      
       if (gte) {
         gte.setHours(0, 0, 0, 0);
         where.deliveryDate.gte = gte;
@@ -36,7 +36,7 @@ export class ReportsSalesOrderService {
         nextDay.setDate(nextDay.getDate() + 1);
         where.deliveryDate.lt = nextDay;
       }
-      if (!gte && !lt) delete where.deliveryDate;
+      if (!gte && !lt) delete where.deliveryDate; 
     }
 
     if (filters.search) {
@@ -44,25 +44,15 @@ export class ReportsSalesOrderService {
         { saleOrderNumber: { contains: filters.search, mode: 'insensitive' } },
         { outboundDelivery: { contains: filters.search, mode: 'insensitive' } },
         { customerNameText: { contains: filters.search, mode: 'insensitive' } },
-        {
-          customer: { name: { contains: filters.search, mode: 'insensitive' } },
-        },
+        { customer: { name: { contains: filters.search, mode: 'insensitive' } } }
       ];
     }
 
     if (filters.payment) {
       const paymentVal = String(filters.payment).toLowerCase();
-      if (
-        paymentVal === 'cash' ||
-        paymentVal === 'true' ||
-        paymentVal === 'cleared'
-      ) {
+      if (paymentVal === 'cash' || paymentVal === 'true' || paymentVal === 'cleared') {
         where.paymentClearance = true;
-      } else if (
-        paymentVal === 'credit' ||
-        paymentVal === 'false' ||
-        paymentVal === 'pending'
-      ) {
+      } else if (paymentVal === 'credit' || paymentVal === 'false' || paymentVal === 'pending') {
         where.paymentClearance = false;
       }
     }
@@ -79,7 +69,10 @@ export class ReportsSalesOrderService {
       ];
 
       if (where.OR) {
-        where.AND = [{ OR: where.OR }, { OR: baseSummaryOr }];
+        where.AND = [
+          { OR: where.OR },
+          { OR: baseSummaryOr }
+        ];
         delete where.OR;
       } else {
         where.OR = baseSummaryOr;
@@ -110,10 +103,6 @@ export class ReportsSalesOrderService {
         createdAt: true,
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
-        statusStepper: {
-          where: { status: 'WIP Storage' },
-          select: { status: true },
-        },
       },
       orderBy: [
         { customer: { name: 'asc' } },
@@ -134,22 +123,14 @@ export class ReportsSalesOrderService {
     const formattedOrders = orders.map((order) => {
       const isDispatched = order.status === 'Dispatched';
       const fgLocationValue = order.fgLocation as unknown;
-
-      const hasFgLocation =
+      const isStored =
         fgLocationValue !== null &&
         fgLocationValue !== undefined &&
-        ((typeof fgLocationValue === 'string' &&
-          fgLocationValue.trim().length > 0) ||
+        (
+          (typeof fgLocationValue === 'string' && fgLocationValue.trim().length > 0) ||
           (Array.isArray(fgLocationValue) && fgLocationValue.length > 0) ||
-          (typeof fgLocationValue !== 'string' &&
-            !Array.isArray(fgLocationValue)));
-
-      // NEW LOGIC: Check if it reached the storage stage historically
-      const hasWipStorageStep =
-        order.statusStepper && order.statusStepper.length > 0;
-
-      // Order is stored if it currently has a location OR historically reached 'WIP Storage'
-      const isStored = hasFgLocation || hasWipStorageStep;
+          (typeof fgLocationValue !== 'string' && !Array.isArray(fgLocationValue))
+        );
 
       const statusObj = {
         isErpImported: order.isErpImported === 1,
@@ -174,17 +155,14 @@ export class ReportsSalesOrderService {
     });
 
     // --- 2. GROUP ALL ORDERS BY CUSTOMER NAME ---
-    const groupedOrdersMap = formattedOrders.reduce(
-      (acc, order) => {
-        const cName = order.customerName;
-        if (!acc[cName]) {
-          acc[cName] = [];
-        }
-        acc[cName].push(order);
-        return acc;
-      },
-      {} as Record<string, typeof formattedOrders>,
-    );
+    const groupedOrdersMap = formattedOrders.reduce((acc, order) => {
+      const cName = order.customerName;
+      if (!acc[cName]) {
+        acc[cName] = [];
+      }
+      acc[cName].push(order);
+      return acc;
+    }, {} as Record<string, typeof formattedOrders>);
 
     const groupedData = Object.keys(groupedOrdersMap).map((customerName) => ({
       customerName,
@@ -194,16 +172,16 @@ export class ReportsSalesOrderService {
     return {
       success: true,
       data: {
-        totalOrders: totalOrdersCount,
-        page,
-        limit,
-        totalPages: Math.ceil(totalOrdersCount / limit),
+        totalOrders: totalOrdersCount, 
+        page,              
+        limit,             
+        totalPages: Math.ceil(totalOrdersCount / limit), 
         groupedOrders: groupedData,
-      },
+      }
     };
   }
 
-  // CUSTOMER REPORTS
+  // CUSTOMER REPORTS 
   async getCustomerReport(startDate?: string, endDate?: string) {
     const where: any = {};
 
@@ -214,14 +192,14 @@ export class ReportsSalesOrderService {
       }
       if (endDate) {
         const end = new Date(endDate);
-        end.setUTCHours(23, 59, 59, 999);
+        end.setUTCHours(23, 59, 59, 999); 
         where.deliveryDate.lte = end;
       }
     }
 
     const groupedPrimary = await this.prisma.salesOrder.groupBy({
       by: ['customerId', 'customerNameText'],
-      where,
+      where, 
       _count: {
         id: true,
       },
@@ -274,11 +252,7 @@ export class ReportsSalesOrderService {
     };
   }
 
-  async getCustomerReportByMaterialCode(
-    materialCode: string,
-    startDate?: string,
-    endDate?: string,
-  ) {
+  async getCustomerReportByMaterialCode(materialCode: string, startDate?: string, endDate?: string) {
     if (!materialCode) {
       return { success: true, data: [] };
     }
@@ -317,11 +291,10 @@ export class ReportsSalesOrderService {
       },
     });
 
-    const archivedSalesOrdersMatches =
-      await this.prisma.salesOrderArchive.findMany({
-        where: dateFilter,
-        select: { id: true, customerId: true, customerNameText: true },
-      });
+    const archivedSalesOrdersMatches = await this.prisma.salesOrderArchive.findMany({
+      where: dateFilter,
+      select: { id: true, customerId: true, customerNameText: true },
+    });
 
     const archivedOrderIds = archivedSalesOrdersMatches.map((o) => o.id);
 
@@ -340,37 +313,28 @@ export class ReportsSalesOrderService {
     for (const mat of archivedMaterials) {
       if (mat.salesOrderId) {
         const qty = Number(mat.Required_Qty) || 0;
-        archiveQtyMap.set(
-          mat.salesOrderId,
-          (archiveQtyMap.get(mat.salesOrderId) || 0) + qty,
-        );
+        archiveQtyMap.set(mat.salesOrderId, (archiveQtyMap.get(mat.salesOrderId) || 0) + qty);
       }
     }
 
     const validArchivedOrders = archivedSalesOrdersMatches.filter(
-      (so) => (archiveQtyMap.get(so.id) || 0) > 0,
+      (so) => (archiveQtyMap.get(so.id) || 0) > 0
     );
 
     const allCustomerIds = new Set<number>();
-    primarySalesOrders.forEach((so) => {
-      if (so.customerId) allCustomerIds.add(so.customerId);
-    });
-    validArchivedOrders.forEach((so) => {
-      if (so.customerId) allCustomerIds.add(so.customerId);
-    });
+    primarySalesOrders.forEach((so) => { if (so.customerId) allCustomerIds.add(so.customerId); });
+    validArchivedOrders.forEach((so) => { if (so.customerId) allCustomerIds.add(so.customerId); });
 
     const customers = await this.prisma.customer.findMany({
       where: { id: { in: Array.from(allCustomerIds) } },
-      select: { id: true, name: true },
+      select: { id: true, name: true }
     });
     const customerMap = new Map(customers.map((c) => [c.id, c.name]));
 
     const resultMap = new Map<string, number>();
 
     for (const so of primarySalesOrders) {
-      const name = so.customerId
-        ? customerMap.get(so.customerId) || '-'
-        : so.customerNameText || '-';
+      const name = so.customerId ? (customerMap.get(so.customerId) || '-') : (so.customerNameText || '-');
       let orderMaterialQty = 0;
       for (const mat of so.materialData) {
         orderMaterialQty += Number(mat.Required_Qty) || 0;
@@ -379,9 +343,7 @@ export class ReportsSalesOrderService {
     }
 
     for (const so of validArchivedOrders) {
-      const name = so.customerId
-        ? customerMap.get(so.customerId) || '-'
-        : so.customerNameText || '-';
+      const name = so.customerId ? (customerMap.get(so.customerId) || '-') : (so.customerNameText || '-');
       const orderMaterialQty = archiveQtyMap.get(so.id) || 0;
       resultMap.set(name, (resultMap.get(name) || 0) + orderMaterialQty);
     }
@@ -390,30 +352,32 @@ export class ReportsSalesOrderService {
       ([customerName, totalQuantity]) => ({
         customerName,
         totalQuantity,
-      }),
+      })
     );
 
     sortedData.sort((a, b) => b.totalQuantity - a.totalQuantity);
 
     return {
       success: true,
-      data: [{ MaterialCode: materialCode }, ...sortedData],
+      data: [
+        { MaterialCode: materialCode },
+        ...sortedData,
+      ],
     };
   }
 
   // FG STORAGE
-  async getFgStorageReport(
-    pageParam?: string,
-    limitParam?: string,
-    search?: string,
-  ) {
+  async getFgStorageReport(pageParam?: string, limitParam?: string, search?: string) {
     const page = pageParam ? parseInt(pageParam, 10) : 1;
     const limit = limitParam ? parseInt(limitParam, 10) : 10;
     const skip = (page - 1) * limit;
 
     const where: any = {
-      fgLocation: { not: null },
-      OR: [{ status: null }, { status: { in: ['R105', 'W105', 'F105'] } }],
+      fgLocation: { not: null }, 
+      OR: [
+        { status: null },
+        { status: { in: ['R105', 'W105', 'F105'] } },
+      ],
     };
 
     const allOrders = await this.prisma.salesOrder.findMany({
@@ -426,7 +390,10 @@ export class ReportsSalesOrderService {
         FGUpdatedBy: true,
         FGUpdatedDateTime: true,
       },
-      orderBy: [{ fgLocation: 'asc' }, { id: 'asc' }],
+      orderBy: [
+        { fgLocation: 'asc' },
+        { id: 'asc' }
+      ]
     });
 
     const now = new Date();
@@ -446,9 +413,8 @@ export class ReportsSalesOrderService {
 
       let durationDays = 0;
       if (order.FGUpdatedDateTime) {
-        const diffTime =
-          now.getTime() - new Date(order.FGUpdatedDateTime).getTime();
-        durationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        const diffTime = now.getTime() - new Date(order.FGUpdatedDateTime).getTime();
+        durationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
       }
 
       return {
@@ -458,8 +424,8 @@ export class ReportsSalesOrderService {
         LastUpdatedBy: order.FGUpdatedBy,
         dateTime: order.FGUpdatedDateTime,
         durationDays: durationDays,
-        durationText: `${durationDays} ${durationDays > 1 ? 'days' : 'day'}`,
-      };
+        durationText: `${durationDays} ${durationDays > 1 ? 'days' : 'day'}`
+};
     });
 
     let filteredOrders = formattedOrders;
@@ -467,11 +433,9 @@ export class ReportsSalesOrderService {
       const lowerSearch = search.toLowerCase();
       filteredOrders = formattedOrders.filter((o) => {
         const soMatch = o.saleOrderNumber.toLowerCase().includes(lowerSearch);
-        const obdMatch = o.outboundDelivery
-          ?.toLowerCase()
-          .includes(lowerSearch);
+        const obdMatch = o.outboundDelivery?.toLowerCase().includes(lowerSearch);
         const locMatch = o.fgLocation.toLowerCase().includes(lowerSearch);
-
+        
         return soMatch || obdMatch || locMatch;
       });
     }
@@ -483,11 +447,11 @@ export class ReportsSalesOrderService {
       success: true,
       data: {
         totalOrders,
-        page,
-        limit,
+        page,              
+        limit,             
         totalPages: Math.ceil(totalOrders / limit),
-        reportData: pagedReportData,
-      },
+        reportData: pagedReportData
+      }
     };
   }
 }
