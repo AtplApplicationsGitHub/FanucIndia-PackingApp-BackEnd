@@ -707,15 +707,34 @@ export class AdminOrderService {
           if (val === null || val === undefined) return undefined;
 
           if (typeof val === 'object') {
-            if ('richText' in val) {
-              val = (val as any).richText.map((rt: any) => rt.text).join('');
-            } else if ('formula' in val) {
-              val = (val as any).result;
-              if (val && typeof val === 'object' && 'error' in val)
-                return undefined;
+            if (val instanceof Date) {
+            } else if ('formula' in val || (val as any).result !== undefined) {
+              let res = (val as any).result;
+              if (res && typeof res === 'object') {
+                if (res.error) return undefined;
+                if (res.richText && Array.isArray(res.richText)) {
+                   val = res.richText.map((rt: any) => rt.text || '').join('');
+                } else if (res.text) {
+                   val = typeof res.text === 'object' && res.text.richText 
+                     ? res.text.richText.map((rt: any) => rt.text || '').join('') 
+                     : res.text;
+                } else {
+                   val = '';
+                }
+              } else {
+                val = res;
+              }
+            } else if ('richText' in val && Array.isArray((val as any).richText)) {
+              val = (val as any).richText.map((rt: any) => rt.text || '').join('');
             } else if ('text' in val) {
-              val = (val as any).text;
-            } else if (val instanceof Date) {
+              let textVal = (val as any).text;
+              if (typeof textVal === 'object' && textVal.richText && Array.isArray(textVal.richText)) {
+                 val = textVal.richText.map((rt: any) => rt.text || '').join('');
+              } else if (typeof textVal === 'object') {
+                 val = '';
+              } else {
+                 val = textVal;
+              }
             } else {
               val = '';
             }

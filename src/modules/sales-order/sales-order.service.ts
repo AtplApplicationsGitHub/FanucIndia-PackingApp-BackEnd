@@ -293,10 +293,41 @@ export class SalesOrderService {
       const extractText = (cellValue: any): string => {
         if (cellValue === null || cellValue === undefined) return '';
         if (typeof cellValue === 'object') {
-          if (cellValue.result !== undefined) return String(cellValue.result); 
-          if (cellValue.richText) return cellValue.richText.map((rt: any) => rt.text).join('');
-          if (cellValue.text) return String(cellValue.text);
+          if (cellValue instanceof Date) {
+            return cellValue.toISOString();
+          }
+
+          if ('formula' in cellValue || cellValue.result !== undefined) {
+            const res = cellValue.result;
+            if (res && typeof res === 'object') {
+              if (res.error) return String(res.error);
+              if (res.richText && Array.isArray(res.richText)) {
+                 return res.richText.map((rt: any) => rt.text || '').join('');
+              }
+              if (res.text) {
+                 return typeof res.text === 'object' && res.text.richText
+                   ? res.text.richText.map((rt: any) => rt.text || '').join('')
+                   : String(res.text);
+              }
+              return ''; 
+            }
+            return res !== undefined && res !== null ? String(res) : '';
+          }
+
+          if (cellValue.richText && Array.isArray(cellValue.richText)) {
+            return cellValue.richText.map((rt: any) => rt.text || '').join('');
+          }
+
+          if (cellValue.text) {
+            if (typeof cellValue.text === 'object' && cellValue.text.richText && Array.isArray(cellValue.text.richText)) {
+               return cellValue.text.richText.map((rt: any) => rt.text || '').join('');
+            }
+            return typeof cellValue.text === 'object' ? '' : String(cellValue.text);
+          }
+
+          return ''; 
         }
+        
         return String(cellValue);
       };
 
