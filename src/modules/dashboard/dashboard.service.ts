@@ -419,7 +419,7 @@ export class DashboardService {
         this.prisma.salesOrder.count({
           where: {
             deliveryDate: { gte: startOfDay, lt: endOfDay },
-            status: { not: 'Dispatched' },
+            OR: [{ status: null }, { status: { not: 'Dispatched' } }],
             statusStepper: {
               some: {
                 status: 'Ready for Dispatch',
@@ -737,7 +737,7 @@ export class DashboardService {
           where: {
             salesZoneId: zoneId,
             deliveryDate: { gte: startOfDay, lt: endOfDay },
-            status: { not: 'Dispatched' },
+            OR: [{ status: null }, { status: { not: 'Dispatched' } }],
             statusStepper: {
               some: {
                 status: 'Ready for Dispatch',
