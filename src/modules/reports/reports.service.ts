@@ -97,12 +97,21 @@ export class ReportsSalesOrderService {
         outboundDelivery: true,
         paymentClearance: true,
         customerNameText: true,
-        status: true,
         isErpImported: true,
-        fgLocation: true,
         createdAt: true,
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
+        statusStepper: {
+          orderBy: { id: 'asc' },
+          select: {
+            id: true,
+            salesOrderNumber: true,
+            salesOrderId: true,
+            status: true,
+            createdDateTime: true,
+            updatedBy: true,
+          },
+        },
       },
       orderBy: [
         { customer: { name: 'asc' } },
@@ -111,37 +120,7 @@ export class ReportsSalesOrderService {
       ],
     });
 
-    const orderIds = orders.map((o) => o.id);
-
-    const printedEntries = await this.prisma.customerLabelPrintEntry.findMany({
-      where: { salesOrderId: { in: orderIds } },
-      select: { salesOrderId: true },
-    });
-
-    const printedOrderIds = new Set(printedEntries.map((e) => e.salesOrderId));
-
     const formattedOrders = orders.map((order) => {
-      const isDispatched = order.status === 'Dispatched';
-      const fgLocationValue = order.fgLocation as unknown;
-      const isStored =
-        fgLocationValue !== null &&
-        fgLocationValue !== undefined &&
-        (
-          (typeof fgLocationValue === 'string' && fgLocationValue.trim().length > 0) ||
-          (Array.isArray(fgLocationValue) && fgLocationValue.length > 0) ||
-          (typeof fgLocationValue !== 'string' && !Array.isArray(fgLocationValue))
-        );
-
-      const statusObj = {
-        isErpImported: order.isErpImported === 1,
-        isR105: ['R105', 'W105', 'F105'].includes(order.status ?? ''),
-        isW105: ['W105', 'F105'].includes(order.status ?? ''),
-        isF105: order.status === 'F105',
-        isStored: isStored,
-        isCustomerLabelPrinted: printedOrderIds.has(order.id),
-        isDispatched: isDispatched,
-      };
-
       return {
         id: order.id,
         saleOrderNumber: order.saleOrderNumber,
@@ -150,7 +129,8 @@ export class ReportsSalesOrderService {
         salesZone: order.salesZone?.name || '-',
         paymentClearance: order.paymentClearance,
         createdAt: order.createdAt,
-        statusObj: statusObj,
+        isErpImported: order.isErpImported === 1,
+        statusStepper: order.statusStepper,
       };
     });
 
