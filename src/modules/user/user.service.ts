@@ -17,13 +17,16 @@ export class UserService {
     const email = dto.email.replace(/\s+/g, '');
 
     const existing = await this.prisma.user.findFirst({
-      where: { 
-        email: { equals: email, mode: 'insensitive' } 
+      where: {
+        email: { equals: email, mode: 'insensitive' },
       },
     });
 
     if (existing) throw new BadRequestException('Email already registered');
-    const hashedPassword = await bcrypt.hash(dto.password.replace(/\s+/g, ''), 10);
+    const hashedPassword = await bcrypt.hash(
+      dto.password.replace(/\s+/g, ''),
+      10,
+    );
 
     return this.prisma.user.create({
       data: {
@@ -65,8 +68,8 @@ export class UserService {
           select: {
             id: true,
             name: true,
-          }
-        }
+          },
+        },
       },
     });
   }
@@ -101,8 +104,8 @@ export class UserService {
           select: {
             id: true,
             name: true,
-          }
-        }
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -112,14 +115,33 @@ export class UserService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
 
-    const updateData: any = { ...dto };
+    const updateData: any = {
+      name: dto.name,
+      email: dto.email,
+      role: dto.role,
+      salesZoneId: dto.salesZoneId,
+      accessPickPack: dto.accessPickPack,
+      accessLabelPrint: dto.accessLabelPrint,
+      accessMaterialFgTransfer: dto.accessMaterialFgTransfer,
+      accessMaterialDispatch: dto.accessMaterialDispatch,
+      accessVehicleEntry: dto.accessVehicleEntry,
+      accessLocationAccuracy: dto.accessLocationAccuracy,
+      accessContentAccuracy: dto.accessContentAccuracy,
+      accessPutAway: dto.accessPutAway,
+      accessErpBarcode: dto.accessErpBarcode,
+      accessAttachment: dto.accessAttachment,
+    };
+
+    Object.keys(updateData).forEach(
+      (key) => updateData[key] === undefined && delete updateData[key],
+    );
     if (dto.email) {
       const email = dto.email.replace(/\s+/g, '');
 
       const duplicate = await this.prisma.user.findFirst({
-        where: { 
+        where: {
           email: { equals: email, mode: 'insensitive' },
-          id: { not: id }
+          id: { not: id },
         },
       });
 
@@ -130,7 +152,10 @@ export class UserService {
       updateData.email = email;
     }
     if (dto.password) {
-      updateData.password = await bcrypt.hash(dto.password.replace(/\s+/g, ''), 10);
+      updateData.password = await bcrypt.hash(
+        dto.password.replace(/\s+/g, ''),
+        10,
+      );
     } else {
       delete updateData.password;
     }
@@ -164,8 +189,8 @@ export class UserService {
           select: {
             id: true,
             name: true,
-          }
-        }
+          },
+        },
       },
     });
   }
@@ -204,12 +229,18 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
-    const isMatch = await bcrypt.compare(dto.oldPassword.replace(/\s+/g, ''), user.password);
+    const isMatch = await bcrypt.compare(
+      dto.oldPassword.replace(/\s+/g, ''),
+      user.password,
+    );
     if (!isMatch) {
       throw new BadRequestException('Incorrect old password');
     }
 
-    const hashedPassword = await bcrypt.hash(dto.newPassword.replace(/\s+/g, ''), 10);
+    const hashedPassword = await bcrypt.hash(
+      dto.newPassword.replace(/\s+/g, ''),
+      10,
+    );
     return this.prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },

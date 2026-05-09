@@ -47,10 +47,13 @@ export class SoSearchService {
   }
 
   async findDetailsBySoNumber(
-    saleOrderNumber: string,
-    obd: string | undefined,
+    rawSaleOrderNumber: string,
+    rawObd: string | undefined,
     user: { userId: number; role: string },
   ) {
+    // Safely sanitize incoming parameters
+    const saleOrderNumber = rawSaleOrderNumber.trim().replace(/\s+/g, ' ');
+    let obd = rawObd ? rawObd.trim().replace(/\s+/g, ' ') : undefined;
     // --- NEW LOGIC: Intercept when no OBD is provided to check for multiples ---
     if (!obd) {
       const activeMatches = await this.prisma.salesOrder.findMany({

@@ -95,7 +95,13 @@ export class SalesCrudService {
         resolvedProductId = defaultProduct.id;
       }
 
-      const { customerName, customerId, productId, salesZoneId: dtoSalesZoneId, ...rest } = dto as any;
+      const {
+        customerName,
+        customerId,
+        productId,
+        salesZoneId: dtoSalesZoneId,
+        ...rest
+      } = dto as any;
 
       const finalSalesZoneId = user?.salesZoneId || dtoSalesZoneId;
 
@@ -165,7 +171,7 @@ export class SalesCrudService {
           },
         },
         select: {
-          id: true,               // Added ID for the mobile developer
+          id: true, // Added ID for the mobile developer
           saleOrderNumber: true,
           outboundDelivery: true, // Added OBD for the popup display
           customerNameText: true,
@@ -271,14 +277,16 @@ export class SalesCrudService {
           packConfig: true,
         },
       });
-      
+
       if (!order) {
         throw new NotFoundException('Sales order not found.');
       }
 
       if (user?.role === 'SALES') {
         if (user?.salesZoneId && order.salesZoneId !== user.salesZoneId) {
-          throw new ForbiddenException('Access denied. This order belongs to a different zone.');
+          throw new ForbiddenException(
+            'Access denied. This order belongs to a different zone.',
+          );
         } else if (!user?.salesZoneId && order.userId !== userId) {
           throw new ForbiddenException('Access denied.');
         }
@@ -286,7 +294,8 @@ export class SalesCrudService {
 
       return order;
     } catch (err) {
-      if (err instanceof NotFoundException || err instanceof ForbiddenException) throw err;
+      if (err instanceof NotFoundException || err instanceof ForbiddenException)
+        throw err;
       throw new InternalServerErrorException(
         'Failed to retrieve sales order.',
         (err as Error).message,
@@ -304,18 +313,23 @@ export class SalesCrudService {
     }
     if (user?.role === 'SALES') {
       if (user?.salesZoneId && existing.salesZoneId !== user.salesZoneId) {
-        throw new ForbiddenException('Access denied. This order belongs to a different zone.');
+        throw new ForbiddenException(
+          'Access denied. This order belongs to a different zone.',
+        );
       } else if (!user?.salesZoneId && existing.userId !== userId) {
         throw new ForbiddenException('Access denied.'); // Fallback
       }
-      if (user?.salesZoneId && dto.salesZoneId && dto.salesZoneId !== user.salesZoneId) {
-        throw new ForbiddenException('You can only assign orders to your own zone.');
+      if (
+        dto.salesZoneId !== undefined &&
+        dto.salesZoneId !== existing.salesZoneId
+      ) {
+        throw new ForbiddenException(
+          'Order zone cannot be changed after creation.',
+        );
       }
     }
 
-    const restrictedStatuses = [
-      'Dispatched',
-    ];
+    const restrictedStatuses = ['Dispatched'];
     if (existing.status && restrictedStatuses.includes(existing.status)) {
       throw new ForbiddenException(
         `Cannot modify order. The order is already ${existing.status}.`,
@@ -366,7 +380,12 @@ export class SalesCrudService {
           : dto.deliveryDate;
 
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      const { customerName, customerId, ...rest } = dto as any;
+      const { customerName, customerId, salesZoneId, ...rest } = dto as any;
+
+      const zoneUpdateData =
+        user?.role === 'ADMIN' && salesZoneId !== undefined
+          ? { salesZoneId }
+          : {};
 
       let fgTrackingData = {};
       if ('fgLocation' in rest && rest.fgLocation !== existing.fgLocation) {
@@ -380,6 +399,7 @@ export class SalesCrudService {
         where: { id },
         data: {
           ...rest,
+          ...zoneUpdateData,
           ...(deliveryDate ? { deliveryDate } : {}),
           UpdatedBy: user?.name || 'System',
           UpdatedDate: new Date(),
@@ -419,14 +439,16 @@ export class SalesCrudService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const existing = await this.prisma.salesOrder.findUnique({
       where: { id },
-    });    
+    });
     if (!existing) {
       throw new NotFoundException('Sales order not found.');
     }
 
     if (user?.role === 'SALES') {
       if (user?.salesZoneId && existing.salesZoneId !== user.salesZoneId) {
-        throw new ForbiddenException('Access denied. This order belongs to a different zone.');
+        throw new ForbiddenException(
+          'Access denied. This order belongs to a different zone.',
+        );
       } else if (!user?.salesZoneId && existing.userId !== userId) {
         throw new ForbiddenException('Access denied.');
       }
@@ -465,57 +487,132 @@ export class SalesCrudService {
     try {
       const skip = (page - 1) * limit;
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      const whereClause: any = {};
 
+      const salesOrderAndConditions: Prisma.SalesOrderWhereInput[] = [];
+      const archiveAndConditions: Prisma.SalesOrderArchiveWhereInput[] = [];
+
+      /**
+       * ROLE-BASED ACCESS CONTROL
+       *
+       * SALES:
+       * - See only orders from their CURRENT assigned salesZoneId.
+       * - Do NOT include { userId } when salesZoneId exists.
+       *
+       * USER:
+       * - Existing business logic preserved.
+       * - USER sees orders assigned to them in assignment fields.
+       *
+       * ADMIN / other roles:
+       * - No base restriction.
+       */
       if (user?.role === 'SALES') {
-        if (user?.salesZoneId) {
-          whereClause.salesZoneId = user.salesZoneId; 
+        if (user.salesZoneId) {
+          salesOrderAndConditions.push({ salesZoneId: user.salesZoneId });
+          archiveAndConditions.push({ salesZoneId: user.salesZoneId });
         } else {
-          whereClause.userId = userId;
+          // Fallback only for SALES users without zone.
+          salesOrderAndConditions.push({ userId });
+          archiveAndConditions.push({ userId });
         }
       } else if (user?.role === 'USER') {
-        whereClause.OR = [
-          { assignedUserId: userId },
-          { issueAssignedUserId: userId },
-          { packingAssignedUserId: userId }
-        ];
+        salesOrderAndConditions.push({
+          OR: [
+            { assignedUserId: userId },
+            { issueAssignedUserId: userId },
+            { packingAssignedUserId: userId },
+          ],
+        });
+
+        archiveAndConditions.push({
+          OR: [
+            { assignedUserId: userId },
+            { issueAssignedUserId: userId },
+            { packingAssignedUserId: userId },
+          ],
+        });
       }
 
-      // 1. APPLY INDIVIDUAL FILTERS
+      /**
+       * PAYMENT CLEARANCE FILTER
+       */
       if (filters.paymentClearance !== undefined) {
-        whereClause.paymentClearance = filters.paymentClearance === 'true';
+        const paymentClearanceValue = filters.paymentClearance === 'true';
+
+        salesOrderAndConditions.push({
+          paymentClearance: paymentClearanceValue,
+        });
+
+        archiveAndConditions.push({
+          paymentClearance: paymentClearanceValue,
+        });
       }
+
+      /**
+       * SALES ZONE FILTER
+       */
       if (filters.salesZoneId) {
         const reqZone = parseInt(filters.salesZoneId, 10);
-        if (user?.salesZoneId && reqZone !== user.salesZoneId) {
-          whereClause.salesZoneId = user.salesZoneId;
-        } else {
-          whereClause.salesZoneId = reqZone;
+
+        if (!Number.isNaN(reqZone)) {
+          if (user?.role === 'SALES' && user.salesZoneId) {
+            /**
+             * SALES cannot use query params to view another zone.
+             * If requested zone is not their current zone, return zero records.
+             */
+            if (reqZone !== user.salesZoneId) {
+              salesOrderAndConditions.push({ salesZoneId: -1 });
+              archiveAndConditions.push({ salesZoneId: -1 });
+            }
+          } else {
+            /**
+             * ADMIN and other permitted roles can filter by selected zone.
+             */
+            salesOrderAndConditions.push({ salesZoneId: reqZone });
+            archiveAndConditions.push({ salesZoneId: reqZone });
+          }
         }
-      }
-      if (filters.status) {
-        if (filters.status === 'None') {
-          whereClause.AND = [
-            ...(Array.isArray(whereClause.AND) ? whereClause.AND : []),
-            { OR: [{ status: null }, { status: '' }] },
-          ];
-        } else {
-          whereClause.status = filters.status;
-        }
-      } else if (filters.excludeStatus) {
-        whereClause.AND = [
-          ...(Array.isArray(whereClause.AND) ? whereClause.AND : []),
-          {
-            OR: [
-              { status: { not: filters.excludeStatus } },
-              { status: null },
-              { status: '' },
-            ],
-          },
-        ];
       }
 
+      /**
+       * STATUS FILTER
+       */
+      if (filters.status) {
+        if (filters.status === 'None') {
+          salesOrderAndConditions.push({
+            OR: [{ status: null }, { status: '' }],
+          });
+
+          archiveAndConditions.push({
+            OR: [{ status: null }, { status: '' }],
+          });
+        } else {
+          salesOrderAndConditions.push({ status: filters.status });
+          archiveAndConditions.push({ status: filters.status });
+        }
+      } else if (filters.excludeStatus) {
+        salesOrderAndConditions.push({
+          OR: [
+            { status: { not: filters.excludeStatus } },
+            { status: null },
+            { status: '' },
+          ],
+        });
+
+        archiveAndConditions.push({
+          OR: [
+            { status: { not: filters.excludeStatus } },
+            { status: null },
+            { status: '' },
+          ],
+        });
+      }
+
+      /**
+       * DATE FILTER
+       * Preserves your existing IST date-range behavior.
+       */
       const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
       const parseYMD = (s: string) => {
         const datePart = s.includes('T') ? s.split('T')[0] : s;
         const [y, m, d] = datePart.split('-').map(Number);
@@ -524,23 +621,35 @@ export class SalesCrudService {
 
       if (filters.startDate || filters.endDate) {
         const range: { gte?: Date; lt?: Date } = {};
+
         if (filters.startDate) {
           const { y, m, d } = parseYMD(filters.startDate);
           range.gte = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
         }
+
         if (filters.endDate) {
           const { y, m, d } = parseYMD(filters.endDate);
-          range.lt = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
+          range.lt = new Date(
+            Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS,
+          );
         }
-        whereClause.deliveryDate = { ...(whereClause.deliveryDate as object), ...range };
+
+        salesOrderAndConditions.push({ deliveryDate: range });
+        archiveAndConditions.push({ deliveryDate: range });
       }
 
-      // 2. APPLY SEARCH ACROSS ALL SPECIFIED COLUMNS
+      /**
+       * SEARCH FILTER
+       *
+       * Important:
+       * Search OR is pushed inside AND.
+       * This prevents search from overwriting role-based access restrictions.
+       */
       if (filters.search) {
         const searchStr = filters.search.trim();
-        const s = { contains: searchStr, mode: 'insensitive' };
+        const s = { contains: searchStr, mode: 'insensitive' as const };
 
-        whereClause.OR = [
+        const salesOrderSearchConditions: Prisma.SalesOrderWhereInput[] = [
           { saleOrderNumber: s },
           { outboundDelivery: s },
           { transferOrder: s },
@@ -555,17 +664,58 @@ export class SalesCrudService {
           { customer: { is: { name: s } } },
         ];
 
+        /**
+         * Archive model must use SalesOrderArchiveWhereInput.
+         * Keep only fields/relations that exist on SalesOrderArchive.
+         *
+         * If your SalesOrderArchive model also has transporter/packConfig relations,
+         * you may add them here later.
+         */
+        const archiveSearchConditions: Prisma.SalesOrderArchiveWhereInput[] = [
+          { saleOrderNumber: s },
+          { outboundDelivery: s },
+          { transferOrder: s },
+          { plantCode: s },
+          { specialRemarks: s },
+          { status: s },
+          { customerNameText: s },
+          { product: { is: { name: s } } },
+          { salesZone: { is: { name: s } } },
+          { customer: { is: { name: s } } },
+        ];
+
         const lowerSearch = searchStr.toLowerCase();
+
         if (['yes', 'true'].includes(lowerSearch)) {
-          whereClause.OR.push({ paymentClearance: true });
+          salesOrderSearchConditions.push({ paymentClearance: true });
+          archiveSearchConditions.push({ paymentClearance: true });
         } else if (['no', 'false'].includes(lowerSearch)) {
-          whereClause.OR.push({ paymentClearance: false });
+          salesOrderSearchConditions.push({ paymentClearance: false });
+          archiveSearchConditions.push({ paymentClearance: false });
         }
+
+        salesOrderAndConditions.push({ OR: salesOrderSearchConditions });
+        archiveAndConditions.push({ OR: archiveSearchConditions });
       }
 
-      // 3. FETCH PAGINATED RESULTS (INTERCEPT FOR DISPATCHED STATUS)
+      const whereClause: Prisma.SalesOrderWhereInput =
+        salesOrderAndConditions.length > 0
+          ? { AND: salesOrderAndConditions }
+          : {};
+
+      const archiveWhereClause: Prisma.SalesOrderArchiveWhereInput =
+        archiveAndConditions.length > 0 ? { AND: archiveAndConditions } : {};
+
+      /**
+       * DISPATCHED STATUS FLOW
+       * Preserves existing behavior:
+       * - Fetch from salesOrder
+       * - Fetch from salesOrderArchive
+       * - Combine
+       * - Sort
+       * - Manually paginate
+       */
       if (filters.status === 'Dispatched') {
-        // Fetch from both tables concurrently
         const [primaryOrders, archivedOrders] = await Promise.all([
           this.prisma.salesOrder.findMany({
             where: whereClause,
@@ -577,41 +727,44 @@ export class SalesCrudService {
               packConfig: true,
               assignedUser: true,
               _count: {
-                select: { materialData: true, soChatNotifications: { where: { userId } } },
+                select: {
+                  materialData: true,
+                  soChatNotifications: { where: { userId } },
+                },
               },
             },
           }),
           this.prisma.salesOrderArchive.findMany({
-            where: whereClause,
+            where: archiveWhereClause,
             include: {
               customer: true,
               product: true,
               salesZone: true,
             },
-          })
+          }),
         ]);
 
-        // Map and format results
         const mappedPrimary = primaryOrders.map((order) => ({
           ...order,
           hasMaterialData: order._count.materialData > 0,
           notificationCount: order._count.soChatNotifications,
-          isArchived: false
+          isArchived: false,
         }));
 
         const mappedArchived = archivedOrders.map((order) => ({
           ...order,
-          hasMaterialData: false, // Archival doesn't track this directly
+          hasMaterialData: false,
           notificationCount: 0,
-          isArchived: true
+          isArchived: true,
         }));
 
-        // Combine, Sort, and Paginate manually
-        const combinedOrders = [...mappedPrimary, ...mappedArchived].sort((a: any, b: any) => {
-          const dateA = new Date(a.UpdatedDate || a.createdAt).getTime();
-          const dateB = new Date(b.UpdatedDate || b.createdAt).getTime();
-          return dateB - dateA; // Descending
-        });
+        const combinedOrders = [...mappedPrimary, ...mappedArchived].sort(
+          (a: any, b: any) => {
+            const dateA = new Date(a.UpdatedDate || a.createdAt).getTime();
+            const dateB = new Date(b.UpdatedDate || b.createdAt).getTime();
+            return dateB - dateA;
+          },
+        );
 
         const totalCount = combinedOrders.length;
         const paginatedCombined = combinedOrders.slice(skip, skip + limit);
@@ -619,7 +772,9 @@ export class SalesCrudService {
         return { orders: paginatedCombined, totalCount };
       }
 
-      // 4. STANDARD FLOW FOR ALL OTHER STATUSES (Optimized DB Pagination)
+      /**
+       * STANDARD FLOW
+       */
       const [orders, totalCount] = await this.prisma.$transaction([
         this.prisma.salesOrder.findMany({
           where: whereClause,
@@ -648,7 +803,7 @@ export class SalesCrudService {
         ...order,
         hasMaterialData: order._count.materialData > 0,
         notificationCount: order._count.soChatNotifications,
-        isArchived: false
+        isArchived: false,
       }));
 
       return { orders: mappedOrders, totalCount };
@@ -662,7 +817,7 @@ export class SalesCrudService {
 
   async processLabelPrint(dto: LabelPrintDto, userId: number) {
     // 1. Extract 'id' instead of 'salesOrderIds' and alias it to 'inputIds' for clarity
-    const { id: inputIds, cncText, boxNN, quantity } = dto as any; 
+    const { id: inputIds, cncText, boxNN, quantity } = dto as any;
     const statusToSet = 'Ready for Dispatch';
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -682,7 +837,9 @@ export class SalesCrudService {
 
         // Safety check
         if (ordersToUpdate.length !== inputIds.length) {
-            throw new NotFoundException("One or more specific orders could not be found.");
+          throw new NotFoundException(
+            'One or more specific orders could not be found.',
+          );
         }
 
         const orderIds = ordersToUpdate.map((o) => o.id);
@@ -702,12 +859,12 @@ export class SalesCrudService {
             },
             update: { createdDateTime: now, updatedBy: userName },
             create: {
-                salesOrderNumber: order.saleOrderNumber,
-                salesOrderId: order.id,
-                status: statusToSet,
-                createdDateTime: now,
-                updatedBy: userName
-            }
+              salesOrderNumber: order.saleOrderNumber,
+              salesOrderId: order.id,
+              status: statusToSet,
+              createdDateTime: now,
+              updatedBy: userName,
+            },
           });
         }
 
@@ -721,7 +878,7 @@ export class SalesCrudService {
             entries: {
               create: ordersToUpdate.map((order) => ({
                 saleOrderNumber: order.saleOrderNumber,
-                salesOrderId: order.id, 
+                salesOrderId: order.id,
               })),
             },
           },
@@ -784,30 +941,6 @@ export class SalesCrudService {
     const customerName = order.customerNameText || order.customer?.name || '';
     const labelRemarks = order.labelRemarks || '';
     const salesZone = order.salesZone?.name || '';
-
-    // const prnCommands = [
-    //   'SIZE 61.5 mm, 40 mm',
-    //   'GAP 3 mm, 0 mm',
-    //   'SET RIBBON ON',
-    //   'DIRECTION 0,0',
-    //   'REFERENCE 0,0',
-    //   'OFFSET 0 mm',
-    //   'SET PEEL OFF',
-    //   'SET CUTTER OFF',
-    //   'SET PARTIAL_CUTTER OFF',
-    //   'SET TEAR ON',
-    //   'CLS',
-    //   'CODEPAGE 1252',
-    //   `TEXT 460,283,"0",180,11,16,"${customerName}"`,
-    //   `TEXT 460,208,"0",180,24,26,"${order.saleOrderNumber}"`,
-    //   `TEXT 368,79,"0",180,12,14,"${labelRemarks}"`,
-    //   `TEXT 460,79,"0",180,12,14,"${salesZone}"`,
-    //   `QRCODE 111,127,L,4,A,180,M2,S7,"${order.saleOrderNumber}"`,
-    //   `PRINT ${qty},1`,
-    //   '',
-    // ];
-
-    // const finalPrn = prnCommands.join('\r\n');
 
     const fileName = 'FANUC_60X40_TE210_160226-LAN.prn';
     const basePath = process.env.PRN_FILE_PATH || 'uploads/fanuc/prn-files/';
@@ -965,7 +1098,7 @@ export class SalesCrudService {
     prn = prn.replace(/@@PinCode@@/g, pinCode);
 
     const configRecord = await this.prisma.systemConfig.findUnique({
-      where: { key: 'CUSTOMER_LABEL_PRINTER_IP' }
+      where: { key: 'CUSTOMER_LABEL_PRINTER_IP' },
     });
     const printerIp = configRecord?.value;
 
@@ -1015,32 +1148,43 @@ export class SalesCrudService {
     });
   }
 
-  async uploadAttachments(salesOrderIds: number[], files: Express.Multer.File[], userId: number) {
+  async uploadAttachments(
+    salesOrderIds: number[],
+    files: Express.Multer.File[],
+    userId: number,
+  ) {
     // 1. Fetch the user to check their assigned Sales Zone
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
     // 2. Fetch the selected Sales Orders, now including salesZoneId
     const salesOrders = await this.prisma.salesOrder.findMany({
       where: { id: { in: salesOrderIds } },
-      select: { id: true, saleOrderNumber: true, outboundDelivery: true, salesZoneId: true },
+      select: {
+        id: true,
+        saleOrderNumber: true,
+        outboundDelivery: true,
+        salesZoneId: true,
+      },
     });
 
     if (salesOrders.length === 0) {
-      throw new NotFoundException('No valid sales orders found for the provided IDs.');
+      throw new NotFoundException(
+        'No valid sales orders found for the provided IDs.',
+      );
     }
 
     if (user?.salesZoneId) {
       const unauthorizedOrders = salesOrders.filter(
-        (order) => Number(order.salesZoneId) !== Number(user.salesZoneId)
+        (order) => Number(order.salesZoneId) !== Number(user.salesZoneId),
       );
-      
+
       if (unauthorizedOrders.length > 0) {
         const mismatchedDetails = unauthorizedOrders
           .map((o) => `Order ID ${o.id} is Zone ${o.salesZoneId}`)
           .join(', ');
 
         throw new ForbiddenException(
-          `Access denied. Your Sales Zone ID is ${user.salesZoneId}, but you selected restricted orders: [${mismatchedDetails}]`
+          `Access denied. Your Sales Zone ID is ${user.salesZoneId}, but you selected restricted orders: [${mismatchedDetails}]`,
         );
       }
     }
@@ -1052,7 +1196,11 @@ export class SalesCrudService {
     // 5. Process each Sales Order
     for (const order of salesOrders) {
       // Format the folder name as SO-OBD and sanitize it
-      const folderName = `${order.saleOrderNumber}-${order.outboundDelivery}`.replace(/[^a-zA-Z0-9-_]/g, '_');
+      const folderName =
+        `${order.saleOrderNumber}-${order.outboundDelivery}`.replace(
+          /[^a-zA-Z0-9-_]/g,
+          '_',
+        );
       const remoteDir = `${basePath.replace(/\/$/, '')}/${folderName}`;
 
       // Ensure the directory exists on the SFTP server
@@ -1063,7 +1211,7 @@ export class SalesCrudService {
         const lastDotIndex = file.originalname.lastIndexOf('.');
         let baseName = file.originalname;
         let extension = '';
-        
+
         if (lastDotIndex !== -1 && lastDotIndex !== 0) {
           baseName = file.originalname.substring(0, lastDotIndex);
           extension = file.originalname.substring(lastDotIndex);
@@ -1089,7 +1237,7 @@ export class SalesCrudService {
           saleOrderNumber: order.saleOrderNumber,
           outboundDelivery: order.outboundDelivery,
           fileName: finalFileName,
-          sftpPath: remotePath, 
+          sftpPath: remotePath,
           mimeType: file.mimetype,
           fileSizeBytes: file.size,
           uploadedBy: userId,
@@ -1109,10 +1257,10 @@ export class SalesCrudService {
       );
     }
 
-    return { 
-      message: 'Attachments uploaded successfully', 
-      totalFilesUploaded: files.length, 
-      appliedToOrdersCount: salesOrders.length 
+    return {
+      message: 'Attachments uploaded successfully',
+      totalFilesUploaded: files.length,
+      appliedToOrdersCount: salesOrders.length,
     };
   }
 

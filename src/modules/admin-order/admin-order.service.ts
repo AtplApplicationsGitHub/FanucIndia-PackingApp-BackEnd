@@ -18,7 +18,7 @@ export class AdminOrderService {
     const {
       page = 1,
       limit = 20,
-      search,
+      search: rawSearch,
       date,
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -91,6 +91,8 @@ export class AdminOrderService {
 
       where.deliveryDate = { ...(where.deliveryDate as object), ...range };
     }
+
+    const search = rawSearch ? rawSearch.trim().replace(/\s+/g, ' ') : undefined;
 
     if (search) {
       const lower = search.toLowerCase();

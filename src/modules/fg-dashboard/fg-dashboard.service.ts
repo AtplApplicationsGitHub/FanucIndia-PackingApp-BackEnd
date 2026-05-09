@@ -94,7 +94,8 @@ export class FgDashboardService {
       limit?: number;
     },
   ) {
-    const { search, date, payment, zone, status, page = 1, limit = 10 } = query;
+    const { search: rawSearch, date, payment, zone, status, page = 1, limit = 10 } = query;
+    const search = rawSearch ? rawSearch.trim().replace(/\s+/g, ' ') : undefined;
     const skip = (page - 1) * limit;
     // const where: Prisma.SalesOrderWhereInput = {
     //   OR: [
@@ -308,7 +309,8 @@ export class FgDashboardService {
     },
     res: Response,
   ) {
-    const { search, date, payment, zone, status } = query;
+    const { search: rawSearch, date, payment, zone, status } = query;
+    const search = rawSearch ? rawSearch.trim().replace(/\s+/g, ' ') : undefined;
     const where: Prisma.SalesOrderWhereInput = {};
 
     // --- REUSE THE SAME FILTER LOGIC AS getFgDashboardData ---

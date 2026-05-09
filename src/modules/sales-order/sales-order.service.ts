@@ -20,10 +20,12 @@ export class SalesOrderService {
     }
 
     // 1. Fetch the user to determine their Zone authorization
-    const user = await this.prisma.user.findUnique({ where: { id: authUserId } });
-    
+    const user = await this.prisma.user.findUnique({
+      where: { id: authUserId },
+    });
+
     const where: any = {};
-    
+
     // 2. Base Query: Restrict to Zone if applicable, otherwise fallback to userId
     if (user?.salesZoneId) {
       where.salesZoneId = user.salesZoneId;
@@ -32,7 +34,7 @@ export class SalesOrderService {
     }
 
     if (filters.search) {
-      const searchStr = filters.search.trim();
+      const searchStr = filters.search.trim().replace(/\s+/g, ' ');
       const s = { contains: searchStr, mode: 'insensitive' };
 
       where.OR = [
@@ -57,10 +59,10 @@ export class SalesOrderService {
         where.OR.push({ paymentClearance: false });
       }
     }
-    
+
     if (filters.paymentClearance !== undefined)
       where.paymentClearance = filters.paymentClearance === 'true';
-    
+
     // Ensure frontend filters cannot bypass the user's zone restriction
     if (filters.salesZoneId) {
       const reqZone = parseInt(filters.salesZoneId, 10);
@@ -80,8 +82,8 @@ export class SalesOrderService {
       } else {
         where.status = filters.status;
       }
-    } else if (filters.excludeStatus) { 
-        where.AND = [
+    } else if (filters.excludeStatus) {
+      where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : []),
         {
           OR: [
@@ -92,7 +94,7 @@ export class SalesOrderService {
         },
       ];
     }
-    
+
     const parseYMD = (s: string) => {
       const datePart = s.includes('T') ? s.split('T')[0] : s;
       const [y, m, d] = datePart.split('-').map(Number);
@@ -180,9 +182,13 @@ export class SalesOrderService {
     // 3. Restrict "Sales Zone" Dropdown Reference Data to the user's specific zone
     let salesZonesData;
     if (user?.salesZoneId) {
-       salesZonesData = await this.prisma.salesZone.findMany({ where: { id: user.salesZoneId } });
+      salesZonesData = await this.prisma.salesZone.findMany({
+        where: { id: user.salesZoneId },
+      });
     } else {
-       salesZonesData = await this.prisma.salesZone.findMany({ orderBy: { name: 'asc' } });
+      salesZonesData = await this.prisma.salesZone.findMany({
+        orderBy: { name: 'asc' },
+      });
     }
 
     const [products, transporters, packConfigs, customers] = await Promise.all([
@@ -217,7 +223,7 @@ export class SalesOrderService {
       const lastRow = values.length + 1;
       const formula = `ReferenceData!$${colLetter}$2:$${colLetter}$${lastRow}`;
 
-      const targetCol = worksheet.columns.find(c => c.header === key);
+      const targetCol = worksheet.columns.find((c) => c.header === key);
       if (targetCol) {
         const totalRows = orders.length + BLANK_ROWS_COUNT + 1;
         for (let row = 2; row <= totalRows; row++) {
@@ -257,24 +263,42 @@ export class SalesOrderService {
 
     let products, transporters, salesZones, packConfigs, customers;
     try {
-      [products, transporters, salesZones, packConfigs, customers] = await Promise.all([
-        this.prisma.product.findMany(),
-        this.prisma.transporter.findMany(),
-        this.prisma.salesZone.findMany(),
-        this.prisma.packConfig.findMany(),
-        this.prisma.customer.findMany(),
-      ]);
+      [products, transporters, salesZones, packConfigs, customers] =
+        await Promise.all([
+          this.prisma.product.findMany(),
+          this.prisma.transporter.findMany(),
+          this.prisma.salesZone.findMany(),
+          this.prisma.packConfig.findMany(),
+          this.prisma.customer.findMany(),
+        ]);
     } catch (err: any) {
-      throw new InternalServerErrorException('Failed to retrieve reference data', err.message);
+      throw new InternalServerErrorException(
+        'Failed to retrieve reference data',
+        err.message,
+      );
     }
 
     const maps = {
-      product: new Map<string, number>(products.map((p: any) => [p.name.trim().toLowerCase(), p.id])),
-      transporter: new Map<string, number>(transporters.map((t: any) => [t.name.trim().toLowerCase(), t.id])),
-      salesZone: new Map<string, number>(salesZones.map((sz: any) => [sz.name.trim().toLowerCase(), sz.id])),
-      packConfig: new Map<string, number>(packConfigs.map((pc: any) => [pc.configName.trim().toLowerCase(), pc.id])),
+      product: new Map<string, number>(
+        products.map((p: any) => [p.name.trim().toLowerCase(), p.id]),
+      ),
+      transporter: new Map<string, number>(
+        transporters.map((t: any) => [t.name.trim().toLowerCase(), t.id]),
+      ),
+      salesZone: new Map<string, number>(
+        salesZones.map((sz: any) => [sz.name.trim().toLowerCase(), sz.id]),
+      ),
+      packConfig: new Map<string, number>(
+        packConfigs.map((pc: any) => [
+          pc.configName.trim().toLowerCase(),
+          pc.id,
+        ]),
+      ),
       customer: new Map<string, { id: number; address: string }>(
-        customers.map((c: any) => [c.name.trim().toLowerCase(), { id: c.id, address: c.address }])
+        customers.map((c: any) => [
+          c.name.trim().toLowerCase(),
+          { id: c.id, address: c.address },
+        ]),
       ),
     };
 
@@ -285,9 +309,20 @@ export class SalesOrderService {
       if (rowNumber === 1) return;
 
       let [
-        product, saleOrderNumber, outboundDelivery, transferOrder, deliveryDate,
-        transporter, plantCode, paymentClearance, salesZone, packConfig,
-        customer, specialRemarks, additionalRemarks, labelRemarks,
+        product,
+        saleOrderNumber,
+        outboundDelivery,
+        transferOrder,
+        deliveryDate,
+        transporter,
+        plantCode,
+        paymentClearance,
+        salesZone,
+        packConfig,
+        customer,
+        specialRemarks,
+        additionalRemarks,
+        labelRemarks,
       ] = (row.values as any[]).slice(1);
 
       const extractText = (cellValue: any): string => {
@@ -302,14 +337,14 @@ export class SalesOrderService {
             if (res && typeof res === 'object') {
               if (res.error) return String(res.error);
               if (res.richText && Array.isArray(res.richText)) {
-                 return res.richText.map((rt: any) => rt.text || '').join('');
+                return res.richText.map((rt: any) => rt.text || '').join('');
               }
               if (res.text) {
-                 return typeof res.text === 'object' && res.text.richText
-                   ? res.text.richText.map((rt: any) => rt.text || '').join('')
-                   : String(res.text);
+                return typeof res.text === 'object' && res.text.richText
+                  ? res.text.richText.map((rt: any) => rt.text || '').join('')
+                  : String(res.text);
               }
-              return ''; 
+              return '';
             }
             return res !== undefined && res !== null ? String(res) : '';
           }
@@ -319,15 +354,23 @@ export class SalesOrderService {
           }
 
           if (cellValue.text) {
-            if (typeof cellValue.text === 'object' && cellValue.text.richText && Array.isArray(cellValue.text.richText)) {
-               return cellValue.text.richText.map((rt: any) => rt.text || '').join('');
+            if (
+              typeof cellValue.text === 'object' &&
+              cellValue.text.richText &&
+              Array.isArray(cellValue.text.richText)
+            ) {
+              return cellValue.text.richText
+                .map((rt: any) => rt.text || '')
+                .join('');
             }
-            return typeof cellValue.text === 'object' ? '' : String(cellValue.text);
+            return typeof cellValue.text === 'object'
+              ? ''
+              : String(cellValue.text);
           }
 
-          return ''; 
+          return '';
         }
-        
+
         return String(cellValue);
       };
 
@@ -340,11 +383,11 @@ export class SalesOrderService {
 
       let productNameRaw = extractText(product).trim();
       if (!productNameRaw) productNameRaw = 'FA';
-      
+
       const transporterNameRaw = extractText(transporter).trim();
       const rawPlantCode = plantCode.trim();
       const plantCodeString = rawPlantCode === '' ? null : rawPlantCode;
-      
+
       const salesZoneNameRaw = extractText(salesZone).trim().toLowerCase();
       let salesZoneId: number | null = null;
       if (salesZoneNameRaw) {
@@ -357,10 +400,10 @@ export class SalesOrderService {
       }
 
       if (userZoneId) {
-        if (!salesZoneId) {
-          salesZoneId = userZoneId;
-        } else if (salesZoneId !== userZoneId) {
-          rowErrors.push(`Access Denied: You cannot import/assign orders to a different zone.`);
+        if (salesZoneId && salesZoneId !== userZoneId) {
+          rowErrors.push(
+            `Access Denied: You cannot import/assign orders to a different zone.`,
+          );
         }
       }
 
@@ -387,16 +430,27 @@ export class SalesOrderService {
       }
 
       if (!saleOrderNumber) rowErrors.push('Missing saleOrderNumber');
-      else if (saleOrderNumber.toString().trim().length < 10) rowErrors.push('Sale Order Number must be at least 10 characters');
-      
+      else if (saleOrderNumber.toString().trim().length < 10)
+        rowErrors.push('Sale Order Number must be at least 10 characters');
+
       let paymentClearanceProvided = false;
       let paymentClearanceVal = false;
-      if (paymentClearance !== undefined && paymentClearance !== null && paymentClearance !== '') {
+      if (
+        paymentClearance !== undefined &&
+        paymentClearance !== null &&
+        paymentClearance !== ''
+      ) {
         paymentClearanceProvided = true;
-        if (!['Yes', 'No', true, false, 'yes', 'no'].includes(paymentClearance.toString())) {
+        if (
+          !['Yes', 'No', true, false, 'yes', 'no'].includes(
+            paymentClearance.toString(),
+          )
+        ) {
           rowErrors.push('Invalid paymentClearance (must be Yes or No)');
         } else {
-          paymentClearanceVal = paymentClearance.toString().toLowerCase() === 'yes' || paymentClearance === true;
+          paymentClearanceVal =
+            paymentClearance.toString().toLowerCase() === 'yes' ||
+            paymentClearance === true;
         }
       }
 
@@ -423,11 +477,11 @@ export class SalesOrderService {
           packConfigId: packConfigId,
           deliveryDate: deliveryDateObj,
           transporterName: transporterNameRaw,
-          paymentClearanceProvided, 
+          paymentClearanceProvided,
           paymentClearance: paymentClearanceVal,
           salesZoneId,
           customerId,
-          customerName: customerNameRaw,          
+          customerName: customerNameRaw,
           specialRemarks: extractText(specialRemarks) || null,
           additionalRemarks: extractText(additionalRemarks) || null,
           labelRemarks: extractText(labelRemarks) || null,
@@ -439,37 +493,46 @@ export class SalesOrderService {
 
     if (errors.length > 0) {
       throw new BadRequestException({
-        message: 'Import failed due to errors in the file. No orders were processed.',
+        message:
+          'Import failed due to errors in the file. No orders were processed.',
         errors,
       });
     }
 
     if (ordersToUpsert.length === 0) {
-      throw new BadRequestException({ message: 'No valid orders found to process.' });
+      throw new BadRequestException({
+        message: 'No valid orders found to process.',
+      });
     }
 
-    const soObdPairs = ordersToUpsert.map(o => `${o.saleOrderNumber}_${o.outboundDelivery}`);
+    const soObdPairs = ordersToUpsert.map(
+      (o) => `${o.saleOrderNumber}_${o.outboundDelivery}`,
+    );
     const hasDuplicates = (arr: string[]) => new Set(arr).size !== arr.length;
-    
+
     if (hasDuplicates(soObdPairs)) {
-      throw new BadRequestException('The import file contains identical Sale Order + Outbound Delivery combinations.');
+      throw new BadRequestException(
+        'The import file contains identical Sale Order + Outbound Delivery combinations.',
+      );
     }
 
     const existingOrders = await this.prisma.salesOrder.findMany({
       where: {
-        OR: ordersToUpsert.map(o => ({
+        OR: ordersToUpsert.map((o) => ({
           saleOrderNumber: o.saleOrderNumber,
-          ...(o.outboundDelivery ? { outboundDelivery: o.outboundDelivery } : {})
-        }))
+          ...(o.outboundDelivery
+            ? { outboundDelivery: o.outboundDelivery }
+            : {}),
+        })),
       },
     });
 
     const existingMap = new Map();
     const existingMapBySo = new Map();
-    
-    existingOrders.forEach(o => {
+
+    existingOrders.forEach((o) => {
       existingMap.set(`${o.saleOrderNumber}_${o.outboundDelivery || ''}`, o);
-      
+
       if (!existingMapBySo.has(o.saleOrderNumber)) {
         existingMapBySo.set(o.saleOrderNumber, [o]);
       } else {
@@ -478,17 +541,22 @@ export class SalesOrderService {
     });
 
     try {
-      const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-      
+      const delay = (ms: number) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
+
       const result = await this.prisma.$transaction(async (tx) => {
         let insertedCount = 0;
         let updatedCount = 0;
 
         for (const orderData of ordersToUpsert) {
           let finalProductId: number | null = null;
-          let foundProdId = maps.product.get(orderData.productName.toLowerCase());
+          let foundProdId = maps.product.get(
+            orderData.productName.toLowerCase(),
+          );
           if (!foundProdId) {
-            const newProduct = await tx.product.create({ data: { name: orderData.productName } });
+            const newProduct = await tx.product.create({
+              data: { name: orderData.productName },
+            });
             foundProdId = newProduct.id;
             maps.product.set(orderData.productName.toLowerCase(), foundProdId);
           }
@@ -496,30 +564,54 @@ export class SalesOrderService {
 
           let finalCustomerId = orderData.customerId;
           let finalCustomerAddress = orderData.address;
-          if (!finalCustomerId && orderData.customerName) { 
-            let foundCust = maps.customer.get(orderData.customerName.toLowerCase());
+          if (!finalCustomerId && orderData.customerName) {
+            let foundCust = maps.customer.get(
+              orderData.customerName.toLowerCase(),
+            );
             if (!foundCust) {
-              const newCustomer = await tx.customer.create({ data: { name: orderData.customerName } });
-              foundCust = { id: newCustomer.id, address: newCustomer.address || '' };
-              maps.customer.set(orderData.customerName.toLowerCase(), foundCust);
+              const newCustomer = await tx.customer.create({
+                data: { name: orderData.customerName },
+              });
+              foundCust = {
+                id: newCustomer.id,
+                address: newCustomer.address || '',
+              };
+              maps.customer.set(
+                orderData.customerName.toLowerCase(),
+                foundCust,
+              );
             }
             finalCustomerId = foundCust.id;
             finalCustomerAddress = foundCust.address;
           }
 
           let finalTransporterId: number | null = null;
-          if (orderData.transporterName) { 
-            let foundTransId = maps.transporter.get(orderData.transporterName.toLowerCase());
+          if (orderData.transporterName) {
+            let foundTransId = maps.transporter.get(
+              orderData.transporterName.toLowerCase(),
+            );
             if (!foundTransId) {
-              const newTransporter = await tx.transporter.create({ data: { name: orderData.transporterName } });
+              const newTransporter = await tx.transporter.create({
+                data: { name: orderData.transporterName },
+              });
               foundTransId = newTransporter.id;
-              maps.transporter.set(orderData.transporterName.toLowerCase(), foundTransId);
+              maps.transporter.set(
+                orderData.transporterName.toLowerCase(),
+                foundTransId,
+              );
             }
             finalTransporterId = foundTransId;
           }
 
-          const { customerName, transporterName, productName, rowNumber, paymentClearanceProvided, ...dataToSave } = orderData;
-          
+          const {
+            customerName,
+            transporterName,
+            productName,
+            rowNumber,
+            paymentClearanceProvided,
+            ...dataToSave
+          } = orderData;
+
           const compositeKey = `${orderData.saleOrderNumber}_${orderData.outboundDelivery}`;
           let existing = existingMap.get(compositeKey);
 
@@ -528,32 +620,54 @@ export class SalesOrderService {
             if (matches && matches.length === 1) {
               existing = matches[0];
             } else if (matches && matches.length > 1) {
-              throw new BadRequestException(`Multiple orders found for Sale Order ${orderData.saleOrderNumber}. Please provide Outbound Delivery to update the correct one.`);
+              throw new BadRequestException(
+                `Multiple orders found for Sale Order ${orderData.saleOrderNumber}. Please provide Outbound Delivery to update the correct one.`,
+              );
             }
           }
 
           if (existing) {
-            // 3. Security check: User cannot update an order that belongs to another zone
             if (userZoneId && existing.salesZoneId !== userZoneId) {
-              throw new ConflictException(`Row ${orderData.rowNumber}: Order ${existing.saleOrderNumber} belongs to a different zone. You do not have permission to modify it.`);
+              throw new ConflictException(
+                `Row ${orderData.rowNumber}: Order ${existing.saleOrderNumber} belongs to a different zone. You do not have permission to modify it.`,
+              );
+            }
+
+            if (
+              orderData.salesZoneId &&
+              orderData.salesZoneId !== existing.salesZoneId
+            ) {
+              throw new ConflictException(
+                `Row ${orderData.rowNumber}: Sales Zone cannot be changed for existing order ${existing.saleOrderNumber}.`,
+              );
             }
 
             const updatePayload: any = {};
-            
+
             if (finalProductId) updatePayload.productId = finalProductId;
             if (finalCustomerId) updatePayload.customerId = finalCustomerId;
-            if (finalCustomerAddress) updatePayload.address = finalCustomerAddress;
-            if (finalTransporterId) updatePayload.transporterId = finalTransporterId;
-            if (orderData.plantCode) updatePayload.plantCode = orderData.plantCode;
-            if (orderData.packConfigId) updatePayload.packConfigId = orderData.packConfigId;
-            if (orderData.deliveryDate) updatePayload.deliveryDate = orderData.deliveryDate;
-            if (orderData.salesZoneId) updatePayload.salesZoneId = orderData.salesZoneId;
-            if (orderData.specialRemarks) updatePayload.specialRemarks = orderData.specialRemarks;
-            if (orderData.additionalRemarks) updatePayload.additionalRemarks = orderData.additionalRemarks;
-            if (orderData.labelRemarks) updatePayload.labelRemarks = orderData.labelRemarks;
-            if (orderData.transferOrder) updatePayload.transferOrder = orderData.transferOrder;
-            if (orderData.outboundDelivery) updatePayload.outboundDelivery = orderData.outboundDelivery;
-            if (paymentClearanceProvided) updatePayload.paymentClearance = orderData.paymentClearance;
+            if (finalCustomerAddress)
+              updatePayload.address = finalCustomerAddress;
+            if (finalTransporterId)
+              updatePayload.transporterId = finalTransporterId;
+            if (orderData.plantCode)
+              updatePayload.plantCode = orderData.plantCode;
+            if (orderData.packConfigId)
+              updatePayload.packConfigId = orderData.packConfigId;
+            if (orderData.deliveryDate)
+              updatePayload.deliveryDate = orderData.deliveryDate;
+            if (orderData.specialRemarks)
+              updatePayload.specialRemarks = orderData.specialRemarks;
+            if (orderData.additionalRemarks)
+              updatePayload.additionalRemarks = orderData.additionalRemarks;
+            if (orderData.labelRemarks)
+              updatePayload.labelRemarks = orderData.labelRemarks;
+            if (orderData.transferOrder)
+              updatePayload.transferOrder = orderData.transferOrder;
+            if (orderData.outboundDelivery)
+              updatePayload.outboundDelivery = orderData.outboundDelivery;
+            if (paymentClearanceProvided)
+              updatePayload.paymentClearance = orderData.paymentClearance;
 
             await tx.salesOrder.update({
               where: { id: existing.id },
@@ -561,20 +675,27 @@ export class SalesOrderService {
             });
             updatedCount++;
           } else {
+            if (userZoneId && !orderData.salesZoneId) {
+              orderData.salesZoneId = userZoneId;
+            }
             const missingForNew: string[] = [];
-            if (!orderData.outboundDelivery) missingForNew.push('Outbound Delivery');
+            if (!orderData.outboundDelivery)
+              missingForNew.push('Outbound Delivery');
             if (!orderData.deliveryDate) missingForNew.push('Delivery Date');
             if (!finalTransporterId) missingForNew.push('Transporter');
             if (!finalCustomerId) missingForNew.push('Customer');
             if (!orderData.salesZoneId) missingForNew.push('Sales Zone');
 
             if (missingForNew.length > 0) {
-              throw new BadRequestException(`Row ${orderData.rowNumber} (Sale Order: ${orderData.saleOrderNumber}) is treated as a NEW order but is missing mandatory fields: ${missingForNew.join(', ')}`);
+              throw new BadRequestException(
+                `Row ${orderData.rowNumber} (Sale Order: ${orderData.saleOrderNumber}) is treated as a NEW order but is missing mandatory fields: ${missingForNew.join(', ')}`,
+              );
             }
 
             const newOrder = await tx.salesOrder.create({
               data: {
                 ...dataToSave,
+                salesZoneId: orderData.salesZoneId,
                 productId: finalProductId,
                 customerId: finalCustomerId,
                 transporterId: finalTransporterId,
@@ -582,13 +703,23 @@ export class SalesOrderService {
               },
             });
 
-            const statuses = ['To be Issued', 'Under Issue', 'Issued', 'Under Packing', 'Packed', 'WIP Storage', 'Ready for Dispatch', 'Dispatched'];
+            const statuses = [
+              'To be Issued',
+              'Under Issue',
+              'Issued',
+              'Under Packing',
+              'Packed',
+              'WIP Storage',
+              'Ready for Dispatch',
+              'Dispatched',
+            ];
             await tx.sO_Status_Stepper.createMany({
               data: statuses.map((status) => ({
                 salesOrderNumber: newOrder.saleOrderNumber,
                 salesOrderId: newOrder.id,
                 status: status,
-                createdDateTime: status === 'To be Issued' ? newOrder.createdAt : null,
+                createdDateTime:
+                  status === 'To be Issued' ? newOrder.createdAt : null,
                 updatedBy: null,
               })),
             });
@@ -606,14 +737,25 @@ export class SalesOrderService {
         updatedCount: result.updatedCount,
       };
     } catch (err: any) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
         const target = (err.meta?.target as string[])?.join(', ');
-        throw new ConflictException(`Database error: A constraint failed. The value for '${target}' must be unique.`);
+        throw new ConflictException(
+          `Database error: A constraint failed. The value for '${target}' must be unique.`,
+        );
       }
-      if (err instanceof BadRequestException || err instanceof ConflictException) {
+      if (
+        err instanceof BadRequestException ||
+        err instanceof ConflictException
+      ) {
         throw err;
       }
-      throw new InternalServerErrorException('Database operation failed', err.message);
+      throw new InternalServerErrorException(
+        'Database operation failed',
+        err.message,
+      );
     }
   }
 
