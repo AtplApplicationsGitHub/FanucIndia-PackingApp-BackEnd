@@ -27,7 +27,8 @@ const PROGRESS_CONFIG: Record<StepLabel, { next: string }> = {
 
 function getStageStatusInfo(order: {
   status?: string | null;
-  assignedUserId?: number | null;
+  issueAssignedUserId?: number | null;
+  packingAssignedUserId?: number | null;
   fgLocation?: any;
   statusStepper?: { status: string; createdDateTime?: Date | null }[];
 }) {
@@ -61,16 +62,20 @@ function getStageStatusInfo(order: {
   } else if (s.includes('F105')) {
     step = 'Packed';
   } else if (s.includes('W105')) {
-    if (order.assignedUserId) {
+    if (order.packingAssignedUserId) {
       step = 'Under Packing';
     } else {
       step = 'Issued';
     }
   } else if (s.includes('R105')) {
+  if (order.issueAssignedUserId) {
     step = 'Under Issue';
   } else {
     step = 'To be Issued';
   }
+} else {
+  step = 'To be Issued';
+}
 
   return {
     current: step,
@@ -80,7 +85,7 @@ function getStageStatusInfo(order: {
 
 @Injectable()
 export class FgDashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getFgDashboardData(
     user: { userId: number; role: string },
@@ -206,7 +211,8 @@ export class FgDashboardService {
           additionalRemarks: true,
           UpdatedBy: true,
           UpdatedDate: true,
-          assignedUserId: true,
+          issueAssignedUserId: true,
+          packingAssignedUserId: true,
           customerNameText: true,
           user: { select: { name: true, email: true } },
           Dispatch_SO: {
@@ -265,7 +271,7 @@ export class FgDashboardService {
       const vehicleNumber =
         order.Dispatch_SO?.length > 0
           ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch
-              ?.vehicleNumber
+            ?.vehicleNumber
           : null;
 
       return {
@@ -289,7 +295,8 @@ export class FgDashboardService {
         vehicleNumber: vehicleNumber,
         updatedBy: order.UpdatedBy,
         updatedDate: order.UpdatedDate,
-        assignedUserId: order.assignedUserId,
+        issueAssignedUserId: order.issueAssignedUserId,
+        packingAssignedUserId: order.packingAssignedUserId,
         isReadyForDispatch,
         isWipStorage,
       };
@@ -410,7 +417,8 @@ export class FgDashboardService {
         fgLocation: true,
         specialRemarks: true,
         additionalRemarks: true,
-        assignedUserId: true,
+        issueAssignedUserId: true,
+        packingAssignedUserId: true,
         customerNameText: true,
         user: { select: { email: true } },
         Dispatch_SO: {
@@ -470,7 +478,7 @@ export class FgDashboardService {
       const vehicleNumber =
         order.Dispatch_SO?.length > 0
           ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch
-              ?.vehicleNumber
+            ?.vehicleNumber
           : null;
 
       let fgLocString = '-';

@@ -35,7 +35,7 @@ export class DispatchService {
       if (resolvedPath.startsWith(tempDir)) {
         fs.unlinkSync(filePath);
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   private async getUserEmail(userId: number): Promise<string> {
@@ -46,7 +46,7 @@ export class DispatchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sftpService: SftpService,
-  ) {}
+  ) { }
 
   async create(dto: any, files: Express.Multer.File[], userId: number) {
     const {
@@ -362,7 +362,7 @@ export class DispatchService {
       files.forEach((file) => {
         try {
           this.safeUnlink(file.path);
-        } catch {}
+        } catch { }
       });
       throw new InternalServerErrorException('Failed to upload attachments.');
     }
@@ -883,6 +883,7 @@ export class DispatchService {
     }
 
     const userName = await this.getUserEmail(userId);
+    const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
       await tx.dispatch_SO.delete({ where: { id: soId } });
@@ -892,19 +893,32 @@ export class DispatchService {
         data: {
           status: 'F105',
           UpdatedBy: userName,
-          UpdatedDate: new Date(),
+          UpdatedDate: now,
+        },
+      });
+
+      await tx.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderId: dispatchSoLink.salesOrderId,
+          status: 'Dispatched',
+        },
+        data: {
+          createdDateTime: null,
+          updatedBy: userName,
         },
       });
 
       await tx.dispatch.update({
         where: { id: dispatchSoLink.dispatchId },
         data: {
-          UpdatedDate: new Date(),
+          UpdatedDate: now,
         },
       });
     });
 
-    return { message: 'SO Number removed and status reverted to F105' };
+    return {
+      message: 'SO Number removed, status reverted to F105, and Dispatched stepper undone',
+    };
   }
 
   async generatePdf(dispatchId: number): Promise<Buffer> {
