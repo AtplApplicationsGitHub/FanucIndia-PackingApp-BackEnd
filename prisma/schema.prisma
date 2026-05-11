@@ -13,11 +13,11 @@ model User {
   email                    String         @unique
   password                 String
   role                     String         @default("SALES")
-  salesZoneId              Int?           
+  salesZoneId              Int?
   salesZone                SalesZone?     @relation(fields: [salesZoneId], references: [id])
   currentSessionId         String?
-  createdAt                DateTime       @default(now())
-  updatedAt                DateTime       @updatedAt
+  createdAt                DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime       @updatedAt @db.Timestamptz(3)
   salesOrders              SalesOrder[]   @relation("CreatedOrders")
   assignedOrders           SalesOrder[]   @relation("AssignedOrders")
   issueAssignedOrders      SalesOrder[]   @relation("IssueAssignedOrders")
@@ -43,9 +43,9 @@ model User {
 }
 
 model Product {
-  id          Int          @id @default(autoincrement())
-  name        String
-  salesOrders SalesOrder[]
+  id             Int                 @id @default(autoincrement())
+  name           String
+  salesOrders    SalesOrder[]
   archivedOrders SalesOrderArchive[]
 }
 
@@ -63,9 +63,9 @@ model PlantCode {
 }
 
 model SalesZone {
-  id          Int          @id @default(autoincrement())
-  name        String
-  salesOrders SalesOrder[]
+  id             Int                 @id @default(autoincrement())
+  name           String
+  salesOrders    SalesOrder[]
   archivedOrders SalesOrderArchive[]
   users          User[]
 }
@@ -77,11 +77,11 @@ model PackConfig {
 }
 
 model Customer {
-  id            Int          @id @default(autoincrement())
-  name          String
-  address       String?
-  contactNumber String?
-  salesOrders   SalesOrder[]
+  id             Int                 @id @default(autoincrement())
+  name           String
+  address        String?
+  contactNumber  String?
+  salesOrders    SalesOrder[]
   archivedOrders SalesOrderArchive[]
 }
 
@@ -122,8 +122,8 @@ model SalesOrder {
   skipPackingStage      Boolean?                @default(false)
   isErpImported         Int                     @default(0)
   binCount              Int?                    @default(0)
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
+  createdAt             DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                @updatedAt @db.Timestamptz(3)
   materialData          ERP_Material_Data[]
   materialFilesByNumber ERP_Material_File[]     @relation("SO_File_By_Number")
   customer              Customer?               @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -138,31 +138,31 @@ model SalesOrder {
   user                  User                    @relation("CreatedOrders", fields: [userId], references: [id])
   Dispatch_SO           Dispatch_SO[]
   UpdatedBy             String?
-  UpdatedDate           DateTime?               @updatedAt
+  UpdatedDate           DateTime?               @updatedAt @db.Timestamptz(3)
   FGUpdatedBy           String?                 @db.VarChar(255)
-  FGUpdatedDateTime     DateTime?
+  FGUpdatedDateTime     DateTime?               @db.Timestamptz(3)
   statusStepper         SO_Status_Stepper[]
   chatMessages          SalesOrderChatMessage[]
   soChatNotifications   SoChatNotification[]
+  attachments           SalesOrderAttachment[]
 
   @@unique([saleOrderNumber, outboundDelivery])
-  attachments SalesOrderAttachment[]
 }
 
 model SalesOrderAttachment {
-  id               Int        @id @default(autoincrement())
+  id               Int      @id @default(autoincrement())
   salesOrderId     Int
-  saleOrderNumber  String     @db.VarChar(500)
-  outboundDelivery String     @db.VarChar(500)
-  fileName         String     @db.VarChar(500)
-  sftpPath         String     @db.VarChar(1000)
-  mimeType         String?    @db.VarChar(255)
+  saleOrderNumber  String   @db.VarChar(500)
+  outboundDelivery String   @db.VarChar(500)
+  fileName         String   @db.VarChar(500)
+  sftpPath         String   @db.VarChar(1000)
+  mimeType         String?  @db.VarChar(255)
   fileSizeBytes    Int
   uploadedBy       Int
-  createdAt        DateTime   @default(now())
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
 
-  salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
-  user             User       @relation(fields: [uploadedBy], references: [id])
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [uploadedBy], references: [id])
 
   @@index([salesOrderId])
 }
@@ -191,19 +191,19 @@ model ERP_Material_Data {
   Remarks_Required     Boolean?
   Classification       String?  @db.VarChar(100)
 
-  UpdatedDate  DateTime?   @db.Timestamp(3)
-  UpdatedBy    String?     @db.VarChar(50)
-  IssueUpdatedDate   DateTime? @db.Timestamp(3)
-  IssueUpdatedBy     String?   @db.VarChar(50)
-  PackingUpdatedDate DateTime? @db.Timestamp(3)
-  PackingUpdatedBy   String?   @db.VarChar(50)
-  salesOrderId Int?
-  salesOrder   SalesOrder? @relation(fields: [salesOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  UpdatedDate        DateTime?   @db.Timestamptz(3)
+  UpdatedBy          String?     @db.VarChar(50)
+  IssueUpdatedDate   DateTime?   @db.Timestamptz(3)
+  IssueUpdatedBy     String?     @db.VarChar(50)
+  PackingUpdatedDate DateTime?   @db.Timestamptz(3)
+  PackingUpdatedBy   String?     @db.VarChar(50)
+  salesOrderId       Int?
+  salesOrder         SalesOrder? @relation(fields: [salesOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model ERPMaterialLog {
   id                Int      @id @default(autoincrement())
-  dateTime          DateTime @map("date_time")
+  dateTime          DateTime @map("date_time") @db.Timestamptz(3)
   fileName          String   @map("file_name") @db.VarChar(255)
   exceptionStatus   String?  @map("exception/status") @db.VarChar(255)
   soNo              String   @map("SO_NO") @db.VarChar(50)
@@ -222,11 +222,11 @@ model ERP_Material_File {
   fileSizeBytes   BigInt
   mimeType        String?  @db.VarChar(255)
   checksumSha256  String?  @db.VarChar(64)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   UpdatedBy          String?
-  UpdatedDate        DateTime?   @updatedAt
+  UpdatedDate        DateTime?   @updatedAt @db.Timestamptz(3)
   salesOrderId       Int?
   salesOrderByNumber SalesOrder? @relation("SO_File_By_Number", fields: [salesOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
@@ -241,15 +241,15 @@ model Dispatch {
   vehicleNumber   String
   attachments     Json?
   createdBy       Int
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   transporter Transporter?  @relation(fields: [transporterId], references: [id])
   user        User          @relation(fields: [createdBy], references: [id])
   dispatchSOs Dispatch_SO[]
 
   UpdatedBy   String?
-  UpdatedDate DateTime? @updatedAt
+  UpdatedDate DateTime? @updatedAt @db.Timestamptz(3)
 
   vehicleEntryId Int?
   vehicleEntry   VehicleEntry? @relation(fields: [vehicleEntryId], references: [id])
@@ -259,7 +259,7 @@ model Dispatch_SO {
   id              Int        @id @default(autoincrement())
   dispatchId      Int
   saleOrderNumber String     @db.VarChar(500)
-  createdAt       DateTime   @default(now())
+  createdAt       DateTime   @default(now()) @db.Timestamptz(3)
   salesOrderId    Int
   dispatch        Dispatch   @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
   salesOrder      SalesOrder @relation(fields: [salesOrderId], references: [id])
@@ -268,46 +268,46 @@ model Dispatch_SO {
 }
 
 model SalesOrderArchive {
-  id                Int       @id @default(autoincrement())
-  userId            Int
-  productId         Int
-  saleOrderNumber   String    @db.VarChar(500)
-  outboundDelivery  String    @db.VarChar(500)
-  transferOrder     String    @db.VarChar(500)
-  deliveryDate      DateTime
-  transporterId     Int
-  plantCode         String?   @db.VarChar(100)
-  paymentClearance  Boolean
-  salesZoneId       Int
-  packConfigId      Int
-  assignedUserId    Int?
-  customerId        Int?
-  customerNameText  String?   @db.VarChar(500)
-  printerId         Int?
-  specialRemarks    String?
-  additionalRemarks String?
-  labelRemarks      String?
-  fgLocation        Json?
-  address           String?
-  status            String?
-  priority          Int?
-  skipStage         Boolean?
+  id                    Int       @id @default(autoincrement())
+  userId                Int
+  productId             Int
+  saleOrderNumber       String    @db.VarChar(500)
+  outboundDelivery      String    @db.VarChar(500)
+  transferOrder         String    @db.VarChar(500)
+  deliveryDate          DateTime
+  transporterId         Int
+  plantCode             String?   @db.VarChar(100)
+  paymentClearance      Boolean
+  salesZoneId           Int
+  packConfigId          Int
+  assignedUserId        Int?
+  customerId            Int?
+  customerNameText      String?   @db.VarChar(500)
+  printerId             Int?
+  specialRemarks        String?
+  additionalRemarks     String?
+  labelRemarks          String?
+  fgLocation            Json?
+  address               String?
+  status                String?
+  priority              Int?
+  skipStage             Boolean?
   issueAssignedUserId   Int?
   packingAssignedUserId Int?
   skipIssueStage        Boolean?
   skipPackingStage      Boolean?
-  isErpImported     Int?
-  binCount          Int?
-  createdAt         DateTime
-  UpdatedBy         String?
-  UpdatedDate       DateTime?
-  FGUpdatedBy       String?   @db.VarChar(255)
-  FGUpdatedDateTime DateTime?
-  archivedAt        DateTime  @default(now())
+  isErpImported         Int?
+  binCount              Int?
+  createdAt             DateTime  @db.Timestamptz(3)
+  UpdatedBy             String?
+  UpdatedDate           DateTime? @db.Timestamptz(3)
+  FGUpdatedBy           String?   @db.VarChar(255)
+  FGUpdatedDateTime     DateTime? @db.Timestamptz(3)
+  archivedAt            DateTime  @default(now()) @db.Timestamptz(3)
 
-  product           Product   @relation(fields: [productId], references: [id])
-  salesZone         SalesZone @relation(fields: [salesZoneId], references: [id])
-  customer          Customer? @relation(fields: [customerId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+  salesZone SalesZone @relation(fields: [salesZoneId], references: [id])
+  customer  Customer? @relation(fields: [customerId], references: [id])
 }
 
 model ERP_Material_DataArchive {
@@ -335,13 +335,13 @@ model ERP_Material_DataArchive {
   Remarks_Required     Boolean?
   Classification       String?  @db.VarChar(100)
 
-  UpdatedDate DateTime? @db.Timestamp(3)
-  UpdatedBy   String?   @db.VarChar(50)
-  IssueUpdatedDate   DateTime? @db.Timestamp(3)
+  UpdatedDate        DateTime? @db.Timestamptz(3)
+  UpdatedBy          String?   @db.VarChar(50)
+  IssueUpdatedDate   DateTime? @db.Timestamptz(3)
   IssueUpdatedBy     String?   @db.VarChar(50)
-  PackingUpdatedDate DateTime? @db.Timestamp(3)
+  PackingUpdatedDate DateTime? @db.Timestamptz(3)
   PackingUpdatedBy   String?   @db.VarChar(50)
-  archivedAt  DateTime  @default(now())
+  archivedAt         DateTime  @default(now()) @db.Timestamptz(3)
 }
 
 model ERP_Material_FileArchive {
@@ -355,10 +355,10 @@ model ERP_Material_FileArchive {
   fileSizeBytes   BigInt
   mimeType        String?   @db.VarChar(255)
   checksumSha256  String?   @db.VarChar(64)
-  createdAt       DateTime
+  createdAt       DateTime  @db.Timestamptz(3)
   UpdatedBy       String?
-  UpdatedDate     DateTime?
-  archivedAt      DateTime  @default(now())
+  UpdatedDate     DateTime? @db.Timestamptz(3)
+  archivedAt      DateTime  @default(now()) @db.Timestamptz(3)
 }
 
 model DispatchArchive {
@@ -368,11 +368,11 @@ model DispatchArchive {
   vehicleNumber   String
   attachments     Json?
   createdBy       Int
-  createdAt       DateTime
+  createdAt       DateTime  @db.Timestamptz(3)
   UpdatedBy       String?
-  UpdatedDate     DateTime?
+  UpdatedDate     DateTime? @db.Timestamptz(3)
   vehicleEntryId  Int?
-  archivedAt      DateTime  @default(now())
+  archivedAt      DateTime  @default(now()) @db.Timestamptz(3)
 }
 
 model Dispatch_SOArchive {
@@ -380,8 +380,8 @@ model Dispatch_SOArchive {
   dispatchId      Int
   saleOrderNumber String   @db.VarChar(500)
   salesOrderId    Int
-  createdAt       DateTime
-  archivedAt      DateTime @default(now())
+  createdAt       DateTime @db.Timestamptz(3)
+  archivedAt      DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model SO_Status_Stepper {
@@ -389,7 +389,7 @@ model SO_Status_Stepper {
   salesOrderNumber String     @db.VarChar(500)
   salesOrderId     Int
   status           String
-  createdDateTime  DateTime?
+  createdDateTime  DateTime?  @db.Timestamptz(3)
   updatedBy        String?
   salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
@@ -402,9 +402,9 @@ model SO_Status_StepperArchive {
   salesOrderNumber String    @db.VarChar(500)
   salesOrderId     Int
   status           String
-  createdDateTime  DateTime?
+  createdDateTime  DateTime? @db.Timestamptz(3)
   updatedBy        String?
-  archivedAt       DateTime  @default(now())
+  archivedAt       DateTime  @default(now()) @db.Timestamptz(3)
 
   @@map("SO_Status_StepperArchive")
 }
@@ -416,16 +416,16 @@ model VehicleEntry {
   transporterName String
   driverNumber    String?
 
-  driverName      String?
-  inTime          String?
-  outTime         String?
+  driverName String?
+  inTime     String?
+  outTime    String?
 
   attachments Json?
 
   createdBy Int
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedBy String?
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   user       User       @relation(fields: [createdBy], references: [id])
   dispatches Dispatch[]
@@ -438,18 +438,18 @@ model VehicleEntryArchive {
   transporterName String
   driverNumber    String?
 
-  driverName      String?
-  inTime          String?
-  outTime         String?
+  driverName String?
+  inTime     String?
+  outTime    String?
 
   attachments Json?
 
   createdBy Int
-  createdAt DateTime
+  createdAt DateTime @db.Timestamptz(3)
   updatedBy String?
-  updatedAt DateTime
+  updatedAt DateTime @db.Timestamptz(3)
 
-  archivedAt DateTime @default(now())
+  archivedAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model MaterialBarcode {
@@ -470,7 +470,7 @@ model SalesOrderChatMessage {
   toUserId     Int
 
   message   String   @db.VarChar(2000)
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
@@ -489,7 +489,7 @@ model SoChatNotification {
   salesOrderId Int
   messageId    Int
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   salesOrder SalesOrder            @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
@@ -506,8 +506,8 @@ model SalesOrderChatMessageArchive {
   fromUserId       Int
   toUserId         Int
   message          String   @db.VarChar(2000)
-  createdAt        DateTime
-  archivedAt       DateTime @default(now())
+  createdAt        DateTime @db.Timestamptz(3)
+  archivedAt       DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([salesOrderId, createdAt])
 }
@@ -518,27 +518,27 @@ model SoChatNotificationArchive {
   salesOrderNumber String   @db.VarChar(500)
   salesOrderId     Int
   messageId        Int
-  createdAt        DateTime
-  archivedAt       DateTime @default(now())
+  createdAt        DateTime @db.Timestamptz(3)
+  archivedAt       DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([userId, createdAt])
 }
 
 model ERPMaterialLogArchive {
   id                Int      @id
-  dateTime          DateTime @map("date_time")
+  dateTime          DateTime @map("date_time") @db.Timestamptz(3)
   fileName          String   @map("file_name") @db.VarChar(255)
   exceptionStatus   String?  @map("exception/status") @db.VarChar(255)
   soNo              String   @map("SO_NO") @db.VarChar(50)
   noOfFilesExecuted Int      @map("no_of_files_executed")
-  archivedAt        DateTime @default(now())
+  archivedAt        DateTime @default(now()) @db.Timestamptz(3)
 
   @@map("ERP_Material_LogArchive")
 }
 
 model CustomerLabelPrint {
   id        Int                       @id @default(autoincrement())
-  createdAt DateTime                  @default(now())
+  createdAt DateTime                  @default(now()) @db.Timestamptz(3)
   userId    Int
   userName  String?
   cncText   String?                   @db.VarChar(255)
@@ -561,11 +561,11 @@ model ERP_Data_Cron_Logs {
   saleOrderNumber String
   status          String
   message         String?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model SystemConfig {
   key       String   @id @db.VarChar(100)
   value     String   @db.VarChar(500)
-  updatedAt DateTime @updatedAt @default(now())
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 }
