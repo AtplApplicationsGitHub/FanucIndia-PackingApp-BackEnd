@@ -11,7 +11,7 @@ import * as ExcelJS from 'exceljs';
 
 @Injectable()
 export class SalesOrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async exportSalesExcel(userId: number, filters: any): Promise<Buffer> {
     const authUserId = Number(userId);
@@ -762,16 +762,63 @@ export class SalesOrderService {
   async resetSalesOrder(id: number, username: string) {
     const so = await this.prisma.salesOrder.findUnique({
       where: { id },
-      select: { saleOrderNumber: true },
+      select: {
+        id: true,
+        saleOrderNumber: true,
+        createdAt: true,
+      },
     });
 
     if (!so) {
       throw new NotFoundException(`Sales Order with ID ${id} not found`);
     }
 
+    const now = new Date();
+
     return this.prisma.$transaction(async (tx) => {
       await tx.eRP_Material_Data.deleteMany({
         where: { salesOrderId: id },
+      });
+
+      await tx.sO_Status_Stepper.updateMany({
+        where: {
+          salesOrderId: id,
+          status: {
+            in: [
+              'Under Issue',
+              'Issued',
+              'Under Packing',
+              'Packed',
+              'WIP Storage',
+              'Ready for Dispatch',
+              'Dispatched',
+            ],
+          },
+        },
+        data: {
+          createdDateTime: null,
+          updatedBy: username,
+        },
+      });
+
+      await tx.sO_Status_Stepper.upsert({
+        where: {
+          salesOrderId_status: {
+            salesOrderId: id,
+            status: 'To be Issued',
+          },
+        },
+        update: {
+          createdDateTime: so.createdAt ?? now,
+          updatedBy: username,
+        },
+        create: {
+          salesOrderId: id,
+          salesOrderNumber: so.saleOrderNumber,
+          status: 'To be Issued',
+          createdDateTime: so.createdAt ?? now,
+          updatedBy: username,
+        },
       });
 
       const updatedSo = await tx.salesOrder.update({
@@ -785,7 +832,7 @@ export class SalesOrderService {
           isErpImported: 0,
           skipStage: false,
           UpdatedBy: username,
-          UpdatedDate: new Date(),
+          UpdatedDate: now,
         },
       });
 

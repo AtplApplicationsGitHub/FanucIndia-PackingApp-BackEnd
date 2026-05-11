@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma.service';
 
 @Injectable()
 export class ReportsSalesOrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getAdminOrderSummary(filters: any = {}) {
     const where: any = {};
@@ -14,18 +14,18 @@ export class ReportsSalesOrderService {
 
     if (filters.date) {
       const gte = new Date(filters.date);
-      gte.setHours(0, 0, 0, 0); 
-      
+      gte.setHours(0, 0, 0, 0);
+
       const lt = new Date(gte);
       lt.setDate(lt.getDate() + 1);
-      
+
       where.deliveryDate = { gte, lt };
     } else if (filters.startDate || filters.endDate) {
       const gte = filters.startDate ? new Date(filters.startDate) : undefined;
       const lt = filters.endDate ? new Date(filters.endDate) : undefined;
-      
+
       where.deliveryDate = {};
-      
+
       if (gte) {
         gte.setHours(0, 0, 0, 0);
         where.deliveryDate.gte = gte;
@@ -36,7 +36,7 @@ export class ReportsSalesOrderService {
         nextDay.setDate(nextDay.getDate() + 1);
         where.deliveryDate.lt = nextDay;
       }
-      if (!gte && !lt) delete where.deliveryDate; 
+      if (!gte && !lt) delete where.deliveryDate;
     }
 
     if (filters.search) {
@@ -98,6 +98,8 @@ export class ReportsSalesOrderService {
         paymentClearance: true,
         customerNameText: true,
         isErpImported: true,
+        priority: true,
+        status: true,
         createdAt: true,
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
@@ -129,6 +131,8 @@ export class ReportsSalesOrderService {
         salesZone: order.salesZone?.name || '-',
         paymentClearance: order.paymentClearance,
         createdAt: order.createdAt,
+        status: order.status,
+        priority: order.priority,
         isErpImported: order.isErpImported === 1,
         statusStepper: order.statusStepper,
       };
@@ -152,10 +156,10 @@ export class ReportsSalesOrderService {
     return {
       success: true,
       data: {
-        totalOrders: totalOrdersCount, 
-        page,              
-        limit,             
-        totalPages: Math.ceil(totalOrdersCount / limit), 
+        totalOrders: totalOrdersCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalOrdersCount / limit),
         groupedOrders: groupedData,
       }
     };
@@ -172,14 +176,14 @@ export class ReportsSalesOrderService {
       }
       if (endDate) {
         const end = new Date(endDate);
-        end.setUTCHours(23, 59, 59, 999); 
+        end.setUTCHours(23, 59, 59, 999);
         where.deliveryDate.lte = end;
       }
     }
 
     const groupedPrimary = await this.prisma.salesOrder.groupBy({
       by: ['customerId', 'customerNameText'],
-      where, 
+      where,
       _count: {
         id: true,
       },
@@ -353,7 +357,7 @@ export class ReportsSalesOrderService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      fgLocation: { not: null }, 
+      fgLocation: { not: null },
       OR: [
         { status: null },
         { status: { in: ['R105', 'W105', 'F105'] } },
@@ -394,7 +398,7 @@ export class ReportsSalesOrderService {
       let durationDays = 0;
       if (order.FGUpdatedDateTime) {
         const diffTime = now.getTime() - new Date(order.FGUpdatedDateTime).getTime();
-        durationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
+        durationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       }
 
       return {
@@ -405,7 +409,7 @@ export class ReportsSalesOrderService {
         dateTime: order.FGUpdatedDateTime,
         durationDays: durationDays,
         durationText: `${durationDays} ${durationDays > 1 ? 'days' : 'day'}`
-};
+      };
     });
 
     let filteredOrders = formattedOrders;
@@ -415,7 +419,7 @@ export class ReportsSalesOrderService {
         const soMatch = o.saleOrderNumber.toLowerCase().includes(lowerSearch);
         const obdMatch = o.outboundDelivery?.toLowerCase().includes(lowerSearch);
         const locMatch = o.fgLocation.toLowerCase().includes(lowerSearch);
-        
+
         return soMatch || obdMatch || locMatch;
       });
     }
@@ -427,8 +431,8 @@ export class ReportsSalesOrderService {
       success: true,
       data: {
         totalOrders,
-        page,              
-        limit,             
+        page,
+        limit,
         totalPages: Math.ceil(totalOrders / limit),
         reportData: pagedReportData
       }
