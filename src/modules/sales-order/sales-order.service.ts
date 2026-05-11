@@ -765,6 +765,7 @@ export class SalesOrderService {
       select: {
         id: true,
         saleOrderNumber: true,
+        outboundDelivery: true,
         createdAt: true,
       },
     });
@@ -775,9 +776,25 @@ export class SalesOrderService {
 
     const now = new Date();
 
+    const erpImportLogKeys = [
+      so.saleOrderNumber,
+      so.outboundDelivery
+        ? `${so.saleOrderNumber}_${so.outboundDelivery}`
+        : null,
+    ].filter((value): value is string => Boolean(value));
+
     return this.prisma.$transaction(async (tx) => {
       await tx.eRP_Material_Data.deleteMany({
         where: { salesOrderId: id },
+      });
+
+      await tx.eRP_Data_Cron_Logs.deleteMany({
+        where: {
+          saleOrderNumber: {
+            in: erpImportLogKeys,
+            mode: 'insensitive',
+          },
+        },
       });
 
       await tx.sO_Status_Stepper.updateMany({
