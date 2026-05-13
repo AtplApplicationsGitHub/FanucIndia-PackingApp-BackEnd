@@ -5,14 +5,20 @@ import {
   IsBoolean,
   IsDateString,
   MinLength,
+  IsIn,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateAdminOrderDto {
-  @ApiPropertyOptional({ example: 'R105', description: 'Order status' })
+  @ApiPropertyOptional({
+    example: 'R105',
+    description: 'Order status',
+    enum: ['R105', 'W105', 'F105', 'Dispatched'],
+    nullable: true,
+  })
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsIn(['R105', 'W105', 'F105', 'Dispatched'])
+  status?: string | null;
 
   @ApiPropertyOptional({ example: 1, description: 'Priority value' })
   @IsOptional()
@@ -24,12 +30,18 @@ export class UpdateAdminOrderDto {
   @IsInt()
   assignedUserId?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'Issue Stage Assigned User ID' })
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Issue Stage Assigned User ID',
+  })
   @IsOptional()
   @IsInt()
   issueAssignedUserId?: number;
 
-  @ApiPropertyOptional({ example: 2, description: 'Packing Stage Assigned User ID' })
+  @ApiPropertyOptional({
+    example: 2,
+    description: 'Packing Stage Assigned User ID',
+  })
   @IsOptional()
   @IsInt()
   packingAssignedUserId?: number;
@@ -39,15 +51,23 @@ export class UpdateAdminOrderDto {
   @IsOptional()
   customerId?: number;
 
-  @ApiPropertyOptional({ example: 'LMW Limited', description: 'Customer Name (free text)' })
-  @IsOptional()
-  @IsString() 
-  customerNameText?: string;
-
-  @ApiPropertyOptional({ example: 'SO123456', description: 'Sale Order Number' })
+  @ApiPropertyOptional({
+    example: 'LMW Limited',
+    description: 'Customer Name (free text)',
+  })
   @IsOptional()
   @IsString()
-  @MinLength(10, { message: 'Sale Order Number must be at least 10 characters long.' })
+  customerNameText?: string;
+
+  @ApiPropertyOptional({
+    example: 'SO123456',
+    description: 'Sale Order Number',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(10, {
+    message: 'Sale Order Number must be at least 10 characters long.',
+  })
   saleOrderNumber?: string;
 
   @ApiPropertyOptional({ example: 'OB7890', description: 'Outbound Delivery' })
@@ -60,24 +80,36 @@ export class UpdateAdminOrderDto {
   @IsString()
   transferOrder?: string;
 
-  @ApiPropertyOptional({ example: '2025-07-18', description: 'Delivery Date (ISO)' })
+  @ApiPropertyOptional({
+    example: '2025-07-18',
+    description: 'Delivery Date (ISO)',
+  })
   @IsOptional()
   @IsDateString()
   deliveryDate?: string;
 
-  @ApiPropertyOptional({ example: 'Delivery is urgent', description: 'Special Remarks' })
+  @ApiPropertyOptional({
+    example: 'Delivery is urgent',
+    description: 'Special Remarks',
+  })
   @IsOptional()
   @IsString()
   specialRemarks?: string;
 
-  @ApiPropertyOptional({ example: 'Call before arrival', description: 'Additional Remarks' })
+  @ApiPropertyOptional({
+    example: 'Call before arrival',
+    description: 'Additional Remarks',
+  })
   @IsOptional()
   @IsString()
   additionalRemarks?: string;
 
-  @ApiPropertyOptional({ example: 'Handle with care', description: 'Label Remarks' })
+  @ApiPropertyOptional({
+    example: 'Handle with care',
+    description: 'Label Remarks',
+  })
   @IsOptional()
-  @IsString() 
+  @IsString()
   labelRemarks?: string;
 
   @ApiPropertyOptional({ example: 1, description: 'Product ID' })
@@ -110,12 +142,18 @@ export class UpdateAdminOrderDto {
   @IsInt()
   packConfigId?: number;
 
-  @ApiPropertyOptional({ example: 'Warehouse A, Rack 5', description: 'Finished Goods Location' })
+  @ApiPropertyOptional({
+    example: 'Warehouse A, Rack 5',
+    description: 'Finished Goods Location',
+  })
   @IsOptional()
   @IsString()
   fgLocation?: string;
 
-  @ApiPropertyOptional({ example: '123 Main St, NY', description: 'Delivery Address' })
+  @ApiPropertyOptional({
+    example: '123 Main St, NY',
+    description: 'Delivery Address',
+  })
   @IsOptional()
   @IsString()
   address?: string;

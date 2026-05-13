@@ -92,7 +92,9 @@ export class AdminOrderService {
       where.deliveryDate = { ...(where.deliveryDate as object), ...range };
     }
 
-    const search = rawSearch ? rawSearch.trim().replace(/\s+/g, ' ') : undefined;
+    const search = rawSearch
+      ? rawSearch.trim().replace(/\s+/g, ' ')
+      : undefined;
 
     if (search) {
       const lower = search.toLowerCase();
@@ -288,6 +290,7 @@ export class AdminOrderService {
     }
 
     if (
+      dto.status === undefined &&
       dto.priority !== undefined &&
       dto.priority !== null &&
       order.status === null
@@ -296,6 +299,124 @@ export class AdminOrderService {
     }
 
     const now = new Date();
+
+    const oldStatus = order.status;
+    const newStatus = dto.status;
+
+    if (newStatus !== undefined && newStatus !== oldStatus) {
+      data.status = newStatus;
+
+      const clearStepperFrom = async (statuses: string[]) => {
+        await this.prisma.sO_Status_Stepper.updateMany({
+          where: {
+            salesOrderId: order.id,
+            status: { in: statuses },
+          },
+          data: {
+            createdDateTime: null,
+            updatedBy: user.name,
+          },
+        });
+      };
+
+      const completeStepper = async (status: string) => {
+        await this.prisma.sO_Status_Stepper.upsert({
+          where: {
+            salesOrderId_status: {
+              salesOrderId: order.id,
+              status,
+            },
+          },
+          update: {
+            createdDateTime: now,
+            updatedBy: user.name,
+          },
+          create: {
+            salesOrderNumber: order.saleOrderNumber,
+            salesOrderId: order.id,
+            status,
+            createdDateTime: now,
+            updatedBy: user.name,
+          },
+        });
+      };
+
+      if (newStatus === null) {
+        data.fgLocation = Prisma.DbNull;
+
+        await clearStepperFrom([
+          'Under Issue',
+          'Issued',
+          'Under Packing',
+          'Packed',
+          'WIP Storage',
+          'Ready for Dispatch',
+          'Dispatched',
+        ]);
+      }
+
+      if (newStatus === 'R105') {
+        data.fgLocation = Prisma.DbNull;
+
+        await completeStepper('To be Issued');
+
+        await completeStepper('Under Issue');
+
+        await clearStepperFrom([
+          'Issued',
+          'Under Packing',
+          'Packed',
+          'WIP Storage',
+          'Ready for Dispatch',
+          'Dispatched',
+        ]);
+      }
+
+      if (newStatus === 'W105') {
+        await completeStepper('To be Issued');
+        await completeStepper('Under Issue');
+        await completeStepper('Issued');
+
+        if (order.packingAssignedUserId) {
+          await completeStepper('Under Packing');
+        }
+
+        await clearStepperFrom([
+          'Packed',
+          'WIP Storage',
+          'Ready for Dispatch',
+          'Dispatched',
+        ]);
+      }
+
+      if (newStatus === 'F105') {
+        await completeStepper('To be Issued');
+        await completeStepper('Under Issue');
+        await completeStepper('Issued');
+        await completeStepper('Under Packing');
+        await completeStepper('Packed');
+
+        await clearStepperFrom([
+          'WIP Storage',
+          'Ready for Dispatch',
+          'Dispatched',
+        ]);
+      }
+
+      if (newStatus === 'Dispatched') {
+        data.fgLocation = Prisma.DbNull;
+        data.assignedUserId = null;
+
+        await completeStepper('To be Issued');
+        await completeStepper('Under Issue');
+        await completeStepper('Issued');
+        await completeStepper('Under Packing');
+        await completeStepper('Packed');
+        await completeStepper('WIP Storage');
+        await completeStepper('Ready for Dispatch');
+        await completeStepper('Dispatched');
+      }
+    }
 
     // 1. Handle Issue Assignment Stepper
     if (
@@ -715,27 +836,39 @@ export class AdminOrderService {
               if (res && typeof res === 'object') {
                 if (res.error) return undefined;
                 if (res.richText && Array.isArray(res.richText)) {
-                   val = res.richText.map((rt: any) => rt.text || '').join('');
+                  val = res.richText.map((rt: any) => rt.text || '').join('');
                 } else if (res.text) {
-                   val = typeof res.text === 'object' && res.text.richText 
-                     ? res.text.richText.map((rt: any) => rt.text || '').join('') 
-                     : res.text;
+                  val =
+                    typeof res.text === 'object' && res.text.richText
+                      ? res.text.richText
+                          .map((rt: any) => rt.text || '')
+                          .join('')
+                      : res.text;
                 } else {
-                   val = '';
+                  val = '';
                 }
               } else {
                 val = res;
               }
-            } else if ('richText' in val && Array.isArray((val as any).richText)) {
-              val = (val as any).richText.map((rt: any) => rt.text || '').join('');
+            } else if (
+              'richText' in val &&
+              Array.isArray((val as any).richText)
+            ) {
+              val = (val as any).richText
+                .map((rt: any) => rt.text || '')
+                .join('');
             } else if ('text' in val) {
               let textVal = (val as any).text;
-              if (typeof textVal === 'object' && textVal.richText && Array.isArray(textVal.richText)) {
-                 val = textVal.richText.map((rt: any) => rt.text || '').join('');
+              if (
+                typeof textVal === 'object' &&
+                textVal.richText &&
+                Array.isArray(textVal.richText)
+              ) {
+                val = textVal.richText.map((rt: any) => rt.text || '').join('');
               } else if (typeof textVal === 'object') {
-                 val = '';
+                val = '';
               } else {
-                 val = textVal;
+                val = textVal;
               }
             } else {
               val = '';
