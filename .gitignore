@@ -65,7 +65,6 @@ backup_contents.txt
 restore_list.txt
 
 # Alternatively, you can use wildcards to ignore ALL .sql and .dump files:
-*.sql
 *.dump
 
 *.csv
