@@ -183,6 +183,31 @@ export class DispatchController {
     return this.dispatchService.addDispatchSO(id, body.saleOrderNumber, req.user.userId, body.salesOrderId);
   }
   
+  @Patch('so/:soId')
+  @Roles('ADMIN', 'USER')
+  updateDispatchSOLRNumber(
+    @Param('soId', ParseIntPipe) soId: number,
+    @Body() body: { LRnumber?: string; lrNumber?: string },
+    @Req() req: AuthRequest,
+  ) {
+    const hasLRnumber =
+      Object.prototype.hasOwnProperty.call(body, 'LRnumber') ||
+      Object.prototype.hasOwnProperty.call(body, 'lrNumber');
+
+    if (!hasLRnumber) {
+      throw new BadRequestException('LRnumber is required.');
+    }
+
+    const LRnumber =
+      body.LRnumber !== undefined ? body.LRnumber : body.lrNumber;
+
+    return this.dispatchService.updateDispatchSOLRNumber(
+      soId,
+      LRnumber,
+      req.user.userId,
+    );
+  }
+  
   @Delete('so/:soId')
   @Roles('ADMIN', 'USER')
   removeDispatchSO(@Param('soId', ParseIntPipe) soId: number, @Req() req: AuthRequest) {

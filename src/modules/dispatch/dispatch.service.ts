@@ -560,7 +560,18 @@ export class DispatchService {
   }
 
   async update(id: number, dto: UpdateDispatchDto, userId: number) {
-    const { transporterId, vehicleNumber } = dto;
+    const {
+      transporterId,
+      vehicleNumber,
+      dispatchSOIds,
+      selectedSalesOrderIds,
+      saleOrderNumbers,
+    } = dto;
+    const hasLRnumber =
+      Object.prototype.hasOwnProperty.call(dto, 'LRnumber') ||
+      Object.prototype.hasOwnProperty.call(dto, 'lrNumber');
+    const LRnumber =
+      dto.LRnumber !== undefined ? dto.LRnumber : dto.lrNumber;
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
     const existingDispatch = await this.prisma.dispatch.findUnique({
@@ -594,14 +605,96 @@ export class DispatchService {
       }
     }
 
-    return this.prisma.dispatch.update({
-      where: { id },
-      data: {
-        transporterId: transporterId ? Number(transporterId) : undefined,
-        vehicleNumber,
-        UpdatedBy: user?.email || 'System',
-        UpdatedDate: new Date(),
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const updatedDispatch = await tx.dispatch.update({
+        where: { id },
+        data: {
+          transporterId: transporterId ? Number(transporterId) : undefined,
+          vehicleNumber,
+          UpdatedBy: user?.email || 'System',
+          UpdatedDate: new Date(),
+        },
+      });
+
+      if (hasLRnumber) {
+        const toUniqueIntegerList = (values?: unknown[]) => [
+          ...new Set(
+            (values || [])
+              .map((value) => Number(value))
+              .filter((value) => Number.isInteger(value)),
+          ),
+        ];
+
+        const selectedDispatchSOIds = [
+          ...new Set(toUniqueIntegerList(dispatchSOIds)),
+        ];
+        const selectedSalesOrderIdList = [
+          ...new Set(
+            toUniqueIntegerList([
+              ...(selectedSalesOrderIds || []),
+              ...(dto.salesOrderIds || []),
+            ]),
+          ),
+        ];
+        const selectedSaleOrderNumberList = [
+          ...new Set((saleOrderNumbers || []).filter(Boolean)),
+        ];
+
+        if (
+          selectedDispatchSOIds.length === 0 &&
+          selectedSalesOrderIdList.length === 0 &&
+          selectedSaleOrderNumberList.length === 0
+        ) {
+          throw new BadRequestException(
+            'Please select at least one SO to update LR number.',
+          );
+        }
+
+        const selectedSoWhere: Prisma.Dispatch_SOWhereInput = {
+          dispatchId: id,
+          OR: [
+            ...(selectedDispatchSOIds.length > 0
+              ? [{ id: { in: selectedDispatchSOIds } }]
+              : []),
+            ...(selectedSalesOrderIdList.length > 0
+              ? [{ salesOrderId: { in: selectedSalesOrderIdList } }]
+              : []),
+            ...(selectedSaleOrderNumberList.length > 0
+              ? [{ saleOrderNumber: { in: selectedSaleOrderNumberList } }]
+              : []),
+          ],
+        };
+
+        const selectedCount = await tx.dispatch_SO.count({
+          where: selectedSoWhere,
+        });
+
+        if (selectedCount === 0) {
+          throw new BadRequestException(
+            'Selected SO numbers are not linked with this dispatch.',
+          );
+        }
+
+        const updatedSOResult = await tx.dispatch_SO.updateMany({
+          where: selectedSoWhere,
+          data: {
+            LRnumber: LRnumber ? LRnumber : null,
+          },
+        });
+
+        if (updatedSOResult.count !== selectedCount) {
+          throw new BadRequestException(
+            'Unable to update LR number for all selected SO numbers.',
+          );
+        }
+      }
+
+      return tx.dispatch.findUnique({
+        where: { id: updatedDispatch.id },
+        include: {
+          dispatchSOs: true,
+        },
+      });
     });
   }
 
@@ -870,6 +963,43 @@ export class DispatchService {
         }
         throw error;
       }
+    });
+  }
+
+  async updateDispatchSOLRNumber(
+    soId: number,
+    LRnumber: string | undefined,
+    userId: number,
+  ) {
+    const userName = await this.getUserEmail(userId);
+    const finalLRnumber =
+      LRnumber === undefined || LRnumber === null ? null : String(LRnumber).trim();
+
+    return this.prisma.$transaction(async (tx) => {
+      const dispatchSoLink = await tx.dispatch_SO.findUnique({
+        where: { id: soId },
+      });
+
+      if (!dispatchSoLink) {
+        throw new NotFoundException('Dispatch SO link not found.');
+      }
+
+      const updatedDispatchSO = await tx.dispatch_SO.update({
+        where: { id: soId },
+        data: {
+          LRnumber: finalLRnumber || null,
+        },
+      });
+
+      await tx.dispatch.update({
+        where: { id: dispatchSoLink.dispatchId },
+        data: {
+          UpdatedBy: userName,
+          UpdatedDate: new Date(),
+        },
+      });
+
+      return updatedDispatchSO;
     });
   }
 

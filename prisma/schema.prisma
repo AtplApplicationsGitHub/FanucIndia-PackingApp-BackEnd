@@ -259,6 +259,7 @@ model Dispatch_SO {
   id              Int        @id @default(autoincrement())
   dispatchId      Int
   saleOrderNumber String     @db.VarChar(500)
+  LRnumber        String?    @db.VarChar(500)
   createdAt       DateTime   @default(now()) @db.Timestamptz(3)
   salesOrderId    Int
   dispatch        Dispatch   @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
@@ -379,6 +380,7 @@ model Dispatch_SOArchive {
   id              Int      @id @default(autoincrement())
   dispatchId      Int
   saleOrderNumber String   @db.VarChar(500)
+  LRnumber        String?  @db.VarChar(500)
   salesOrderId    Int
   createdAt       DateTime @db.Timestamptz(3)
   archivedAt      DateTime @default(now()) @db.Timestamptz(3)
