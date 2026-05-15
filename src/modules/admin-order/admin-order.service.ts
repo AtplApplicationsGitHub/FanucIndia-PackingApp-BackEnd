@@ -482,10 +482,10 @@ export class AdminOrderService {
   async remove(id: number) {
     const order = await this.prisma.salesOrder.findUnique({
       where: { id },
-      include: {
-        _count: {
-          select: { materialData: true },
-        },
+      select: {
+        id: true,
+        saleOrderNumber: true,
+        outboundDelivery: true,
       },
     });
 
@@ -493,13 +493,28 @@ export class AdminOrderService {
       throw new NotFoundException('Sales order not found');
     }
 
-    if (order._count.materialData > 0) {
-      throw new BadRequestException(
-        'Cannot delete an order that has material data imported.',
-      );
-    }
+    const erpImportLogKeys = [
+      order.saleOrderNumber,
+      order.outboundDelivery
+        ? `${order.saleOrderNumber}_${order.outboundDelivery}`
+        : null,
+    ].filter((value): value is string => Boolean(value));
 
-    await this.prisma.salesOrder.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.dispatch_SO.deleteMany({ where: { salesOrderId: id } });
+      await tx.eRP_Material_Data.deleteMany({ where: { salesOrderId: id } });
+      await tx.eRP_Material_File.deleteMany({ where: { salesOrderId: id } });
+      await tx.eRP_Data_Cron_Logs.deleteMany({
+        where: {
+          saleOrderNumber: {
+            in: erpImportLogKeys,
+            mode: 'insensitive',
+          },
+        },
+      });
+      await tx.salesOrder.delete({ where: { id } });
+    });
+
     return { message: 'Sales order deleted successfully' };
   }
 
