@@ -562,6 +562,7 @@ export class DispatchService {
   async update(id: number, dto: UpdateDispatchDto, userId: number) {
     const {
       transporterId,
+      transporterName,
       vehicleNumber,
       dispatchSOIds,
       selectedSalesOrderIds,
@@ -573,6 +574,21 @@ export class DispatchService {
     const LRnumber =
       dto.LRnumber !== undefined ? dto.LRnumber : dto.lrNumber;
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const hasTransporterId = Object.prototype.hasOwnProperty.call(
+      dto,
+      'transporterId',
+    );
+    const hasTransporterName = Object.prototype.hasOwnProperty.call(
+      dto,
+      'transporterName',
+    );
+    const rawTransporterId = transporterId as string | null | undefined;
+    const finalTransporterId =
+      rawTransporterId === undefined ||
+      rawTransporterId === null ||
+      rawTransporterId === ''
+        ? null
+        : Number(rawTransporterId);
 
     const existingDispatch = await this.prisma.dispatch.findUnique({
       where: { id },
@@ -605,15 +621,44 @@ export class DispatchService {
       }
     }
 
+    if (hasTransporterId && finalTransporterId !== null) {
+      const transporterExists = await this.prisma.transporter.findUnique({
+        where: { id: finalTransporterId },
+      });
+
+      if (!transporterExists) {
+        throw new BadRequestException(
+          `Transporter with ID ${finalTransporterId} not found.`,
+        );
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
+      const dispatchUpdateData: Prisma.DispatchUncheckedUpdateInput = {
+        vehicleNumber,
+        UpdatedBy: user?.email || 'System',
+        UpdatedDate: new Date(),
+      };
+
+      if (hasTransporterId) {
+        dispatchUpdateData.transporterId = finalTransporterId;
+
+        if (!hasTransporterName) {
+          dispatchUpdateData.transporterName = null;
+        }
+      }
+
+      if (hasTransporterName) {
+        dispatchUpdateData.transporterName = transporterName || null;
+
+        if (!hasTransporterId) {
+          dispatchUpdateData.transporterId = null;
+        }
+      }
+
       const updatedDispatch = await tx.dispatch.update({
         where: { id },
-        data: {
-          transporterId: transporterId ? Number(transporterId) : undefined,
-          vehicleNumber,
-          UpdatedBy: user?.email || 'System',
-          UpdatedDate: new Date(),
-        },
+        data: dispatchUpdateData,
       });
 
       if (hasLRnumber) {

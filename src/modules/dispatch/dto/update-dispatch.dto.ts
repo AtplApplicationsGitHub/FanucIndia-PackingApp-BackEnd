@@ -27,6 +27,17 @@ export class UpdateDispatchDto extends PartialType(CreateDispatchDto) {
   lrNumber?: string;
 
   @ApiPropertyOptional({
+    description: 'Transporter name to store when a transporter ID is not selected.',
+    example: '89',
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined || value === null ? value : String(value).trim(),
+  )
+  @IsString()
+  transporterName?: string;
+
+  @ApiPropertyOptional({
     type: [Number],
     description: 'Selected Dispatch_SO row IDs to update.',
     example: [1, 2],
