@@ -29,6 +29,25 @@ function convertBigInts(obj: any): any {
 export class SoSearchService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private addDispatchSOLRNumbers<T extends { id: number }>(
+    dispatchInfo: T[],
+    dispatchSOs: { id: number; dispatchId: number; LRnumber: string | null }[],
+  ) {
+    const dispatchSOByDispatchId = new Map(
+      dispatchSOs.map((dso) => [dso.dispatchId, dso]),
+    );
+
+    return dispatchInfo.map((dispatch) => {
+      const dispatchSO = dispatchSOByDispatchId.get(dispatch.id);
+
+      return {
+        ...dispatch,
+        dispatchSOId: dispatchSO?.id ?? null,
+        LRnumber: dispatchSO?.LRnumber ?? null,
+      };
+    });
+  }
+
   private buildErpImportLogWhereClause(
     saleOrderNumber: string,
     outboundDelivery?: string | null,
@@ -179,7 +198,7 @@ export class SoSearchService {
       let [dispatchSOs, materialDetails, erpImportLogs] = await Promise.all([
         this.prisma.dispatch_SO.findMany({
           where: { salesOrderId: salesOrder.id },
-          select: { dispatchId: true },
+          select: { id: true, dispatchId: true, LRnumber: true },
         }),
         this.prisma.eRP_Material_Data.findMany({
           where: { salesOrderId: salesOrder.id },
@@ -252,9 +271,14 @@ export class SoSearchService {
         }
       }
 
+      const dispatchInfoWithLRNumbers = this.addDispatchSOLRNumbers(
+        dispatchInfo,
+        dispatchSOs,
+      );
+
       const result = {
         salesOrder,
-        dispatchInfo,
+        dispatchInfo: dispatchInfoWithLRNumbers,
         materialDetails,
         erpImportLogs,
         isArchived: false,
@@ -301,8 +325,8 @@ export class SoSearchService {
       let [dispatchSOArchives, materialDetails, materialFiles, statusStepper, erpImportLogs] =
         await Promise.all([
           this.prisma.dispatch_SOArchive.findMany({
-            where: { saleOrderNumber: canonicalSoNumber },
-            select: { dispatchId: true },
+            where: { salesOrderId: archivedSalesOrder.id },
+            select: { id: true, dispatchId: true, LRnumber: true },
           }),
           this.prisma.eRP_Material_DataArchive.findMany({
             where: { saleOrderNumber: canonicalSoNumber },
@@ -420,9 +444,14 @@ export class SoSearchService {
           : null,
       }));
 
+      const dispatchInfoWithLRNumbers = this.addDispatchSOLRNumbers(
+        dispatchInfo,
+        dispatchSOArchives,
+      );
+
       const result = {
         salesOrder: { ...salesOrderWithDetails, statusStepper },
-        dispatchInfo,
+        dispatchInfo: dispatchInfoWithLRNumbers,
         materialDetails,
         materialFiles,
         erpImportLogs,
