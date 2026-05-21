@@ -229,9 +229,7 @@ export class ErpMaterialImporterService {
           `Auto-scan bulk import completed. Summary: ${JSON.stringify(result.summary)}`,
         );
       } else {
-        this.logger.log(
-          `No eligible orders found for today's delivery date.`,
-        );
+        this.logger.log(`No eligible orders found for today's delivery date.`);
       }
     } catch (error) {
       this.logger.error('Failed to execute automated SFTP folder scan.', error);
@@ -680,8 +678,8 @@ export class ErpMaterialImporterService {
 
             headers[colNumber] = canonicalHeader;
           });
-        // } else if (rowNumber <= skipRows) {
-        //   return;
+          // } else if (rowNumber <= skipRows) {
+          //   return;
         } else {
           const rowData: any = {};
           let hasData = false;
@@ -708,11 +706,13 @@ export class ErpMaterialImporterService {
 
           if (hasData) {
             if (rowNumber === 2) {
-              const matCode = String(rowData['Material_Code'] || '').trim();              
+              const matCode = String(rowData['Material Code'] || '').trim();
+
               if (/^[0-9]/.test(matCode)) {
-                return; 
+                return;
               }
             }
+
             jsonData.push(rowData);
           }
         }
