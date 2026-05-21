@@ -668,7 +668,7 @@ export class ErpMaterialImporterService {
         headerLookup.set(key.toLowerCase(), key);
       });
 
-      const skipRows = parseInt(process.env.ERP_IMPORT_SKIP_ROWS || '1', 10);
+      // const skipRows = parseInt(process.env.ERP_IMPORT_SKIP_ROWS || '1', 10);
 
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) {
@@ -680,8 +680,8 @@ export class ErpMaterialImporterService {
 
             headers[colNumber] = canonicalHeader;
           });
-        } else if (rowNumber <= skipRows) {
-          return;
+        // } else if (rowNumber <= skipRows) {
+        //   return;
         } else {
           const rowData: any = {};
           let hasData = false;
@@ -707,6 +707,12 @@ export class ErpMaterialImporterService {
           });
 
           if (hasData) {
+            if (rowNumber === 2) {
+              const matCode = String(rowData['Material_Code'] || '').trim();              
+              if (/^[0-9]/.test(matCode)) {
+                return; 
+              }
+            }
             jsonData.push(rowData);
           }
         }

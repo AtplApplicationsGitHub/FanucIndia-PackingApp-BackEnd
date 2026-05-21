@@ -319,6 +319,7 @@ export class DispatchService {
           transporterId: finalTransporterId,
           transporterName: finalTransporterName,
           vehicleNumber,
+          vehicleEntryId: vehicleEntry.id,
           createdBy: userId,
           UpdatedBy: userName,
           UpdatedDate: new Date(),
@@ -585,8 +586,8 @@ export class DispatchService {
     const rawTransporterId = transporterId as string | null | undefined;
     const finalTransporterId =
       rawTransporterId === undefined ||
-      rawTransporterId === null ||
-      rawTransporterId === ''
+        rawTransporterId === null ||
+        rawTransporterId === ''
         ? null
         : Number(rawTransporterId);
 
@@ -597,15 +598,18 @@ export class DispatchService {
       throw new NotFoundException(`Dispatch with ID ${id} not found.`);
     }
 
+    let linkedVehicleEntryId: number | undefined;
+
     if (vehicleNumber) {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
+
       const endOfToday = new Date();
       endOfToday.setHours(23, 59, 59, 999);
 
       const existingDispatchToday = await this.prisma.dispatch.findFirst({
         where: {
-          vehicleNumber: vehicleNumber,
+          vehicleNumber,
           id: { not: id },
           createdAt: {
             gte: startOfToday,
@@ -619,8 +623,26 @@ export class DispatchService {
           `Vehicle Number '${vehicleNumber}' is already assigned to another dispatch today. Please use a different vehicle.`,
         );
       }
-    }
 
+      const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
+        where: {
+          vehicleNumber,
+          createdAt: {
+            gte: startOfToday,
+            lte: endOfToday,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!vehicleEntry) {
+        throw new BadRequestException(
+          `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`,
+        );
+      }
+
+      linkedVehicleEntryId = vehicleEntry.id;
+    }
     if (hasTransporterId && finalTransporterId !== null) {
       const transporterExists = await this.prisma.transporter.findUnique({
         where: { id: finalTransporterId },
@@ -636,6 +658,9 @@ export class DispatchService {
     return this.prisma.$transaction(async (tx) => {
       const dispatchUpdateData: Prisma.DispatchUncheckedUpdateInput = {
         vehicleNumber,
+        ...(linkedVehicleEntryId !== undefined
+          ? { vehicleEntryId: linkedVehicleEntryId }
+          : {}),
         UpdatedBy: user?.email || 'System',
         UpdatedDate: new Date(),
       };
@@ -750,16 +775,27 @@ export class DispatchService {
   ) {
     const { transporterId, transporterName, vehicleNumber } = dto;
 
+    const existingDispatch = await this.prisma.dispatch.findUnique({
+      where: { id: dispatchId },
+    });
+
+    if (!existingDispatch) {
+      throw new NotFoundException(`Dispatch with ID ${dispatchId} not found.`);
+    }
+
+    let linkedVehicleEntryId: number | undefined;
+
     if (vehicleNumber) {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
+
       const endOfToday = new Date();
       endOfToday.setHours(23, 59, 59, 999);
 
       const existingDispatchToday = await this.prisma.dispatch.findFirst({
         where: {
-          vehicleNumber: vehicleNumber,
-          id: { not: dispatchId }, // Exclude the current dispatch being updated
+          vehicleNumber,
+          id: { not: dispatchId },
           createdAt: {
             gte: startOfToday,
             lte: endOfToday,
@@ -772,26 +808,38 @@ export class DispatchService {
           `Vehicle Number '${vehicleNumber}' is already assigned to another dispatch today. Please use a different vehicle.`,
         );
       }
-    }
 
-    return this.prisma.$transaction(async (tx) => {
-      const dispatch = await tx.dispatch.findUnique({
-        where: { id: dispatchId },
+      const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
+        where: {
+          vehicleNumber,
+          createdAt: {
+            gte: startOfToday,
+            lte: endOfToday,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
       });
-      if (!dispatch) {
-        throw new NotFoundException(
-          `Dispatch with ID ${dispatchId} not found.`,
+
+      if (!vehicleEntry) {
+        throw new BadRequestException(
+          `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`,
         );
       }
 
+      linkedVehicleEntryId = vehicleEntry.id;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
       let finalTransporterId: number | null = null;
       let finalTransporterName: string | null = null;
 
       if (transporterId) {
         finalTransporterId = Number(transporterId);
+
         const transporterExists = await tx.transporter.findUnique({
           where: { id: finalTransporterId },
         });
+
         if (!transporterExists) {
           throw new BadRequestException(
             `Transporter with ID ${transporterId} not found.`,
@@ -811,7 +859,10 @@ export class DispatchService {
         data: {
           transporterId: finalTransporterId,
           transporterName: finalTransporterName,
-          vehicleNumber: vehicleNumber,
+          vehicleNumber,
+          ...(linkedVehicleEntryId !== undefined
+            ? { vehicleEntryId: linkedVehicleEntryId }
+            : {}),
           UpdatedBy: userName,
           UpdatedDate: new Date(),
         },

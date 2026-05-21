@@ -25,7 +25,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 @UseGuards(JwtAuthGuard)
 @Controller('vehicle-entry')
 export class VehicleEntryController {
-  constructor(private readonly service: VehicleEntryService) {}
+  constructor(private readonly service: VehicleEntryService) { }
 
   @Post()
   @Roles('USER')
@@ -65,7 +65,7 @@ export class VehicleEntryController {
   }
 
   @Get(':id/attachments')
-  @Roles('USER') 
+  @Roles('ADMIN', 'USER', 'SALES')
   @ApiOperation({ summary: 'Get the list of uploaded attachments for a vehicle entry' })
   @ApiResponse({ status: 200, description: 'Returns an array of attachment objects.' })
   @ApiResponse({ status: 404, description: 'Vehicle Entry not found.' })

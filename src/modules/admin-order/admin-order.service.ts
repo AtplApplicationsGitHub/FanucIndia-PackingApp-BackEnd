@@ -652,6 +652,7 @@ export class AdminOrderService {
         specialRemarks: true,
         additionalRemarks: true,
         labelRemarks: true,
+        fgLocation: true,
         binCount: true,
         transporter: { select: { name: true } },
         packConfig: { select: { configName: true } },
@@ -738,6 +739,7 @@ export class AdminOrderService {
       specialRemarks: order.specialRemarks,
       additionalRemarks: order.additionalRemarks,
       labelRemarks: order.labelRemarks,
+      fgLocation: order.fgLocation,
       binCount: order.binCount,
       transporter: order.transporter,
       packConfig: order.packConfig,
@@ -1137,6 +1139,36 @@ export class AdminOrderService {
           }
         }
 
+        const rowFgLocation = getCellString('FG LOCATION');
+        let fgLocationUpdateData: any = {};
+
+        if (rowFgLocation !== undefined) {
+          const dbFgStr = dbOrder.fgLocation
+            ? typeof dbOrder.fgLocation === 'string'
+              ? dbOrder.fgLocation
+              : JSON.stringify(dbOrder.fgLocation)
+            : '';
+          const newFgStr = rowFgLocation;
+
+          if (dbFgStr !== newFgStr) {
+            fgLocationUpdateData.fgLocation =
+              newFgStr === '' ? Prisma.DbNull : newFgStr;
+            fgLocationUpdateData.FGUpdatedBy = user.name;
+            fgLocationUpdateData.FGUpdatedDateTime = new Date();
+
+            await tx.sO_Status_Stepper.updateMany({
+              where: {
+                salesOrderNumber: dbOrder.saleOrderNumber,
+                status: 'WIP Storage',
+              },
+              data: {
+                createdDateTime: new Date(),
+                updatedBy: user.name,
+              },
+            });
+          }
+        }
+
         const safeString = (val: string | undefined, fallback: any) =>
           val !== undefined && val !== '' ? val : fallback;
 
@@ -1173,6 +1205,7 @@ export class AdminOrderService {
             ),
             UpdatedBy: user.name,
             UpdatedDate: new Date(),
+            ...fgLocationUpdateData
           },
         });
       }
