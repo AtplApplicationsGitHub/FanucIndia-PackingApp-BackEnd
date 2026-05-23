@@ -30,6 +30,7 @@ export class FgDashboardController {
       payment?: string,
       zone?: string,
       status?: string,
+      hideDispatched?: string,
       page?: string, 
       limit?: string 
     }
@@ -56,6 +57,7 @@ export class FgDashboardController {
       payment?: string;
       zone?: string;
       status?: string;
+      hideDispatched?: string,
     },
   ) {
     await this.fgDashboardService.exportFgDashboardData(req.user, query, res);
