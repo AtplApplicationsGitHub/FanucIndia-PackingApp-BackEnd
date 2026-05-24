@@ -8,10 +8,14 @@ import {
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
+import {
+  getDateOnlyRange,
+  parseYmdDateOnly,
+} from '../../common/utils/date-only.util';
 
 @Injectable()
 export class SalesOrderService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async exportSalesExcel(userId: number, filters: any): Promise<Buffer> {
     const authUserId = Number(userId);
@@ -101,18 +105,16 @@ export class SalesOrderService {
       return { y, m, d };
     };
 
-    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-    if (filters.startDate || filters.endDate) {
-      const range: { gte?: Date; lt?: Date } = {};
-      if (filters.startDate) {
-        const { y, m, d } = parseYMD(filters.startDate);
-        range.gte = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
-      }
-      if (filters.endDate) {
-        const { y, m, d } = parseYMD(filters.endDate);
-        range.lt = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
-      }
-      where.deliveryDate = { ...(where.deliveryDate as object), ...range };
+    const deliveryDateRange = getDateOnlyRange(
+      filters.startDate,
+      filters.endDate,
+    );
+
+    if (deliveryDateRange) {
+      where.deliveryDate = {
+        ...(where.deliveryDate as object),
+        ...deliveryDateRange,
+      };
     }
 
     let orders: any[] = [];
@@ -374,6 +376,61 @@ export class SalesOrderService {
         return String(cellValue);
       };
 
+      const normalizeDeliveryDateForDb = (value: any): Date | null => {
+        if (!value) return null;
+
+        if (value instanceof Date) {
+          return new Date(
+            Date.UTC(
+              value.getFullYear(),
+              value.getMonth(),
+              value.getDate(),
+              0,
+              0,
+              0,
+              0,
+            ),
+          );
+        }
+
+        const raw = extractText(value).trim();
+        if (!raw) return null;
+
+        const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+
+        if (ymdMatch) {
+          return parseYmdDateOnly(raw) ?? null;
+        }
+
+        const dmyMatch = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(raw);
+
+        if (dmyMatch) {
+          const d = Number(dmyMatch[1]);
+          const m = Number(dmyMatch[2]);
+          const y = Number(dmyMatch[3]);
+
+          return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+        }
+
+        const fallback = new Date(raw);
+
+        if (Number.isNaN(fallback.getTime())) {
+          return null;
+        }
+
+        return new Date(
+          Date.UTC(
+            fallback.getFullYear(),
+            fallback.getMonth(),
+            fallback.getDate(),
+            0,
+            0,
+            0,
+            0,
+          ),
+        );
+      };
+
       saleOrderNumber = extractText(saleOrderNumber);
       outboundDelivery = extractText(outboundDelivery);
       transferOrder = extractText(transferOrder);
@@ -455,12 +512,12 @@ export class SalesOrderService {
       }
 
       let deliveryDateObj: Date | null = null;
+
       if (deliveryDate) {
-        const dt = new Date(deliveryDate);
-        if (isNaN(dt.getTime())) {
+        deliveryDateObj = normalizeDeliveryDateForDb(deliveryDate);
+
+        if (!deliveryDateObj) {
           rowErrors.push('Invalid deliveryDate format');
-        } else {
-          deliveryDateObj = dt;
         }
       }
 

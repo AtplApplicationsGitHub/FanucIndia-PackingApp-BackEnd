@@ -13,6 +13,7 @@ import * as path from 'path';
 import { Response } from 'express';
 import { Cron, Interval } from '@nestjs/schedule';
 import AdmZip from 'adm-zip';
+import { getSingleDateOnlyRange } from '../../common/utils/date-only.util';
 
 const columnMapping = {
   'SO Number': 'saleOrderNumber',
@@ -163,35 +164,16 @@ export class ErpMaterialImporterService {
       //   soNumbersFromFiles.push(nameParts[0]);
       // }
 
-      const istOffsetMs = 5.5 * 60 * 60 * 1000;
-
       const year = istTime.getUTCFullYear();
-      const month = istTime.getUTCMonth();
-      const date = istTime.getUTCDate();
+      const month = String(istTime.getUTCMonth() + 1).padStart(2, '0');
+      const date = String(istTime.getUTCDate()).padStart(2, '0');
 
-      const startOfTodayUtc = new Date(
-        Date.UTC(year, month, date) - istOffsetMs,
-      );
-      const startOfTomorrowUtc = new Date(
-        Date.UTC(year, month, date + 1) - istOffsetMs,
-      );
+      const todayYmd = `${year}-${month}-${date}`;
+      const deliveryDateRange = getSingleDateOnlyRange(todayYmd);
 
       const eligibleOrders = await this.prisma.salesOrder.findMany({
         where: {
-          OR: [
-            {
-              deliveryDate: {
-                gte: startOfTodayUtc,
-                lt: startOfTomorrowUtc,
-              },
-            },
-            // {
-            //   deliveryDate: {
-            //     lt: startOfTodayUtc,
-            //   },
-            //   isErpImported: 0,
-            // },
-          ],
+          deliveryDate: deliveryDateRange,
         },
         select: { saleOrderNumber: true },
       });
@@ -872,7 +854,7 @@ export class ErpMaterialImporterService {
     const buildCustomerName = (name1: any, name2: any): string => {
       const a = safeToString(name1, '') || '';
       const b = safeToString(name2, '') || '';
-      const rawName = [a, b].filter(Boolean).join(' ');      
+      const rawName = [a, b].filter(Boolean).join(' ');
       return rawName.trim().replace(/\s+/g, ' ');
     };
 
@@ -902,7 +884,7 @@ export class ErpMaterialImporterService {
       ]
         .map((p) => (typeof p === 'string' ? p.trim() : ''))
         .filter(Boolean);
-      
+
       const rawAddress = parts.join(' ');
       return rawAddress.trim().replace(/\s+/g, ' ');
     };
@@ -980,7 +962,9 @@ export class ErpMaterialImporterService {
           let existingCustomer = await tx.customer.findFirst({
             where: {
               name: { equals: computedCustomerName, mode: 'insensitive' },
-              address: computedCustomerAddress ? { equals: computedCustomerAddress, mode: 'insensitive' } : null,
+              address: computedCustomerAddress
+                ? { equals: computedCustomerAddress, mode: 'insensitive' }
+                : null,
             },
           });
 
@@ -991,7 +975,10 @@ export class ErpMaterialImporterService {
                 address: computedCustomerAddress || null,
               },
             });
-          } else if (computedCustomerAddress && existingCustomer.address !== computedCustomerAddress) {
+          } else if (
+            computedCustomerAddress &&
+            existingCustomer.address !== computedCustomerAddress
+          ) {
             existingCustomer = await tx.customer.update({
               where: { id: existingCustomer.id },
               data: { address: computedCustomerAddress },

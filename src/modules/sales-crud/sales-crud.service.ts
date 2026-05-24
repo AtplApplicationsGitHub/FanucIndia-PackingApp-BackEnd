@@ -13,6 +13,10 @@ import { LabelPrintDto } from './dto/label-print.dto';
 import * as net from 'net';
 import { PrintLabelDto } from './dto/print-label.dto';
 import { SftpService } from '../sftp/sftp.service';
+import {
+  getDateOnlyRange,
+  normalizeDateOnlyForWrite,
+} from '../../common/utils/date-only.util';
 
 @Injectable()
 export class SalesCrudService {
@@ -76,10 +80,9 @@ export class SalesCrudService {
         : null;
       const address = customer?.address || null;
 
-      const deliveryDate =
-        dto.deliveryDate && dto.deliveryDate.length === 10
-          ? new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString()
-          : dto.deliveryDate;
+      const deliveryDate = dto.deliveryDate
+        ? normalizeDateOnlyForWrite(dto.deliveryDate)
+        : dto.deliveryDate;
 
       let resolvedProductId = dto.productId;
       if (!resolvedProductId) {
@@ -374,10 +377,9 @@ export class SalesCrudService {
         if (customer) address = customer.address;
       }
 
-      const deliveryDate =
-        dto.deliveryDate && dto.deliveryDate.length === 10
-          ? new Date(`${dto.deliveryDate}T00:00:00.000Z`).toISOString()
-          : dto.deliveryDate;
+      const deliveryDate = dto.deliveryDate
+        ? normalizeDateOnlyForWrite(dto.deliveryDate)
+        : dto.deliveryDate;
 
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
       const { customerName, customerId, salesZoneId, ...rest } = dto as any;
@@ -609,33 +611,15 @@ export class SalesCrudService {
 
       /**
        * DATE FILTER
-       * Preserves your existing IST date-range behavior.
        */
-      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+      const deliveryDateRange = getDateOnlyRange(
+        filters.startDate,
+        filters.endDate,
+      );
 
-      const parseYMD = (s: string) => {
-        const datePart = s.includes('T') ? s.split('T')[0] : s;
-        const [y, m, d] = datePart.split('-').map(Number);
-        return { y, m, d };
-      };
-
-      if (filters.startDate || filters.endDate) {
-        const range: { gte?: Date; lt?: Date } = {};
-
-        if (filters.startDate) {
-          const { y, m, d } = parseYMD(filters.startDate);
-          range.gte = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
-        }
-
-        if (filters.endDate) {
-          const { y, m, d } = parseYMD(filters.endDate);
-          range.lt = new Date(
-            Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS,
-          );
-        }
-
-        salesOrderAndConditions.push({ deliveryDate: range });
-        archiveAndConditions.push({ deliveryDate: range });
+      if (deliveryDateRange) {
+        salesOrderAndConditions.push({ deliveryDate: deliveryDateRange });
+        archiveAndConditions.push({ deliveryDate: deliveryDateRange });
       }
 
       /**

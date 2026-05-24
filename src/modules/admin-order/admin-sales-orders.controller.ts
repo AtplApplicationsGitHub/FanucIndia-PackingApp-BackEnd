@@ -14,6 +14,7 @@ import { Response } from 'express';
 import { PrismaService } from '../../prisma.service';
 import { Roles } from '../auth/roles.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { getDateOnlyRange } from '../../common/utils/date-only.util';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -32,7 +33,7 @@ export class AdminSalesOrdersController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sambaService: SambaService,
-  ) { }
+  ) {}
 
   @Get('counts/dynamic')
   @Roles('ADMIN')
@@ -75,19 +76,10 @@ export class AdminSalesOrdersController {
       where.isErpImported = 0;
     }
 
-    if (startDate || endDate) {
-      const dateFilter: any = {};
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        dateFilter.gte = start;
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        dateFilter.lte = end;
-      }
-      where.deliveryDate = dateFilter;
+    const deliveryDateRange = getDateOnlyRange(startDate, endDate);
+
+    if (deliveryDateRange) {
+      where.deliveryDate = deliveryDateRange;
     }
 
     if (search) {
@@ -216,7 +208,7 @@ export class AdminSalesOrdersController {
     const erpSuccessUploadCount = await this.prisma.salesOrder.count({
       where: {
         ...pendingImportWhere,
-        isErpImported: 1,   
+        isErpImported: 1,
       },
     });
     const counts = {

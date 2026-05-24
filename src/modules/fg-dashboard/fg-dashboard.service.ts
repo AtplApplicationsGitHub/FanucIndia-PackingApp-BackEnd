@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
+import { getSingleDateOnlyRange } from '../../common/utils/date-only.util';
 
 type StepLabel =
   | 'To be Issued'
@@ -131,21 +132,11 @@ export class FgDashboardService {
     }
 
     if (date) {
-      const parseYMD = (s: string) => {
-        const [y, m, d] = s.split('-').map(Number);
-        return { y, m, d };
-      };
-      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-      const { y, m, d } = parseYMD(date);
-      const startIST = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
-      const endISTExclusive = new Date(
-        Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS,
-      );
+      const deliveryDateRange = getSingleDateOnlyRange(date);
 
-      where.deliveryDate = {
-        gte: startIST,
-        lt: endISTExclusive,
-      };
+      if (deliveryDateRange) {
+        where.deliveryDate = deliveryDateRange;
+      }
     }
 
     if (payment) {
@@ -360,21 +351,11 @@ export class FgDashboardService {
 
     // --- REUSE THE SAME FILTER LOGIC AS getFgDashboardData ---
     if (date) {
-      const parseYMD = (s: string) => {
-        const [y, m, d] = s.split('-').map(Number);
-        return { y, m, d };
-      };
-      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-      const { y, m, d } = parseYMD(date);
-      const startIST = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
-      const endISTExclusive = new Date(
-        Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS,
-      );
+      const deliveryDateRange = getSingleDateOnlyRange(date);
 
-      where.deliveryDate = {
-        gte: startIST,
-        lt: endISTExclusive,
-      };
+      if (deliveryDateRange) {
+        where.deliveryDate = deliveryDateRange;
+      }
     }
 
     if (payment) {

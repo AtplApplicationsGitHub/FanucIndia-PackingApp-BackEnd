@@ -9,6 +9,12 @@ import { UpdateAdminOrderDto } from './dto/update-admin-order.dto';
 import { BulkAssignOrderDto } from './dto/bulk-assign-order.dto';
 import { Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
+import {
+  getDateOnlyRange,
+  getSingleDateOnlyRange,
+  normalizeDateOnlyForWrite,
+  parseYmdDateOnly,
+} from '../../common/utils/date-only.util';
 
 @Injectable()
 export class AdminOrderService {
@@ -67,29 +73,13 @@ export class AdminOrderService {
       }
     }
 
-    const parseYMD = (s: string) => {
-      const [y, m, d] = s.split('-').map(Number);
-      return { y, m, d };
-    };
+    const deliveryDateRange = getDateOnlyRange(startDate, endDate);
 
-    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-
-    if (startDate || endDate) {
-      const range: { gte?: Date; lt?: Date } = {};
-
-      if (startDate) {
-        const { y, m, d } = parseYMD(startDate);
-        const s = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - IST_OFFSET_MS);
-        range.gte = s;
-      }
-
-      if (endDate) {
-        const { y, m, d } = parseYMD(endDate);
-        const e = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - IST_OFFSET_MS);
-        range.lt = e;
-      }
-
-      where.deliveryDate = { ...(where.deliveryDate as object), ...range };
+    if (deliveryDateRange) {
+      where.deliveryDate = {
+        ...(where.deliveryDate as object),
+        ...deliveryDateRange,
+      };
     }
 
     const search = rawSearch
@@ -150,15 +140,7 @@ export class AdminOrderService {
     }
 
     if (date) {
-      const [y, m, d] = date.split('-').map(Number);
-
-      const startUtc = new Date(
-        Date.UTC(y, m - 1, d, 0, 0, 0) - 5.5 * 60 * 60 * 1000,
-      );
-      const endUtc = new Date(
-        Date.UTC(y, m - 1, d, 23, 59, 59, 999) - 5.5 * 60 * 60 * 1000,
-      );
-      where.deliveryDate = { gte: startUtc, lte: endUtc };
+      where.deliveryDate = getSingleDateOnlyRange(date);
     }
 
     try {
@@ -255,10 +237,14 @@ export class AdminOrderService {
       if (customer) addressToSave = customer.address;
     }
 
-    if (dto.deliveryDate && dto.deliveryDate.length === 10) {
-      dto.deliveryDate = new Date(
-        `${dto.deliveryDate}T00:00:00.000Z`,
-      ).toISOString();
+    if (dto.deliveryDate) {
+      const normalizedDeliveryDate = normalizeDateOnlyForWrite(
+        dto.deliveryDate,
+      );
+
+      if (normalizedDeliveryDate) {
+        dto.deliveryDate = normalizedDeliveryDate;
+      }
     }
 
     const { customerId, customerNameText, ...rest } = dto;
@@ -817,6 +803,58 @@ export class AdminOrderService {
     await workbook.xlsx.load(fileBuffer as any);
     const worksheet = workbook.worksheets[0];
 
+    const normalizeExcelDeliveryDate = (value: unknown): Date | undefined => {
+      if (!value) return undefined;
+
+      if (value instanceof Date) {
+        return new Date(
+          Date.UTC(
+            value.getFullYear(),
+            value.getMonth(),
+            value.getDate(),
+            0,
+            0,
+            0,
+            0,
+          ),
+        );
+      }
+
+      const raw = String(value).trim();
+      if (!raw) return undefined;
+
+      const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+
+      if (ymdMatch) {
+        return parseYmdDateOnly(raw);
+      }
+
+      const dmyMatch = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(raw);
+
+      if (dmyMatch) {
+        const d = Number(dmyMatch[1]);
+        const m = Number(dmyMatch[2]);
+        const y = Number(dmyMatch[3]);
+
+        return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+      }
+
+      const fallback = new Date(raw);
+      if (Number.isNaN(fallback.getTime())) return undefined;
+
+      return new Date(
+        Date.UTC(
+          fallback.getFullYear(),
+          fallback.getMonth(),
+          fallback.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+    };
+
     if (!worksheet) throw new BadRequestException('Invalid Excel file');
 
     // Safely map headers to their column indexes (ExcelJS columns are 1-based)
@@ -1127,16 +1165,12 @@ export class AdminOrderService {
         const deliveryDateCell = colMap['DELIVERY DATE']
           ? row.getCell(colMap['DELIVERY DATE']).value
           : undefined;
-        if (deliveryDateCell) {
-          if (deliveryDateCell instanceof Date) {
-            deliveryDate = deliveryDateCell;
-          } else {
-            // If it's a string from excel, parse it safely
-            const parsedDate = new Date(deliveryDateCell.toString());
-            if (!isNaN(parsedDate.getTime())) {
-              deliveryDate = parsedDate;
-            }
-          }
+
+        const normalizedExcelDate =
+          normalizeExcelDeliveryDate(deliveryDateCell);
+
+        if (normalizedExcelDate) {
+          deliveryDate = normalizedExcelDate;
         }
 
         const rowFgLocation = getCellString('FG LOCATION');
@@ -1205,7 +1239,7 @@ export class AdminOrderService {
             ),
             UpdatedBy: user.name,
             UpdatedDate: new Date(),
-            ...fgLocationUpdateData
+            ...fgLocationUpdateData,
           },
         });
       }

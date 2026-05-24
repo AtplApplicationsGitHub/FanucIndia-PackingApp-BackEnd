@@ -14,6 +14,11 @@ import {
   AdminStatusByCustomerDto,
   AdminPaymentByCustomerDto,
 } from './dto/admin-customer-metrics.dto';
+import {
+  addUtcDays,
+  getSingleDateOnlyRange,
+  parseYmdDateOnly,
+} from '../../common/utils/date-only.util';
 
 function calculatePercentageChange(current: number, previous: number): number {
   if (previous === 0) {
@@ -35,6 +40,27 @@ function getDayBoundariesIST(date: Date) {
   return { startOfDay, endOfDay };
 }
 
+function getTodayYmdInIST() {
+  const now = new Date();
+  const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+
+  const y = ist.getUTCFullYear();
+  const m = String(ist.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(ist.getUTCDate()).padStart(2, '0');
+
+  return `${y}-${m}-${d}`;
+}
+
+function toYmdInIST(date: Date) {
+  const ist = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+
+  const y = ist.getUTCFullYear();
+  const m = String(ist.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(ist.getUTCDate()).padStart(2, '0');
+
+  return `${y}-${m}-${d}`;
+}
+
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
@@ -43,11 +69,13 @@ export class DashboardService {
     if (dateStr) {
       const targetDate = new Date(dateStr);
       const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+      const targetDateOnly = parseYmdDateOnly(dateStr)!;
 
       const previousDay = new Date(targetDate);
       previousDay.setDate(previousDay.getDate() - 1);
       const { startOfDay: prevStart, endOfDay: prevEnd } =
         getDayBoundariesIST(previousDay);
+      const prevDateOnly = addUtcDays(targetDateOnly, -1);
 
       const dateFilter = { createdAt: { gte: startOfDay, lt: endOfDay } };
       const prevDateFilter = { createdAt: { gte: prevStart, lt: prevEnd } };
@@ -82,11 +110,11 @@ export class DashboardService {
       };
 
       const overdueFilter = {
-        deliveryDate: { lt: startOfDay },
+        deliveryDate: { lt: targetDateOnly },
         status: { not: 'Dispatched' },
       };
       const prevOverdueFilter = {
-        deliveryDate: { lt: prevStart },
+        deliveryDate: { lt: prevDateOnly },
         status: { not: 'Dispatched' },
       };
 
@@ -149,6 +177,7 @@ export class DashboardService {
     } else {
       const now = new Date();
       const { startOfDay: todayStart } = getDayBoundariesIST(now);
+      const todayDateOnly = parseYmdDateOnly(getTodayYmdInIST())!;
       const startOfCurrentMonth = new Date(
         now.getFullYear(),
         now.getMonth(),
@@ -181,7 +210,7 @@ export class DashboardService {
         this.prisma.salesOrder.count(),
         this.prisma.salesOrder.count({
           where: {
-            deliveryDate: { lt: todayStart },
+            deliveryDate: { lt: todayDateOnly },
             status: { not: 'Dispatched' },
           },
         }),
@@ -190,7 +219,7 @@ export class DashboardService {
         this.prisma.salesOrderArchive.count(),
         this.prisma.salesOrderArchive.count({
           where: {
-            deliveryDate: { lt: todayStart },
+            deliveryDate: { lt: todayDateOnly },
             status: { not: 'Dispatched' },
           },
         }),
@@ -217,7 +246,7 @@ export class DashboardService {
         }),
         this.prisma.salesOrder.count({
           where: {
-            deliveryDate: { lt: todayStart },
+            deliveryDate: { lt: todayDateOnly },
             status: { not: 'Dispatched' },
             createdAt: { gte: startOfCurrentMonth },
           },
@@ -239,7 +268,7 @@ export class DashboardService {
         }),
         this.prisma.salesOrderArchive.count({
           where: {
-            deliveryDate: { lt: todayStart },
+            deliveryDate: { lt: todayDateOnly },
             status: { not: 'Dispatched' },
             createdAt: { gte: startOfCurrentMonth },
           },
@@ -272,7 +301,7 @@ export class DashboardService {
         }),
         this.prisma.salesOrder.count({
           where: {
-            deliveryDate: { lt: todayStart },
+            deliveryDate: { lt: todayDateOnly },
             status: { not: 'Dispatched' },
             createdAt: { gte: startOfLastMonth, lte: endOfLastMonthMTD },
           },
@@ -299,7 +328,7 @@ export class DashboardService {
         }),
         this.prisma.salesOrderArchive.count({
           where: {
-            deliveryDate: { lt: todayStart },
+            deliveryDate: { lt: todayDateOnly },
             status: { not: 'Dispatched' },
             createdAt: { gte: startOfLastMonth, lte: endOfLastMonthMTD },
           },
@@ -375,15 +404,14 @@ export class DashboardService {
       const targetDate = new Date(today);
       targetDate.setDate(today.getDate() + i);
 
-      const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+      const formattedDate = toYmdInIST(targetDate);
+      const deliveryDateRange = getSingleDateOnlyRange(formattedDate);
 
       const count = await this.prisma.salesOrder.count({
         where: {
-          deliveryDate: { gte: startOfDay, lt: endOfDay },
+          deliveryDate: deliveryDateRange,
         },
       });
-
-      const formattedDate = targetDate.toISOString().split('T')[0];
       let dayLabel: string;
 
       if (i === 0)
@@ -405,20 +433,20 @@ export class DashboardService {
   async getAdminDispatchSummary(
     dateStr?: string,
   ): Promise<AdminDispatchSummaryDto> {
-    const targetDate = dateStr ? new Date(dateStr) : new Date();
-    const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+    const targetYmd = dateStr ?? getTodayYmdInIST();
+    const deliveryDateRange = getSingleDateOnlyRange(targetYmd);
 
     const [ordersToBeDispatched, readyForDispatchToday, ordersDispatchedToday] =
       await this.prisma.$transaction([
         this.prisma.salesOrder.count({
           where: {
-            deliveryDate: { gte: startOfDay, lt: endOfDay },
+            deliveryDate: deliveryDateRange,
             OR: [{ status: null }, { status: { not: 'Dispatched' } }],
           },
         }),
         this.prisma.salesOrder.count({
           where: {
-            deliveryDate: { gte: startOfDay, lt: endOfDay },
+            deliveryDate: deliveryDateRange,
             OR: [{ status: null }, { status: { not: 'Dispatched' } }],
             statusStepper: {
               some: {
@@ -430,7 +458,7 @@ export class DashboardService {
         }),
         this.prisma.salesOrder.count({
           where: {
-            deliveryDate: { gte: startOfDay, lt: endOfDay },
+            deliveryDate: deliveryDateRange,
             status: 'Dispatched',
           },
         }),
@@ -448,8 +476,7 @@ export class DashboardService {
   ): Promise<AdminOverallStatusDto> {
     let dateFilter: any = {};
     if (dateStr) {
-      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter = { deliveryDate: { gte: startOfDay, lt: endOfDay } };
+      dateFilter = { deliveryDate: getSingleDateOnlyRange(dateStr) };
     }
 
     const [statusCounts, totalOrders] = await Promise.all([
@@ -499,8 +526,7 @@ export class DashboardService {
   ): Promise<AdminStatusByZoneDto[]> {
     let dateFilter: any = {};
     if (dateStr) {
-      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter = { deliveryDate: { gte: startOfDay, lt: endOfDay } };
+      dateFilter = { deliveryDate: getSingleDateOnlyRange(dateStr) };
     }
 
     const allZones = await this.prisma.salesZone.findMany({
@@ -556,8 +582,7 @@ export class DashboardService {
   ): Promise<AdminPaymentByZoneDto[]> {
     let dateFilter: any = {};
     if (dateStr) {
-      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter = { deliveryDate: { gte: startOfDay, lt: endOfDay } };
+      dateFilter = { deliveryDate: getSingleDateOnlyRange(dateStr) };
     }
 
     const allZones = await this.prisma.salesZone.findMany({
@@ -721,22 +746,22 @@ export class DashboardService {
   // Row 1: Sales Dispatch Summary
   async getSalesDispatchSummary(userId: number, dateStr?: string) {
     const zoneId = await this.getUserZoneId(userId);
-    const targetDate = dateStr ? new Date(dateStr) : new Date();
-    const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+    const targetYmd = dateStr ?? getTodayYmdInIST();
+    const deliveryDateRange = getSingleDateOnlyRange(targetYmd);
 
     const [ordersToBeDispatched, readyForDispatchToday, ordersDispatchedToday] =
       await this.prisma.$transaction([
         this.prisma.salesOrder.count({
           where: {
             salesZoneId: zoneId,
-            deliveryDate: { gte: startOfDay, lt: endOfDay },
+            deliveryDate: deliveryDateRange,
             OR: [{ status: null }, { status: { not: 'Dispatched' } }],
           },
         }),
         this.prisma.salesOrder.count({
           where: {
             salesZoneId: zoneId,
-            deliveryDate: { gte: startOfDay, lt: endOfDay },
+            deliveryDate: deliveryDateRange,
             OR: [{ status: null }, { status: { not: 'Dispatched' } }],
             statusStepper: {
               some: {
@@ -749,7 +774,7 @@ export class DashboardService {
         this.prisma.salesOrder.count({
           where: {
             salesZoneId: zoneId,
-            deliveryDate: { gte: startOfDay, lt: endOfDay },
+            deliveryDate: deliveryDateRange,
             status: 'Dispatched',
           },
         }),
@@ -804,16 +829,15 @@ export class DashboardService {
     for (let i = 0; i < 5; i++) {
       const targetDate = new Date(today);
       targetDate.setDate(today.getDate() + i);
-      const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+      const formattedDate = toYmdInIST(targetDate);
+      const deliveryDateRange = getSingleDateOnlyRange(formattedDate);
 
       const count = await this.prisma.salesOrder.count({
         where: {
           salesZoneId: zoneId,
-          deliveryDate: { gte: startOfDay, lt: endOfDay },
+          deliveryDate: deliveryDateRange,
         },
       });
-
-      const formattedDate = targetDate.toISOString().split('T')[0];
       let dayLabel =
         i === 0
           ? `Today (${targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
@@ -837,8 +861,7 @@ export class DashboardService {
     const zoneId = await this.getUserZoneId(userId);
     let dateFilter: any = { salesZoneId: zoneId };
     if (dateStr) {
-      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = getSingleDateOnlyRange(dateStr);
     }
 
     const [statusCounts, totalOrders] = await Promise.all([
@@ -888,8 +911,7 @@ export class DashboardService {
     const zoneId = await this.getUserZoneId(userId);
     let dateFilter: any = { salesZoneId: zoneId };
     if (dateStr) {
-      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = getSingleDateOnlyRange(dateStr);
     }
 
     const rawCounts = await this.prisma.salesOrder.groupBy({
@@ -921,8 +943,7 @@ export class DashboardService {
   ): Promise<AdminStatusByCustomerDto[]> {
     let dateFilter: any = { customerId: { not: null } };
     if (dateStr) {
-      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = getSingleDateOnlyRange(dateStr);
     }
 
     const statusCounts = await this.prisma.salesOrder.groupBy({
@@ -994,8 +1015,7 @@ export class DashboardService {
     let dateFilter: any = { customerId: { not: null }, salesZoneId: zoneId };
 
     if (dateStr) {
-      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = getSingleDateOnlyRange(dateStr);
     }
 
     const statusCounts = await this.prisma.salesOrder.groupBy({
@@ -1057,8 +1077,7 @@ export class DashboardService {
   ): Promise<AdminPaymentByCustomerDto[]> {
     let dateFilter: any = { customerId: { not: null } };
     if (dateStr) {
-      const { startOfDay, endOfDay } = getDayBoundariesIST(new Date(dateStr));
-      dateFilter.deliveryDate = { gte: startOfDay, lt: endOfDay };
+      dateFilter.deliveryDate = getSingleDateOnlyRange(dateStr);
     }
 
     const paymentCounts = await this.prisma.salesOrder.groupBy({
@@ -1102,8 +1121,8 @@ export class DashboardService {
   }
 
   async getOperatorStats(dateStr?: string) {
-    const targetDate = dateStr ? new Date(dateStr) : new Date();
-    const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
+    const targetYmd = dateStr ?? getTodayYmdInIST();
+    const deliveryDateRange = getSingleDateOnlyRange(targetYmd);
 
     const operators = await this.prisma.user.findMany({
       where: { role: 'USER' },
@@ -1156,10 +1175,7 @@ export class DashboardService {
 
     const orders = await this.prisma.salesOrder.findMany({
       where: {
-        deliveryDate: {
-          gte: startOfDay,
-          lt: endOfDay,
-        },
+        deliveryDate: deliveryDateRange,
         OR: [
           { issueAssignedUserId: { not: null } },
           { packingAssignedUserId: { not: null } },
@@ -1243,14 +1259,7 @@ export class DashboardService {
     const where: any = {};
 
     if (dateStr) {
-      const targetDate = new Date(dateStr);
-      const { startOfDay, endOfDay } = getDayBoundariesIST(targetDate);
-
-      // Same behavior as Assign SO date filter: deliveryDate based
-      where.deliveryDate = {
-        gte: startOfDay,
-        lt: endOfDay,
-      };
+      where.deliveryDate = getSingleDateOnlyRange(dateStr);
     }
 
     const failedLogs = await this.prisma.eRP_Data_Cron_Logs.findMany({
