@@ -872,7 +872,8 @@ export class ErpMaterialImporterService {
     const buildCustomerName = (name1: any, name2: any): string => {
       const a = safeToString(name1, '') || '';
       const b = safeToString(name2, '') || '';
-      return [a, b].filter(Boolean).join(' ').trim();
+      const rawName = [a, b].filter(Boolean).join(' ');      
+      return rawName.trim().replace(/\s+/g, ' ');
     };
 
     const ensureComma = (val: string): string => {
@@ -901,8 +902,9 @@ export class ErpMaterialImporterService {
       ]
         .map((p) => (typeof p === 'string' ? p.trim() : ''))
         .filter(Boolean);
-
-      return parts.join(' ').trim();
+      
+      const rawAddress = parts.join(' ');
+      return rawAddress.trim().replace(/\s+/g, ' ');
     };
 
     const firstRow = records[0];
@@ -978,6 +980,7 @@ export class ErpMaterialImporterService {
           let existingCustomer = await tx.customer.findFirst({
             where: {
               name: { equals: computedCustomerName, mode: 'insensitive' },
+              address: computedCustomerAddress ? { equals: computedCustomerAddress, mode: 'insensitive' } : null,
             },
           });
 
@@ -988,7 +991,7 @@ export class ErpMaterialImporterService {
                 address: computedCustomerAddress || null,
               },
             });
-          } else if (computedCustomerAddress) {
+          } else if (computedCustomerAddress && existingCustomer.address !== computedCustomerAddress) {
             existingCustomer = await tx.customer.update({
               where: { id: existingCustomer.id },
               data: { address: computedCustomerAddress },

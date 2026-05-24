@@ -247,27 +247,81 @@ export class LookupService {
   }
 
   async createCustomer(dto: CreateCustomerDto) {
-    const existing = await this.prisma.customer.findFirst({
-      where: { name: { equals: dto.name, mode: 'insensitive' } },
-    });
-    if (existing)
-      throw new BadRequestException(`Customer "${dto.name}" already exists.`);
+    const normalizedName = dto.name.trim().replace(/\s+/g, ' ');
+    const normalizedAddress = dto.address
+      ? dto.address.trim().replace(/\s+/g, ' ')
+      : undefined;
 
-    return this.prisma.customer.create({ data: dto });
+    const existing = await this.prisma.customer.findFirst({
+      where: {
+        name: { equals: normalizedName, mode: 'insensitive' },
+        address: normalizedAddress
+          ? { equals: normalizedAddress, mode: 'insensitive' }
+          : null,
+      },
+    });
+
+    if (existing) {
+      const location = normalizedAddress ? ` at ${normalizedAddress}` : '';
+      throw new BadRequestException(
+        `Customer "${normalizedName}"${location} already exists.`,
+      );
+    }
+
+    return this.prisma.customer.create({
+      data: {
+        ...dto,
+        name: normalizedName,
+        address: normalizedAddress,
+      },
+    });
   }
 
   async updateCustomer(id: number, dto: UpdateCustomerDto) {
-    if (dto.name) {
-      const existing = await this.prisma.customer.findFirst({
-        where: {
-          name: { equals: dto.name, mode: 'insensitive' },
-          id: { not: id },
-        },
-      });
-      if (existing)
-        throw new BadRequestException(`Customer "${dto.name}" already exists.`);
+    const currentCustomer = await this.prisma.customer.findUnique({
+      where: { id },
+    });
+    if (!currentCustomer) {
+      throw new BadRequestException(`Customer not found.`);
     }
-    return this.prisma.customer.update({ where: { id }, data: dto });
+
+    const normalizedName =
+      dto.name !== undefined
+        ? dto.name.trim().replace(/\s+/g, ' ')
+        : currentCustomer.name;
+
+    const normalizedAddress =
+      dto.address !== undefined
+        ? dto.address
+          ? dto.address.trim().replace(/\s+/g, ' ')
+          : null
+        : currentCustomer.address;
+
+    const existing = await this.prisma.customer.findFirst({
+      where: {
+        name: { equals: normalizedName, mode: 'insensitive' },
+        address: normalizedAddress
+          ? { equals: normalizedAddress, mode: 'insensitive' }
+          : null,
+        id: { not: id },
+      },
+    });
+
+    if (existing) {
+      const location = normalizedAddress ? ` at ${normalizedAddress}` : '';
+      throw new BadRequestException(
+        `Customer "${normalizedName}"${location} already exists.`,
+      );
+    }
+
+    return this.prisma.customer.update({
+      where: { id },
+      data: {
+        ...dto,
+        ...(dto.name !== undefined && { name: normalizedName }),
+        ...(dto.address !== undefined && { address: normalizedAddress }),
+      },
+    });
   }
 
   async deleteCustomer(id: number) {
@@ -769,11 +823,19 @@ export class LookupService {
             const id = row.getCell(1).value
               ? Number(row.getCell(1).value)
               : null;
-            const name = getVal(row, 2);
-            const address = getVal(row, 3) || '';
+
+            const rawName = getVal(row, 2);
+            const rawAddress = getVal(row, 3) || '';
             const contactNumber = getVal(row, 4);
-            if (name) {
-              const key = name.toLowerCase();
+
+            if (rawName) {
+              const name = rawName.trim().replace(/\s+/g, ' ');
+              const address = rawAddress
+                ? rawAddress.trim().replace(/\s+/g, ' ')
+                : '';
+
+              const key = `${name.toLowerCase()}_${address.toLowerCase()}`;
+
               if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
                 uniqueItems.set(key, { id, name, address, contactNumber });
               }
@@ -783,6 +845,7 @@ export class LookupService {
           for (const item of uniqueItems.values()) {
             const { id, name, address, contactNumber } = item;
             const data = { name, address, contactNumber };
+
             if (id) {
               promises.push(
                 tx.customer.update({ where: { id }, data }).catch(() => {}),
@@ -791,7 +854,12 @@ export class LookupService {
               promises.push(
                 (async () => {
                   const existing = await tx.customer.findFirst({
-                    where: { name: { equals: name, mode: 'insensitive' } },
+                    where: {
+                      name: { equals: name, mode: 'insensitive' },
+                      address: address
+                        ? { equals: address, mode: 'insensitive' }
+                        : null,
+                    },
                   });
                   if (!existing) await tx.customer.create({ data });
                 })().catch(() => {}),

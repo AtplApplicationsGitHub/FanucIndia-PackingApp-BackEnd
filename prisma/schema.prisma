@@ -83,6 +83,8 @@ model Customer {
   contactNumber  String?
   salesOrders    SalesOrder[]
   archivedOrders SalesOrderArchive[]
+
+  @@unique([name, address])
 }
 
 model Printer {
@@ -98,7 +100,7 @@ model SalesOrder {
   saleOrderNumber       String                  @db.VarChar(500)
   outboundDelivery      String                  @db.VarChar(500)
   transferOrder         String?                 @db.VarChar(500)
-  deliveryDate          DateTime
+  deliveryDate          DateTime                @db.Date
   transporterId         Int
   plantCode             String?                 @db.VarChar(100)
   paymentClearance      Boolean
@@ -275,7 +277,7 @@ model SalesOrderArchive {
   saleOrderNumber       String    @db.VarChar(500)
   outboundDelivery      String    @db.VarChar(500)
   transferOrder         String    @db.VarChar(500)
-  deliveryDate          DateTime
+  deliveryDate          DateTime  @db.Date
   transporterId         Int
   plantCode             String?   @db.VarChar(100)
   paymentClearance      Boolean
