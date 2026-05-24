@@ -68,14 +68,14 @@ function getStageStatusInfo(order: {
       step = 'Issued';
     }
   } else if (s.includes('R105')) {
-  if (order.issueAssignedUserId) {
-    step = 'Under Issue';
+    if (order.issueAssignedUserId) {
+      step = 'Under Issue';
+    } else {
+      step = 'To be Issued';
+    }
   } else {
     step = 'To be Issued';
   }
-} else {
-  step = 'To be Issued';
-}
 
   return {
     current: step,
@@ -85,7 +85,7 @@ function getStageStatusInfo(order: {
 
 @Injectable()
 export class FgDashboardService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async getFgDashboardData(
     user: { userId: number; role: string },
@@ -95,12 +95,24 @@ export class FgDashboardService {
       payment?: string;
       zone?: string;
       status?: string;
+      hideDispatched?: string;
       page?: number;
       limit?: number;
     },
   ) {
-    const { search: rawSearch, date, payment, zone, status, page = 1, limit = 10 } = query;
-    const search = rawSearch ? rawSearch.trim().replace(/\s+/g, ' ') : undefined;
+    const {
+      search: rawSearch,
+      date,
+      payment,
+      zone,
+      status,
+      hideDispatched,
+      page = 1,
+      limit = 10,
+    } = query;
+    const search = rawSearch
+      ? rawSearch.trim().replace(/\s+/g, ' ')
+      : undefined;
     const skip = (page - 1) * limit;
     // const where: Prisma.SalesOrderWhereInput = {
     //   OR: [
@@ -109,6 +121,14 @@ export class FgDashboardService {
     //   ]
     // };
     const where: Prisma.SalesOrderWhereInput = {};
+
+    if (hideDispatched === 'true' && !status) {
+      where.OR = [
+        { status: null },
+        { status: '' },
+        { NOT: { status: { equals: 'Dispatched', mode: 'insensitive' } } },
+      ];
+    }
 
     if (date) {
       const parseYMD = (s: string) => {
@@ -271,7 +291,7 @@ export class FgDashboardService {
       const vehicleNumber =
         order.Dispatch_SO?.length > 0
           ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch
-            ?.vehicleNumber
+              ?.vehicleNumber
           : null;
 
       return {
@@ -313,12 +333,30 @@ export class FgDashboardService {
       payment?: string;
       zone?: string;
       status?: string;
+      hideDispatched?: string;
     },
     res: Response,
   ) {
-    const { search: rawSearch, date, payment, zone, status } = query;
-    const search = rawSearch ? rawSearch.trim().replace(/\s+/g, ' ') : undefined;
+    const {
+      search: rawSearch,
+      date,
+      payment,
+      zone,
+      status,
+      hideDispatched,
+    } = query;
+    const search = rawSearch
+      ? rawSearch.trim().replace(/\s+/g, ' ')
+      : undefined;
     const where: Prisma.SalesOrderWhereInput = {};
+
+    if (hideDispatched === 'true' && !status) {
+      where.OR = [
+        { status: null },
+        { status: '' },
+        { NOT: { status: { equals: 'Dispatched', mode: 'insensitive' } } },
+      ];
+    }
 
     // --- REUSE THE SAME FILTER LOGIC AS getFgDashboardData ---
     if (date) {
@@ -478,7 +516,7 @@ export class FgDashboardService {
       const vehicleNumber =
         order.Dispatch_SO?.length > 0
           ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch
-            ?.vehicleNumber
+              ?.vehicleNumber
           : null;
 
       let fgLocString = '-';
