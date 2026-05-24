@@ -30,14 +30,18 @@ export class ReportsSalesOrderController {
   @Get('customer-report')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Get report of how many Sales Orders per Customer' })
-  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'YYYY-MM-DD' })
-  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'DD-MM-YYYY or YYYY-MM-DD' })
+  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'DD-MM-YYYY or YYYY-MM-DD' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Backward-compatible alias for fromDate' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Backward-compatible alias for toDate' })
   @ApiResponse({ status: 200, description: 'Customer report returned successfully' })
   getCustomerReport(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string
   ) {
-    return this.reportsSalesOrderService.getCustomerReport(startDate, endDate);
+    return this.reportsSalesOrderService.getCustomerReport(fromDate || startDate, toDate || endDate);
   }
 
   @Get('customers-by-material/:materialCode')

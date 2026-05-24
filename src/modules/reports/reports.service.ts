@@ -1,9 +1,59 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 
 @Injectable()
 export class ReportsSalesOrderService {
   constructor(private readonly prisma: PrismaService) { }
+
+  private parseReportDate(date?: string) {
+    if (!date?.trim()) {
+      return undefined;
+    }
+
+    const value = date.trim();
+    const yyyyMmDd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const ddMmYyyy = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+
+    let parsedDate: Date;
+    if (yyyyMmDd) {
+      parsedDate = new Date(Number(yyyyMmDd[1]), Number(yyyyMmDd[2]) - 1, Number(yyyyMmDd[3]));
+    } else if (ddMmYyyy) {
+      parsedDate = new Date(Number(ddMmYyyy[3]), Number(ddMmYyyy[2]) - 1, Number(ddMmYyyy[1]));
+    } else {
+      parsedDate = new Date(value);
+    }
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException('Invalid date format. Use DD-MM-YYYY or YYYY-MM-DD.');
+    }
+
+    return parsedDate;
+  }
+
+  private getDeliveryDateFilter(fromDate?: string, toDate?: string) {
+    const start = this.parseReportDate(fromDate);
+    const end = this.parseReportDate(toDate);
+
+    if (!start && !end) {
+      return undefined;
+    }
+
+    const deliveryDate: any = {};
+
+    if (start) {
+      start.setHours(0, 0, 0, 0);
+      deliveryDate.gte = start;
+    }
+
+    if (end) {
+      const nextDay = new Date(end);
+      nextDay.setHours(0, 0, 0, 0);
+      nextDay.setDate(nextDay.getDate() + 1);
+      deliveryDate.lt = nextDay;
+    }
+
+    return deliveryDate;
+  }
 
   async getAdminOrderSummary(filters: any = {}) {
     const where: any = {};
@@ -166,65 +216,75 @@ export class ReportsSalesOrderService {
   }
 
   // CUSTOMER REPORTS 
-  async getCustomerReport(startDate?: string, endDate?: string) {
+  async getCustomerReport(fromDate?: string, toDate?: string) {
     const where: any = {};
+    const deliveryDateFilter = this.getDeliveryDateFilter(fromDate, toDate);
 
-    if (startDate || endDate) {
-      where.deliveryDate = {};
-      if (startDate) {
-        where.deliveryDate.gte = new Date(startDate);
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setUTCHours(23, 59, 59, 999);
-        where.deliveryDate.lte = end;
-      }
+    if (deliveryDateFilter) {
+      where.deliveryDate = deliveryDateFilter;
     }
 
-    const groupedPrimary = await this.prisma.salesOrder.groupBy({
-      by: ['customerId', 'customerNameText'],
-      where,
-      _count: {
-        id: true,
-      },
-    });
+    const [primaryOrders, archivedOrders] = await Promise.all([
+      this.prisma.salesOrder.findMany({
+        where,
+        select: {
+          customerId: true,
+          customerNameText: true,
+          saleOrderNumber: true,
+        },
+      }),
+      this.prisma.salesOrderArchive.findMany({
+        where,
+        select: {
+          customerId: true,
+          customerNameText: true,
+          saleOrderNumber: true,
+        },
+      }),
+    ]);
 
-    const groupedArchive = await this.prisma.salesOrderArchive.groupBy({
-      by: ['customerId', 'customerNameText'],
-      where,
-      _count: {
-        id: true,
-      },
-    });
-
-    const combinedGrouped = [...groupedPrimary, ...groupedArchive];
+    const combinedOrders = [...primaryOrders, ...archivedOrders];
 
     const customerIds = [
       ...new Set(
-        combinedGrouped
-          .filter((g) => g.customerId !== null)
-          .map((g) => g.customerId as number),
+        combinedOrders
+          .filter((order) => order.customerId !== null)
+          .map((order) => order.customerId as number),
       ),
     ];
 
-    const customers = await this.prisma.customer.findMany({
-      where: { id: { in: customerIds } },
-    });
+    const customers = customerIds.length
+      ? await this.prisma.customer.findMany({
+        where: { id: { in: customerIds } },
+        select: { id: true, name: true },
+      })
+      : [];
     const customerMap = new Map(customers.map((c) => [c.id, c.name]));
 
-    const resultMap = new Map<string, number>();
+    const resultMap = new Map<string, { saleOrderNumberCount: number; saleOrderNumbers: string[] }>();
 
-    for (const g of combinedGrouped) {
+    for (const order of combinedOrders) {
       const name =
-        (g.customerId ? customerMap.get(g.customerId) : g.customerNameText) ||
+        (order.customerId ? customerMap.get(order.customerId) : order.customerNameText) ||
         'N/A';
-      resultMap.set(name, (resultMap.get(name) || 0) + g._count.id);
+      const report = resultMap.get(name) || {
+        saleOrderNumberCount: 0,
+        saleOrderNumbers: [],
+      };
+
+      report.saleOrderNumberCount += 1;
+      if (order.saleOrderNumber) {
+        report.saleOrderNumbers.push(order.saleOrderNumber);
+      }
+
+      resultMap.set(name, report);
     }
 
     const reportData = Array.from(resultMap.entries()).map(
-      ([customerName, saleOrderNumberCount]) => ({
+      ([customerName, report]) => ({
         customerName,
-        saleOrderNumberCount,
+        saleOrderNumberCount: report.saleOrderNumberCount,
+        saleOrderNumbers: [...report.saleOrderNumbers].sort(),
       }),
     );
 
