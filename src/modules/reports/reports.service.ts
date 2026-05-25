@@ -7,7 +7,7 @@ import {
 
 @Injectable()
 export class ReportsSalesOrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private parseReportDate(date?: string) {
     if (!date?.trim()) {
@@ -248,9 +248,9 @@ export class ReportsSalesOrderService {
 
     const customers = customerIds.length
       ? await this.prisma.customer.findMany({
-          where: { id: { in: customerIds } },
-          select: { id: true, name: true },
-        })
+        where: { id: { in: customerIds } },
+        select: { id: true, name: true },
+      })
       : [];
     const customerMap = new Map(customers.map((c) => [c.id, c.name]));
 
@@ -319,13 +319,17 @@ export class ReportsSalesOrderService {
         },
       },
       select: {
+        id: true,
+        saleOrderNumber: true,
         customerId: true,
         customerNameText: true,
         materialData: {
           where: {
             Material_Code: { contains: materialCode, mode: 'insensitive' },
           },
-          select: { Required_Qty: true },
+          select: {
+            Required_Qty: true,
+          },
         },
       },
     });
@@ -333,31 +337,42 @@ export class ReportsSalesOrderService {
     const archivedSalesOrdersMatches =
       await this.prisma.salesOrderArchive.findMany({
         where: dateFilter,
-        select: { id: true, customerId: true, customerNameText: true },
+        select: {
+          id: true,
+          saleOrderNumber: true,
+          customerId: true,
+          customerNameText: true,
+        },
       });
 
     const archivedOrderIds = archivedSalesOrdersMatches.map((o) => o.id);
 
     let archivedMaterials: any[] = [];
+
     if (archivedOrderIds.length > 0) {
       archivedMaterials = await this.prisma.eRP_Material_DataArchive.findMany({
         where: {
           salesOrderId: { in: archivedOrderIds },
           Material_Code: { contains: materialCode, mode: 'insensitive' },
         },
-        select: { salesOrderId: true, Required_Qty: true },
+        select: {
+          salesOrderId: true,
+          Required_Qty: true,
+        },
       });
     }
 
     const archiveQtyMap = new Map<number, number>();
+
     for (const mat of archivedMaterials) {
-      if (mat.salesOrderId) {
-        const qty = Number(mat.Required_Qty) || 0;
-        archiveQtyMap.set(
-          mat.salesOrderId,
-          (archiveQtyMap.get(mat.salesOrderId) || 0) + qty,
-        );
-      }
+      if (!mat.salesOrderId) continue;
+
+      const qty = Number(mat.Required_Qty) || 0;
+
+      archiveQtyMap.set(
+        mat.salesOrderId,
+        (archiveQtyMap.get(mat.salesOrderId) || 0) + qty,
+      );
     }
 
     const validArchivedOrders = archivedSalesOrdersMatches.filter(
@@ -365,44 +380,94 @@ export class ReportsSalesOrderService {
     );
 
     const allCustomerIds = new Set<number>();
+
     primarySalesOrders.forEach((so) => {
       if (so.customerId) allCustomerIds.add(so.customerId);
     });
+
     validArchivedOrders.forEach((so) => {
       if (so.customerId) allCustomerIds.add(so.customerId);
     });
 
     const customers = await this.prisma.customer.findMany({
       where: { id: { in: Array.from(allCustomerIds) } },
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+      },
     });
+
     const customerMap = new Map(customers.map((c) => [c.id, c.name]));
 
-    const resultMap = new Map<string, number>();
+    const resultMap = new Map<
+      string,
+      {
+        totalQuantity: number;
+        orderDetails: {
+          soNumber: string;
+          requiredQuantity: number;
+        }[];
+      }
+    >();
 
     for (const so of primarySalesOrders) {
-      const name = so.customerId
+      const customerName = so.customerId
         ? customerMap.get(so.customerId) || '-'
         : so.customerNameText || '-';
-      let orderMaterialQty = 0;
-      for (const mat of so.materialData) {
-        orderMaterialQty += Number(mat.Required_Qty) || 0;
-      }
-      resultMap.set(name, (resultMap.get(name) || 0) + orderMaterialQty);
+
+      const orderMaterialQty = so.materialData.reduce(
+        (sum, mat) => sum + (Number(mat.Required_Qty) || 0),
+        0,
+      );
+
+      if (orderMaterialQty <= 0) continue;
+
+      const existing = resultMap.get(customerName) || {
+        totalQuantity: 0,
+        orderDetails: [],
+      };
+
+      existing.totalQuantity += orderMaterialQty;
+
+      existing.orderDetails.push({
+        soNumber: so.saleOrderNumber || '-',
+        requiredQuantity: orderMaterialQty,
+      });
+
+      resultMap.set(customerName, existing);
     }
 
     for (const so of validArchivedOrders) {
-      const name = so.customerId
+      const customerName = so.customerId
         ? customerMap.get(so.customerId) || '-'
         : so.customerNameText || '-';
+
       const orderMaterialQty = archiveQtyMap.get(so.id) || 0;
-      resultMap.set(name, (resultMap.get(name) || 0) + orderMaterialQty);
+
+      if (orderMaterialQty <= 0) continue;
+
+      const existing = resultMap.get(customerName) || {
+        totalQuantity: 0,
+        orderDetails: [],
+      };
+
+      existing.totalQuantity += orderMaterialQty;
+
+      existing.orderDetails.push({
+        soNumber: so.saleOrderNumber || '-',
+        requiredQuantity: orderMaterialQty,
+      });
+
+      resultMap.set(customerName, existing);
     }
 
     const sortedData = Array.from(resultMap.entries()).map(
-      ([customerName, totalQuantity]) => ({
+      ([customerName, report]) => ({
         customerName,
-        totalQuantity,
+        totalQuantity: report.totalQuantity,
+        orderDetails: report.orderDetails.sort((a, b) =>
+          a.soNumber.localeCompare(b.soNumber),
+        ),
       }),
     );
 
