@@ -640,6 +640,7 @@ export class DashboardService {
   async getAdminOrdersByCustomer(): Promise<AdminCountByEntityDto[]> {
     const counts = await this.prisma.salesOrder.groupBy({
       by: ['customerId'],
+      where: { customerId: { not: null } },
       _count: { id: true },
       orderBy: { _count: { id: 'desc' } },
       take: 5,

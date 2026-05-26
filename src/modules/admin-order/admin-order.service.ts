@@ -1100,38 +1100,6 @@ export class AdminOrderService {
           }
         }
 
-        let customerId = dbOrder.customerId;
-        let customerNameText = dbOrder.customerNameText;
-        let address = dbOrder.address; // Added address tracking
-        const rowCustomer = getCellString('CUSTOMER NAME');
-
-        if (rowCustomer !== undefined) {
-          if (rowCustomer === '') {
-            customerId = null;
-            customerNameText = null;
-            address = null;
-          } else {
-            const c = await tx.customer.findFirst({
-              where: { name: rowCustomer },
-            });
-            if (c) {
-              customerId = c.id;
-              customerNameText = null;
-              address = c.address; // Fix: Dynamically update address from the DB
-            } else {
-              customerId = null;
-              customerNameText = rowCustomer;
-              // Fix: Clear old address if a completely new name is typed
-              if (
-                dbOrder.customer?.name !== rowCustomer &&
-                dbOrder.customerNameText !== rowCustomer
-              ) {
-                address = null;
-              }
-            }
-          }
-        }
-
         // ----------------------------------------------------
         // 5. PARSE FORMATTED DATA (Date, Boolean, Number)
         // ----------------------------------------------------
@@ -1214,9 +1182,6 @@ export class AdminOrderService {
             assignedUserId,
             issueAssignedUserId,
             packingAssignedUserId,
-            customerId,
-            customerNameText,
-            address,
             paymentClearance,
             priority,
             skipStage,
