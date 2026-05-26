@@ -904,6 +904,7 @@ export class SalesOrderService {
           issueAssignedUserId: null,
           packingAssignedUserId: null,
           isErpImported: 0,
+          binCount: 0,
           skipStage: false,
           UpdatedBy: username,
           UpdatedDate: now,
