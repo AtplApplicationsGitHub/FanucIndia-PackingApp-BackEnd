@@ -314,13 +314,24 @@ export class LookupService {
       );
     }
 
-    return this.prisma.customer.update({
-      where: { id },
-      data: {
-        ...dto,
-        ...(dto.name !== undefined && { name: normalizedName }),
-        ...(dto.address !== undefined && { address: normalizedAddress }),
-      },
+    return await this.prisma.$transaction(async (tx) => {
+      const updatedCustomer = await tx.customer.update({
+        where: { id },
+        data: {
+          ...dto,
+          ...(dto.name !== undefined && { name: normalizedName }),
+          ...(dto.address !== undefined && { address: normalizedAddress }),
+        },
+      });
+
+      if (dto.address !== undefined) {
+        await tx.salesOrder.updateMany({
+          where: { customerId: id },
+          data: { address: normalizedAddress },
+        });
+      }
+
+      return updatedCustomer;
     });
   }
 
@@ -848,21 +859,15 @@ export class LookupService {
 
             if (id) {
               promises.push(
-                tx.customer.update({ where: { id }, data }).catch(() => {}),
-              );
-            } else {
-              promises.push(
-                (async () => {
-                  const existing = await tx.customer.findFirst({
-                    where: {
-                      name: { equals: name, mode: 'insensitive' },
-                      address: address
-                        ? { equals: address, mode: 'insensitive' }
-                        : null,
-                    },
-                  });
-                  if (!existing) await tx.customer.create({ data });
-                })().catch(() => {}),
+                tx.customer
+                  .update({ where: { id }, data })
+                  .then(() => {
+                    return tx.salesOrder.updateMany({
+                      where: { customerId: id },
+                      data: { address: data.address },
+                    });
+                  })
+                  .catch(() => {}),
               );
             }
           }
