@@ -221,22 +221,39 @@ export class ReportsSalesOrderService {
       this.prisma.salesOrder.findMany({
         where,
         select: {
+          id: true,
           customerId: true,
           customerNameText: true,
           saleOrderNumber: true,
+          outboundDelivery: true,
         },
       }),
       this.prisma.salesOrderArchive.findMany({
         where,
         select: {
+          id: true,
           customerId: true,
           customerNameText: true,
           saleOrderNumber: true,
+          outboundDelivery: true,
         },
       }),
     ]);
 
-    const combinedOrders = [...primaryOrders, ...archivedOrders];
+    const primaryOrdersWithSource = primaryOrders.map((order) => ({
+      ...order,
+      source: 'ACTIVE' as const,
+    }));
+
+    const archivedOrdersWithSource = archivedOrders.map((order) => ({
+      ...order,
+      source: 'ARCHIVE' as const,
+    }));
+
+    const combinedOrders = [
+      ...primaryOrdersWithSource,
+      ...archivedOrdersWithSource,
+    ];
 
     const customerIds = [
       ...new Set(
@@ -252,11 +269,20 @@ export class ReportsSalesOrderService {
         select: { id: true, name: true },
       })
       : [];
+
     const customerMap = new Map(customers.map((c) => [c.id, c.name]));
 
     const resultMap = new Map<
       string,
-      { saleOrderNumberCount: number; saleOrderNumbers: string[] }
+      {
+        saleOrderNumberCount: number;
+        salesOrders: {
+          id: number;
+          saleOrderNumber: string | null;
+          outboundDelivery: string | null;
+          source: 'ACTIVE' | 'ARCHIVE';
+        }[];
+      }
     >();
 
     for (const order of combinedOrders) {
@@ -264,15 +290,20 @@ export class ReportsSalesOrderService {
         (order.customerId
           ? customerMap.get(order.customerId)
           : order.customerNameText) || 'N/A';
+
       const report = resultMap.get(name) || {
         saleOrderNumberCount: 0,
-        saleOrderNumbers: [],
+        salesOrders: [],
       };
 
       report.saleOrderNumberCount += 1;
-      if (order.saleOrderNumber) {
-        report.saleOrderNumbers.push(order.saleOrderNumber);
-      }
+
+      report.salesOrders.push({
+        id: order.id,
+        saleOrderNumber: order.saleOrderNumber || null,
+        outboundDelivery: order.outboundDelivery || null,
+        source: order.source,
+      });
 
       resultMap.set(name, report);
     }
@@ -281,7 +312,11 @@ export class ReportsSalesOrderService {
       ([customerName, report]) => ({
         customerName,
         saleOrderNumberCount: report.saleOrderNumberCount,
-        saleOrderNumbers: [...report.saleOrderNumbers].sort(),
+        salesOrders: report.salesOrders.sort((a, b) =>
+          String(a.saleOrderNumber || '').localeCompare(
+            String(b.saleOrderNumber || ''),
+          ),
+        ),
       }),
     );
 
@@ -321,6 +356,7 @@ export class ReportsSalesOrderService {
       select: {
         id: true,
         saleOrderNumber: true,
+        outboundDelivery: true,
         customerId: true,
         customerNameText: true,
         materialData: {
@@ -340,6 +376,7 @@ export class ReportsSalesOrderService {
         select: {
           id: true,
           saleOrderNumber: true,
+          outboundDelivery: true,
           customerId: true,
           customerNameText: true,
         },
@@ -404,7 +441,9 @@ export class ReportsSalesOrderService {
       {
         totalQuantity: number;
         orderDetails: {
+          id: number;
           soNumber: string;
+          outboundDelivery: string;
           requiredQuantity: number;
         }[];
       }
@@ -430,7 +469,9 @@ export class ReportsSalesOrderService {
       existing.totalQuantity += orderMaterialQty;
 
       existing.orderDetails.push({
+        id: so.id,
         soNumber: so.saleOrderNumber || '-',
+        outboundDelivery: so.outboundDelivery || '-',
         requiredQuantity: orderMaterialQty,
       });
 
@@ -454,7 +495,9 @@ export class ReportsSalesOrderService {
       existing.totalQuantity += orderMaterialQty;
 
       existing.orderDetails.push({
+        id: so.id,
         soNumber: so.saleOrderNumber || '-',
+        outboundDelivery: so.outboundDelivery || '-',
         requiredQuantity: orderMaterialQty,
       });
 
