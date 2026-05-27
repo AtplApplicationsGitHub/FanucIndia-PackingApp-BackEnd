@@ -11,8 +11,9 @@ import {
   BadRequestException,
   Get,
   Res,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthRequest } from '../auth/types/auth-request.type';
@@ -26,6 +27,27 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 @Controller('vehicle-entry')
 export class VehicleEntryController {
   constructor(private readonly service: VehicleEntryService) { }
+
+  @Get()
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({
+    summary: 'Get vehicle entries with Pending/Started dispatch status',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['all', 'pending', 'started'],
+    description: 'Filter by dispatch status. Defaults to all.',
+  })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  findAll(
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.service.findAll(status, startDate, endDate);
+  }
 
   @Post()
   @Roles('USER')

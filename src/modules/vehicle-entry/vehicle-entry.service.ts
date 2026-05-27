@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateVehicleEntryDto } from './dto/create-vehicle-entry.dto';
 import { SftpService } from '../sftp/sftp.service';
@@ -12,6 +12,10 @@ export class VehicleEntryService {
     private readonly sftpService: SftpService,
   ) {}
 
+  private normalizeAttachments(attachments: Prisma.JsonValue | null) {
+    return Array.isArray(attachments) ? attachments : [];
+  }
+
   async create(dto: CreateVehicleEntryDto, userId: number) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user?.name || 'System';
@@ -22,16 +26,131 @@ export class VehicleEntryService {
         vehicleNumber: dto.vehicleNumber,
         transporterName: dto.transporterName,
         driverNumber: dto.driverNumber,
-
         driverName: dto.driverName,
         inTime: dto.inTime,
         outTime: dto.outTime,
-
         createdBy: userId,
         updatedBy: userName,
         attachments: Prisma.JsonNull,
       },
     });
+  }
+
+  async findAll(status = 'all', startDate?: string, endDate?: string) {
+    const normalizedStatus = (status || 'all').toLowerCase();
+    if (!['all', 'pending', 'started', 'created'].includes(normalizedStatus)) {
+      throw new BadRequestException(
+        "status must be one of 'all', 'pending', or 'started'.",
+      );
+    }
+
+    const where: Prisma.VehicleEntryWhereInput = {};
+
+    if (startDate || endDate) {
+      const start = startDate ? new Date(startDate) : new Date(0);
+      const end = endDate ? new Date(endDate) : new Date();
+
+      if (Number.isNaN(start.getTime())) {
+        throw new BadRequestException('Invalid startDate provided.');
+      }
+      if (Number.isNaN(end.getTime())) {
+        throw new BadRequestException('Invalid endDate provided.');
+      }
+
+      end.setHours(23, 59, 59, 999);
+
+      where.createdAt = {
+        gte: start,
+        lte: end,
+      };
+    }
+
+    const entries = await this.prisma.vehicleEntry.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        customerName: true,
+        vehicleNumber: true,
+        transporterName: true,
+        driverNumber: true,
+        driverName: true,
+        inTime: true,
+        outTime: true,
+        attachments: true,
+        createdBy: true,
+        createdAt: true,
+        updatedBy: true,
+        updatedAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        dispatches: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (entries.length === 0) {
+      return [];
+    }
+
+    const entryIds = entries.map((entry) => entry.id);
+    const archivedDispatches = await this.prisma.dispatchArchive.findMany({
+      where: {
+        vehicleEntryId: { in: entryIds },
+      },
+      select: {
+        vehicleEntryId: true,
+      },
+    });
+
+    const archivedDispatchEntryIds = new Set(
+      archivedDispatches
+        .map((dispatch) => dispatch.vehicleEntryId)
+        .filter((entryId): entryId is number => entryId !== null),
+    );
+
+    const mappedEntries = entries.map((entry) => {
+      const hasDispatch =
+        entry.dispatches.length > 0 || archivedDispatchEntryIds.has(entry.id);
+
+      return {
+        id: entry.id,
+        customerName: entry.customerName,
+        vehicleNumber: entry.vehicleNumber,
+        transporterName: entry.transporterName,
+        driverNumber: entry.driverNumber,
+        driverName: entry.driverName,
+        inTime: entry.inTime,
+        outTime: entry.outTime,
+        createdBy: entry.createdBy,
+        createdAt: entry.createdAt,
+        updatedBy: entry.updatedBy,
+        updatedAt: entry.updatedAt,
+        attachments: this.normalizeAttachments(entry.attachments),
+        createdUser: entry.user,
+        dispatchStatus: hasDispatch ? 'Started' : 'Pending',
+      };
+    });
+
+    if (normalizedStatus === 'pending') {
+      return mappedEntries.filter(
+        (entry) => entry.dispatchStatus === 'Pending',
+      );
+    }
+
+    if (normalizedStatus === 'started' || normalizedStatus === 'created') {
+      return mappedEntries.filter(
+        (entry) => entry.dispatchStatus === 'Started',
+      );
+    }
+
+    return mappedEntries;
   }
 
   async uploadAttachments(entryId: number, files: Express.Multer.File[], userId: number) {

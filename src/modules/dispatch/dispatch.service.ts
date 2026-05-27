@@ -22,6 +22,7 @@ export interface AttachmentData {
   path: string;
   mimeType: string;
   size: number;
+  uploadedAt?: string;
 }
 
 @Injectable()
@@ -43,27 +44,85 @@ export class DispatchService {
     return user?.email || 'System';
   }
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly sftpService: SftpService,
-  ) { }
-
-  async create(dto: any, files: Express.Multer.File[], userId: number) {
-    const {
-      transporterId: transporterIdString,
-      vehicleNumber,
-      salesOrderIds,
-    } = dto;
-
+  private getTodayRange() {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
+    return { startOfToday, endOfToday };
+  }
+
+  private parseOptionalPositiveInteger(value: unknown, fieldName: string) {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+
+    const parsedValue = Number(value);
+    if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
+      throw new BadRequestException(`Invalid ${fieldName} provided.`);
+    }
+
+    return parsedValue;
+  }
+
+  private normalizeAttachments(attachments: Prisma.JsonValue | null) {
+    return Array.isArray(attachments)
+      ? (attachments as unknown as AttachmentData[])
+      : [];
+  }
+
+  private async findTodayVehicleEntryForDispatch(
+    vehicleNumber: string,
+    vehicleEntryId?: number,
+  ) {
+    const { startOfToday, endOfToday } = this.getTodayRange();
+
+    if (vehicleEntryId) {
+      const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
+        where: {
+          id: vehicleEntryId,
+          createdAt: {
+            gte: startOfToday,
+            lte: endOfToday,
+          },
+        },
+      });
+
+      if (!vehicleEntry) {
+        throw new BadRequestException(
+          `Vehicle Entry ID '${vehicleEntryId}' not found in today's Vehicle Entry records.`,
+        );
+      }
+
+      if (vehicleEntry.vehicleNumber !== vehicleNumber) {
+        throw new BadRequestException(
+          `Vehicle Entry ID '${vehicleEntryId}' belongs to vehicle number '${vehicleEntry.vehicleNumber}', not '${vehicleNumber}'.`,
+        );
+      }
+
+      const existingDispatch = await this.prisma.dispatch.findFirst({
+        where: { vehicleEntryId },
+      });
+
+      const existingArchivedDispatch =
+        await this.prisma.dispatchArchive.findFirst({
+          where: { vehicleEntryId },
+        });
+
+      if (existingDispatch || existingArchivedDispatch) {
+        throw new BadRequestException(
+          `Vehicle Entry ID '${vehicleEntryId}' already has a dispatch created.`,
+        );
+      }
+
+      return vehicleEntry;
+    }
+
     const existingDispatchToday = await this.prisma.dispatch.findFirst({
       where: {
-        vehicleNumber: vehicleNumber,
+        vehicleNumber,
         createdAt: {
           gte: startOfToday,
           lte: endOfToday,
@@ -79,7 +138,7 @@ export class DispatchService {
 
     const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
       where: {
-        vehicleNumber: vehicleNumber,
+        vehicleNumber,
         createdAt: {
           gte: startOfToday,
           lte: endOfToday,
@@ -93,6 +152,31 @@ export class DispatchService {
         `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`,
       );
     }
+
+    return vehicleEntry;
+  }
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sftpService: SftpService,
+  ) { }
+
+  async create(dto: any, files: Express.Multer.File[], userId: number) {
+    const {
+      transporterId: transporterIdString,
+      vehicleNumber,
+      salesOrderIds,
+      vehicleEntryId: rawVehicleEntryId,
+    } = dto;
+
+    const vehicleEntryId = this.parseOptionalPositiveInteger(
+      rawVehicleEntryId,
+      'vehicleEntryId',
+    );
+    const vehicleEntry = await this.findTodayVehicleEntryForDispatch(
+      vehicleNumber,
+      vehicleEntryId,
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } });
@@ -249,46 +333,12 @@ export class DispatchService {
     dto: CreateMobileDispatchDto,
     userId: number,
   ) {
-    const { transporterId, transporterName, vehicleNumber } = dto;
+    const { transporterId, transporterName, vehicleNumber, vehicleEntryId } = dto;
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
-
-    const existingDispatchToday = await this.prisma.dispatch.findFirst({
-      where: {
-        vehicleNumber: vehicleNumber,
-        createdAt: {
-          gte: startOfToday,
-          lte: endOfToday,
-        },
-      },
-    });
-
-    if (existingDispatchToday) {
-      throw new BadRequestException(
-        `Vehicle Number '${vehicleNumber}' has already been used for a dispatch today. It can only be used again tomorrow.`,
-      );
-    }
-
-    const vehicleEntry = await this.prisma.vehicleEntry.findFirst({
-      where: {
-        vehicleNumber: vehicleNumber,
-        createdAt: {
-          gte: startOfToday,
-          lte: endOfToday,
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!vehicleEntry) {
-      throw new BadRequestException(
-        `Vehicle Number '${vehicleNumber}' not found in today's Vehicle Entry records. Please ensure a vehicle entry is created for today.`,
-      );
-    }
+    const vehicleEntry = await this.findTodayVehicleEntryForDispatch(
+      vehicleNumber,
+      vehicleEntryId,
+    );
 
     return this.prisma.$transaction(async (tx) => {
       let finalTransporterId: number | null = null;
@@ -451,6 +501,218 @@ export class DispatchService {
         outboundDelivery: salesOrder.outboundDelivery,
       };
     });
+  }
+
+  async findVehicleEntriesForDispatch(
+    status = 'all',
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const normalizedStatus = (status || 'all').toLowerCase();
+    if (!['all', 'pending', 'started', 'created'].includes(normalizedStatus)) {
+      throw new BadRequestException(
+        "status must be one of 'all', 'pending', or 'started'.",
+      );
+    }
+
+    const where: Prisma.VehicleEntryWhereInput = {};
+
+    if (startDate || endDate) {
+      const start = startDate ? new Date(startDate) : new Date(0);
+      const end = endDate ? new Date(endDate) : new Date();
+
+      if (Number.isNaN(start.getTime())) {
+        throw new BadRequestException('Invalid startDate provided.');
+      }
+      if (Number.isNaN(end.getTime())) {
+        throw new BadRequestException('Invalid endDate provided.');
+      }
+
+      end.setHours(23, 59, 59, 999);
+
+      where.createdAt = {
+        gte: start,
+        lte: end,
+      };
+    }
+
+    const vehicleEntries = await this.prisma.vehicleEntry.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        customerName: true,
+        vehicleNumber: true,
+        transporterName: true,
+        driverNumber: true,
+        driverName: true,
+        inTime: true,
+        outTime: true,
+        attachments: true,
+        createdBy: true,
+        createdAt: true,
+        updatedBy: true,
+        updatedAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        dispatches: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            transporterId: true,
+            transporterName: true,
+            vehicleNumber: true,
+            createdAt: true,
+            updatedAt: true,
+            UpdatedBy: true,
+            UpdatedDate: true,
+          },
+        },
+      },
+    });
+
+    if (vehicleEntries.length === 0) {
+      return [];
+    }
+
+    const vehicleEntryIds = vehicleEntries.map((entry) => entry.id);
+    const archivedDispatches = await this.prisma.dispatchArchive.findMany({
+      where: {
+        vehicleEntryId: { in: vehicleEntryIds },
+      },
+      select: {
+        id: true,
+        transporterId: true,
+        transporterName: true,
+        vehicleNumber: true,
+        createdAt: true,
+        UpdatedBy: true,
+        UpdatedDate: true,
+        vehicleEntryId: true,
+      },
+    });
+
+    const archivedDispatchesByVehicleEntryId = new Map<number, any[]>();
+    for (const dispatch of archivedDispatches) {
+      if (!dispatch.vehicleEntryId) {
+        continue;
+      }
+
+      const existing =
+        archivedDispatchesByVehicleEntryId.get(dispatch.vehicleEntryId) || [];
+      existing.push({
+        id: dispatch.id,
+        transporterId: dispatch.transporterId,
+        transporterName: dispatch.transporterName,
+        vehicleNumber: dispatch.vehicleNumber,
+        createdAt: dispatch.createdAt,
+        updatedAt: dispatch.UpdatedDate,
+        UpdatedBy: dispatch.UpdatedBy,
+        UpdatedDate: dispatch.UpdatedDate,
+        isArchived: true,
+      });
+      archivedDispatchesByVehicleEntryId.set(dispatch.vehicleEntryId, existing);
+    }
+
+    const mappedVehicleEntries = vehicleEntries.map((entry) => {
+      const activeDispatches = entry.dispatches.map((dispatch) => ({
+        ...dispatch,
+        isArchived: false,
+      }));
+      const archivedDispatchesForEntry =
+        archivedDispatchesByVehicleEntryId.get(entry.id) || [];
+      const dispatches = [
+        ...activeDispatches,
+        ...archivedDispatchesForEntry,
+      ].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      const isDispatchCreated = dispatches.length > 0;
+
+      return {
+        id: entry.id,
+        customerName: entry.customerName,
+        vehicleNumber: entry.vehicleNumber,
+        transporterName: entry.transporterName,
+        driverNumber: entry.driverNumber,
+        driverName: entry.driverName,
+        inTime: entry.inTime,
+        outTime: entry.outTime,
+        createdBy: entry.createdBy,
+        createdAt: entry.createdAt,
+        updatedBy: entry.updatedBy,
+        updatedAt: entry.updatedAt,
+        attachments: this.normalizeAttachments(entry.attachments),
+        createdUser: entry.user,
+        dispatchStatus: isDispatchCreated ? 'Started' : 'Pending',
+      };
+    });
+
+    if (normalizedStatus === 'pending') {
+      return mappedVehicleEntries.filter(
+        (entry) => entry.dispatchStatus === 'Pending',
+      );
+    }
+
+    if (normalizedStatus === 'started' || normalizedStatus === 'created') {
+      return mappedVehicleEntries.filter(
+        (entry) => entry.dispatchStatus === 'Started',
+      );
+    }
+
+    return mappedVehicleEntries;
+  }
+
+  async findVehicleEntryAttachments(entryId: number) {
+    let entry: any = await this.prisma.vehicleEntry.findUnique({
+      where: { id: entryId },
+      select: { attachments: true },
+    });
+
+    if (!entry) {
+      entry = await this.prisma.vehicleEntryArchive.findUnique({
+        where: { id: entryId },
+        select: { attachments: true },
+      });
+    }
+
+    if (!entry) {
+      throw new NotFoundException(`Vehicle Entry with ID ${entryId} not found.`);
+    }
+
+    return this.normalizeAttachments(entry.attachments);
+  }
+
+  async getVehicleEntryAttachmentStream(entryId: number, fileName: string) {
+    const attachments = await this.findVehicleEntryAttachments(entryId);
+    const attachment = attachments.find((att) => att.fileName === fileName);
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    try {
+      const streamOrBuffer = await this.sftpService.getStream(attachment.path);
+
+      let stream;
+      if (Buffer.isBuffer(streamOrBuffer)) {
+        const { Readable } = require('stream');
+        stream = Readable.from(streamOrBuffer);
+      } else {
+        stream = streamOrBuffer;
+      }
+
+      return { stream, mimeType: attachment.mimeType };
+    } catch (error) {
+      console.error('Vehicle entry SFTP stream error:', error);
+      throw new NotFoundException('File not found on storage server.');
+    }
   }
 
   async findAll(startDate?: string, endDate?: string) {

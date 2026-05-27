@@ -20,7 +20,102 @@ import {
 export class AdminOrderService {
   constructor(private prisma: PrismaService) {}
 
+  private normalizeName(value?: string | null) {
+    const normalized = value?.trim();
+    return normalized ? normalized : null;
+  }
+
+  private async resolveTransporter(transporterName: string) {
+    let transporter = await this.prisma.transporter.findFirst({
+      where: {
+        name: { equals: transporterName, mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+
+    if (!transporter) {
+      transporter = await this.prisma.transporter.create({
+        data: { name: transporterName },
+        select: { id: true },
+      });
+    }
+
+    return transporter;
+  }
+
+  private async syncTransportersFromVehicleEntries() {
+    const vehicleEntries = await this.prisma.vehicleEntry.findMany({
+      where: {
+        customerName: { not: null },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        customerName: true,
+        transporterName: true,
+      },
+    });
+
+    const latestEntryByCustomer = new Map<
+      string,
+      { customerName: string; transporterName: string }
+    >();
+
+    for (const entry of vehicleEntries) {
+      const customerName = this.normalizeName(entry.customerName);
+      const transporterName = this.normalizeName(entry.transporterName);
+
+      if (!customerName || !transporterName) continue;
+
+      const customerKey = customerName.toLowerCase();
+
+      if (!latestEntryByCustomer.has(customerKey)) {
+        latestEntryByCustomer.set(customerKey, {
+          customerName,
+          transporterName,
+        });
+      }
+    }
+
+    for (const entry of latestEntryByCustomer.values()) {
+      const transporter = await this.resolveTransporter(entry.transporterName);
+
+      await this.prisma.salesOrder.updateMany({
+        where: {
+          AND: [
+            {
+              OR: [
+                {
+                  customer: {
+                    is: {
+                      name: { equals: entry.customerName, mode: 'insensitive' },
+                    },
+                  },
+                },
+                {
+                  customerNameText: {
+                    equals: entry.customerName,
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+            },
+            {
+              transporterId: { not: transporter.id },
+            },
+          ],
+        },
+        data: {
+          transporterId: transporter.id,
+          UpdatedBy: 'Vehicle Entry',
+          UpdatedDate: new Date(),
+        },
+      });
+    }
+  }
+
   async findAll(query: any, user: { userId: number }) {
+    await this.syncTransportersFromVehicleEntries();
+
     const {
       page = 1,
       limit = 20,
@@ -619,6 +714,8 @@ export class AdminOrderService {
   }
 
   async fetchActiveOrders() {
+    await this.syncTransportersFromVehicleEntries();
+
     const data = await this.prisma.salesOrder.findMany({
       where: {
         OR: [{ status: null }, { status: 'R105' }, { status: 'W105' }],
