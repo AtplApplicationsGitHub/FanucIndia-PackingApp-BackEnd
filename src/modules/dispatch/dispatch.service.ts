@@ -504,17 +504,9 @@ export class DispatchService {
   }
 
   async findVehicleEntriesForDispatch(
-    status = 'all',
     startDate?: string,
     endDate?: string,
   ) {
-    const normalizedStatus = (status || 'all').toLowerCase();
-    if (!['all', 'pending', 'started', 'created'].includes(normalizedStatus)) {
-      throw new BadRequestException(
-        "status must be one of 'all', 'pending', or 'started'.",
-      );
-    }
-
     const where: Prisma.VehicleEntryWhereInput = {};
 
     if (startDate || endDate) {
@@ -654,19 +646,11 @@ export class DispatchService {
       };
     });
 
-    if (normalizedStatus === 'pending') {
-      return mappedVehicleEntries.filter(
-        (entry) => entry.dispatchStatus === 'Pending',
-      );
-    }
-
-    if (normalizedStatus === 'started' || normalizedStatus === 'created') {
-      return mappedVehicleEntries.filter(
-        (entry) => entry.dispatchStatus === 'Started',
-      );
-    }
-
-    return mappedVehicleEntries;
+    // Started entries are intentionally hidden for now. Restore status-based
+    // filtering here when the Started list is needed again.
+    return mappedVehicleEntries.filter(
+      (entry) => entry.dispatchStatus === 'Pending',
+    );
   }
 
   async findVehicleEntryAttachments(entryId: number) {

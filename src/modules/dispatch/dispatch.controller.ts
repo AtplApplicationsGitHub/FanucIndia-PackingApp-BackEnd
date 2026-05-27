@@ -115,24 +115,15 @@ export class DispatchController {
   @Get('vehicle-entries')
   @Roles('ADMIN', 'USER')
   @ApiOperation({
-    summary:
-      'Get vehicle entries for dispatch with Pending/Started dispatch status',
-  })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    enum: ['all', 'pending', 'started'],
-    description: 'Filter by dispatch creation status. Defaults to all.',
+    summary: 'Get pending vehicle entries for dispatch',
   })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
   findVehicleEntriesForDispatch(
-    @Query('status') status?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     return this.dispatchService.findVehicleEntriesForDispatch(
-      status,
       startDate,
       endDate,
     );
