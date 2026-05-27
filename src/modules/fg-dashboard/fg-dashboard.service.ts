@@ -26,6 +26,19 @@ const PROGRESS_CONFIG: Record<StepLabel, { next: string }> = {
   Dispatched: { next: '' },
 };
 
+type VehicleEntryDispatchInfo = {
+  vehicleNumber: string;
+  transporterName: string;
+};
+
+type SalesOrderDispatchLink = {
+  dispatch?: {
+    vehicleNumber?: string | null;
+    transporterName?: string | null;
+    transporter?: { name?: string | null } | null;
+  } | null;
+};
+
 function getStageStatusInfo(order: {
   status?: string | null;
   issueAssignedUserId?: number | null;
@@ -87,6 +100,143 @@ function getStageStatusInfo(order: {
 @Injectable()
 export class FgDashboardService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private normalizeCustomerName(customerName?: string | null) {
+    return customerName?.trim().toLowerCase() || '';
+  }
+
+  private getSalesOrderCustomerName(order: {
+    customerNameText?: string | null;
+    customer?: { name?: string | null } | null;
+  }) {
+    return order.customerNameText || order.customer?.name || null;
+  }
+
+  private getDispatchInfo(order: { Dispatch_SO?: SalesOrderDispatchLink[] }) {
+    return order.Dispatch_SO && order.Dispatch_SO.length > 0
+      ? order.Dispatch_SO[0].dispatch || null
+      : null;
+  }
+
+  private getDispatchVehicleNumber(order: {
+    Dispatch_SO?: SalesOrderDispatchLink[];
+  }) {
+    return this.getDispatchInfo(order)?.vehicleNumber || null;
+  }
+
+  private getDispatchTransporterName(order: {
+    Dispatch_SO?: SalesOrderDispatchLink[];
+  }) {
+    const dispatchInfo = this.getDispatchInfo(order);
+
+    return (
+      dispatchInfo?.transporterName || dispatchInfo?.transporter?.name || null
+    );
+  }
+
+  private async getVehicleEntryDispatchInfoByCustomerName(
+    customerNames: (string | null | undefined)[],
+  ) {
+    const uniqueCustomerNames = [
+      ...new Set(customerNames.map((name) => name?.trim()).filter(Boolean)),
+    ] as string[];
+
+    if (uniqueCustomerNames.length === 0) {
+      return new Map<string, VehicleEntryDispatchInfo>();
+    }
+
+    const vehicleEntries = await this.prisma.vehicleEntry.findMany({
+      where: {
+        OR: uniqueCustomerNames.map((customerName) => ({
+          customerName: { equals: customerName, mode: 'insensitive' },
+        })),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        customerName: true,
+        vehicleNumber: true,
+        transporterName: true,
+      },
+    });
+
+    const vehicleEntryInfoByCustomerName = new Map<
+      string,
+      VehicleEntryDispatchInfo
+    >();
+    for (const entry of vehicleEntries) {
+      const customerNameKey = this.normalizeCustomerName(entry.customerName);
+      if (
+        !customerNameKey ||
+        vehicleEntryInfoByCustomerName.has(customerNameKey)
+      ) {
+        continue;
+      }
+
+      vehicleEntryInfoByCustomerName.set(customerNameKey, {
+        vehicleNumber: entry.vehicleNumber,
+        transporterName: entry.transporterName,
+      });
+    }
+
+    return vehicleEntryInfoByCustomerName;
+  }
+
+  private getVehicleEntryDispatchInfoForSalesOrder(
+    order: {
+      customerNameText?: string | null;
+      customer?: { name?: string | null } | null;
+    },
+    vehicleEntryInfoByCustomerName: Map<string, VehicleEntryDispatchInfo>,
+  ) {
+    const customerNameKey = this.normalizeCustomerName(
+      this.getSalesOrderCustomerName(order),
+    );
+
+    return vehicleEntryInfoByCustomerName.get(customerNameKey) || null;
+  }
+
+  private getVehicleNumberForSalesOrder(
+    order: {
+      customerNameText?: string | null;
+      customer?: { name?: string | null } | null;
+      Dispatch_SO?: SalesOrderDispatchLink[];
+    },
+    vehicleEntryInfoByCustomerName: Map<string, VehicleEntryDispatchInfo>,
+  ) {
+    const dispatchVehicleNumber = this.getDispatchVehicleNumber(order);
+    if (dispatchVehicleNumber) {
+      return dispatchVehicleNumber;
+    }
+
+    const vehicleEntryInfo = this.getVehicleEntryDispatchInfoForSalesOrder(
+      order,
+      vehicleEntryInfoByCustomerName,
+    );
+
+    return vehicleEntryInfo?.vehicleNumber || null;
+  }
+
+  private getTransporterNameForSalesOrder(
+    order: {
+      customerNameText?: string | null;
+      customer?: { name?: string | null } | null;
+      transporter?: { name?: string | null } | null;
+      Dispatch_SO?: SalesOrderDispatchLink[];
+    },
+    vehicleEntryInfoByCustomerName: Map<string, VehicleEntryDispatchInfo>,
+  ) {
+    const dispatchTransporterName = this.getDispatchTransporterName(order);
+    if (dispatchTransporterName) {
+      return dispatchTransporterName;
+    }
+
+    const vehicleEntryInfo = this.getVehicleEntryDispatchInfoForSalesOrder(
+      order,
+      vehicleEntryInfoByCustomerName,
+    );
+
+    return vehicleEntryInfo?.transporterName || order.transporter?.name || null;
+  }
 
   async getFgDashboardData(
     user: { userId: number; role: string },
@@ -227,10 +377,14 @@ export class FgDashboardService {
           customerNameText: true,
           user: { select: { name: true, email: true } },
           Dispatch_SO: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
             select: {
               dispatch: {
                 select: {
                   vehicleNumber: true,
+                  transporterName: true,
+                  transporter: { select: { name: true } },
                 },
               },
             },
@@ -272,6 +426,11 @@ export class FgDashboardService {
       this.prisma.salesOrder.count({ where }),
     ]);
 
+    const vehicleEntryInfoByCustomerName =
+      await this.getVehicleEntryDispatchInfoByCustomerName(
+        salesOrders.map((order) => this.getSalesOrderCustomerName(order)),
+      );
+
     const fgData = salesOrders.map((order) => {
       const isReadyForDispatch = order.statusStepper.some(
         (s) => s.status === 'Ready for Dispatch',
@@ -279,11 +438,14 @@ export class FgDashboardService {
       const isWipStorage = order.statusStepper.some(
         (s) => s.status === 'WIP Storage',
       );
-      const vehicleNumber =
-        order.Dispatch_SO?.length > 0
-          ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch
-              ?.vehicleNumber
-          : null;
+      const vehicleNumber = this.getVehicleNumberForSalesOrder(
+        order,
+        vehicleEntryInfoByCustomerName,
+      );
+      const transporterName = this.getTransporterNameForSalesOrder(
+        order,
+        vehicleEntryInfoByCustomerName,
+      );
 
       return {
         id: order.id,
@@ -294,7 +456,7 @@ export class FgDashboardService {
         product: order.product?.name,
         customerName: order.customerNameText || order.customer?.name,
         salesZone: order.salesZone?.name,
-        transporter: order.transporter?.name,
+        transporter: transporterName,
         payment: order.paymentClearance,
         attachments: order.attachments || [],
         status: order.status,
@@ -441,10 +603,14 @@ export class FgDashboardService {
         customerNameText: true,
         user: { select: { email: true } },
         Dispatch_SO: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
           select: {
             dispatch: {
               select: {
                 vehicleNumber: true,
+                transporterName: true,
+                transporter: { select: { name: true } },
               },
             },
           },
@@ -466,6 +632,11 @@ export class FgDashboardService {
       },
       orderBy: { id: 'desc' },
     });
+
+    const vehicleEntryInfoByCustomerName =
+      await this.getVehicleEntryDispatchInfoByCustomerName(
+        salesOrders.map((order) => this.getSalesOrderCustomerName(order)),
+      );
 
     // Create Excel Workbook
     const workbook = new ExcelJS.Workbook();
@@ -494,11 +665,14 @@ export class FgDashboardService {
 
     // Add Data
     salesOrders.forEach((order) => {
-      const vehicleNumber =
-        order.Dispatch_SO?.length > 0
-          ? order.Dispatch_SO[order.Dispatch_SO.length - 1].dispatch
-              ?.vehicleNumber
-          : null;
+      const vehicleNumber = this.getVehicleNumberForSalesOrder(
+        order,
+        vehicleEntryInfoByCustomerName,
+      );
+      const transporterName = this.getTransporterNameForSalesOrder(
+        order,
+        vehicleEntryInfoByCustomerName,
+      );
 
       let fgLocString = '-';
       if (order.fgLocation) {
@@ -524,7 +698,7 @@ export class FgDashboardService {
         completedStatus: stageInfo.current || '-',
         nextStatus: stageInfo.next || '-',
         payment: order.paymentClearance ? 'Yes' : 'No',
-        transporter: order.transporter?.name || '-',
+        transporter: transporterName || '-',
         vehicle: vehicleNumber || '-',
         location: fgLocString,
         specialRemarks: order.specialRemarks || '-',

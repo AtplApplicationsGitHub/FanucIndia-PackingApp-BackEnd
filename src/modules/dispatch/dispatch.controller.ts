@@ -112,6 +112,52 @@ export class DispatchController {
     return this.dispatchService.searchSOForDispatch(soNumber);
   }
 
+  @Get('vehicle-entries')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({
+    summary: 'Get pending vehicle entries for dispatch',
+  })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  findVehicleEntriesForDispatch(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.dispatchService.findVehicleEntriesForDispatch(
+      startDate,
+      endDate,
+    );
+  }
+
+  @Get('vehicle-entries/:id/attachments')
+  @Roles('ADMIN', 'USER', 'SALES')
+  @ApiOperation({
+    summary: 'Get the list of attachments for a vehicle entry from dispatch',
+  })
+  @ApiParam({ name: 'id', description: 'The ID of the vehicle entry', type: Number })
+  @ApiResponse({ status: 200, description: 'Returns an array of attachment objects.' })
+  @ApiResponse({ status: 404, description: 'Vehicle Entry not found.' })
+  findVehicleEntryAttachments(@Param('id', ParseIntPipe) id: number) {
+    return this.dispatchService.findVehicleEntryAttachments(id);
+  }
+
+  @Get('vehicle-entries/:id/attachments/:fileName')
+  @Roles('ADMIN', 'USER', 'SALES')
+  @ApiOperation({
+    summary: 'Download a vehicle entry attachment from dispatch',
+  })
+  async downloadVehicleEntryAttachment(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
+  ) {
+    const { stream, mimeType } =
+      await this.dispatchService.getVehicleEntryAttachmentStream(id, fileName);
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+    stream.pipe(res);
+  }
+
   @Get()
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: 'Get all dispatches with optional date filtering' })
