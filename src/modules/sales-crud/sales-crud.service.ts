@@ -690,15 +690,6 @@ export class SalesCrudService {
       const archiveWhereClause: Prisma.SalesOrderArchiveWhereInput =
         archiveAndConditions.length > 0 ? { AND: archiveAndConditions } : {};
 
-      /**
-       * DISPATCHED STATUS FLOW
-       * Preserves existing behavior:
-       * - Fetch from salesOrder
-       * - Fetch from salesOrderArchive
-       * - Combine
-       * - Sort
-       * - Manually paginate
-       */
       if (filters.status === 'Dispatched') {
         const [primaryOrders, archivedOrders] = await Promise.all([
           this.prisma.salesOrder.findMany({
@@ -710,6 +701,7 @@ export class SalesCrudService {
               salesZone: true,
               packConfig: true,
               assignedUser: true,
+              Dispatch_SO: { select: { LRnumber: true } },
               _count: {
                 select: {
                   materialData: true,
@@ -728,6 +720,21 @@ export class SalesCrudService {
           }),
         ]);
 
+        const archivedOrderIds = archivedOrders.map((o) => o.id);
+        const dispatchSoArchives =
+          await this.prisma.dispatch_SOArchive.findMany({
+            where: { salesOrderId: { in: archivedOrderIds } },
+            select: { salesOrderId: true, LRnumber: true },
+          });
+
+        const dispatchSoMap = new Map();
+        for (const dso of dispatchSoArchives) {
+          if (!dispatchSoMap.has(dso.salesOrderId)) {
+            dispatchSoMap.set(dso.salesOrderId, []);
+          }
+          dispatchSoMap.get(dso.salesOrderId).push({ LRnumber: dso.LRnumber });
+        }
+
         const mappedPrimary = primaryOrders.map((order) => ({
           ...order,
           hasMaterialData: order._count.materialData > 0,
@@ -740,6 +747,7 @@ export class SalesCrudService {
           hasMaterialData: false,
           notificationCount: 0,
           isArchived: true,
+          Dispatch_SO: dispatchSoMap.get(order.id) || [],
         }));
 
         const combinedOrders = [...mappedPrimary, ...mappedArchived].sort(
