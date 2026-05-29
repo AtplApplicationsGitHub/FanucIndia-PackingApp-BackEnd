@@ -465,19 +465,23 @@ export class AdminOrderService {
     });
   }
 
-  async remove(id: number) {
+  async remove(id: number, password?: string) {
+    const config = await this.prisma.order_Delete_Password.findFirst();
+    if (!config) {
+      throw new BadRequestException(
+        'Super password not configured',
+      );
+    }
+    if (config.password !== password) {
+      throw new BadRequestException('Incorrect Password');
+    }
+
     const order = await this.prisma.salesOrder.findUnique({
       where: { id },
-      select: {
-        id: true,
-        saleOrderNumber: true,
-        outboundDelivery: true,
-      },
+      select: { id: true, saleOrderNumber: true, outboundDelivery: true },
     });
 
-    if (!order) {
-      throw new NotFoundException('Sales order not found');
-    }
+    if (!order) throw new NotFoundException('Sales order not found');
 
     const erpImportLogKeys = [
       order.saleOrderNumber,
@@ -492,16 +496,27 @@ export class AdminOrderService {
       await tx.eRP_Material_File.deleteMany({ where: { salesOrderId: id } });
       await tx.eRP_Data_Cron_Logs.deleteMany({
         where: {
-          saleOrderNumber: {
-            in: erpImportLogKeys,
-            mode: 'insensitive',
-          },
+          saleOrderNumber: { in: erpImportLogKeys, mode: 'insensitive' },
         },
       });
       await tx.salesOrder.delete({ where: { id } });
     });
 
     return { message: 'Sales order deleted successfully' };
+  }
+
+  async updateSuperPassword(newPassword: string) {
+    const existing = await this.prisma.order_Delete_Password.findFirst();
+    if (existing) {
+      return this.prisma.order_Delete_Password.update({
+        where: { id: existing.id },
+        data: { password: newPassword },
+      });
+    } else {
+      return this.prisma.order_Delete_Password.create({
+        data: { id: 1, password: newPassword },
+      });
+    }
   }
 
   async bulkAssign(

@@ -141,15 +141,21 @@ export class AdminOrderController {
   @Delete(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete a specific sales order (admin only)' })
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    description: 'ID of the sales order to delete',
-  })
-  @ApiResponse({ status: 200, description: 'Sales order deleted successfully' })
-  @ApiResponse({ status: 404, description: 'Sales order not found' })
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.service.remove(id);
+  async remove(
+    @Param('id', ParseIntPipe) id: number, 
+    @Body('password') password?: string
+  ) {
+    if(!password) throw new BadRequestException('Password is required to delete an order.');
+    return this.service.remove(id, password);
+  }
+
+  @Post('super-password')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Update the Super Password for order deletion' })
+  async updateSuperPassword(@Body('password') password: string) {
+    if (!password) throw new BadRequestException('Password cannot be empty');
+    await this.service.updateSuperPassword(password);
+    return { message: 'Super Password updated successfully' };
   }
 
   @Get('active-export-list')

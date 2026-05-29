@@ -583,3 +583,9 @@ model ManualFgStorage {
 
   @@index([salesOrderNumber])
 }
+
+model Order_Delete_Password {
+  id        Int      @id @default(1)
+  password  String
+  updatedAt DateTime @updatedAt
+}
