@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import { Prisma } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import * as os from 'os';
+import { getIstTimestampRange } from '../../common/utils/date-only.util';
 
 export interface AttachmentData {
   fileName: string;
@@ -52,6 +53,41 @@ export class DispatchService {
     endOfToday.setHours(23, 59, 59, 999);
 
     return { startOfToday, endOfToday };
+  }
+
+  private getTodayYmdInIST(date = new Date()) {
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(date.getTime() + IST_OFFSET_MS);
+    const year = istDate.getUTCFullYear();
+    const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(istDate.getUTCDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  private getVehicleEntryCreatedAtRange(startDate?: string, endDate?: string) {
+    const range: Prisma.DateTimeFilter = {};
+
+    if (!startDate && !endDate) {
+      const todayRange = getIstTimestampRange(this.getTodayYmdInIST())!;
+
+      return {
+        gte: todayRange.startOfDay,
+        lt: todayRange.endOfDay,
+      };
+    }
+
+    if (startDate) {
+      range.gte = getIstTimestampRange(startDate)!.startOfDay;
+    }
+
+    if (endDate) {
+      range.lt = getIstTimestampRange(endDate)!.endOfDay;
+    } else {
+      range.lte = new Date();
+    }
+
+    return range;
   }
 
   private parseOptionalPositiveInteger(value: unknown, fieldName: string) {
@@ -503,30 +539,10 @@ export class DispatchService {
     });
   }
 
-  async findVehicleEntriesForDispatch(
-    startDate?: string,
-    endDate?: string,
-  ) {
-    const where: Prisma.VehicleEntryWhereInput = {};
-
-    if (startDate || endDate) {
-      const start = startDate ? new Date(startDate) : new Date(0);
-      const end = endDate ? new Date(endDate) : new Date();
-
-      if (Number.isNaN(start.getTime())) {
-        throw new BadRequestException('Invalid startDate provided.');
-      }
-      if (Number.isNaN(end.getTime())) {
-        throw new BadRequestException('Invalid endDate provided.');
-      }
-
-      end.setHours(23, 59, 59, 999);
-
-      where.createdAt = {
-        gte: start,
-        lte: end,
-      };
-    }
+  async findVehicleEntriesForDispatch(startDate?: string, endDate?: string) {
+    const where: Prisma.VehicleEntryWhereInput = {
+      createdAt: this.getVehicleEntryCreatedAtRange(startDate, endDate),
+    };
 
     const vehicleEntries = await this.prisma.vehicleEntry.findMany({
       where,

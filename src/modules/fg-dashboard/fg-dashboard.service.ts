@@ -3,7 +3,10 @@ import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
-import { getSingleDateOnlyRange } from '../../common/utils/date-only.util';
+import {
+  getIstTimestampRange,
+  getSingleDateOnlyRange,
+} from '../../common/utils/date-only.util';
 
 type StepLabel =
   | 'To be Issued'
@@ -27,9 +30,14 @@ const PROGRESS_CONFIG: Record<StepLabel, { next: string }> = {
 };
 
 type VehicleEntryDispatchInfo = {
-  vehicleNumber: string;
-  transporterName: string;
+  vehicleNumber: string | null;
+  transporterName: string | null;
 };
+
+type VehicleEntryDispatchInfoByCustomerAndDate = Map<
+  string,
+  Map<string, VehicleEntryDispatchInfo>
+>;
 
 type SalesOrderDispatchLink = {
   dispatch?: {
@@ -102,7 +110,29 @@ export class FgDashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   private normalizeCustomerName(customerName?: string | null) {
-    return customerName?.trim().toLowerCase() || '';
+    return customerName?.trim() || '';
+  }
+
+  private getDateOnlyKey(date?: Date | null) {
+    if (!date) {
+      return null;
+    }
+
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  private getIstDateKey(date: Date) {
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(date.getTime() + istOffsetMs);
+    const year = istDate.getUTCFullYear();
+    const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(istDate.getUTCDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
   }
 
   private getSalesOrderCustomerName(order: {
@@ -134,74 +164,147 @@ export class FgDashboardService {
     );
   }
 
-  private async getVehicleEntryDispatchInfoByCustomerName(
-    customerNames: (string | null | undefined)[],
+  private getVehicleEntryDateKeysForSalesOrder(order: {
+    deliveryDate?: Date | null;
+  }) {
+    const requiredDateKey = this.getDateOnlyKey(order.deliveryDate);
+
+    return requiredDateKey ? [requiredDateKey] : [];
+  }
+
+  private async getVehicleEntryDispatchInfoByCustomerAndDate(
+    orders: {
+      customerNameText?: string | null;
+      customer?: { name?: string | null } | null;
+      deliveryDate?: Date | null;
+    }[],
   ) {
     const uniqueCustomerNames = [
-      ...new Set(customerNames.map((name) => name?.trim()).filter(Boolean)),
+      ...new Set(
+        orders
+          .map((order) => this.getSalesOrderCustomerName(order)?.trim())
+          .filter(Boolean),
+      ),
     ] as string[];
 
     if (uniqueCustomerNames.length === 0) {
-      return new Map<string, VehicleEntryDispatchInfo>();
+      return new Map<string, Map<string, VehicleEntryDispatchInfo>>();
     }
+
+    const vehicleEntryDateKeys = [
+      ...new Set(
+        orders.flatMap((order) =>
+          this.getVehicleEntryDateKeysForSalesOrder(order),
+        ),
+      ),
+    ];
+
+    if (vehicleEntryDateKeys.length === 0) {
+      return new Map<string, Map<string, VehicleEntryDispatchInfo>>();
+    }
+
+    const vehicleEntryDateRanges = vehicleEntryDateKeys
+      .map((dateKey) => getIstTimestampRange(dateKey))
+      .filter(Boolean) as NonNullable<
+      ReturnType<typeof getIstTimestampRange>
+    >[];
 
     const vehicleEntries = await this.prisma.vehicleEntry.findMany({
       where: {
-        OR: uniqueCustomerNames.map((customerName) => ({
-          customerName: { equals: customerName, mode: 'insensitive' },
-        })),
+        AND: [
+          {
+            dispatches: { none: {} },
+          },
+          {
+            OR: uniqueCustomerNames.map((customerName) => ({
+              customerName: { equals: customerName },
+            })),
+          },
+          {
+            OR: vehicleEntryDateRanges.map((range) => ({
+              createdAt: {
+                gte: range.startOfDay,
+                lt: range.endOfDay,
+              },
+            })),
+          },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       select: {
         customerName: true,
         vehicleNumber: true,
         transporterName: true,
+        createdAt: true,
       },
     });
 
-    const vehicleEntryInfoByCustomerName = new Map<
-      string,
-      VehicleEntryDispatchInfo
-    >();
+    const vehicleEntryInfoByCustomerAndDate: VehicleEntryDispatchInfoByCustomerAndDate =
+      new Map();
     for (const entry of vehicleEntries) {
       const customerNameKey = this.normalizeCustomerName(entry.customerName);
+      const vehicleEntryDateKey = this.getIstDateKey(entry.createdAt);
+
       if (
         !customerNameKey ||
-        vehicleEntryInfoByCustomerName.has(customerNameKey)
+        !vehicleEntryDateKeys.includes(vehicleEntryDateKey)
       ) {
         continue;
       }
 
-      vehicleEntryInfoByCustomerName.set(customerNameKey, {
+      const customerDateInfo =
+        vehicleEntryInfoByCustomerAndDate.get(customerNameKey) || new Map();
+
+      if (customerDateInfo.has(vehicleEntryDateKey)) {
+        continue;
+      }
+
+      customerDateInfo.set(vehicleEntryDateKey, {
         vehicleNumber: entry.vehicleNumber,
         transporterName: entry.transporterName,
       });
+      vehicleEntryInfoByCustomerAndDate.set(customerNameKey, customerDateInfo);
     }
 
-    return vehicleEntryInfoByCustomerName;
+    return vehicleEntryInfoByCustomerAndDate;
   }
 
   private getVehicleEntryDispatchInfoForSalesOrder(
     order: {
       customerNameText?: string | null;
       customer?: { name?: string | null } | null;
+      deliveryDate?: Date | null;
     },
-    vehicleEntryInfoByCustomerName: Map<string, VehicleEntryDispatchInfo>,
+    vehicleEntryInfoByCustomerAndDate: VehicleEntryDispatchInfoByCustomerAndDate,
   ) {
     const customerNameKey = this.normalizeCustomerName(
       this.getSalesOrderCustomerName(order),
     );
+    const vehicleEntryInfoByDate =
+      vehicleEntryInfoByCustomerAndDate.get(customerNameKey);
 
-    return vehicleEntryInfoByCustomerName.get(customerNameKey) || null;
+    if (!vehicleEntryInfoByDate) {
+      return null;
+    }
+
+    for (const dateKey of this.getVehicleEntryDateKeysForSalesOrder(order)) {
+      const vehicleEntryInfo = vehicleEntryInfoByDate.get(dateKey);
+      if (vehicleEntryInfo) {
+        return vehicleEntryInfo;
+      }
+    }
+
+    return null;
   }
 
   private getVehicleNumberForSalesOrder(
     order: {
       customerNameText?: string | null;
       customer?: { name?: string | null } | null;
+      deliveryDate?: Date | null;
       Dispatch_SO?: SalesOrderDispatchLink[];
     },
-    vehicleEntryInfoByCustomerName: Map<string, VehicleEntryDispatchInfo>,
+    vehicleEntryInfoByCustomerAndDate: VehicleEntryDispatchInfoByCustomerAndDate,
   ) {
     const dispatchVehicleNumber = this.getDispatchVehicleNumber(order);
     if (dispatchVehicleNumber) {
@@ -210,32 +313,22 @@ export class FgDashboardService {
 
     const vehicleEntryInfo = this.getVehicleEntryDispatchInfoForSalesOrder(
       order,
-      vehicleEntryInfoByCustomerName,
+      vehicleEntryInfoByCustomerAndDate,
     );
 
     return vehicleEntryInfo?.vehicleNumber || null;
   }
 
-  private getTransporterNameForSalesOrder(
-    order: {
-      customerNameText?: string | null;
-      customer?: { name?: string | null } | null;
-      transporter?: { name?: string | null } | null;
-      Dispatch_SO?: SalesOrderDispatchLink[];
-    },
-    vehicleEntryInfoByCustomerName: Map<string, VehicleEntryDispatchInfo>,
-  ) {
+  private getTransporterNameForSalesOrder(order: {
+    transporter?: { name?: string | null } | null;
+    Dispatch_SO?: SalesOrderDispatchLink[];
+  }) {
     const dispatchTransporterName = this.getDispatchTransporterName(order);
     if (dispatchTransporterName) {
       return dispatchTransporterName;
     }
 
-    const vehicleEntryInfo = this.getVehicleEntryDispatchInfoForSalesOrder(
-      order,
-      vehicleEntryInfoByCustomerName,
-    );
-
-    return vehicleEntryInfo?.transporterName || order.transporter?.name || null;
+    return order.transporter?.name || null;
   }
 
   async getFgDashboardData(
@@ -426,10 +519,8 @@ export class FgDashboardService {
       this.prisma.salesOrder.count({ where }),
     ]);
 
-    const vehicleEntryInfoByCustomerName =
-      await this.getVehicleEntryDispatchInfoByCustomerName(
-        salesOrders.map((order) => this.getSalesOrderCustomerName(order)),
-      );
+    const vehicleEntryInfoByCustomerAndDate =
+      await this.getVehicleEntryDispatchInfoByCustomerAndDate(salesOrders);
 
     const fgData = salesOrders.map((order) => {
       const isReadyForDispatch = order.statusStepper.some(
@@ -440,12 +531,9 @@ export class FgDashboardService {
       );
       const vehicleNumber = this.getVehicleNumberForSalesOrder(
         order,
-        vehicleEntryInfoByCustomerName,
+        vehicleEntryInfoByCustomerAndDate,
       );
-      const transporterName = this.getTransporterNameForSalesOrder(
-        order,
-        vehicleEntryInfoByCustomerName,
-      );
+      const transporterName = this.getTransporterNameForSalesOrder(order);
 
       return {
         id: order.id,
@@ -633,10 +721,8 @@ export class FgDashboardService {
       orderBy: { id: 'desc' },
     });
 
-    const vehicleEntryInfoByCustomerName =
-      await this.getVehicleEntryDispatchInfoByCustomerName(
-        salesOrders.map((order) => this.getSalesOrderCustomerName(order)),
-      );
+    const vehicleEntryInfoByCustomerAndDate =
+      await this.getVehicleEntryDispatchInfoByCustomerAndDate(salesOrders);
 
     // Create Excel Workbook
     const workbook = new ExcelJS.Workbook();
@@ -667,12 +753,9 @@ export class FgDashboardService {
     salesOrders.forEach((order) => {
       const vehicleNumber = this.getVehicleNumberForSalesOrder(
         order,
-        vehicleEntryInfoByCustomerName,
+        vehicleEntryInfoByCustomerAndDate,
       );
-      const transporterName = this.getTransporterNameForSalesOrder(
-        order,
-        vehicleEntryInfoByCustomerName,
-      );
+      const transporterName = this.getTransporterNameForSalesOrder(order);
 
       let fgLocString = '-';
       if (order.fgLocation) {

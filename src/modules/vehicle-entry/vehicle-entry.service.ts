@@ -1,9 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateVehicleEntryDto } from './dto/create-vehicle-entry.dto';
 import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import { Prisma } from '@prisma/client';
+import { getIstTimestampRange } from '../../common/utils/date-only.util';
 
 @Injectable()
 export class VehicleEntryService {
@@ -14,6 +20,26 @@ export class VehicleEntryService {
 
   private normalizeAttachments(attachments: Prisma.JsonValue | null) {
     return Array.isArray(attachments) ? attachments : [];
+  }
+
+  private getCreatedAtRange(startDate?: string, endDate?: string) {
+    if (!startDate && !endDate) {
+      return undefined;
+    }
+
+    const range: Prisma.DateTimeFilter = {};
+
+    if (startDate) {
+      range.gte = getIstTimestampRange(startDate)!.startOfDay;
+    }
+
+    if (endDate) {
+      range.lt = getIstTimestampRange(endDate)!.endOfDay;
+    } else {
+      range.lte = new Date();
+    }
+
+    return range;
   }
 
   async create(dto: CreateVehicleEntryDto, userId: number) {
@@ -46,23 +72,9 @@ export class VehicleEntryService {
 
     const where: Prisma.VehicleEntryWhereInput = {};
 
-    if (startDate || endDate) {
-      const start = startDate ? new Date(startDate) : new Date(0);
-      const end = endDate ? new Date(endDate) : new Date();
-
-      if (Number.isNaN(start.getTime())) {
-        throw new BadRequestException('Invalid startDate provided.');
-      }
-      if (Number.isNaN(end.getTime())) {
-        throw new BadRequestException('Invalid endDate provided.');
-      }
-
-      end.setHours(23, 59, 59, 999);
-
-      where.createdAt = {
-        gte: start,
-        lte: end,
-      };
+    const createdAtRange = this.getCreatedAtRange(startDate, endDate);
+    if (createdAtRange) {
+      where.createdAt = createdAtRange;
     }
 
     const entries = await this.prisma.vehicleEntry.findMany({
@@ -153,7 +165,11 @@ export class VehicleEntryService {
     return mappedEntries;
   }
 
-  async uploadAttachments(entryId: number, files: Express.Multer.File[], userId: number) {
+  async uploadAttachments(
+    entryId: number,
+    files: Express.Multer.File[],
+    userId: number,
+  ) {
     const entry = await this.prisma.vehicleEntry.findUnique({
       where: { id: entryId },
     });
@@ -165,8 +181,8 @@ export class VehicleEntryService {
     const uploadedFiles: any[] = (entry.attachments as any[]) || [];
     
     const remoteDir = path.posix.join(
-      process.env.SFTP_BASE_DIR_VEHICLE_ENTRY || '', 
-      String(entryId)
+      process.env.SFTP_BASE_DIR_VEHICLE_ENTRY || '',
+      String(entryId),
     );
 
     try {
@@ -174,7 +190,7 @@ export class VehicleEntryService {
 
       for (const file of files) {
         const remotePath = path.posix.join(remoteDir, file.originalname);
-        
+
         await this.sftpService.put(file.buffer, remotePath);
 
         uploadedFiles.push({
@@ -187,7 +203,7 @@ export class VehicleEntryService {
       }
 
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      
+
       return await this.prisma.vehicleEntry.update({
         where: { id: entryId },
         data: {
@@ -195,7 +211,6 @@ export class VehicleEntryService {
           updatedBy: user?.name || 'System',
         },
       });
-
     } catch (error) {
       console.error('SFTP Upload Error:', error);
       throw new InternalServerErrorException('Failed to upload attachments');
@@ -216,23 +231,27 @@ export class VehicleEntryService {
   }
 
   async getAttachmentStream(entryId: number, fileName: string, res: any) {
-    const entry = await this.prisma.vehicleEntry.findUnique({ where: { id: entryId } });
+    const entry = await this.prisma.vehicleEntry.findUnique({
+      where: { id: entryId },
+    });
     if (!entry) throw new NotFoundException('Entry not found');
 
     const attachments = (entry.attachments as any[]) || [];
-    const fileData = attachments.find(a => a.fileName === fileName);
-    
+    const fileData = attachments.find((a) => a.fileName === fileName);
+
     if (!fileData) throw new NotFoundException('File not found in record');
 
     try {
       const stream = await this.sftpService.getStream(fileData.path);
-      res.setHeader('Content-Type', fileData.mimeType || 'application/octet-stream');
+      res.setHeader(
+        'Content-Type',
+        fileData.mimeType || 'application/octet-stream',
+      );
       res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
-      
+
       if (Buffer.isBuffer(stream)) return res.end(stream);
 
       return (stream as NodeJS.ReadableStream).pipe(res);
-      
     } catch (e) {
       throw new InternalServerErrorException('Could not retrieve file from storage');
     }

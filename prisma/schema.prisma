@@ -573,3 +573,13 @@ model SystemConfig {
   value     String   @db.VarChar(500)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 }
+
+model ManualFgStorage {
+  id               Int      @id @default(autoincrement())
+  salesOrderNumber String   @db.VarChar(500)
+  fgLocation       String   @db.VarChar(500)
+  user             String   @db.VarChar(255)
+  dateTime         DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([salesOrderNumber])
+}
