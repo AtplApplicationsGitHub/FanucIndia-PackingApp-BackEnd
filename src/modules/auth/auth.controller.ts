@@ -5,6 +5,7 @@ import {
   Get,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common'
 import { Request } from 'express'
 import { AuthService } from './auth.service'
@@ -18,11 +19,19 @@ import {
   ApiQuery,
 } from '@nestjs/swagger'
 import { Public } from './public.decorator'
+import { JwtAuthGuard } from './jwt-auth.guard'
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get('check-session')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Silently verify if the current session is still active' })
+  checkSession() {
+    return { valid: true };
+  }
 
   @Public()
   @Post('signup')
