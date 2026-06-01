@@ -222,6 +222,7 @@ export class AuthService {
         accessPutAway: user.accessPutAway,
         accessErpBarcode: user.accessErpBarcode,
         accessAttachment: user.accessAttachment,
+        accessManualFgLocation: user.accessManualFgLocation,
       },
     };
   }

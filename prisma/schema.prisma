@@ -34,6 +34,7 @@ model User {
   accessPutAway            Boolean        @default(false)
   accessErpBarcode         Boolean        @default(false)
   accessAttachment         Boolean        @default(false)
+  accessManualFgLocation   Boolean        @default(false)
 
   sentSoChatMessages     SalesOrderChatMessage[] @relation("SoChatFrom")
   receivedSoChatMessages SalesOrderChatMessage[] @relation("SoChatTo")

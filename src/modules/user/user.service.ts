@@ -45,6 +45,7 @@ export class UserService {
         accessPutAway: dto.accessPutAway || false,
         accessErpBarcode: dto.accessErpBarcode || false,
         accessAttachment: dto.accessAttachment || false,
+        accessManualFgLocation: dto.accessManualFgLocation || false,
       },
       select: {
         id: true,
@@ -63,6 +64,7 @@ export class UserService {
         accessPutAway: true,
         accessErpBarcode: true,
         accessAttachment: true,
+        accessManualFgLocation: true,
         salesZoneId: true,
         salesZone: {
           select: {
@@ -99,6 +101,7 @@ export class UserService {
         accessPutAway: true,
         accessErpBarcode: true,
         accessAttachment: true,
+        accessManualFgLocation: true,
         salesZoneId: true,
         salesZone: {
           select: {
@@ -130,6 +133,7 @@ export class UserService {
       accessPutAway: dto.accessPutAway,
       accessErpBarcode: dto.accessErpBarcode,
       accessAttachment: dto.accessAttachment,
+      accessManualFgLocation: dto.accessManualFgLocation,
     };
 
     Object.keys(updateData).forEach(
@@ -184,6 +188,7 @@ export class UserService {
         accessPutAway: true,
         accessErpBarcode: true,
         accessAttachment: true,
+        accessManualFgLocation: true,
         salesZoneId: true,
         salesZone: {
           select: {
@@ -262,6 +267,7 @@ export class UserService {
         accessPutAway: true,
         accessErpBarcode: true,
         accessAttachment: true,
+        accessManualFgLocation: true,
       },
     });
 

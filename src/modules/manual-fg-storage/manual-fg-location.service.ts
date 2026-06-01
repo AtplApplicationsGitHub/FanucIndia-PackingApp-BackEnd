@@ -168,7 +168,7 @@ export class ManualFgStorageService {
   }
 
   private formatIstDateTime(dateTime: Date) {
-    return new Intl.DateTimeFormat('en-GB', {
+    const parts = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
       month: '2-digit',
@@ -177,7 +177,15 @@ export class ManualFgStorageService {
       minute: '2-digit',
       second: '2-digit',
       hour12: false,
-    }).format(dateTime);
+      hourCycle: 'h23',
+    }).formatToParts(dateTime);
+
+    const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((part) => part.type === type)?.value ?? '00';
+
+    return `${getPart('day')}/${getPart('month')}/${getPart(
+      'year',
+    )} ${getPart('hour')}:${getPart('minute')}:${getPart('second')}`;
   }
 
   private toResponse(record: {

@@ -95,6 +95,11 @@ export class CreateUserDto {
   @IsOptional()
   @IsBoolean()
   accessAttachment?: boolean;
+
+  @ApiProperty({ description: 'Access to Manual FG Location module', required: false })
+  @IsOptional()
+  @IsBoolean()
+  accessManualFgLocation?: boolean;
 }
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
