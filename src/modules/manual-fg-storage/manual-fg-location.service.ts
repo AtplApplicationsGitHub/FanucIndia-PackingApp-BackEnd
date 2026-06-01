@@ -1,4 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import * as ExcelJS from 'exceljs';
+import { Response } from 'express';
+import { getIstTimestampRange } from '../../common/utils/date-only.util';
 import { PrismaService } from '../../prisma.service';
 import { CreateManualFgStorageDto } from './dto/create-manual-fg-storage.dto';
 
@@ -14,23 +18,69 @@ type ManualFgStorageResponse = {
 export class ManualFgStorageService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(salesOrderNumber?: string) {
-    const trimmedSalesOrderNumber = salesOrderNumber?.trim();
+  async findAll(salesOrderNumber?: string, date?: string) {
+    const filterDate = date?.trim();
+    const where = this.buildWhere(salesOrderNumber, filterDate);
 
     const manualFgStorages = await this.prisma.manualFgStorage.findMany({
-      where: trimmedSalesOrderNumber
-        ? { salesOrderNumber: trimmedSalesOrderNumber }
-        : undefined,
+      where,
       orderBy: { dateTime: 'desc' },
     });
 
     return {
       message: 'Manual FG storage details fetched successfully.',
+      filterDate,
       count: manualFgStorages.length,
       data: manualFgStorages.map((manualFgStorage) =>
         this.toResponse(manualFgStorage),
       ),
     };
+  }
+
+  async downloadExcel(
+    salesOrderNumber: string | undefined,
+    date: string | undefined,
+    res: Response,
+  ) {
+    const filterDate = date?.trim();
+    const manualFgStorages = await this.prisma.manualFgStorage.findMany({
+      where: this.buildWhere(salesOrderNumber, filterDate),
+      orderBy: { dateTime: 'desc' },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Manual FG Storage');
+
+    worksheet.columns = [
+      { header: 'SO Number', key: 'salesOrderNumber', width: 22 },
+      { header: 'Location', key: 'fgLocation', width: 28 },
+      { header: 'User', key: 'user', width: 22 },
+      { header: 'Date/Time', key: 'dateTime', width: 24 },
+    ];
+
+    worksheet.getRow(1).font = { bold: true };
+
+    manualFgStorages.forEach((manualFgStorage) => {
+      worksheet.addRow({
+        salesOrderNumber: manualFgStorage.salesOrderNumber,
+        fgLocation: manualFgStorage.fgLocation,
+        user: manualFgStorage.user,
+        dateTime: this.formatIstDateTime(manualFgStorage.dateTime),
+      });
+    });
+
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="Manual_FG_Loaction_${filterDate || 'All_Dates'}.xlsx"`,
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
   }
 
   async create(dto: CreateManualFgStorageDto) {
@@ -93,6 +143,41 @@ export class ManualFgStorageService {
     }
 
     return parsedDateTime;
+  }
+
+  private buildWhere(
+    salesOrderNumber?: string,
+    date?: string,
+  ): Prisma.ManualFgStorageWhereInput {
+    const trimmedSalesOrderNumber = salesOrderNumber?.trim();
+    const dateRange = getIstTimestampRange(date);
+    const where: Prisma.ManualFgStorageWhereInput = {};
+
+    if (trimmedSalesOrderNumber) {
+      where.salesOrderNumber = trimmedSalesOrderNumber;
+    }
+
+    if (dateRange) {
+      where.dateTime = {
+        gte: dateRange.startOfDay,
+        lt: dateRange.endOfDay,
+      };
+    }
+
+    return where;
+  }
+
+  private formatIstDateTime(dateTime: Date) {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(dateTime);
   }
 
   private toResponse(record: {

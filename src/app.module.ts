@@ -28,7 +28,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SambaModule } from './modules/samba/samba.module';
 import { ArchivedDataModule } from './modules/archived-data/archived-data.module';
-import { ManualFgStorageModule } from './modules/manual-fg-storage/manual-fg-storage.module';
+import { ManualFgStorageModule } from './modules/manual-fg-storage/manual-fg-location.module';
 
 @Module({
   imports: [
