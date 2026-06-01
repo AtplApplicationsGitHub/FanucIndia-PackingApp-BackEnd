@@ -65,30 +65,26 @@ export class DispatchService {
     return `${year}-${month}-${day}`;
   }
 
-  private getVehicleEntryCreatedAtRange(startDate?: string, endDate?: string) {
-    const range: Prisma.DateTimeFilter = {};
-
-    if (!startDate && !endDate) {
-      const todayRange = getIstTimestampRange(this.getTodayYmdInIST())!;
-
-      return {
-        gte: todayRange.startOfDay,
-        lt: todayRange.endOfDay,
-      };
-    }
-
-    if (startDate) {
-      range.gte = getIstTimestampRange(startDate)!.startOfDay;
-    }
-
-    if (endDate) {
-      range.lt = getIstTimestampRange(endDate)!.endOfDay;
-    } else {
-      range.lte = new Date();
-    }
-
-    return range;
+  private getVehicleEntryCreatedAtRange(
+  startDate?: string,
+  endDate?: string,
+): Prisma.DateTimeFilter | undefined {
+  if (!startDate && !endDate) {
+    return undefined;
   }
+
+  const range: Prisma.DateTimeFilter = {};
+
+  if (startDate) {
+    range.gte = getIstTimestampRange(startDate)!.startOfDay;
+  }
+
+  if (endDate) {
+    range.lt = getIstTimestampRange(endDate)!.endOfDay;
+  }
+
+  return range;
+}
 
   private parseOptionalPositiveInteger(value: unknown, fieldName: string) {
     if (value === undefined || value === null || value === '') {
