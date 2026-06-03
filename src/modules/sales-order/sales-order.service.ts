@@ -749,6 +749,15 @@ export class SalesOrderService {
               );
             }
 
+            if (
+              orderData.outboundDelivery &&
+              !/^\d+$/.test(String(orderData.outboundDelivery).trim())
+            ) {
+              throw new BadRequestException(
+                `Row ${orderData.rowNumber}: Outbound Delivery must contain only numbers. You cannot create a new order with an alphanumeric OBD (Found: '${orderData.outboundDelivery}').`,
+              );
+            }
+
             const newOrder = await tx.salesOrder.create({
               data: {
                 ...dataToSave,

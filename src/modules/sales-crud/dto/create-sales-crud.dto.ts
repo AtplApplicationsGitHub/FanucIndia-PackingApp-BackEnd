@@ -6,6 +6,7 @@ import {
   IsOptional,
   MinLength,
   ValidateIf,
+  IsNumberString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -20,8 +21,9 @@ export class CreateSalesCrudDto {
   @MinLength(10, { message: 'Sale Order Number must be at least 10 characters long.' })
   saleOrderNumber: string;
 
-  @ApiProperty({ example: 'OUT123', description: 'Outbound Delivery' })
+  @ApiProperty({ example: '123456', description: 'Outbound Delivery (numbers only)' })
   @IsString({ message: 'Outbound Delivery must be a string.' })
+  @IsNumberString({}, { message: 'Outbound Delivery must contain only numbers.' })
   outboundDelivery: string;
 
   @ApiPropertyOptional({ example: 'TRF456', description: 'Transfer Order' })

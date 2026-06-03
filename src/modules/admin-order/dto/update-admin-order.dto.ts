@@ -6,6 +6,7 @@ import {
   IsDateString,
   MinLength,
   IsIn,
+  IsNumberString,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -70,9 +71,10 @@ export class UpdateAdminOrderDto {
   })
   saleOrderNumber?: string;
 
-  @ApiPropertyOptional({ example: 'OB7890', description: 'Outbound Delivery' })
+  @ApiPropertyOptional({ example: '123456', description: 'Outbound Delivery (numbers only)' })
   @IsOptional()
   @IsString()
+  @IsNumberString({}, { message: 'Outbound Delivery must contain only numbers.' })
   outboundDelivery?: string;
 
   @ApiPropertyOptional({ example: 'TR999', description: 'Transfer Order' })
