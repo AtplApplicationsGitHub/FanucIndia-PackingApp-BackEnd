@@ -61,14 +61,15 @@ export class UpdateAdminOrderDto {
   customerNameText?: string;
 
   @ApiPropertyOptional({
-    example: 'SO123456',
-    description: 'Sale Order Number',
+    example: '1234567890',
+    description: 'Sale Order Number (numbers only)',
   })
   @IsOptional()
   @IsString()
   @MinLength(10, {
     message: 'Sale Order Number must be at least 10 characters long.',
   })
+  @IsNumberString({}, { message: 'Sale Order Number must contain only numbers.' })
   saleOrderNumber?: string;
 
   @ApiPropertyOptional({ example: '123456', description: 'Outbound Delivery (numbers only)' })

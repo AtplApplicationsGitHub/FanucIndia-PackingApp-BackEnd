@@ -486,9 +486,22 @@ export class SalesOrderService {
         }
       }
 
-      if (!saleOrderNumber) rowErrors.push('Missing saleOrderNumber');
-      else if (saleOrderNumber.toString().trim().length < 10)
-        rowErrors.push('Sale Order Number must be at least 10 characters');
+      const soNumStr = saleOrderNumber ? saleOrderNumber.toString().trim() : '';
+      if (!soNumStr) {
+        rowErrors.push('Missing saleOrderNumber');
+      } else {
+        if (soNumStr.length < 10) {
+          rowErrors.push('Sale Order Number must be at least 10 characters');
+        }
+        if (!/^\d+$/.test(soNumStr)) {
+          rowErrors.push('Sale Order Number must contain only numbers');
+        }
+      }
+
+      const obdStr = outboundDelivery ? outboundDelivery.toString().trim() : '';
+      if (obdStr && !/^\d+$/.test(obdStr)) {
+        rowErrors.push('Outbound Delivery must contain only numbers');
+      }
 
       let paymentClearanceProvided = false;
       let paymentClearanceVal = false;
@@ -746,15 +759,6 @@ export class SalesOrderService {
             if (missingForNew.length > 0) {
               throw new BadRequestException(
                 `Row ${orderData.rowNumber} (Sale Order: ${orderData.saleOrderNumber}) is treated as a NEW order but is missing mandatory fields: ${missingForNew.join(', ')}`,
-              );
-            }
-
-            if (
-              orderData.outboundDelivery &&
-              !/^\d+$/.test(String(orderData.outboundDelivery).trim())
-            ) {
-              throw new BadRequestException(
-                `Row ${orderData.rowNumber}: Outbound Delivery must contain only numbers. You cannot create a new order with an alphanumeric OBD (Found: '${orderData.outboundDelivery}').`,
               );
             }
 

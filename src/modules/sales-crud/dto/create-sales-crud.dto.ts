@@ -16,9 +16,10 @@ export class CreateSalesCrudDto {
   @IsInt({ message: 'Product ID must be an integer.' })
   productId?: number;
 
-  @ApiProperty({ example: 'SO12345', description: 'Sale Order Number' })
+  @ApiProperty({ example: '1234567890', description: 'Sale Order Number (numbers only)' })
   @IsString({ message: 'Sale Order Number must be a string.' })
   @MinLength(10, { message: 'Sale Order Number must be at least 10 characters long.' })
+  @IsNumberString({}, { message: 'Sale Order Number must contain only numbers.' })
   saleOrderNumber: string;
 
   @ApiProperty({ example: '123456', description: 'Outbound Delivery (numbers only)' })
