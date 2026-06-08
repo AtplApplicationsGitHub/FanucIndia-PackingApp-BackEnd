@@ -561,17 +561,10 @@ export class SalesOrderService {
       }
     });
 
-    if (errors.length > 0) {
-      throw new BadRequestException({
-        message:
-          'Import failed due to errors in the file. No orders were processed.',
-        errors,
-      });
-    }
-
     if (ordersToUpsert.length === 0) {
       throw new BadRequestException({
-        message: 'No valid orders found to process.',
+        message: 'No valid orders found to process. All rows contained errors or the file was empty.',
+        errors,
       });
     }
 
@@ -800,11 +793,16 @@ export class SalesOrderService {
         return { insertedCount, updatedCount };
       });
 
+      const skippedCount = errors.length;
+      
       return {
-        message: `Processed successfully. Inserted: ${result.insertedCount}, Updated: ${result.updatedCount}`,
+        message: skippedCount > 0 
+          ? `Processed with warnings. Inserted: ${result.insertedCount}, Updated: ${result.updatedCount}. Skipped ${skippedCount} invalid row(s).`
+          : `Processed successfully. Inserted: ${result.insertedCount}, Updated: ${result.updatedCount}`,
         errors,
         insertedCount: result.insertedCount,
         updatedCount: result.updatedCount,
+        skippedCount,
       };
     } catch (err: any) {
       if (
