@@ -934,7 +934,7 @@ export class SalesCrudService {
     const labelRemarks = order.labelRemarks || '';
     const salesZone = order.salesZone?.name || '';
 
-    const fileName = 'FANUC_60X40_TE210_160226-LAN.prn';
+    const fileName = process.env.ORDER_LABEL_PRN_FILE || 'FANUC_60X40_TE210_090626.prn';
     const basePath = process.env.PRN_FILE_PATH || 'uploads/fanuc/prn-files/';
     const sftpTemplatePath = `${basePath.replace(/\/$/, '')}/${fileName}`;
 
@@ -1053,7 +1053,7 @@ export class SalesCrudService {
     const cncPackage = labelPrint.cncText || '';
     const boxNumber = labelPrint.boxNN || '';
 
-    const fileName = 'FANUC_ZEBRA_ZT421_210X150_060326.prn';
+    const fileName = process.env.CUSTOMER_LABEL_PRN_FILE || 'FANUC_ZEBRA_ZT421_210X150_060326.prn';
 
     const basePath = process.env.PRN_FILE_PATH || 'uploads/fanuc/prn-files/';
 
