@@ -929,12 +929,13 @@ export class SalesCrudService {
       throw new InternalServerErrorException('Printer name not configured.');
     }
 
-    const qty = dto.quantity || 1;
+    const printQty = Math.max(1, Number(dto.quantity) || 1);
     const customerName = order.customerNameText || order.customer?.name || '';
     const labelRemarks = order.labelRemarks || '';
     const salesZone = order.salesZone?.name || '';
 
-    const fileName = process.env.ORDER_LABEL_PRN_FILE || 'FANUC_60X40_TE210_090626.prn';
+    const fileName =
+      process.env.ORDER_LABEL_PRN_FILE || 'FANUC_60X40_TE210_090626.prn';
     const basePath = process.env.PRN_FILE_PATH || 'uploads/fanuc/prn-files/';
     const sftpTemplatePath = `${basePath.replace(/\/$/, '')}/${fileName}`;
 
@@ -959,7 +960,7 @@ export class SalesCrudService {
     finalPrn = finalPrn.replace(/@@SONumber@@/g, order.saleOrderNumber);
     finalPrn = finalPrn.replace(/@@LabelRemarks@@/g, labelRemarks);
     finalPrn = finalPrn.replace(/@@SalesZone@@/g, salesZone);
-    finalPrn = finalPrn.replace(/@@Quantity@@/g, qty.toString());
+    finalPrn = finalPrn.replace(/PRINT\s+@@Quantity@@,1/g, 'PRINT 1,1');
 
     // return {
     //   success: true,
@@ -967,33 +968,42 @@ export class SalesCrudService {
     //   payload: finalPrn
     // };
 
-    return new Promise((resolve, reject) => {
-      const client = new net.Socket();
-      client.setTimeout(5000);
+    const printerHost = printer.name.trim();
 
-      client.connect(9100, printer.name, () => {
-        client.write(finalPrn, () => {
-          client.end();
-          resolve({ success: true, message: 'Print job sent successfully' });
+    for (let i = 0; i < printQty; i++) {
+      await new Promise<void>((resolve, reject) => {
+        const client = new net.Socket();
+        client.setTimeout(5000);
+
+        client.connect(9100, printerHost, () => {
+          client.write(finalPrn, () => {
+            client.end();
+            resolve();
+          });
+        });
+
+        client.on('error', (err) => {
+          client.destroy();
+          reject(
+            new InternalServerErrorException(`Printer error: ${err.message}`),
+          );
+        });
+
+        client.on('timeout', () => {
+          client.destroy();
+          reject(
+            new InternalServerErrorException(
+              `Printer error: Connection to ${printerHost}:9100 timed out after 5000ms. Verify the printer is online.`,
+            ),
+          );
         });
       });
+    }
 
-      client.on('error', (err) => {
-        client.destroy();
-        reject(
-          new InternalServerErrorException(`Printer error: ${err.message}`),
-        );
-      });
-
-      client.on('timeout', () => {
-        client.destroy();
-        reject(
-          new InternalServerErrorException(
-            `Printer error: Connection to ${printer.name}:9100 timed out after 5000ms. Verify the printer is online.`,
-          ),
-        );
-      });
-    });
+    return {
+      success: true,
+      message: `Print job sent successfully. Printed ${printQty} time(s).`,
+    };
   }
 
   async printCustomerLabel(labelPrintId: number, quantity: number = 1) {
@@ -1053,7 +1063,9 @@ export class SalesCrudService {
     const cncPackage = labelPrint.cncText || '';
     const boxNumber = labelPrint.boxNN || '';
 
-    const fileName = process.env.CUSTOMER_LABEL_PRN_FILE || 'FANUC_ZEBRA_ZT421_210X150_060326.prn';
+    const fileName =
+      process.env.CUSTOMER_LABEL_PRN_FILE ||
+      'FANUC_ZEBRA_ZT421_210X150_060326.prn';
 
     const basePath = process.env.PRN_FILE_PATH || 'uploads/fanuc/prn-files/';
 
