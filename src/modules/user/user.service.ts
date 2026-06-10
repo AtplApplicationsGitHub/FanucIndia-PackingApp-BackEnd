@@ -76,10 +76,17 @@ export class UserService {
     });
   }
 
-  async findAll(role?: 'ADMIN' | 'SALES' | 'USER') {
+  async findAll(role?: 'ADMIN' | 'SALES' | 'USER', search?: string) {
     const where: Prisma.UserWhereInput = {};
     if (role) {
       where.role = role;
+    }
+    if (search) {   
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { salesZone: { name: { contains: search, mode: 'insensitive' } } },
+      ];
     }
 
     return this.prisma.user.findMany({

@@ -39,10 +39,18 @@ export class UserController {
 
   @Get()
   @ApiOperation({ summary: 'Get all users (Admin only)' })
-  @ApiQuery({ name: 'role', required: false, type: String, description: 'Filter by user role' })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    type: String,
+    description: 'Filter by user role',
+  })
   @ApiResponse({ status: 200, description: 'List of all users' })
-  findAll(@Query('role') role?: 'ADMIN' | 'SALES' | 'USER') {
-    return this.userService.findAll(role);
+  findAll(
+    @Query('role') role?: 'ADMIN' | 'SALES' | 'USER',
+    @Query('search') search?: string,
+  ) {
+    return this.userService.findAll(role, search);
   }
 
   @Patch(':id')
@@ -76,7 +84,9 @@ export class UserController {
   }
 
   @Get('mobile-modules')
-  @ApiOperation({ summary: 'Get mobile module access flags for the current user' })
+  @ApiOperation({
+    summary: 'Get mobile module access flags for the current user',
+  })
   @ApiResponse({ status: 200, description: 'Returns module access flags' })
   getMobileModules(@Req() req: AuthRequest) {
     return this.userService.getMobileModules(req.user.userId);
