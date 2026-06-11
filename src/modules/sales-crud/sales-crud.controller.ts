@@ -14,6 +14,7 @@ import {
   UploadedFiles,
   UseInterceptors,
   BadRequestException,
+  Patch,
 } from '@nestjs/common';
 import { SalesCrudService } from './sales-crud.service';
 import { CreateSalesCrudDto } from './dto/create-sales-crud.dto';
@@ -236,5 +237,15 @@ export class SalesCrudController {
     @Res() res: Response,
   ) {
     return this.service.downloadAttachment(attachmentId, res);
+  }
+
+  @Put('bulk/delivery-date')
+  @Roles('SALES')
+  @ApiOperation({ summary: 'Bulk update delivery date for sales orders' })
+  async bulkUpdateDeliveryDate(
+    @Body() dto: { salesOrderIds: number[]; deliveryDate: string },
+    @Req() req,
+  ) {
+    return this.service.bulkUpdateDeliveryDate(dto, req.user.userId);
   }
 }

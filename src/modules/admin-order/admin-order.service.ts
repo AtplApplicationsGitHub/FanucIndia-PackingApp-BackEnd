@@ -531,8 +531,11 @@ export class AdminOrderService {
       skipIssueStage,
       skipPackingStage,
       priority,
+      deliveryDate,
     } = dto;
     const now = new Date();
+
+    const parsedDeliveryDate = deliveryDate ? normalizeDateOnlyForWrite(deliveryDate) : undefined;
 
     const orders = await this.prisma.salesOrder.findMany({
       where: { id: { in: salesOrderIds } },
@@ -615,6 +618,10 @@ export class AdminOrderService {
         // Apply priority
         if (priority !== undefined) {
           updateData.priority = priority;
+        }
+
+        if (parsedDeliveryDate !== undefined) {
+          updateData.deliveryDate = parsedDeliveryDate;
         }
 
         // 5. Update Status to R105 ONLY if it's currently null AND a priority is explicitly set

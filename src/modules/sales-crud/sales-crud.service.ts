@@ -4,6 +4,7 @@ import {
   ConflictException,
   InternalServerErrorException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateSalesCrudDto } from './dto/create-sales-crud.dto';
@@ -1324,5 +1325,62 @@ export class SalesCrudService {
         err.message,
       );
     }
+  }
+
+  async bulkUpdateDeliveryDate(
+    dto: { salesOrderIds: number[]; deliveryDate: string },
+    userId: number,
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    // Parse the date properly for Prisma
+    const parsedDeliveryDate = normalizeDateOnlyForWrite(dto.deliveryDate);
+    if (!parsedDeliveryDate) {
+      throw new BadRequestException('Invalid delivery date format');
+    }
+
+    // Security Check: Fetch orders to validate permissions
+    const orders = await this.prisma.salesOrder.findMany({
+      where: { id: { in: dto.salesOrderIds } },
+    });
+
+    if (orders.length === 0) {
+      throw new NotFoundException('No valid orders found');
+    }
+
+    const validOrderIds: number[] = [];
+
+    for (const order of orders) {
+      // 1. Zone Validation: Sales user can only modify orders in their zone (if they are restricted to one)
+      if (user?.salesZoneId && order.salesZoneId !== user.salesZoneId) {
+        throw new ForbiddenException(
+          `Access denied. Order ${order.saleOrderNumber || order.id} belongs to a different zone.`,
+        );
+      }
+
+      // 2. Status Validation: Cannot modify dispatched orders
+      if (order.status === 'Dispatched') {
+        throw new ForbiddenException(
+          `Cannot modify dispatched orders (Order ${order.saleOrderNumber || order.id}).`,
+        );
+      }
+
+      validOrderIds.push(order.id);
+    }
+
+    // Execute the bulk update
+    await this.prisma.salesOrder.updateMany({
+      where: { id: { in: validOrderIds } },
+      data: {
+        deliveryDate: parsedDeliveryDate,
+        UpdatedBy: user?.name || 'System',
+        UpdatedDate: new Date(),
+      },
+    });
+
+    return {
+      message: 'Successfully updated required dates',
+      updatedCount: validOrderIds.length,
+    };
   }
 }

@@ -37,4 +37,8 @@ export class BulkAssignOrderDto {
   @IsOptional()
   @IsInt()
   priority?: number | null;
+
+  @ApiPropertyOptional({ description: 'Bulk delivery date update' })
+  @IsOptional()
+  deliveryDate?: string;
 }
