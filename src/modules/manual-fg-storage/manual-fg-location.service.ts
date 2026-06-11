@@ -18,9 +18,9 @@ type ManualFgStorageResponse = {
 export class ManualFgStorageService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(salesOrderNumber?: string, date?: string) {
+  async findAll(salesOrderNumber?: string, date?: string, fromDate?: string, toDate?: string) {
     const filterDate = date?.trim();
-    const where = this.buildWhere(salesOrderNumber, filterDate);
+    const where = this.buildWhere(salesOrderNumber, filterDate, fromDate?.trim(), toDate?.trim());
 
     const manualFgStorages = await this.prisma.manualFgStorage.findMany({
       where,
@@ -41,10 +41,12 @@ export class ManualFgStorageService {
     salesOrderNumber: string | undefined,
     date: string | undefined,
     res: Response,
+    fromDate?: string,
+    toDate?: string,
   ) {
     const filterDate = date?.trim();
     const manualFgStorages = await this.prisma.manualFgStorage.findMany({
-      where: this.buildWhere(salesOrderNumber, filterDate),
+      where: this.buildWhere(salesOrderNumber, filterDate, fromDate?.trim(), toDate?.trim()),
       orderBy: { dateTime: 'desc' },
     });
 
@@ -76,7 +78,7 @@ export class ManualFgStorageService {
     );
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="Manual_FG_Loaction_${filterDate || 'All_Dates'}.xlsx"`,
+      `attachment; filename="Manual_FG_Location.xlsx"`,
     );
 
     await workbook.xlsx.write(res);
@@ -145,22 +147,30 @@ export class ManualFgStorageService {
     return parsedDateTime;
   }
 
-  private buildWhere(
+ private buildWhere(
     salesOrderNumber?: string,
     date?: string,
+    fromDate?: string,
+    toDate?: string,
   ): Prisma.ManualFgStorageWhereInput {
     const trimmedSalesOrderNumber = salesOrderNumber?.trim();
-    const dateRange = getIstTimestampRange(date);
     const where: Prisma.ManualFgStorageWhereInput = {};
 
     if (trimmedSalesOrderNumber) {
       where.salesOrderNumber = trimmedSalesOrderNumber;
     }
 
-    if (dateRange) {
+    if (date) {
+      const dateRange = getIstTimestampRange(date);
+      if (dateRange) {
+        where.dateTime = { gte: dateRange.startOfDay, lt: dateRange.endOfDay };
+      }
+    } else if (fromDate || toDate) {
+      const fromRange = fromDate ? getIstTimestampRange(fromDate) : null;
+      const toRange = toDate ? getIstTimestampRange(toDate) : null;
       where.dateTime = {
-        gte: dateRange.startOfDay,
-        lt: dateRange.endOfDay,
+        ...(fromRange ? { gte: fromRange.startOfDay } : {}),
+        ...(toRange ? { lt: toRange.endOfDay } : {}),
       };
     }
 

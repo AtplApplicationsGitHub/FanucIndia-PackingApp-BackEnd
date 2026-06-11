@@ -50,11 +50,25 @@ export class ManualFgStorageController {
     status: 403,
     description: 'Forbidden. Only ADMIN can access this API.',
   })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    description: 'From date YYYY-MM-DD',
+    example: '2026-01-01',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    description: 'To date YYYY-MM-DD',
+    example: '2026-06-11',
+  })
   findAll(
     @Query('salesOrderNumber') salesOrderNumber?: string,
     @Query('date') date?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
   ) {
-    return this.service.findAll(salesOrderNumber, date);
+    return this.service.findAll(salesOrderNumber, date, fromDate, toDate);
   }
 
   @Get('download-excel')
@@ -88,18 +102,37 @@ export class ManualFgStorageController {
     status: 403,
     description: 'Forbidden. Only ADMIN can access this API.',
   })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    description: 'From date YYYY-MM-DD',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    description: 'To date YYYY-MM-DD',
+  })
   downloadExcel(
     @Query('salesOrderNumber') salesOrderNumber: string | undefined,
     @Query('date') date: string | undefined,
     @Res() res: Response,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
   ) {
-    return this.service.downloadExcel(salesOrderNumber, date, res);
+    return this.service.downloadExcel(
+      salesOrderNumber,
+      date,
+      res,
+      fromDate,
+      toDate,
+    );
   }
 
   @Post()
   @Public()
   @ApiOperation({
-    summary: 'Save single or multiple manual FG storage details without authorization',
+    summary:
+      'Save single or multiple manual FG storage details without authorization',
   })
   @ApiResponse({
     status: 201,
