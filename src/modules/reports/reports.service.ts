@@ -7,7 +7,7 @@ import {
 
 @Injectable()
 export class ReportsSalesOrderService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   private parseReportDate(date?: string) {
     if (!date?.trim()) {
@@ -265,9 +265,9 @@ export class ReportsSalesOrderService {
 
     const customers = customerIds.length
       ? await this.prisma.customer.findMany({
-        where: { id: { in: customerIds } },
-        select: { id: true, name: true },
-      })
+          where: { id: { in: customerIds } },
+          select: { id: true, name: true },
+        })
       : [];
 
     const customerMap = new Map(customers.map((c) => [c.id, c.name]));
@@ -527,6 +527,7 @@ export class ReportsSalesOrderService {
     pageParam?: string,
     limitParam?: string,
     search?: string,
+    ageFilter?: string,
   ) {
     const page = pageParam ? parseInt(pageParam, 10) : 1;
     const limit = limitParam ? parseInt(limitParam, 10) : 10;
@@ -596,7 +597,30 @@ export class ReportsSalesOrderService {
         return soMatch || obdMatch || locMatch;
       });
     }
+    const ageCounts = {
+      age0to3Months: filteredOrders.filter((o) => o.durationDays <= 90).length,
+      age3to6Months: filteredOrders.filter(
+        (o) => o.durationDays > 90 && o.durationDays <= 180,
+      ).length,
+      age6to12Months: filteredOrders.filter(
+        (o) => o.durationDays > 180 && o.durationDays <= 365,
+      ).length,
+      ageAbove12Months: filteredOrders.filter((o) => o.durationDays > 365)
+        .length,
+    };
 
+    // Now apply age filter
+    if (ageFilter) {
+      filteredOrders = filteredOrders.filter((o) => {
+        if (ageFilter === '0-3') return o.durationDays <= 90;
+        if (ageFilter === '3-6')
+          return o.durationDays > 90 && o.durationDays <= 180;
+        if (ageFilter === '6-12')
+          return o.durationDays > 180 && o.durationDays <= 365;
+        if (ageFilter === '>12') return o.durationDays > 365;
+        return true;
+      });
+    }
     const totalOrders = filteredOrders.length;
     const pagedReportData = filteredOrders.slice(skip, skip + limit);
 
@@ -607,6 +631,7 @@ export class ReportsSalesOrderService {
         page,
         limit,
         totalPages: Math.ceil(totalOrders / limit),
+        ageCounts,
         reportData: pagedReportData,
       },
     };

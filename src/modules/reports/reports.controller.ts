@@ -65,11 +65,13 @@ export class ReportsSalesOrderController {
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, options: 10, 20, 50, 100)' })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by SO, OBD, or Location' }) // <-- Added search query
   @ApiResponse({ status: 200, description: 'FG storage report returned successfully' })
+  @ApiQuery({ name: 'ageFilter', required: false, type: String, description: '0-3 | 3-6 | 6-12 | >12' })
   getFgStorageReport(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string 
-  ) {
-    return this.reportsSalesOrderService.getFgStorageReport(page, limit, search);
-  }
+  @Query('page') page?: string,
+  @Query('limit') limit?: string,
+  @Query('search') search?: string,
+  @Query('ageFilter') ageFilter?: string,
+) {
+  return this.reportsSalesOrderService.getFgStorageReport(page, limit, search, ageFilter);
+}
 }
