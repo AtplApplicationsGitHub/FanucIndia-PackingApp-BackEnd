@@ -468,9 +468,7 @@ export class AdminOrderService {
   async remove(id: number, password?: string) {
     const config = await this.prisma.order_Delete_Password.findFirst();
     if (!config) {
-      throw new BadRequestException(
-        'Super password not configured',
-      );
+      throw new BadRequestException('Super password not configured');
     }
     if (config.password !== password) {
       throw new BadRequestException('Incorrect Password');
@@ -532,10 +530,13 @@ export class AdminOrderService {
       skipPackingStage,
       priority,
       deliveryDate,
+      paymentClearance,
     } = dto;
     const now = new Date();
 
-    const parsedDeliveryDate = deliveryDate ? normalizeDateOnlyForWrite(deliveryDate) : undefined;
+    const parsedDeliveryDate = deliveryDate
+      ? normalizeDateOnlyForWrite(deliveryDate)
+      : undefined;
 
     const orders = await this.prisma.salesOrder.findMany({
       where: { id: { in: salesOrderIds } },
@@ -622,6 +623,10 @@ export class AdminOrderService {
 
         if (parsedDeliveryDate !== undefined) {
           updateData.deliveryDate = parsedDeliveryDate;
+        }
+
+        if (paymentClearance !== undefined) {
+          updateData.paymentClearance = paymentClearance;
         }
 
         // 5. Update Status to R105 ONLY if it's currently null AND a priority is explicitly set

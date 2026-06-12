@@ -1328,15 +1328,26 @@ export class SalesCrudService {
   }
 
   async bulkUpdateDeliveryDate(
-    dto: { salesOrderIds: number[]; deliveryDate: string },
+    dto: {
+      salesOrderIds: number[];
+      deliveryDate?: string;
+      paymentClearance?: boolean;
+    },
     userId: number,
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
-    // Parse the date properly for Prisma
-    const parsedDeliveryDate = normalizeDateOnlyForWrite(dto.deliveryDate);
-    if (!parsedDeliveryDate) {
-      throw new BadRequestException('Invalid delivery date format');
+    if (dto.deliveryDate === undefined && dto.paymentClearance === undefined) {
+      throw new BadRequestException('Nothing to update');
+    }
+
+    let parsedDeliveryDate: string | undefined;
+    if (dto.deliveryDate !== undefined) {
+      parsedDeliveryDate =
+        normalizeDateOnlyForWrite(dto.deliveryDate) ?? undefined;
+      if (!parsedDeliveryDate) {
+        throw new BadRequestException('Invalid delivery date format');
+      }
     }
 
     // Security Check: Fetch orders to validate permissions
@@ -1351,14 +1362,12 @@ export class SalesCrudService {
     const validOrderIds: number[] = [];
 
     for (const order of orders) {
-      // 1. Zone Validation: Sales user can only modify orders in their zone (if they are restricted to one)
       if (user?.salesZoneId && order.salesZoneId !== user.salesZoneId) {
         throw new ForbiddenException(
           `Access denied. Order ${order.saleOrderNumber || order.id} belongs to a different zone.`,
         );
       }
 
-      // 2. Status Validation: Cannot modify dispatched orders
       if (order.status === 'Dispatched') {
         throw new ForbiddenException(
           `Cannot modify dispatched orders (Order ${order.saleOrderNumber || order.id}).`,
@@ -1368,18 +1377,22 @@ export class SalesCrudService {
       validOrderIds.push(order.id);
     }
 
-    // Execute the bulk update
+    const updateData: Prisma.SalesOrderUpdateManyMutationInput = {
+      UpdatedBy: user?.name || 'System',
+      UpdatedDate: new Date(),
+    };
+    if (parsedDeliveryDate !== undefined)
+      updateData.deliveryDate = parsedDeliveryDate;
+    if (dto.paymentClearance !== undefined)
+      updateData.paymentClearance = dto.paymentClearance;
+
     await this.prisma.salesOrder.updateMany({
       where: { id: { in: validOrderIds } },
-      data: {
-        deliveryDate: parsedDeliveryDate,
-        UpdatedBy: user?.name || 'System',
-        UpdatedDate: new Date(),
-      },
+      data: updateData,
     });
 
     return {
-      message: 'Successfully updated required dates',
+      message: 'Successfully updated orders',
       updatedCount: validOrderIds.length,
     };
   }

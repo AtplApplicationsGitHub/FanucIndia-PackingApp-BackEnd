@@ -100,12 +100,20 @@ export class SalesCrudController {
   ) {
     const pageNumber = Number(page) || 1;
     const pageSize = Number(limit) || 10;
-    
+
     return this.service.getPaginatedOrders(
       pageNumber,
       pageSize,
       req.user.userId,
-      { search, paymentClearance, salesZoneId, status, excludeStatus, startDate, endDate }
+      {
+        search,
+        paymentClearance,
+        salesZoneId,
+        status,
+        excludeStatus,
+        startDate,
+        endDate,
+      },
     );
   }
 
@@ -180,12 +188,14 @@ export class SalesCrudController {
   @Post('customer-label/:id/print')
   @Roles('USER', 'ADMIN')
   @ApiOperation({ summary: 'Print Customer Label using specific IP' })
-  @ApiParam({ name: 'id', type: Number, description: 'The ID from the CustomerLabelPrint table' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'The ID from the CustomerLabelPrint table',
+  })
   @ApiResponse({ status: 200, description: 'Print job sent successfully' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async printCustomerLabel(
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async printCustomerLabel(@Param('id', ParseIntPipe) id: number) {
     return this.service.printCustomerLabel(id);
   }
 
@@ -214,15 +224,23 @@ export class SalesCrudController {
         salesOrderIds = salesOrderIdsString.split(',').map(Number);
       }
     } catch (e) {
-      throw new BadRequestException('Invalid format for salesOrderIds. Expected comma-separated string or JSON array.');
+      throw new BadRequestException(
+        'Invalid format for salesOrderIds. Expected comma-separated string or JSON array.',
+      );
     }
 
-    return this.service.uploadAttachments(salesOrderIds, files, req.user.userId);
+    return this.service.uploadAttachments(
+      salesOrderIds,
+      files,
+      req.user.userId,
+    );
   }
 
   @Get(':id/attachments')
   @Roles('SALES', 'ADMIN', 'USER') // Adjust roles based on who can view the search page
-  @ApiOperation({ summary: 'Get a list of attachments for a specific Sales Order' })
+  @ApiOperation({
+    summary: 'Get a list of attachments for a specific Sales Order',
+  })
   @ApiParam({ name: 'id', type: Number, description: 'The Sales Order ID' })
   async getAttachments(@Param('id', ParseIntPipe) id: number) {
     return this.service.getAttachments(id);
@@ -231,7 +249,11 @@ export class SalesCrudController {
   @Get('attachments/download/:attachmentId')
   @Roles('SALES', 'ADMIN', 'USER')
   @ApiOperation({ summary: 'Download a specific attachment file' })
-  @ApiParam({ name: 'attachmentId', type: Number, description: 'The ID of the attachment' })
+  @ApiParam({
+    name: 'attachmentId',
+    type: Number,
+    description: 'The ID of the attachment',
+  })
   async downloadAttachment(
     @Param('attachmentId', ParseIntPipe) attachmentId: number,
     @Res() res: Response,
@@ -241,9 +263,16 @@ export class SalesCrudController {
 
   @Put('bulk/delivery-date')
   @Roles('SALES')
-  @ApiOperation({ summary: 'Bulk update delivery date for sales orders' })
+  @ApiOperation({
+    summary: 'Bulk update delivery date / payment status for sales orders',
+  })
   async bulkUpdateDeliveryDate(
-    @Body() dto: { salesOrderIds: number[]; deliveryDate: string },
+    @Body()
+    dto: {
+      salesOrderIds: number[];
+      deliveryDate?: string;
+      paymentClearance?: boolean;
+    },
     @Req() req,
   ) {
     return this.service.bulkUpdateDeliveryDate(dto, req.user.userId);
