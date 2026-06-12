@@ -558,11 +558,17 @@ export class ReportsSalesOrderService {
       if (order.fgLocation) {
         const loc = order.fgLocation as any;
         if (Array.isArray(loc)) {
-          locationStr = loc.map((l: any) => String(l).trim()).join(', ');
+          locationStr = loc
+            .map((l: any) =>
+              typeof l === 'object' && l !== null
+                ? JSON.stringify(l)
+                : String(l).trim(),
+            )
+            .join(', ');
         } else if (typeof loc === 'string') {
           locationStr = loc.trim();
         } else {
-          locationStr = String(loc);
+          locationStr = JSON.stringify(loc);
         }
       }
 
