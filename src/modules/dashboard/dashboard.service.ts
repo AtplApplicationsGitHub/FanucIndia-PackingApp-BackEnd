@@ -19,6 +19,7 @@ import {
   getSingleDateOnlyRange,
   parseYmdDateOnly,
 } from '../../common/utils/date-only.util';
+import { AdminBinCountDto } from './dto/admin-bin-count.dto';
 
 function calculatePercentageChange(current: number, previous: number): number {
   if (previous === 0) {
@@ -519,6 +520,35 @@ export class DashboardService {
       }
     }
     return result;
+  }
+
+  async getAdminBinCounts(dateStr?: string): Promise<AdminBinCountDto> {
+    const targetYmd = dateStr ?? getTodayYmdInIST();
+    const deliveryDateRange = getSingleDateOnlyRange(targetYmd);
+
+    const [oneBinCount, twoToThreeBinCount, fourPlusBinCount] =
+      await this.prisma.$transaction([
+        this.prisma.salesOrder.count({
+          where: {
+            deliveryDate: deliveryDateRange,
+            binCount: { equals: 1 },
+          },
+        }),
+        this.prisma.salesOrder.count({
+          where: {
+            deliveryDate: deliveryDateRange,
+            binCount: { gte: 2, lte: 3 },
+          },
+        }),
+        this.prisma.salesOrder.count({
+          where: {
+            deliveryDate: deliveryDateRange,
+            binCount: { gte: 4 },
+          },
+        }),
+      ]);
+
+    return { oneBinCount, twoToThreeBinCount, fourPlusBinCount };
   }
 
   async getAdminStatusByZone(

@@ -4,6 +4,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -19,7 +20,7 @@ import { AdminStatusByZoneDto } from './dto/admin-status-by-zone.dto';
 import { AdminPaymentByZoneDto } from './dto/admin-payment-by-zone.dto';
 import { AdminCountByEntityDto } from './dto/admin-count-by-entity.dto';
 import { AdminErpImportCountsDto } from './dto/admin-erp-import-counts.dto';
-
+import { AdminBinCountDto } from './dto/admin-bin-count.dto';
 @ApiTags('Dashboard')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -45,6 +46,26 @@ export class DashboardController {
     return this.dashboardService.getAdminNewImports();
   }
 
+  @Get('admin-bin-counts')
+  @ApiOperation({
+    summary: 'Get package bin count breakdown for a delivery date',
+  })
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    description: 'Delivery date in YYYY-MM-DD format',
+    example: '2026-06-12',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bin count breakdown',
+    type: AdminBinCountDto,
+  })
+  async getAdminBinCounts(
+    @Query('date') date?: string,
+  ): Promise<AdminBinCountDto> {
+    return this.dashboardService.getAdminBinCounts(date);
+  }
   @Get('admin-dispatch-summary')
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: "Get today's dispatch summary" })
