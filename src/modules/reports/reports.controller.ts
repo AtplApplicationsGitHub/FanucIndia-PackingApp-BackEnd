@@ -12,7 +12,7 @@ export class ReportsSalesOrderController {
   constructor(private readonly reportsSalesOrderService: ReportsSalesOrderService) {}
 
   @Get('summary')
-  @Roles('ADMIN')
+  @Roles('ADMIN','USER')
   @ApiOperation({ summary: 'Get summary list with SO, OBD, Customer, Zone, Payment and Filters (Combined)' })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'payment', required: false, type: String })
