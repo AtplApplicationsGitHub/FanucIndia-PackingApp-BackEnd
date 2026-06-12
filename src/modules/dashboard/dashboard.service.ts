@@ -20,6 +20,10 @@ import {
   parseYmdDateOnly,
 } from '../../common/utils/date-only.util';
 import { AdminBinCountDto } from './dto/admin-bin-count.dto';
+import {
+  AdminBacklogCountDto,
+  AdminBacklogItemDto,
+} from './dto/admin-backlog-count.dto';
 
 function calculatePercentageChange(current: number, previous: number): number {
   if (previous === 0) {
@@ -549,6 +553,53 @@ export class DashboardService {
       ]);
 
     return { oneBinCount, twoToThreeBinCount, fourPlusBinCount };
+  }
+
+  async getAdminBacklogCount(dateStr?: string): Promise<AdminBacklogCountDto> {
+    const targetYmd = dateStr ?? getTodayYmdInIST();
+    const targetDate = parseYmdDateOnly(targetYmd)!;
+
+    const breakdown: AdminBacklogItemDto[] = [];
+
+    for (let i = 1; i <= 5; i++) {
+      const dayDate = addUtcDays(targetDate, -i);
+      const dayYmd = `${dayDate.getUTCFullYear()}-${String(dayDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dayDate.getUTCDate()).padStart(2, '0')}`;
+      const deliveryDateRange = getSingleDateOnlyRange(dayYmd);
+
+      const orders = await this.prisma.salesOrder.findMany({
+        where: {
+          deliveryDate: deliveryDateRange,
+          OR: [{ status: null }, { status: { not: 'Dispatched' } }],
+        },
+        select: {
+          saleOrderNumber: true,
+          outboundDelivery: true,
+        },
+      });
+      const count = orders.length;
+
+      const jsDate = new Date(
+        Date.UTC(
+          dayDate.getUTCFullYear(),
+          dayDate.getUTCMonth(),
+          dayDate.getUTCDate(),
+        ),
+      );
+      let dayLabel: string;
+      if (i === 1)
+        dayLabel = `Yesterday (${jsDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      else
+        dayLabel = jsDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        });
+
+      breakdown.push({ date: dayYmd, dayLabel, count, orders });
+    }
+
+    const totalBacklog = breakdown.reduce((sum, item) => sum + item.count, 0);
+
+    return { totalBacklog, breakdown };
   }
 
   async getAdminStatusByZone(

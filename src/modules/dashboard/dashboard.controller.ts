@@ -21,6 +21,7 @@ import { AdminPaymentByZoneDto } from './dto/admin-payment-by-zone.dto';
 import { AdminCountByEntityDto } from './dto/admin-count-by-entity.dto';
 import { AdminErpImportCountsDto } from './dto/admin-erp-import-counts.dto';
 import { AdminBinCountDto } from './dto/admin-bin-count.dto';
+import { AdminBacklogCountDto } from './dto/admin-backlog-count.dto';
 @ApiTags('Dashboard')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -66,6 +67,17 @@ export class DashboardController {
   ): Promise<AdminBinCountDto> {
     return this.dashboardService.getAdminBinCounts(date);
   }
+
+ @Get('admin-backlog-count')
+ @ApiOperation({ summary: 'Get backlog count — undispatched SOs for 5 days before selected delivery date' })
+ @ApiQuery({ name: 'date', required: false, description: 'Reference date in YYYY-MM-DD format. Defaults to today.', example: '2026-06-12' })
+ @ApiResponse({ status: 200, description: 'Backlog count with per-day breakdown', type: AdminBacklogCountDto })
+ async getAdminBacklogCount(
+  @Query('date') date?: string,
+ ): Promise<AdminBacklogCountDto> {
+  return this.dashboardService.getAdminBacklogCount(date);
+ }
+
   @Get('admin-dispatch-summary')
   @Roles('ADMIN', 'USER')
   @ApiOperation({ summary: "Get today's dispatch summary" })
