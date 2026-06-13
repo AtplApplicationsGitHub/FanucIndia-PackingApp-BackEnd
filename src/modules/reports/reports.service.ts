@@ -57,7 +57,6 @@ export class ReportsSalesOrderService {
 
     if (filters.date) {
       const deliveryDateRange = getSingleDateOnlyRange(filters.date);
-
       if (deliveryDateRange) {
         where.deliveryDate = deliveryDateRange;
       }
@@ -66,7 +65,6 @@ export class ReportsSalesOrderService {
         filters.startDate,
         filters.endDate,
       );
-
       if (deliveryDateRange) {
         where.deliveryDate = deliveryDateRange;
       }
@@ -110,7 +108,6 @@ export class ReportsSalesOrderService {
         { status: 'F105' },
         { status: 'Dispatched' },
       ];
-
       if (where.OR) {
         where.AND = [{ OR: where.OR }, { OR: baseSummaryOr }];
         delete where.OR;
@@ -125,8 +122,10 @@ export class ReportsSalesOrderService {
     if (filters.customerId) {
       where.customerId = parseInt(filters.customerId, 10);
     }
+
     const totalOrdersCount = await this.prisma.salesOrder.count({ where });
-    // --- 1. FETCH ALL MATCHING ORDERS (No Skip/Take here) ---
+
+    // --- 1. FETCH ALL MATCHING ORDERS WITH DISPATCH & REMARKS ---
     const orders = await this.prisma.salesOrder.findMany({
       where,
       skip,
@@ -141,8 +140,19 @@ export class ReportsSalesOrderService {
         priority: true,
         status: true,
         createdAt: true,
+        specialRemarks: true,
+        additionalRemarks: true,
         customer: { select: { name: true } },
         salesZone: { select: { name: true } },
+        Dispatch_SO: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            dispatch: {
+              select: { vehicleNumber: true },
+            },
+          },
+        },
         statusStepper: {
           orderBy: { id: 'asc' },
           select: {
@@ -163,12 +173,86 @@ export class ReportsSalesOrderService {
       ],
     });
 
+    // --- 2. FETCH VEHICLE ENTRIES CREATED TODAY FOR THESE CUSTOMERS ---
+    const uniqueCustomerNames = [
+      ...new Set(
+        orders
+          .map((o) => (o.customer?.name || o.customerNameText || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    const customerVehicleMap = new Map<string, string>();
+
+    if (uniqueCustomerNames.length > 0) {
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const now = new Date();
+      const istNow = new Date(now.getTime() + istOffset);
+
+      const startOfIstToday = new Date(
+        Date.UTC(
+          istNow.getUTCFullYear(),
+          istNow.getUTCMonth(),
+          istNow.getUTCDate(),
+          -5,
+          -30,
+          0,
+          0,
+        ),
+      );
+      const endOfIstToday = new Date(
+        Date.UTC(
+          istNow.getUTCFullYear(),
+          istNow.getUTCMonth(),
+          istNow.getUTCDate(),
+          18,
+          29,
+          59,
+          999,
+        ),
+      );
+
+      const vehicleEntries = await this.prisma.vehicleEntry.findMany({
+        where: {
+          customerName: { in: uniqueCustomerNames },
+          createdAt: {
+            gte: startOfIstToday,
+            lte: endOfIstToday,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      for (const entry of vehicleEntries) {
+        const cName = entry.customerName?.trim();
+        if (cName && !customerVehicleMap.has(cName)) {
+          customerVehicleMap.set(cName, entry.vehicleNumber || '');
+        }
+      }
+    }
+
+    // --- 3. FORMAT ORDERS ---
     const formattedOrders = orders.map((order) => {
+      const cName = order.customer?.name || order.customerNameText || '-';
+      const cNameTrimmed = cName.trim();
+
+      let vehicleNumber =
+        order.Dispatch_SO?.[0]?.dispatch?.vehicleNumber || null;
+      if (!vehicleNumber && cNameTrimmed !== '-') {
+        vehicleNumber = customerVehicleMap.get(cNameTrimmed) || null;
+      }
+
+      // Explicitly type the array as string[] to resolve the 'never' error
+      const remarksArr: string[] = [];
+
+      if (order.specialRemarks) remarksArr.push(order.specialRemarks);
+      if (order.additionalRemarks) remarksArr.push(order.additionalRemarks);
+
       return {
         id: order.id,
         saleOrderNumber: order.saleOrderNumber,
         outboundDelivery: order.outboundDelivery,
-        customerName: order.customer?.name || order.customerNameText || '-',
+        customerName: cName,
         salesZone: order.salesZone?.name || '-',
         paymentClearance: order.paymentClearance,
         createdAt: order.createdAt,
@@ -176,16 +260,17 @@ export class ReportsSalesOrderService {
         priority: order.priority,
         isErpImported: order.isErpImported === 1,
         statusStepper: order.statusStepper,
+        vehicleNumber: vehicleNumber || '-',
+        remarks: remarksArr.join(' | ') || '-',
+        specialRemarks: order.specialRemarks || '',
+        additionalRemarks: order.additionalRemarks || '',
       };
     });
 
-    // --- 2. GROUP ALL ORDERS BY CUSTOMER NAME ---
     const groupedOrdersMap = formattedOrders.reduce(
       (acc, order) => {
         const cName = order.customerName;
-        if (!acc[cName]) {
-          acc[cName] = [];
-        }
+        if (!acc[cName]) acc[cName] = [];
         acc[cName].push(order);
         return acc;
       },
