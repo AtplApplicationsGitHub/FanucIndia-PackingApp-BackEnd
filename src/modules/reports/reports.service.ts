@@ -158,6 +158,7 @@ export class ReportsSalesOrderService {
       orderBy: [
         { customer: { name: 'asc' } },
         { customerNameText: 'asc' },
+        { salesZone: { name: 'asc' } },
         { saleOrderNumber: 'asc' },
       ],
     });
