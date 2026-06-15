@@ -16,6 +16,9 @@ export class SambaService {
   private readonly baseDir =
     process.env.SFTP_BASE_DIR_DRIVE || '/uploads/fanuc/samba_mount_drive';
 
+  private fileListCache = new Map<string, { data: any[]; ts: number }>();
+  private readonly CACHE_TTL_MS = 30_000;
+
   constructor(
     private readonly sftpService: SftpService,
     private prisma: PrismaService,
@@ -23,8 +26,14 @@ export class SambaService {
 
   async listFiles(folder: string) {
     const validFolders = ['active', 'archive', 'error', 'logs'];
-    if (!validFolders.includes(folder.toLowerCase())) {
+    const cacheKey = folder.toLowerCase();
+    if (!validFolders.includes(cacheKey)) {
       throw new BadRequestException('Invalid folder name');
+    }
+
+    const cached = this.fileListCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < this.CACHE_TTL_MS) {
+      return cached.data;
     }
 
     let targetDir = '';
@@ -109,6 +118,7 @@ export class SambaService {
         });
       }
 
+      this.fileListCache.set(cacheKey, { data: mappedFiles, ts: Date.now() });
       return mappedFiles;
     } catch (error) {
       this.logger.warn(
