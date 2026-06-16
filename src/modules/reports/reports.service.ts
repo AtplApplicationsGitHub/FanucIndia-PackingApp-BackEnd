@@ -633,6 +633,8 @@ export class ReportsSalesOrderService {
         outboundDelivery: true,
         FGUpdatedBy: true,
         FGUpdatedDateTime: true,
+        salesZone: { select: { name: true } },
+        customer: { select: { name: true } },
       },
       orderBy: [{ fgLocation: 'asc' }, { id: 'asc' }],
     });
@@ -673,6 +675,8 @@ export class ReportsSalesOrderService {
         dateTime: order.FGUpdatedDateTime,
         durationDays: durationDays,
         durationText: `${durationDays} ${durationDays > 1 ? 'days' : 'day'}`,
+        salesZoneName: order.salesZone?.name ?? '-',
+        customerName: order.customer?.name ?? '-',
       };
     });
 
@@ -685,8 +689,7 @@ export class ReportsSalesOrderService {
           ?.toLowerCase()
           .includes(lowerSearch);
         const locMatch = o.fgLocation.toLowerCase().includes(lowerSearch);
-
-        return soMatch || obdMatch || locMatch;
+        return soMatch || obdMatch || locMatch || o.customerName.toLowerCase().includes(lowerSearch);
       });
     }
     const ageCounts = {
