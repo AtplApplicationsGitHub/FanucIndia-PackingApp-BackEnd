@@ -6,6 +6,12 @@ export class AdminBacklogOrderDto {
 
   @ApiProperty({ example: '123456799' })
   outboundDelivery: string;
+
+  @ApiProperty({ example: 'Acme Corp', nullable: true })
+  customerName: string | null;
+
+  @ApiProperty({ example: true })
+  paymentClearance: boolean;
 }
 
 export class AdminBacklogItemDto {

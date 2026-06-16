@@ -728,4 +728,137 @@ export class ReportsSalesOrderService {
       },
     };
   }
+
+  async getSalesFgStorageReport(
+    userId: number,
+    pageParam?: string,
+    limitParam?: string,
+    search?: string,
+    ageFilter?: string,
+  ) {
+    const page = pageParam ? parseInt(pageParam, 10) : 1;
+    const limit = limitParam ? parseInt(limitParam, 10) : 10;
+    const skip = (page - 1) * limit;
+
+    // Get the sales user's zone
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const salesZoneId = user?.salesZoneId;
+
+    const where: any = {
+      fgLocation: { not: null },
+      OR: [{ status: null }, { status: { in: ['R105', 'W105', 'F105'] } }],
+    };
+
+    // Zone restriction — only show records belonging to this user's zone
+    if (salesZoneId) {
+      where.salesZoneId = salesZoneId;
+    }
+
+    const allOrders = await this.prisma.salesOrder.findMany({
+      where,
+      select: {
+        id: true,
+        fgLocation: true,
+        saleOrderNumber: true,
+        outboundDelivery: true,
+        FGUpdatedBy: true,
+        FGUpdatedDateTime: true,
+        salesZone: { select: { name: true } },
+        customer: { select: { name: true } },
+      },
+      orderBy: [{ fgLocation: 'asc' }, { id: 'asc' }],
+    });
+
+    const now = new Date();
+
+    const formattedOrders = allOrders.map((order) => {
+      let locationStr = '-';
+      if (order.fgLocation) {
+        const loc = order.fgLocation as any;
+        if (Array.isArray(loc)) {
+          locationStr = loc
+            .map((l: any) =>
+              typeof l === 'object' && l !== null
+                ? JSON.stringify(l)
+                : String(l).trim(),
+            )
+            .join(', ');
+        } else if (typeof loc === 'string') {
+          locationStr = loc.trim();
+        } else {
+          locationStr = JSON.stringify(loc);
+        }
+      }
+
+      let durationDays = 0;
+      if (order.FGUpdatedDateTime) {
+        const diffTime =
+          now.getTime() - new Date(order.FGUpdatedDateTime).getTime();
+        durationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      return {
+        fgLocation: locationStr,
+        saleOrderNumber: order.saleOrderNumber,
+        outboundDelivery: order.outboundDelivery,
+        LastUpdatedBy: order.FGUpdatedBy,
+        dateTime: order.FGUpdatedDateTime,
+        durationDays,
+        durationText: `${durationDays} ${durationDays > 1 ? 'days' : 'day'}`,
+        salesZoneName: order.salesZone?.name ?? '-',
+        customerName: order.customer?.name ?? '-',
+      };
+    });
+
+    let filteredOrders = formattedOrders;
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      filteredOrders = formattedOrders.filter(
+        (o) =>
+          o.saleOrderNumber.toLowerCase().includes(lowerSearch) ||
+          o.outboundDelivery?.toLowerCase().includes(lowerSearch) ||
+          o.fgLocation.toLowerCase().includes(lowerSearch) ||
+          o.customerName.toLowerCase().includes(lowerSearch),
+      );
+    }
+
+    const ageCounts = {
+      age0to3Months: filteredOrders.filter((o) => o.durationDays <= 90).length,
+      age3to6Months: filteredOrders.filter(
+        (o) => o.durationDays > 90 && o.durationDays <= 180,
+      ).length,
+      age6to12Months: filteredOrders.filter(
+        (o) => o.durationDays > 180 && o.durationDays <= 365,
+      ).length,
+      ageAbove12Months: filteredOrders.filter((o) => o.durationDays > 365)
+        .length,
+    };
+
+    if (ageFilter) {
+      filteredOrders = filteredOrders.filter((o) => {
+        if (ageFilter === '0-3') return o.durationDays <= 90;
+        if (ageFilter === '3-6')
+          return o.durationDays > 90 && o.durationDays <= 180;
+        if (ageFilter === '6-12')
+          return o.durationDays > 180 && o.durationDays <= 365;
+        if (ageFilter === '>12') return o.durationDays > 365;
+        return true;
+      });
+    }
+
+    const totalOrders = filteredOrders.length;
+    const pagedReportData = filteredOrders.slice(skip, skip + limit);
+
+    return {
+      success: true,
+      data: {
+        totalOrders,
+        page,
+        limit,
+        totalPages: Math.ceil(totalOrders / limit),
+        ageCounts,
+        reportData: pagedReportData,
+      },
+    };
+  }
 }

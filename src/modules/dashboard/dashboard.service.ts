@@ -574,6 +574,10 @@ export class DashboardService {
         select: {
           saleOrderNumber: true,
           outboundDelivery: true,
+          paymentClearance: true,
+          customer: {
+            select: { name: true },
+          },
         },
       });
       const count = orders.length;
@@ -594,7 +598,17 @@ export class DashboardService {
           day: 'numeric',
         });
 
-      breakdown.push({ date: dayYmd, dayLabel, count, orders });
+      breakdown.push({
+        date: dayYmd,
+        dayLabel,
+        count,
+        orders: orders.map((o) => ({
+          saleOrderNumber: o.saleOrderNumber,
+          outboundDelivery: o.outboundDelivery ?? '-',
+          customerName: o.customer?.name ?? null,
+          paymentClearance: o.paymentClearance,
+        })),
+      });
     }
 
     const totalBacklog = breakdown.reduce((sum, item) => sum + item.count, 0);

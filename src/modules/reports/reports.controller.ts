@@ -1,28 +1,58 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ReportsSalesOrderService } from './reports.service';
+import { AuthRequest } from '../auth/types/auth-request.type';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('reports/sales-order')
 export class ReportsSalesOrderController {
-  constructor(private readonly reportsSalesOrderService: ReportsSalesOrderService) {}
+  constructor(
+    private readonly reportsSalesOrderService: ReportsSalesOrderService,
+  ) {}
 
   @Get('summary')
-  @Roles('ADMIN','USER')
-  @ApiOperation({ summary: 'Get summary list with SO, OBD, Customer, Zone, Payment and Filters (Combined)' })
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({
+    summary:
+      'Get summary list with SO, OBD, Customer, Zone, Payment and Filters (Combined)',
+  })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'payment', required: false, type: String })
   @ApiQuery({ name: 'salesZoneId', required: false, type: Number })
   @ApiQuery({ name: 'customerId', required: false, type: Number })
-  @ApiQuery({ name: 'date', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    type: String,
+    description: 'YYYY-MM-DD',
+  })
   @ApiQuery({ name: 'status', required: false, type: String })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, options: 10, 20, 50, 100)' })
-  @ApiResponse({ status: 200, description: 'Order summary returned successfully' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, options: 10, 20, 50, 100)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order summary returned successfully',
+  })
   getAdminOrderSummary(@Query() filters: any) {
     return this.reportsSalesOrderService.getAdminOrderSummary(filters);
   }
@@ -30,48 +60,153 @@ export class ReportsSalesOrderController {
   @Get('customer-report')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Get report of how many Sales Orders per Customer' })
-  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'DD-MM-YYYY or YYYY-MM-DD' })
-  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'DD-MM-YYYY or YYYY-MM-DD' })
-  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Backward-compatible alias for fromDate' })
-  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Backward-compatible alias for toDate' })
-  @ApiResponse({ status: 200, description: 'Customer report returned successfully' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'DD-MM-YYYY or YYYY-MM-DD',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'DD-MM-YYYY or YYYY-MM-DD',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    description: 'Backward-compatible alias for fromDate',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    description: 'Backward-compatible alias for toDate',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Customer report returned successfully',
+  })
   getCustomerReport(
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
     @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
   ) {
-    return this.reportsSalesOrderService.getCustomerReport(fromDate || startDate, toDate || endDate);
+    return this.reportsSalesOrderService.getCustomerReport(
+      fromDate || startDate,
+      toDate || endDate,
+    );
   }
 
   @Get('customers-by-material/:materialCode')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get report of customers who ordered a specific material code' })
-  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'YYYY-MM-DD' })
-  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'YYYY-MM-DD' })
-  @ApiResponse({ status: 200, description: 'Customer report filtered by material returned successfully' })
+  @ApiOperation({
+    summary: 'Get report of customers who ordered a specific material code',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    description: 'YYYY-MM-DD',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    description: 'YYYY-MM-DD',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Customer report filtered by material returned successfully',
+  })
   getCustomerReportByMaterialCode(
     @Param('materialCode') materialCode: string,
     @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
   ) {
-    return this.reportsSalesOrderService.getCustomerReportByMaterialCode(materialCode, startDate, endDate);
+    return this.reportsSalesOrderService.getCustomerReportByMaterialCode(
+      materialCode,
+      startDate,
+      endDate,
+    );
   }
 
   @Get('fg-storage-report')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get report of FG Storage with orders not dispatched' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, options: 10, 20, 50, 100)' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by SO, OBD, or Location' }) // <-- Added search query
-  @ApiResponse({ status: 200, description: 'FG storage report returned successfully' })
-  @ApiQuery({ name: 'ageFilter', required: false, type: String, description: '0-3 | 3-6 | 6-12 | >12' })
+  @ApiOperation({
+    summary: 'Get report of FG Storage with orders not dispatched',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, options: 10, 20, 50, 100)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by SO, OBD, or Location',
+  }) // <-- Added search query
+  @ApiResponse({
+    status: 200,
+    description: 'FG storage report returned successfully',
+  })
+  @ApiQuery({
+    name: 'ageFilter',
+    required: false,
+    type: String,
+    description: '0-3 | 3-6 | 6-12 | >12',
+  })
   getFgStorageReport(
-  @Query('page') page?: string,
-  @Query('limit') limit?: string,
-  @Query('search') search?: string,
-  @Query('ageFilter') ageFilter?: string,
-) {
-  return this.reportsSalesOrderService.getFgStorageReport(page, limit, search, ageFilter);
-}
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('ageFilter') ageFilter?: string,
+  ) {
+    return this.reportsSalesOrderService.getFgStorageReport(
+      page,
+      limit,
+      search,
+      ageFilter,
+    );
+  }
+
+  @Get('sales-fg-storage-report')
+  @Roles('SALES')
+  @ApiOperation({
+    summary: 'Get FG Storage report filtered by Sales user zone',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({
+    name: 'ageFilter',
+    required: false,
+    type: String,
+    description: '0-3 | 3-6 | 6-12 | >12',
+  })
+  getSalesFgStorageReport(
+    @Req() req: AuthRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('ageFilter') ageFilter?: string,
+  ) {
+    return this.reportsSalesOrderService.getSalesFgStorageReport(
+      req.user.userId,
+      page,
+      limit,
+      search,
+      ageFilter,
+    );
+  }
 }
