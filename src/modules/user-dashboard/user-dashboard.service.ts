@@ -10,6 +10,7 @@ import { UpdateMaterialDataDto } from './dto/update-material-data.dto';
 import { SftpService } from '../sftp/sftp.service';
 import * as path from 'path';
 import * as fs from 'fs';
+import { EfficiencyService } from '../efficiency/efficiency.service';
 
 function getDayBoundariesIST(date: Date) {
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -28,6 +29,7 @@ export class UserDashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sftpService: SftpService,
+    private readonly efficiencyService: EfficiencyService,
   ) {}
 
   async findAssignedOrders(userId: number) {
@@ -300,13 +302,25 @@ export class UserDashboardService {
     data: UpdateMaterialDataDto,
   ) {
     const order = await this.findOrderById(orderId, user.userId, user.role);
-
-    return this.processDataUpdate(
+    const result = await this.processDataUpdate(
       order.saleOrderNumber,
       order.outboundDelivery,
       data,
       user.name,
     );
+    if (result.completion?.orderId) {
+      if (result.completion.issueCompleted)
+        await this.efficiencyService.recordStageCompletion(
+          result.completion.orderId,
+          'Issue',
+        );
+      if (result.completion.packingCompleted)
+        await this.efficiencyService.recordStageCompletion(
+          result.completion.orderId,
+          'Packing',
+        );
+    }
+    return result;
   }
 
   async updateDataBySoNumber(
@@ -319,13 +333,25 @@ export class UserDashboardService {
       user.userId,
       user.role,
     );
-
-    return this.processDataUpdate(
+    const result = await this.processDataUpdate(
       order.saleOrderNumber,
       order.outboundDelivery,
       data,
       user.name,
     );
+    if (result.completion?.orderId) {
+      if (result.completion.issueCompleted)
+        await this.efficiencyService.recordStageCompletion(
+          result.completion.orderId,
+          'Issue',
+        );
+      if (result.completion.packingCompleted)
+        await this.efficiencyService.recordStageCompletion(
+          result.completion.orderId,
+          'Packing',
+        );
+    }
+    return result;
   }
 
   async uploadAttachmentsById(
@@ -368,14 +394,23 @@ export class UserDashboardService {
     userName: string,
   ) {
     try {
+      let completion:
+        | {
+            issueCompleted: boolean;
+            packingCompleted: boolean;
+            orderId: number | null;
+          }
+        | undefined;
+
       await this.prisma.$transaction(async (tx) => {
-        await this.processDataUpdate(
+        const result = await this.processDataUpdate(
           saleOrderNumber,
           outboundDelivery,
           data,
           userName,
           tx,
         );
+        completion = result.completion;
         await this.processAttachmentsUpload(
           saleOrderNumber,
           outboundDelivery,
@@ -383,6 +418,19 @@ export class UserDashboardService {
           tx,
         );
       });
+
+      if (completion?.orderId) {
+        if (completion.issueCompleted)
+          await this.efficiencyService.recordStageCompletion(
+            completion.orderId,
+            'Issue',
+          );
+        if (completion.packingCompleted)
+          await this.efficiencyService.recordStageCompletion(
+            completion.orderId,
+            'Packing',
+          );
+      }
 
       return { message: 'Data and attachments synchronized successfully.' };
     } catch (error) {
@@ -484,14 +532,13 @@ export class UserDashboardService {
       }
     }
 
-    await this._checkAndUpdateOrderStatus(
+    const completion = await this._checkAndUpdateOrderStatus(
       saleOrderNumber,
       outboundDelivery,
       prismaClient,
       userName,
     );
-
-    return { message: 'Data updated successfully.' };
+    return { message: 'Data updated successfully.', completion };
   }
 
   private async processAttachmentsUpload(
@@ -619,7 +666,7 @@ export class UserDashboardService {
     });
 
     if (!order) {
-      return;
+      return { issueCompleted: false, packingCompleted: false, orderId: null };
     }
 
     const allMaterials = await prismaClient.eRP_Material_Data.findMany({
@@ -631,8 +678,15 @@ export class UserDashboardService {
     });
 
     if (allMaterials.length === 0) {
-      return;
+      return {
+        issueCompleted: false,
+        packingCompleted: false,
+        orderId: order.id,
+      };
     }
+
+    let issueCompleted = false;
+    let packingCompleted = false;
 
     const issueStageCompleted = allMaterials.every(
       (m) => m.Required_Qty > 0 && m.Issue_stage >= m.Required_Qty,
@@ -652,18 +706,38 @@ export class UserDashboardService {
 
       // NEW CODE
       await prismaClient.sO_Status_Stepper.upsert({
-        where: { salesOrderId_status: { salesOrderId: order.id, status: 'Issued' } },
+        where: {
+          salesOrderId_status: { salesOrderId: order.id, status: 'Issued' },
+        },
         update: { createdDateTime: new Date(), updatedBy: userName },
-        create: { salesOrderNumber: saleOrderNumber, salesOrderId: order.id, status: 'Issued', createdDateTime: new Date(), updatedBy: userName }
+        create: {
+          salesOrderNumber: saleOrderNumber,
+          salesOrderId: order.id,
+          status: 'Issued',
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
       });
 
       if (order.packingAssignedUserId) {
         await prismaClient.sO_Status_Stepper.upsert({
-          where: { salesOrderId_status: { salesOrderId: order.id, status: 'Under Packing' } },
+          where: {
+            salesOrderId_status: {
+              salesOrderId: order.id,
+              status: 'Under Packing',
+            },
+          },
           update: { createdDateTime: new Date(), updatedBy: userName },
-          create: { salesOrderNumber: saleOrderNumber, salesOrderId: order.id, status: 'Under Packing', createdDateTime: new Date(), updatedBy: userName }
+          create: {
+            salesOrderNumber: saleOrderNumber,
+            salesOrderId: order.id,
+            status: 'Under Packing',
+            createdDateTime: new Date(),
+            updatedBy: userName,
+          },
         });
       }
+      issueCompleted = true;
     }
 
     const packingStageCompleted = allMaterials.every(
@@ -679,11 +753,21 @@ export class UserDashboardService {
       });
 
       await prismaClient.sO_Status_Stepper.upsert({
-        where: { salesOrderId_status: { salesOrderId: order.id, status: 'Packed' } },
+        where: {
+          salesOrderId_status: { salesOrderId: order.id, status: 'Packed' },
+        },
         update: { createdDateTime: new Date(), updatedBy: userName },
-        create: { salesOrderNumber: saleOrderNumber, salesOrderId: order.id, status: 'Packed', createdDateTime: new Date(), updatedBy: userName }
+        create: {
+          salesOrderNumber: saleOrderNumber,
+          salesOrderId: order.id,
+          status: 'Packed',
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
       });
+      packingCompleted = true;
     }
+    return { issueCompleted, packingCompleted, orderId: order.id };
   }
 
   async getDashboardStats(userId: number, dateStr?: string) {

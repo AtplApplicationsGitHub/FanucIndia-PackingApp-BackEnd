@@ -29,6 +29,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SambaModule } from './modules/samba/samba.module';
 import { ArchivedDataModule } from './modules/archived-data/archived-data.module';
 import { ManualFgStorageModule } from './modules/manual-fg-storage/manual-fg-location.module';
+import { EfficiencyModule } from './modules/efficiency/efficiency.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { ManualFgStorageModule } from './modules/manual-fg-storage/manual-fg-loc
     SambaModule,
     ArchivedDataModule,
     ManualFgStorageModule,
+    EfficiencyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

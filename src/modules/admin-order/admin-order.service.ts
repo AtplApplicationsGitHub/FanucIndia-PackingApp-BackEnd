@@ -444,6 +444,22 @@ export class AdminOrderService {
       }
     }
 
+    // Set IA_Time when Issue user is assigned/changed
+    if (
+      dto.issueAssignedUserId !== undefined &&
+      order.issueAssignedUserId !== dto.issueAssignedUserId
+    ) {
+      data.IA_Time = now;
+    }
+
+    // Set PA_Time when Packing user is assigned/changed
+    if (
+      dto.packingAssignedUserId !== undefined &&
+      order.packingAssignedUserId !== dto.packingAssignedUserId
+    ) {
+      data.PA_Time = now;
+    }
+
     if (dto.fgLocation && order.fgLocation !== dto.fgLocation) {
       await this.prisma.sO_Status_Stepper.updateMany({
         where: {
@@ -609,6 +625,9 @@ export class AdminOrderService {
           updateData.issueAssignedUserId = issueUserId;
         if (packingUserId !== undefined)
           updateData.packingAssignedUserId = packingUserId;
+
+        if (isIssueUserChanging) updateData.IA_Time = now;
+        if (isPackingUserChanging) updateData.PA_Time = now;
 
         // Apply skip stages
         if (skipIssueStage !== undefined)
@@ -1232,6 +1251,12 @@ export class AdminOrderService {
             UpdatedBy: user.name,
             UpdatedDate: new Date(),
             ...fgLocationUpdateData,
+            ...(issueAssignedUserId !== dbOrder.issueAssignedUserId && {
+              IA_Time: new Date(),
+            }),
+            ...(packingAssignedUserId !== dbOrder.packingAssignedUserId && {
+              PA_Time: new Date(),
+            }),
           },
         });
       }

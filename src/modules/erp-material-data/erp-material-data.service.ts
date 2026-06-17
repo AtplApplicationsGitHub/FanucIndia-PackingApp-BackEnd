@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import { UpdateMappingDto } from './dto/update-mapping.dto';
+import { EfficiencyService } from '../efficiency/efficiency.service';
 
 function convertBigInts(obj: any): any {
   if (obj === null || obj === undefined) {
@@ -43,13 +44,13 @@ async function verifyOrderAccess(
   }
 
   const order = await prisma.salesOrder.findFirst({
-    where: { 
+    where: {
       id: orderId,
       OR: [
         { issueAssignedUserId: userId },
         { packingAssignedUserId: userId },
-        { assignedUserId: userId }
-      ]
+        { assignedUserId: userId },
+      ],
     },
   });
   if (!order) {
@@ -62,7 +63,10 @@ async function verifyOrderAccess(
 
 @Injectable()
 export class ErpMaterialDataService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly efficiencyService: EfficiencyService,
+  ) {}
 
   private async getUserName(userId: number): Promise<string> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -83,9 +87,9 @@ export class ErpMaterialDataService {
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
     const materials = await this.prisma.eRP_Material_Data.findMany({
-      where: { 
+      where: {
         saleOrderNumber: salesOrder.saleOrderNumber,
-        FG_OBD: salesOrder.outboundDelivery || '' // Filter by the correct DB column
+        FG_OBD: salesOrder.outboundDelivery || '', // Filter by the correct DB column
       },
       orderBy: { ID: 'asc' },
     });
@@ -102,7 +106,11 @@ export class ErpMaterialDataService {
     await verifyOrderAccess(this.prisma, orderId, userId, userRole);
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true, outboundDelivery: true, packingAssignedUserId: true }, // Added OBD
+      select: {
+        saleOrderNumber: true,
+        outboundDelivery: true,
+        packingAssignedUserId: true,
+      }, // Added OBD
     });
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
 
@@ -148,9 +156,9 @@ export class ErpMaterialDataService {
     });
 
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { 
+      where: {
         saleOrderNumber: salesOrder.saleOrderNumber,
-        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+        FG_OBD: salesOrder.outboundDelivery || '', // Filter
       },
       select: { Issue_stage: true, Required_Qty: true },
     });
@@ -170,17 +178,40 @@ export class ErpMaterialDataService {
         },
       });
       issueStageCompleted = true;
+      await this.efficiencyService.recordStageCompletion(orderId, 'Issue');
       await this.prisma.sO_Status_Stepper.upsert({
-        where: { salesOrderId_status: { salesOrderId: updatedOrder.id, status: 'Issued' } },
+        where: {
+          salesOrderId_status: {
+            salesOrderId: updatedOrder.id,
+            status: 'Issued',
+          },
+        },
         update: { createdDateTime: new Date(), updatedBy: userName },
-        create: { salesOrderNumber: updatedOrder.saleOrderNumber, salesOrderId: updatedOrder.id, status: 'Issued', createdDateTime: new Date(), updatedBy: userName }
+        create: {
+          salesOrderNumber: updatedOrder.saleOrderNumber,
+          salesOrderId: updatedOrder.id,
+          status: 'Issued',
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
       });
 
       if (updatedOrder.packingAssignedUserId) {
         await this.prisma.sO_Status_Stepper.upsert({
-          where: { salesOrderId_status: { salesOrderId: updatedOrder.id, status: 'Under Packing' } },
+          where: {
+            salesOrderId_status: {
+              salesOrderId: updatedOrder.id,
+              status: 'Under Packing',
+            },
+          },
           update: { createdDateTime: new Date(), updatedBy: userName },
-          create: { salesOrderNumber: updatedOrder.saleOrderNumber, salesOrderId: updatedOrder.id, status: 'Under Packing', createdDateTime: new Date(), updatedBy: userName }
+          create: {
+            salesOrderNumber: updatedOrder.saleOrderNumber,
+            salesOrderId: updatedOrder.id,
+            status: 'Under Packing',
+            createdDateTime: new Date(),
+            updatedBy: userName,
+          },
         });
       }
     }
@@ -204,7 +235,11 @@ export class ErpMaterialDataService {
 
     const salesOrder = await this.prisma.salesOrder.findUnique({
       where: { id: orderId },
-      select: { saleOrderNumber: true, outboundDelivery: true, packingAssignedUserId: true }, // Added OBD
+      select: {
+        saleOrderNumber: true,
+        outboundDelivery: true,
+        packingAssignedUserId: true,
+      }, // Added OBD
     });
 
     if (!salesOrder) throw new NotFoundException('Sales Order not found');
@@ -219,7 +254,7 @@ export class ErpMaterialDataService {
         where: {
           Material_Code: materialCode,
           saleOrderNumber: salesOrder.saleOrderNumber,
-          FG_OBD: salesOrder.outboundDelivery || '' // Filter
+          FG_OBD: salesOrder.outboundDelivery || '', // Filter
         },
       });
     }
@@ -258,9 +293,9 @@ export class ErpMaterialDataService {
     });
 
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { 
+      where: {
         saleOrderNumber: salesOrder.saleOrderNumber,
-        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+        FG_OBD: salesOrder.outboundDelivery || '', // Filter
       },
       select: { Issue_stage: true, Required_Qty: true },
     });
@@ -279,17 +314,40 @@ export class ErpMaterialDataService {
         },
       });
       issueStageCompleted = true;
+      await this.efficiencyService.recordStageCompletion(orderId, 'Issue');
       await this.prisma.sO_Status_Stepper.upsert({
-        where: { salesOrderId_status: { salesOrderId: updatedOrder.id, status: 'Issued' } },
+        where: {
+          salesOrderId_status: {
+            salesOrderId: updatedOrder.id,
+            status: 'Issued',
+          },
+        },
         update: { createdDateTime: new Date(), updatedBy: userName },
-        create: { salesOrderNumber: updatedOrder.saleOrderNumber, salesOrderId: updatedOrder.id, status: 'Issued', createdDateTime: new Date(), updatedBy: userName }
+        create: {
+          salesOrderNumber: updatedOrder.saleOrderNumber,
+          salesOrderId: updatedOrder.id,
+          status: 'Issued',
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
       });
 
       if (updatedOrder.packingAssignedUserId) {
         await this.prisma.sO_Status_Stepper.upsert({
-          where: { salesOrderId_status: { salesOrderId: updatedOrder.id, status: 'Under Packing' } },
+          where: {
+            salesOrderId_status: {
+              salesOrderId: updatedOrder.id,
+              status: 'Under Packing',
+            },
+          },
           update: { createdDateTime: new Date(), updatedBy: userName },
-          create: { salesOrderNumber: updatedOrder.saleOrderNumber, salesOrderId: updatedOrder.id, status: 'Under Packing', createdDateTime: new Date(), updatedBy: userName }
+          create: {
+            salesOrderNumber: updatedOrder.saleOrderNumber,
+            salesOrderId: updatedOrder.id,
+            status: 'Under Packing',
+            createdDateTime: new Date(),
+            updatedBy: userName,
+          },
         });
       }
     }
@@ -357,9 +415,9 @@ export class ErpMaterialDataService {
     });
 
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { 
+      where: {
         saleOrderNumber: salesOrder.saleOrderNumber,
-        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+        FG_OBD: salesOrder.outboundDelivery || '', // Filter
       },
       select: { Packing_stage: true, Required_Qty: true },
     });
@@ -378,10 +436,22 @@ export class ErpMaterialDataService {
         },
       });
       packingStageCompleted = true;
+      await this.efficiencyService.recordStageCompletion(orderId, 'Packing');
       await this.prisma.sO_Status_Stepper.upsert({
-        where: { salesOrderId_status: { salesOrderId: updatedOrder.id, status: 'Packed' } },
+        where: {
+          salesOrderId_status: {
+            salesOrderId: updatedOrder.id,
+            status: 'Packed',
+          },
+        },
         update: { createdDateTime: new Date(), updatedBy: userName },
-        create: { salesOrderNumber: updatedOrder.saleOrderNumber, salesOrderId: updatedOrder.id, status: 'Packed', createdDateTime: new Date(), updatedBy: userName }
+        create: {
+          salesOrderNumber: updatedOrder.saleOrderNumber,
+          salesOrderId: updatedOrder.id,
+          status: 'Packed',
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
       });
     }
 
@@ -472,9 +542,9 @@ export class ErpMaterialDataService {
     userName: string,
   ) {
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { 
+      where: {
         saleOrderNumber: soNumber,
-        FG_OBD: outboundDelivery // Passed from calling functions
+        FG_OBD: outboundDelivery, // Passed from calling functions
       },
       select: { Issue_stage: true, Packing_stage: true, Required_Qty: true },
     });
@@ -505,17 +575,36 @@ export class ErpMaterialDataService {
           },
         });
         await this.prisma.sO_Status_Stepper.upsert({
-          where: { salesOrderId_status: { salesOrderId: orderId, status: 'Issued' } },
+          where: {
+            salesOrderId_status: { salesOrderId: orderId, status: 'Issued' },
+          },
           update: { createdDateTime: new Date(), updatedBy: userName },
-          create: { salesOrderNumber: soNumber, salesOrderId: orderId, status: 'Issued', createdDateTime: new Date(), updatedBy: userName }
+          create: {
+            salesOrderNumber: soNumber,
+            salesOrderId: orderId,
+            status: 'Issued',
+            createdDateTime: new Date(),
+            updatedBy: userName,
+          },
         });
         isIssueComplete = true;
 
         if (current.packingAssignedUserId) {
           await this.prisma.sO_Status_Stepper.upsert({
-            where: { salesOrderId_status: { salesOrderId: orderId, status: 'Under Packing' } },
+            where: {
+              salesOrderId_status: {
+                salesOrderId: orderId,
+                status: 'Under Packing',
+              },
+            },
             update: { createdDateTime: new Date(), updatedBy: userName },
-            create: { salesOrderNumber: soNumber, salesOrderId: orderId, status: 'Under Packing', createdDateTime: new Date(), updatedBy: userName }
+            create: {
+              salesOrderNumber: soNumber,
+              salesOrderId: orderId,
+              status: 'Under Packing',
+              createdDateTime: new Date(),
+              updatedBy: userName,
+            },
           });
         }
       }
@@ -535,11 +624,26 @@ export class ErpMaterialDataService {
         },
       });
       await this.prisma.sO_Status_Stepper.upsert({
-        where: { salesOrderId_status: { salesOrderId: orderId, status: 'Packed' } },
+        where: {
+          salesOrderId_status: { salesOrderId: orderId, status: 'Packed' },
+        },
         update: { createdDateTime: new Date(), updatedBy: userName },
-        create: { salesOrderNumber: soNumber, salesOrderId: orderId, status: 'Packed', createdDateTime: new Date(), updatedBy: userName }
+        create: {
+          salesOrderNumber: soNumber,
+          salesOrderId: orderId,
+          status: 'Packed',
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
       });
       isPackingComplete = true;
+    }
+
+    if (isIssueComplete) {
+      await this.efficiencyService.recordStageCompletion(orderId, 'Issue');
+    }
+    if (isPackingComplete) {
+      await this.efficiencyService.recordStageCompletion(orderId, 'Packing');
     }
 
     return {
@@ -578,7 +682,7 @@ export class ErpMaterialDataService {
         where: {
           Material_Code: materialCode,
           saleOrderNumber: salesOrder.saleOrderNumber,
-          FG_OBD: salesOrder.outboundDelivery || '' // Filter
+          FG_OBD: salesOrder.outboundDelivery || '', // Filter
         },
       });
     }
@@ -610,9 +714,9 @@ export class ErpMaterialDataService {
     });
 
     const allMaterials = await this.prisma.eRP_Material_Data.findMany({
-      where: { 
+      where: {
         saleOrderNumber: salesOrder.saleOrderNumber,
-        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+        FG_OBD: salesOrder.outboundDelivery || '', // Filter
       },
       select: { Packing_stage: true, Required_Qty: true },
     });
@@ -631,10 +735,22 @@ export class ErpMaterialDataService {
         },
       });
       packingStageCompleted = true;
+      await this.efficiencyService.recordStageCompletion(orderId, 'Packing');
       await this.prisma.sO_Status_Stepper.upsert({
-        where: { salesOrderId_status: { salesOrderId: updatedOrder.id, status: 'Packed' } },
+        where: {
+          salesOrderId_status: {
+            salesOrderId: updatedOrder.id,
+            status: 'Packed',
+          },
+        },
         update: { createdDateTime: new Date(), updatedBy: userName },
-        create: { salesOrderNumber: updatedOrder.saleOrderNumber, salesOrderId: updatedOrder.id, status: 'Packed', createdDateTime: new Date(), updatedBy: userName }
+        create: {
+          salesOrderNumber: updatedOrder.saleOrderNumber,
+          salesOrderId: updatedOrder.id,
+          status: 'Packed',
+          createdDateTime: new Date(),
+          updatedBy: userName,
+        },
       });
     }
 
@@ -690,9 +806,9 @@ export class ErpMaterialDataService {
     const now = new Date();
 
     const materials = await this.prisma.eRP_Material_Data.findMany({
-      where: { 
+      where: {
         saleOrderNumber: salesOrder.saleOrderNumber,
-        FG_OBD: salesOrder.outboundDelivery || '' // Filter
+        FG_OBD: salesOrder.outboundDelivery || '', // Filter
       },
     });
 
@@ -767,7 +883,7 @@ export class ErpMaterialDataService {
         where: {
           saleOrderNumber: currentMaterial.saleOrderNumber,
           FG_OBD: currentMaterial.FG_OBD, // <--- Prevents split conflict
-          ID: { not: dto.materialId }, 
+          ID: { not: dto.materialId },
           OR: [
             { Material_Code: { equals: barcodeToCheck, mode: 'insensitive' } },
             {
@@ -812,8 +928,8 @@ export class ErpMaterialDataService {
           erpCode: materialCode,
           mappingBarcode: dto.mappingBarcode || null,
           group: dto.group || null,
-          acceptBulkData: false, 
-          remarksRequired: false, 
+          acceptBulkData: false,
+          remarksRequired: false,
         },
       });
     }

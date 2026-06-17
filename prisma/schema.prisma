@@ -123,6 +123,9 @@ model SalesOrder {
   packingAssignedUserId Int?
   skipIssueStage        Boolean?                @default(false)
   skipPackingStage      Boolean?                @default(false)
+  IA_Time               DateTime?               @db.Timestamptz(3)
+  PA_Time               DateTime?               @db.Timestamptz(3)
+  efficiencyRecords     Efficiency_PP[]
   isErpImported         Int                     @default(0)
   binCount              Int?                    @default(0)
   createdAt             DateTime                @default(now()) @db.Timestamptz(3)
@@ -589,4 +592,24 @@ model Order_Delete_Password {
   id        Int      @id @default(1)
   password  String
   updatedAt DateTime @updatedAt
+}
+
+model Efficiency_PP {
+  id               Int      @id @default(autoincrement())
+  salesOrderId     Int
+  saleOrderNumber  String   @db.VarChar(500)
+  outboundDelivery String   @db.VarChar(500)
+  requiredDate     DateTime @db.Date
+  userId           Int
+  userName         String   @db.VarChar(255)
+  leadTime         Float
+  scanTime         Float
+  bin              String   @db.VarChar(10)
+  stage            String   @db.VarChar(20)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([salesOrderId, stage])
 }
