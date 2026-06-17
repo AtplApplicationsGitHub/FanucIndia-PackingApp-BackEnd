@@ -48,8 +48,7 @@ export class EfficiencyService {
           ? order.issueAssignedUserId
           : order.packingAssignedUserId;
 
-      const assignmentTime =
-        stage === 'Issue' ? order.IA_Time : order.PA_Time;
+      const assignmentTime = stage === 'Issue' ? order.IA_Time : order.PA_Time;
 
       if (!assignedUserId || !assignmentTime) return;
 
@@ -121,21 +120,24 @@ export class EfficiencyService {
       });
     } catch (err) {
       // Log but never break the main stage completion flow
-      console.error(`[EfficiencyService] recordStageCompletion failed for orderId=${orderId} stage=${stage}:`, err);
+      console.error(
+        `[EfficiencyService] recordStageCompletion failed for orderId=${orderId} stage=${stage}:`,
+        err,
+      );
     }
   }
 
-  async getReport(from: Date, to: Date) {
+  async getReport(
+    from: Date | null,
+    to: Date | null,
+    stage: 'Issue' | 'Packing',
+  ) {
     return this.prisma.efficiency_PP.findMany({
       where: {
-        requiredDate: { gte: from, lte: to },
+        stage,
+        ...(from && to ? { requiredDate: { gte: from, lte: to } } : {}),
       },
-      orderBy: [
-        { requiredDate: 'asc' },
-        { userName: 'asc' },
-        { stage: 'asc' },
-        { bin: 'asc' },
-      ],
+      orderBy: [{ requiredDate: 'asc' }, { userName: 'asc' }, { bin: 'asc' }],
     });
   }
 }

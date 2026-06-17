@@ -1,4 +1,4 @@
-import { IsOptional, IsDateString } from 'class-validator';
+import { IsOptional, IsDateString, IsIn } from 'class-validator';
 
 export class QueryEfficiencyDto {
   @IsOptional()
@@ -8,4 +8,8 @@ export class QueryEfficiencyDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  @IsOptional()
+  @IsIn(['Issue', 'Packing'])
+  stage?: 'Issue' | 'Packing';
 }

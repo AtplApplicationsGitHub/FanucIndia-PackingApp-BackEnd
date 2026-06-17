@@ -13,12 +13,14 @@ export class EfficiencyController {
 
   @Get('report')
   async getReport(@Query() query: QueryEfficiencyDto) {
-    const now = new Date();
-    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const stage = query.stage ?? 'Issue';
 
-    const from = query.from ? new Date(query.from) : today;
-    const to = query.to ? new Date(query.to) : today;
+    if (!query.from && !query.to) {
+      return this.efficiencyService.getReport(null, null, stage);
+    }
 
-    return this.efficiencyService.getReport(from, to);
+    const from = new Date(query.from!);
+    const to = new Date(query.to!);
+    return this.efficiencyService.getReport(from, to, stage);
   }
 }
