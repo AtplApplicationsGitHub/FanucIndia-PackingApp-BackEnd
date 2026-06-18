@@ -964,7 +964,7 @@ export class ErpMaterialImporterService {
               name: { equals: computedCustomerName, mode: 'insensitive' },
               address: computedCustomerAddress
                 ? { equals: computedCustomerAddress, mode: 'insensitive' }
-                : null,
+                : undefined,
             },
           });
 
