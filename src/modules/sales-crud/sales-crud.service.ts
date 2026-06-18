@@ -1035,7 +1035,7 @@ export class SalesCrudService {
 
         contactNumber = firstSo.customer?.contactNumber || '';
 
-        const rawAddress = firstSo.customer?.address || firstSo.address || '';
+        const rawAddress = firstSo.address || '';
 
         if (rawAddress) {
           const addrParts = rawAddress

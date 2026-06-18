@@ -29,25 +29,35 @@ export class LookupService {
   }
 
   async createProduct(dto: CreateProductDto) {
+    const normalizedName = dto.name.trim().replace(/\s+/g, ' ');
+
     const existing = await this.prisma.product.findFirst({
-      where: { name: { equals: dto.name, mode: 'insensitive' } },
+      where: { name: { equals: normalizedName, mode: 'insensitive' } },
     });
     if (existing)
-      throw new BadRequestException(`Product "${dto.name}" already exists.`);
+      throw new BadRequestException(
+        `Product "${normalizedName}" already exists.`,
+      );
 
-    return this.prisma.product.create({ data: dto });
+    return this.prisma.product.create({
+      data: { ...dto, name: normalizedName },
+    });
   }
 
   async updateProduct(id: number, dto: UpdateProductDto) {
     if (dto.name) {
+      const normalizedName = dto.name.trim().replace(/\s+/g, ' ');
       const existing = await this.prisma.product.findFirst({
         where: {
-          name: { equals: dto.name, mode: 'insensitive' },
+          name: { equals: normalizedName, mode: 'insensitive' },
           id: { not: id },
         },
       });
       if (existing)
-        throw new BadRequestException(`Product "${dto.name}" already exists.`);
+        throw new BadRequestException(
+          `Product "${normalizedName}" already exists.`,
+        );
+      dto.name = normalizedName;
     }
     return this.prisma.product.update({ where: { id }, data: dto });
   }
@@ -71,29 +81,35 @@ export class LookupService {
   }
 
   async createTransporter(dto: CreateTransporterDto) {
+    const normalizedName = dto.name.trim().replace(/\s+/g, ' ');
+
     const existing = await this.prisma.transporter.findFirst({
-      where: { name: { equals: dto.name, mode: 'insensitive' } },
+      where: { name: { equals: normalizedName, mode: 'insensitive' } },
     });
     if (existing)
       throw new BadRequestException(
-        `Transporter "${dto.name}" already exists.`,
+        `Transporter "${normalizedName}" already exists.`,
       );
 
-    return this.prisma.transporter.create({ data: dto });
+    return this.prisma.transporter.create({
+      data: { ...dto, name: normalizedName },
+    });
   }
 
   async updateTransporter(id: number, dto: UpdateTransporterDto) {
     if (dto.name) {
+      const normalizedName = dto.name.trim().replace(/\s+/g, ' ');
       const existing = await this.prisma.transporter.findFirst({
         where: {
-          name: { equals: dto.name, mode: 'insensitive' },
+          name: { equals: normalizedName, mode: 'insensitive' },
           id: { not: id },
         },
       });
       if (existing)
         throw new BadRequestException(
-          `Transporter "${dto.name}" already exists.`,
+          `Transporter "${normalizedName}" already exists.`,
         );
+      dto.name = normalizedName;
     }
     return this.prisma.transporter.update({ where: { id }, data: dto });
   }
@@ -159,27 +175,35 @@ export class LookupService {
   }
 
   async createSalesZone(dto: CreateSalesZoneDto) {
+    const normalizedName = dto.name.trim().replace(/\s+/g, ' ');
+
     const existing = await this.prisma.salesZone.findFirst({
-      where: { name: { equals: dto.name, mode: 'insensitive' } },
+      where: { name: { equals: normalizedName, mode: 'insensitive' } },
     });
     if (existing)
-      throw new BadRequestException(`Sales Zone "${dto.name}" already exists.`);
+      throw new BadRequestException(
+        `Sales Zone "${normalizedName}" already exists.`,
+      );
 
-    return this.prisma.salesZone.create({ data: dto });
+    return this.prisma.salesZone.create({
+      data: { ...dto, name: normalizedName },
+    });
   }
 
   async updateSalesZone(id: number, dto: UpdateSalesZoneDto) {
     if (dto.name) {
+      const normalizedName = dto.name.trim().replace(/\s+/g, ' ');
       const existing = await this.prisma.salesZone.findFirst({
         where: {
-          name: { equals: dto.name, mode: 'insensitive' },
+          name: { equals: normalizedName, mode: 'insensitive' },
           id: { not: id },
         },
       });
       if (existing)
         throw new BadRequestException(
-          `Sales Zone "${dto.name}" already exists.`,
+          `Sales Zone "${normalizedName}" already exists.`,
         );
+      dto.name = normalizedName;
     }
     return this.prisma.salesZone.update({ where: { id }, data: dto });
   }
@@ -202,29 +226,37 @@ export class LookupService {
   }
 
   async createPackConfig(dto: CreatePackConfigDto) {
+    const normalizedConfigName = dto.configName.trim().replace(/\s+/g, ' ');
+
     const existing = await this.prisma.packConfig.findFirst({
-      where: { configName: { equals: dto.configName, mode: 'insensitive' } },
+      where: {
+        configName: { equals: normalizedConfigName, mode: 'insensitive' },
+      },
     });
     if (existing)
       throw new BadRequestException(
-        `Pack Config "${dto.configName}" already exists.`,
+        `Pack Config "${normalizedConfigName}" already exists.`,
       );
 
-    return this.prisma.packConfig.create({ data: dto });
+    return this.prisma.packConfig.create({
+      data: { ...dto, configName: normalizedConfigName },
+    });
   }
 
   async updatePackConfig(id: number, dto: UpdatePackConfigDto) {
     if (dto.configName) {
+      const normalizedConfigName = dto.configName.trim().replace(/\s+/g, ' ');
       const existing = await this.prisma.packConfig.findFirst({
         where: {
-          configName: { equals: dto.configName, mode: 'insensitive' },
+          configName: { equals: normalizedConfigName, mode: 'insensitive' },
           id: { not: id },
         },
       });
       if (existing)
         throw new BadRequestException(
-          `Pack Config "${dto.configName}" already exists.`,
+          `Pack Config "${normalizedConfigName}" already exists.`,
         );
+      dto.configName = normalizedConfigName;
     }
     return this.prisma.packConfig.update({ where: { id }, data: dto });
   }
@@ -251,6 +283,9 @@ export class LookupService {
     const normalizedAddress = dto.address
       ? dto.address.trim().replace(/\s+/g, ' ')
       : undefined;
+    const normalizedContactNumber = dto.contactNumber
+      ? dto.contactNumber.trim().replace(/\s+/g, ' ')
+      : undefined;
 
     const existing = await this.prisma.customer.findFirst({
       where: {
@@ -273,6 +308,7 @@ export class LookupService {
         ...dto,
         name: normalizedName,
         address: normalizedAddress,
+        contactNumber: normalizedContactNumber,
       },
     });
   }
@@ -296,6 +332,13 @@ export class LookupService {
           ? dto.address.trim().replace(/\s+/g, ' ')
           : null
         : currentCustomer.address;
+
+    const normalizedContactNumber =
+      dto.contactNumber !== undefined
+        ? dto.contactNumber
+          ? dto.contactNumber.trim().replace(/\s+/g, ' ')
+          : null
+        : currentCustomer.contactNumber;
 
     const existing = await this.prisma.customer.findFirst({
       where: {
@@ -321,6 +364,9 @@ export class LookupService {
           ...dto,
           ...(dto.name !== undefined && { name: normalizedName }),
           ...(dto.address !== undefined && { address: normalizedAddress }),
+          ...(dto.contactNumber !== undefined && {
+            contactNumber: normalizedContactNumber,
+          }),
         },
       });
 
@@ -353,25 +399,35 @@ export class LookupService {
   }
 
   async createPrinter(dto: CreatePrinterDto) {
+    const normalizedName = dto.name.trim().replace(/\s+/g, ' ');
+
     const existing = await this.prisma.printer.findFirst({
-      where: { name: { equals: dto.name, mode: 'insensitive' } },
+      where: { name: { equals: normalizedName, mode: 'insensitive' } },
     });
     if (existing)
-      throw new BadRequestException(`Printer "${dto.name}" already exists.`);
+      throw new BadRequestException(
+        `Printer "${normalizedName}" already exists.`,
+      );
 
-    return this.prisma.printer.create({ data: dto });
+    return this.prisma.printer.create({
+      data: { ...dto, name: normalizedName },
+    });
   }
 
   async updatePrinter(id: number, dto: UpdatePrinterDto) {
     if (dto.name) {
+      const normalizedName = dto.name.trim().replace(/\s+/g, ' ');
       const existing = await this.prisma.printer.findFirst({
         where: {
-          name: { equals: dto.name, mode: 'insensitive' },
+          name: { equals: normalizedName, mode: 'insensitive' },
           id: { not: id },
         },
       });
       if (existing)
-        throw new BadRequestException(`Printer "${dto.name}" already exists.`);
+        throw new BadRequestException(
+          `Printer "${normalizedName}" already exists.`,
+        );
+      dto.name = normalizedName;
     }
     return this.prisma.printer.update({ where: { id }, data: dto });
   }
@@ -623,7 +679,8 @@ export class LookupService {
             const id = row.getCell(1).value
               ? Number(row.getCell(1).value)
               : null;
-            const name = getVal(row, 2);
+            const rawName = getVal(row, 2);
+            const name = rawName ? rawName.trim().replace(/\s+/g, ' ') : null;
             if (name) {
               const key = name.toLowerCase();
               if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
@@ -664,7 +721,8 @@ export class LookupService {
             const id = row.getCell(1).value
               ? Number(row.getCell(1).value)
               : null;
-            const name = getVal(row, 2);
+            const rawName = getVal(row, 2);
+            const name = rawName ? rawName.trim().replace(/\s+/g, ' ') : null;
             if (name) {
               const key = name.toLowerCase();
               if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
@@ -706,8 +764,10 @@ export class LookupService {
             const id = row.getCell(1).value
               ? Number(row.getCell(1).value)
               : null;
-            const code = getVal(row, 2);
-            const description = getVal(row, 3) || '';
+            const rawCode = getVal(row, 2);
+            const code = rawCode ? rawCode.trim().replace(/\s+/g, ' ') : null;
+            const rawDescription = getVal(row, 3) || '';
+            const description = rawDescription.trim().replace(/\s+/g, ' ');
             if (code) {
               const key = code.toLowerCase();
               if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
@@ -749,7 +809,8 @@ export class LookupService {
             const id = row.getCell(1).value
               ? Number(row.getCell(1).value)
               : null;
-            const name = getVal(row, 2);
+            const rawName = getVal(row, 2);
+            const name = rawName ? rawName.trim().replace(/\s+/g, ' ') : null;
             if (name) {
               const key = name.toLowerCase();
               if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
@@ -790,7 +851,10 @@ export class LookupService {
             const id = row.getCell(1).value
               ? Number(row.getCell(1).value)
               : null;
-            const configName = getVal(row, 2);
+            const rawConfigName = getVal(row, 2);
+            const configName = rawConfigName
+              ? rawConfigName.trim().replace(/\s+/g, ' ')
+              : null;
             if (configName) {
               const key = configName.toLowerCase();
               if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
@@ -837,13 +901,16 @@ export class LookupService {
 
             const rawName = getVal(row, 2);
             const rawAddress = getVal(row, 3) || '';
-            const contactNumber = getVal(row, 4);
+            const rawContactNumber = getVal(row, 4);
 
             if (rawName) {
               const name = rawName.trim().replace(/\s+/g, ' ');
               const address = rawAddress
                 ? rawAddress.trim().replace(/\s+/g, ' ')
                 : '';
+              const contactNumber = rawContactNumber
+                ? rawContactNumber.trim().replace(/\s+/g, ' ')
+                : null;
 
               const key = `${name.toLowerCase()}_${address.toLowerCase()}`;
 
@@ -884,7 +951,8 @@ export class LookupService {
             const id = row.getCell(1).value
               ? Number(row.getCell(1).value)
               : null;
-            const name = getVal(row, 2);
+            const rawName = getVal(row, 2);
+            const name = rawName ? rawName.trim().replace(/\s+/g, ' ') : null;
             if (name) {
               const key = name.toLowerCase();
               if (!uniqueItems.has(key) || (id && !uniqueItems.get(key).id)) {
