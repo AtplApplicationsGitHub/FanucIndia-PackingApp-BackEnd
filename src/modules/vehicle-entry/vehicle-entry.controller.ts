@@ -13,7 +13,15 @@ import {
   Res,
   Query,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiConsumes,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthRequest } from '../auth/types/auth-request.type';
@@ -26,7 +34,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 @UseGuards(JwtAuthGuard)
 @Controller('vehicle-entry')
 export class VehicleEntryController {
-  constructor(private readonly service: VehicleEntryService) { }
+  constructor(private readonly service: VehicleEntryService) {}
 
   @Get()
   @Roles('ADMIN', 'USER')
@@ -57,6 +65,14 @@ export class VehicleEntryController {
     return this.service.create(dto, req.user.userId);
   }
 
+  @Get('check-duplicate')
+  @Roles('USER')
+  @ApiOperation({ summary: 'Check if a vehicle number already exists today' })
+  @ApiQuery({ name: 'vehicleNumber', required: true })
+  checkDuplicate(@Query('vehicleNumber') vehicleNumber: string) {
+    return this.service.checkDuplicate(vehicleNumber);
+  }
+
   @Post(':id/attachments')
   @Roles('USER')
   @ApiOperation({ summary: 'Upload photos for a vehicle entry' })
@@ -72,9 +88,11 @@ export class VehicleEntryController {
       },
     },
   })
-  @UseInterceptors(FilesInterceptor('files', 10, {
-    limits: { fileSize: 200 * 1024 * 1024 }
-  }))
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      limits: { fileSize: 200 * 1024 * 1024 },
+    }),
+  )
   uploadAttachments(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],
@@ -88,8 +106,13 @@ export class VehicleEntryController {
 
   @Get(':id/attachments')
   @Roles('ADMIN', 'USER', 'SALES')
-  @ApiOperation({ summary: 'Get the list of uploaded attachments for a vehicle entry' })
-  @ApiResponse({ status: 200, description: 'Returns an array of attachment objects.' })
+  @ApiOperation({
+    summary: 'Get the list of uploaded attachments for a vehicle entry',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns an array of attachment objects.',
+  })
   @ApiResponse({ status: 404, description: 'Vehicle Entry not found.' })
   getAttachments(@Param('id', ParseIntPipe) id: number) {
     return this.service.getAttachments(id);

@@ -18,6 +18,15 @@ export class VehicleEntryService {
     private readonly sftpService: SftpService,
   ) {}
 
+  private getTodayYmdInIST(date = new Date()) {
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(date.getTime() + IST_OFFSET_MS);
+    const year = istDate.getUTCFullYear();
+    const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(istDate.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   private normalizeAttachments(attachments: Prisma.JsonValue | null) {
     return Array.isArray(attachments) ? attachments : [];
   }
@@ -43,6 +52,19 @@ export class VehicleEntryService {
   }
 
   async create(dto: CreateVehicleEntryDto, userId: number) {
+    const todayRange = getIstTimestampRange(this.getTodayYmdInIST())!;
+    const existing = await this.prisma.vehicleEntry.findFirst({
+      where: {
+        vehicleNumber: dto.vehicleNumber,
+        createdAt: { gte: todayRange.startOfDay, lt: todayRange.endOfDay },
+      },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        `Vehicle Number '${dto.vehicleNumber}' has already been entered today. It can only be entered again tomorrow.`,
+      );
+    }
+
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const userName = user?.name || 'System';
 
@@ -60,6 +82,21 @@ export class VehicleEntryService {
         attachments: Prisma.JsonNull,
       },
     });
+  }
+
+  async checkDuplicate(
+    vehicleNumber: string,
+  ): Promise<{ isDuplicate: boolean }> {
+    if (!vehicleNumber?.trim()) return { isDuplicate: false };
+
+    const todayRange = getIstTimestampRange(this.getTodayYmdInIST())!;
+    const existing = await this.prisma.vehicleEntry.findFirst({
+      where: {
+        vehicleNumber: vehicleNumber.trim(),
+        createdAt: { gte: todayRange.startOfDay, lt: todayRange.endOfDay },
+      },
+    });
+    return { isDuplicate: !!existing };
   }
 
   async findAll(status = 'all', startDate?: string, endDate?: string) {
@@ -175,11 +212,13 @@ export class VehicleEntryService {
     });
 
     if (!entry) {
-      throw new NotFoundException(`Vehicle Entry with ID ${entryId} not found.`);
+      throw new NotFoundException(
+        `Vehicle Entry with ID ${entryId} not found.`,
+      );
     }
 
     const uploadedFiles: any[] = (entry.attachments as any[]) || [];
-    
+
     const remoteDir = path.posix.join(
       process.env.SFTP_BASE_DIR_VEHICLE_ENTRY || '',
       String(entryId),
@@ -224,7 +263,9 @@ export class VehicleEntryService {
     });
 
     if (!entry) {
-      throw new NotFoundException(`Vehicle Entry with ID ${entryId} not found.`);
+      throw new NotFoundException(
+        `Vehicle Entry with ID ${entryId} not found.`,
+      );
     }
 
     return (entry.attachments as any[]) || [];
@@ -253,7 +294,9 @@ export class VehicleEntryService {
 
       return (stream as NodeJS.ReadableStream).pipe(res);
     } catch (e) {
-      throw new InternalServerErrorException('Could not retrieve file from storage');
+      throw new InternalServerErrorException(
+        'Could not retrieve file from storage',
+      );
     }
   }
 }
