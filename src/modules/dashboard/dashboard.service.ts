@@ -24,6 +24,7 @@ import {
   AdminBacklogCountDto,
   AdminBacklogItemDto,
 } from './dto/admin-backlog-count.dto';
+import { Prisma } from '@prisma/client';
 
 function calculatePercentageChange(current: number, previous: number): number {
   if (previous === 0) {
@@ -441,38 +442,64 @@ export class DashboardService {
     const targetYmd = dateStr ?? getTodayYmdInIST();
     const deliveryDateRange = getSingleDateOnlyRange(targetYmd);
 
-    const [ordersToBeDispatched, readyForDispatchToday, ordersDispatchedToday] =
-      await this.prisma.$transaction([
-        this.prisma.salesOrder.count({
-          where: {
-            deliveryDate: deliveryDateRange,
-            OR: [{ status: null }, { status: { not: 'Dispatched' } }],
-          },
-        }),
-        this.prisma.salesOrder.count({
-          where: {
-            deliveryDate: deliveryDateRange,
-            OR: [{ status: null }, { status: { not: 'Dispatched' } }],
-            statusStepper: {
-              some: {
-                status: 'Ready for Dispatch',
-                createdDateTime: { not: null },
-              },
+    const toDispatchWhere = {
+      deliveryDate: deliveryDateRange,
+      OR: [{ status: null }, { status: { not: 'Dispatched' } }],
+    };
+
+    const [
+      ordersToBeDispatched,
+      ordersToBeDispatchedPaymentCleared,
+      readyForDispatchToday,
+      ordersDispatchedToday,
+      fgLocationCount,
+    ] = await this.prisma.$transaction([
+      this.prisma.salesOrder.count({
+        where: toDispatchWhere,
+      }),
+
+      this.prisma.salesOrder.count({
+        where: {
+          ...toDispatchWhere,
+          paymentClearance: true,
+        },
+      }),
+
+      this.prisma.salesOrder.count({
+        where: {
+          ...toDispatchWhere,
+          statusStepper: {
+            some: {
+              status: 'Ready for Dispatch',
+              createdDateTime: { not: null },
             },
           },
-        }),
-        this.prisma.salesOrder.count({
-          where: {
-            deliveryDate: deliveryDateRange,
-            status: 'Dispatched',
+        },
+      }),
+
+      this.prisma.salesOrder.count({
+        where: {
+          deliveryDate: deliveryDateRange,
+          status: 'Dispatched',
+        },
+      }),
+
+      this.prisma.salesOrder.count({
+        where: {
+          deliveryDate: deliveryDateRange,
+          fgLocation: {
+            not: Prisma.DbNull,
           },
-        }),
-      ]);
+        },
+      }),
+    ]);
 
     return {
       ordersToBeDispatched,
+      ordersToBeDispatchedPaymentCleared,
       readyForDispatchToday,
       ordersDispatchedToday,
+      fgLocationCount,
     };
   }
 
