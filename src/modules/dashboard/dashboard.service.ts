@@ -450,7 +450,7 @@ export class DashboardService {
     const fgLocationWhere = {
       deliveryDate: deliveryDateRange,
       fgLocation: {
-        not: Prisma.DbNull,
+        not: Prisma.AnyNull,
       },
     };
 
@@ -502,11 +502,18 @@ export class DashboardService {
       }),
     ]);
 
-    const fgLocationOrders = fgLocationOrdersRaw.map((order) => ({
-      saleOrderNumber: order.saleOrderNumber,
-      outboundDelivery: order.outboundDelivery,
-      location: order.fgLocation,
-    }));
+    const fgLocationOrders = fgLocationOrdersRaw
+      .filter((order) => {
+        const loc = order.fgLocation;
+        if (!loc) return false;
+        if (Array.isArray(loc) && (loc as unknown[]).length === 0) return false;
+        return true;
+      })
+      .map((order) => ({
+        saleOrderNumber: order.saleOrderNumber,
+        outboundDelivery: order.outboundDelivery,
+        location: order.fgLocation,
+      }));
 
     return {
       ordersToBeDispatched,
