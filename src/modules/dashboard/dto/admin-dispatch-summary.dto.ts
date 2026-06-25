@@ -1,5 +1,25 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+export class AdminFgLocationOrderDto {
+  @ApiProperty({
+    example: '4500012345',
+    description: 'Sales order number',
+  })
+  saleOrderNumber: string;
+
+  @ApiProperty({
+    example: '8000012345',
+    description: 'Outbound delivery number',
+  })
+  outboundDelivery: string;
+
+  @ApiProperty({
+    example: { bin: 'FG-01', rack: 'A1' },
+    description: 'FG location value from SalesOrder.fgLocation',
+  })
+  location: unknown;
+}
+
 export class AdminDispatchSummaryDto {
   @ApiProperty({
     example: 8,
@@ -35,4 +55,11 @@ export class AdminDispatchSummaryDto {
       'Count of SalesOrder records with fgLocation not null for the selected deliveryDate',
   })
   fgLocationCount: number;
+
+  @ApiProperty({
+    type: [AdminFgLocationOrderDto],
+    description:
+      'Sales order, outbound delivery and FG location details used for FG popup',
+  })
+  fgLocationOrders: AdminFgLocationOrderDto[];
 }

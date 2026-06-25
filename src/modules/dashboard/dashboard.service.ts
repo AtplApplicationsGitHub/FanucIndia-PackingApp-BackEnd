@@ -447,12 +447,19 @@ export class DashboardService {
       OR: [{ status: null }, { status: { not: 'Dispatched' } }],
     };
 
+    const fgLocationWhere = {
+      deliveryDate: deliveryDateRange,
+      fgLocation: {
+        not: Prisma.DbNull,
+      },
+    };
+
     const [
       ordersToBeDispatched,
       ordersToBeDispatchedPaymentCleared,
       readyForDispatchToday,
       ordersDispatchedToday,
-      fgLocationCount,
+      fgLocationOrdersRaw,
     ] = await this.prisma.$transaction([
       this.prisma.salesOrder.count({
         where: toDispatchWhere,
@@ -484,22 +491,30 @@ export class DashboardService {
         },
       }),
 
-      this.prisma.salesOrder.count({
-        where: {
-          deliveryDate: deliveryDateRange,
-          fgLocation: {
-            not: Prisma.DbNull,
-          },
+      this.prisma.salesOrder.findMany({
+        where: fgLocationWhere,
+        select: {
+          saleOrderNumber: true,
+          outboundDelivery: true,
+          fgLocation: true,
         },
+        orderBy: [{ saleOrderNumber: 'asc' }, { outboundDelivery: 'asc' }],
       }),
     ]);
+
+    const fgLocationOrders = fgLocationOrdersRaw.map((order) => ({
+      saleOrderNumber: order.saleOrderNumber,
+      outboundDelivery: order.outboundDelivery,
+      location: order.fgLocation,
+    }));
 
     return {
       ordersToBeDispatched,
       ordersToBeDispatchedPaymentCleared,
       readyForDispatchToday,
       ordersDispatchedToday,
-      fgLocationCount,
+      fgLocationCount: fgLocationOrders.length,
+      fgLocationOrders,
     };
   }
 
