@@ -283,17 +283,38 @@ export class ErpMaterialImporterService {
     }
   }
 
-  async importFromDrive(saleOrderNumber: string, username: string) {
+  async importFromDrive(
+    saleOrderNumber: string,
+    username: string,
+    obdOverride?: string,
+  ) {
     this.logger.log(`Initiating Drive Import for SO: ${saleOrderNumber}`);
 
     const so = await this.prisma.salesOrder.findFirst({
       where: { saleOrderNumber },
-      select: { outboundDelivery: true },
+      select: { id: true, outboundDelivery: true },
     });
 
-    if (!so || !so.outboundDelivery) {
+    if (!so) {
       throw new BadRequestException(
-        `Sales Order or Outbound Delivery (OBD) not found for SO: ${saleOrderNumber}`,
+        `Sales Order not found: ${saleOrderNumber}`,
+      );
+    }
+
+    const obdToUse = obdOverride || so.outboundDelivery;
+    if (!obdToUse) {
+      throw new BadRequestException(
+        `Outbound Delivery (OBD) not found for SO: ${saleOrderNumber}`,
+      );
+    }
+
+    if (obdOverride && obdOverride !== so.outboundDelivery) {
+      await this.prisma.salesOrder.update({
+        where: { id: so.id },
+        data: { outboundDelivery: obdOverride },
+      });
+      this.logger.log(
+        `Corrected OBD for SO ${saleOrderNumber}: '${so.outboundDelivery}' -> '${obdOverride}'`,
       );
     }
 
@@ -305,7 +326,7 @@ export class ErpMaterialImporterService {
     const archivedDir = path.posix.join(baseDir, 'archive');
     const errorDir = path.posix.join(baseDir, 'error');
 
-    const filename = `${saleOrderNumber}_${so.outboundDelivery}.xlsx`;
+    const filename = `${saleOrderNumber}_${obdToUse}.xlsx`;
     const filePath = path.posix.join(activeDir, filename);
 
     this.logger.log(`Looking for file at SFTP path: ${filePath}`);
@@ -351,7 +372,7 @@ export class ErpMaterialImporterService {
 
       await this.prisma.eRP_Data_Cron_Logs.create({
         data: {
-          saleOrderNumber: `${saleOrderNumber}_${so.outboundDelivery}`,
+          saleOrderNumber: `${saleOrderNumber}_${obdToUse}`,
           status: 'Success',
           message: 'Imported successfully - MANUAL',
           createdAt: new Date(),
@@ -597,7 +618,7 @@ export class ErpMaterialImporterService {
         results.push({
           soNumber: displayId,
           status: 'Failed',
-          reason: error.message || 'Processing failed',
+          reason: error instanceof Error ? error.message : 'Processing failed',
         });
       }
     }
@@ -790,7 +811,9 @@ export class ErpMaterialImporterService {
   private renameColumns(records: any[]): any[] {
     return records.map((record) => {
       const newRecord: { [key: string]: any } = {};
-      for (const key of Object.keys(columnMapping)) {
+      for (const key of Object.keys(
+        columnMapping,
+      ) as (keyof typeof columnMapping)[]) {
         newRecord[columnMapping[key]] = record[key];
       }
       return newRecord;
@@ -1126,5 +1149,31 @@ export class ErpMaterialImporterService {
     }
 
     await archive.finalize();
+  }
+
+  async getActiveFilesForSo(
+    saleOrderNumber: string,
+  ): Promise<{ obd: string; filename: string }[]> {
+    const baseDir =
+      process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+    const activeDir = path.posix.join(baseDir, 'active');
+
+    const files = (await this.sftpService.list(activeDir)) as Array<{
+      type: string;
+      name: string;
+    }>;
+    const prefix = `${saleOrderNumber}_`;
+
+    return files
+      .filter(
+        (f) =>
+          f.type !== 'd' &&
+          f.name.startsWith(prefix) &&
+          f.name.endsWith('.xlsx'),
+      )
+      .map((f) => ({
+        obd: f.name.slice(prefix.length, -'.xlsx'.length),
+        filename: f.name,
+      }));
   }
 }

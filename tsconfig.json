@@ -3,6 +3,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2023",
+    "rootDir": "./",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,

@@ -85,6 +85,17 @@ export class ErpMaterialImporterController {
     );
   }
 
+  @Post('active-obd-options')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({
+    summary: 'List all active-folder files matching an SO number',
+  })
+  async getActiveObdOptions(@Body('saleOrderNumber') saleOrderNumber: string) {
+    if (!saleOrderNumber)
+      throw new BadRequestException('Sale Order Number is required.');
+    return this.service.getActiveFilesForSo(saleOrderNumber);
+  }
+
   @Post('import-from-drive')
   @Roles('ADMIN', 'USER')
   @ApiOperation({
@@ -104,12 +115,13 @@ export class ErpMaterialImporterController {
   })
   async importFromDrive(
     @Body('saleOrderNumber') saleOrderNumber: string,
+    @Body('obd') obd: string,
     @Req() req: AuthRequest,
   ) {
     if (!saleOrderNumber) {
       throw new BadRequestException('Sale Order Number is required.');
     }
-    return this.service.importFromDrive(saleOrderNumber, req.user.name);
+    return this.service.importFromDrive(saleOrderNumber, req.user.name, obd);
   }
 
   @Post('bulk-download-drive')
