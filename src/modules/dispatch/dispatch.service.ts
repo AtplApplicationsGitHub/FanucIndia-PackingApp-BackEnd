@@ -37,7 +37,7 @@ export class DispatchService {
       if (resolvedPath.startsWith(tempDir)) {
         fs.unlinkSync(filePath);
       }
-    } catch (e) { }
+    } catch (e) {}
   }
 
   private async getUserEmail(userId: number): Promise<string> {
@@ -66,25 +66,25 @@ export class DispatchService {
   }
 
   private getVehicleEntryCreatedAtRange(
-  startDate?: string,
-  endDate?: string,
-): Prisma.DateTimeFilter | undefined {
-  if (!startDate && !endDate) {
-    return undefined;
+    startDate?: string,
+    endDate?: string,
+  ): Prisma.DateTimeFilter | undefined {
+    if (!startDate && !endDate) {
+      return undefined;
+    }
+
+    const range: Prisma.DateTimeFilter = {};
+
+    if (startDate) {
+      range.gte = getIstTimestampRange(startDate)!.startOfDay;
+    }
+
+    if (endDate) {
+      range.lt = getIstTimestampRange(endDate)!.endOfDay;
+    }
+
+    return range;
   }
-
-  const range: Prisma.DateTimeFilter = {};
-
-  if (startDate) {
-    range.gte = getIstTimestampRange(startDate)!.startOfDay;
-  }
-
-  if (endDate) {
-    range.lt = getIstTimestampRange(endDate)!.endOfDay;
-  }
-
-  return range;
-}
 
   private parseOptionalPositiveInteger(value: unknown, fieldName: string) {
     if (value === undefined || value === null || value === '') {
@@ -191,7 +191,7 @@ export class DispatchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sftpService: SftpService,
-  ) { }
+  ) {}
 
   async create(dto: any, files: Express.Multer.File[], userId: number) {
     const {
@@ -365,7 +365,8 @@ export class DispatchService {
     dto: CreateMobileDispatchDto,
     userId: number,
   ) {
-    const { transporterId, transporterName, vehicleNumber, vehicleEntryId } = dto;
+    const { transporterId, transporterName, vehicleNumber, vehicleEntryId } =
+      dto;
 
     const vehicleEntry = await this.findTodayVehicleEntryForDispatch(
       vehicleNumber,
@@ -445,7 +446,7 @@ export class DispatchService {
       files.forEach((file) => {
         try {
           this.safeUnlink(file.path);
-        } catch { }
+        } catch {}
       });
       throw new InternalServerErrorException('Failed to upload attachments.');
     }
@@ -679,7 +680,9 @@ export class DispatchService {
     }
 
     if (!entry) {
-      throw new NotFoundException(`Vehicle Entry with ID ${entryId} not found.`);
+      throw new NotFoundException(
+        `Vehicle Entry with ID ${entryId} not found.`,
+      );
     }
 
     return this.normalizeAttachments(entry.attachments);
@@ -830,8 +833,7 @@ export class DispatchService {
     const hasLRnumber =
       Object.prototype.hasOwnProperty.call(dto, 'LRnumber') ||
       Object.prototype.hasOwnProperty.call(dto, 'lrNumber');
-    const LRnumber =
-      dto.LRnumber !== undefined ? dto.LRnumber : dto.lrNumber;
+    const LRnumber = dto.LRnumber !== undefined ? dto.LRnumber : dto.lrNumber;
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const hasVehicleNumber = Object.prototype.hasOwnProperty.call(
       dto,
@@ -848,8 +850,8 @@ export class DispatchService {
     const rawTransporterId = transporterId as string | null | undefined;
     const finalTransporterId =
       rawTransporterId === undefined ||
-        rawTransporterId === null ||
-        rawTransporterId === ''
+      rawTransporterId === null ||
+      rawTransporterId === ''
         ? null
         : Number(rawTransporterId);
 
@@ -1350,7 +1352,9 @@ export class DispatchService {
   ) {
     const userName = await this.getUserEmail(userId);
     const finalLRnumber =
-      LRnumber === undefined || LRnumber === null ? null : String(LRnumber).trim();
+      LRnumber === undefined || LRnumber === null
+        ? null
+        : String(LRnumber).trim();
 
     return this.prisma.$transaction(async (tx) => {
       const dispatchSoLink = await tx.dispatch_SO.findUnique({
@@ -1424,7 +1428,8 @@ export class DispatchService {
     });
 
     return {
-      message: 'SO Number removed, status reverted to F105, and Dispatched stepper undone',
+      message:
+        'SO Number removed, status reverted to F105, and Dispatched stepper undone',
     };
   }
 
@@ -1628,5 +1633,60 @@ export class DispatchService {
     }
 
     return orders;
+  }
+
+  async removeDispatch(id: number, userId: number) {
+    const dispatch = await this.prisma.dispatch.findUnique({
+      where: { id },
+      include: { dispatchSOs: true },
+    });
+
+    if (!dispatch) {
+      throw new NotFoundException('Dispatch record not found.');
+    }
+
+    const userName = await this.getUserEmail(userId);
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const so of dispatch.dispatchSOs) {
+        await tx.salesOrder.update({
+          where: { id: so.salesOrderId },
+          data: {
+            status: 'F105',
+            UpdatedBy: userName,
+            UpdatedDate: now,
+          },
+        });
+
+        await tx.sO_Status_Stepper.updateMany({
+          where: {
+            salesOrderId: so.salesOrderId,
+            status: 'Dispatched',
+          },
+          data: {
+            createdDateTime: null,
+            updatedBy: userName,
+          },
+        });
+      }
+
+      await tx.dispatch.delete({ where: { id } });
+    });
+
+    try {
+      const remoteDir = path.posix.join(
+        process.env.SFTP_BASE_DIR_DISPATCH || '',
+        String(id),
+      );
+      await this.sftpService.rmdir(remoteDir);
+    } catch {}
+
+    return {
+      message:
+        dispatch.dispatchSOs.length > 0
+          ? 'Dispatch record and its mapped SO(s) deleted successfully, SO status reverted to F105.'
+          : 'Dispatch record deleted successfully.',
+    };
   }
 }

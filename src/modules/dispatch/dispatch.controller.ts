@@ -25,7 +25,16 @@ import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { CreateMobileDispatchDto } from './dto/create-mobile-dispatch.dto';
 import { UpdateMobileDispatchDto } from './dto/update-mobile-dispatch.dto';
 import { Response } from 'express';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody, ApiParam, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiConsumes,
+  ApiBody,
+  ApiParam,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 
 @ApiTags('Dispatch')
 @ApiBearerAuth()
@@ -36,10 +45,12 @@ export class DispatchController {
 
   @Post()
   @Roles('ADMIN', 'USER')
-  @UseInterceptors(FilesInterceptor('attachments', 10, {
-    limits: { fileSize: 200 * 1024 * 1024 }
-  }))
-    create(
+  @UseInterceptors(
+    FilesInterceptor('attachments', 10, {
+      limits: { fileSize: 200 * 1024 * 1024 },
+    }),
+  )
+  create(
     @Body() createDispatchDto: CreateDispatchDto,
     @UploadedFiles() files: Express.Multer.File[],
     @Req() req: AuthRequest,
@@ -53,58 +64,84 @@ export class DispatchController {
 
   @Post('mobile/header')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Step 1 (Mobile): Create dispatch header with ID or Name for Customer/Transporter.' })
+  @ApiOperation({
+    summary:
+      'Step 1 (Mobile): Create dispatch header with ID or Name for Customer/Transporter.',
+  })
   @ApiBody({
-    description: 'Provide either customerId OR customerName. Provide either transporterId OR transporterName (optional).',
-    type: CreateMobileDispatchDto, 
+    description:
+      'Provide either customerId OR customerName. Provide either transporterId OR transporterName (optional).',
+    type: CreateMobileDispatchDto,
   })
   createMobileDispatchHeader(
-    @Body() dto: CreateMobileDispatchDto, 
+    @Body() dto: CreateMobileDispatchDto,
     @Req() req: AuthRequest,
   ) {
-    return this.dispatchService.createMobileDispatchHeader(dto, req.user.userId);
+    return this.dispatchService.createMobileDispatchHeader(
+      dto,
+      req.user.userId,
+    );
   }
 
   @Post('mobile/:id/attachments')
   @Roles('ADMIN', 'USER')
-  @UseInterceptors(FilesInterceptor('attachments', 10, {
-    limits: { fileSize: 200 * 1024 * 1024 }
-  }))
-  @ApiOperation({ summary: 'Step 2 (Mobile): Upload attachments for a dispatch record.' })
+  @UseInterceptors(
+    FilesInterceptor('attachments', 10, {
+      limits: { fileSize: 200 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({
+    summary: 'Step 2 (Mobile): Upload attachments for a dispatch record.',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-      schema: {
-          type: 'object',
-          properties: { attachments: { type: 'array', items: { type: 'string', format: 'binary' } } },
+    schema: {
+      type: 'object',
+      properties: {
+        attachments: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+        },
       },
+    },
   })
   addMobileAttachments(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
     if (!files || files.length === 0) {
-        throw new BadRequestException('No attachment files provided.');
+      throw new BadRequestException('No attachment files provided.');
     }
     return this.dispatchService.addMobileAttachments(id, files);
   }
 
   @Post('mobile/:id/so')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Step 3 (Mobile): Link a Sales Order and update its status to Dispatched.' })
+  @ApiOperation({
+    summary:
+      'Step 3 (Mobile): Link a Sales Order and update its status to Dispatched.',
+  })
   addMobileDispatchSO(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { id: number },
     @Req() req: AuthRequest,
   ) {
     if (!body.id) {
-        throw new BadRequestException('Sales Order ID (id) is required.');
+      throw new BadRequestException('Sales Order ID (id) is required.');
     }
-    return this.dispatchService.addMobileDispatchSO(id, body.id, req.user.userId);
+    return this.dispatchService.addMobileDispatchSO(
+      id,
+      body.id,
+      req.user.userId,
+    );
   }
 
   @Get('search-so/:soNumber')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Search for SOs by number to handle duplicates (returns id, SO, OBD)' })
+  @ApiOperation({
+    summary:
+      'Search for SOs by number to handle duplicates (returns id, SO, OBD)',
+  })
   searchSOForDispatch(@Param('soNumber') soNumber: string) {
     if (!soNumber) {
       throw new BadRequestException('soNumber is required');
@@ -134,8 +171,15 @@ export class DispatchController {
   @ApiOperation({
     summary: 'Get the list of attachments for a vehicle entry from dispatch',
   })
-  @ApiParam({ name: 'id', description: 'The ID of the vehicle entry', type: Number })
-  @ApiResponse({ status: 200, description: 'Returns an array of attachment objects.' })
+  @ApiParam({
+    name: 'id',
+    description: 'The ID of the vehicle entry',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns an array of attachment objects.',
+  })
   @ApiResponse({ status: 404, description: 'Vehicle Entry not found.' })
   findVehicleEntryAttachments(@Param('id', ParseIntPipe) id: number) {
     return this.dispatchService.findVehicleEntryAttachments(id);
@@ -171,10 +215,19 @@ export class DispatchController {
   }
 
   @Get(':id/attachments')
-  @Roles('ADMIN', 'USER') 
-  @ApiOperation({ summary: 'Get the list of attachments for a specific dispatch ID' })
-  @ApiParam({ name: 'id', description: 'The ID of the dispatch record', type: Number })
-  @ApiResponse({ status: 200, description: 'Returns an array of attachment objects.' })
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({
+    summary: 'Get the list of attachments for a specific dispatch ID',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The ID of the dispatch record',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns an array of attachment objects.',
+  })
   @ApiResponse({ status: 404, description: 'Dispatch not found.' })
   findAttachments(@Param('id', ParseIntPipe) id: number) {
     return this.dispatchService.findAttachmentsByDispatchId(id);
@@ -187,13 +240,20 @@ export class DispatchController {
     @Body() updateDispatchDto: UpdateDispatchDto,
     @Req() req: AuthRequest,
   ) {
-    return this.dispatchService.update(id, updateDispatchDto, req.user.userId); 
+    return this.dispatchService.update(id, updateDispatchDto, req.user.userId);
   }
 
   @Patch('mobile/:id')
   @Roles('ADMIN', 'USER')
-  @ApiOperation({ summary: 'Update dispatch details (Mobile). Handles Customer/Transporter by ID or Name.' })
-  @ApiParam({ name: 'id', description: 'The ID of the dispatch record to update', type: Number })
+  @ApiOperation({
+    summary:
+      'Update dispatch details (Mobile). Handles Customer/Transporter by ID or Name.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The ID of the dispatch record to update',
+    type: Number,
+  })
   @ApiBody({ type: UpdateMobileDispatchDto })
   updateMobileDispatch(
     @Param('id', ParseIntPipe) id: number,
@@ -201,10 +261,14 @@ export class DispatchController {
     @Req() req: AuthRequest,
   ) {
     if (!dto.customerId && !dto.customerName) {
-      throw new BadRequestException('Either customerId or customerName must be provided.');
+      throw new BadRequestException(
+        'Either customerId or customerName must be provided.',
+      );
     }
-     if (!dto.transporterId && !dto.transporterName) {
-      throw new BadRequestException('Either transporterId or transporterName must be provided.');
+    if (!dto.transporterId && !dto.transporterName) {
+      throw new BadRequestException(
+        'Either transporterId or transporterName must be provided.',
+      );
     }
 
     return this.dispatchService.updateMobileDispatch(id, dto, req.user.userId);
@@ -226,9 +290,14 @@ export class DispatchController {
     if (!body.saleOrderNumber) {
       throw new BadRequestException('saleOrderNumber is required.');
     }
-    return this.dispatchService.addDispatchSO(id, body.saleOrderNumber, req.user.userId, body.salesOrderId);
+    return this.dispatchService.addDispatchSO(
+      id,
+      body.saleOrderNumber,
+      req.user.userId,
+      body.salesOrderId,
+    );
   }
-  
+
   @Patch('so/:soId')
   @Roles('ADMIN', 'USER')
   updateDispatchSOLRNumber(
@@ -253,10 +322,13 @@ export class DispatchController {
       req.user.userId,
     );
   }
-  
+
   @Delete('so/:soId')
   @Roles('ADMIN', 'USER')
-  removeDispatchSO(@Param('soId', ParseIntPipe) soId: number, @Req() req: AuthRequest) {
+  removeDispatchSO(
+    @Param('soId', ParseIntPipe) soId: number,
+    @Req() req: AuthRequest,
+  ) {
     return this.dispatchService.removeDispatchSO(soId, req.user.userId);
   }
 
@@ -277,9 +349,11 @@ export class DispatchController {
 
   @Post(':id/attachments')
   @Roles('ADMIN', 'USER')
-  @UseInterceptors(FilesInterceptor('attachments', 10, {
-    limits: { fileSize: 200 * 1024 * 1024 }
-  }))
+  @UseInterceptors(
+    FilesInterceptor('attachments', 10, {
+      limits: { fileSize: 200 * 1024 * 1024 },
+    }),
+  )
   addAttachments(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],
@@ -306,9 +380,24 @@ export class DispatchController {
     @Param('fileName') fileName: string,
     @Res() res: Response,
   ) {
-    const { stream, mimeType } = await this.dispatchService.getAttachmentStream(id, fileName);
+    const { stream, mimeType } = await this.dispatchService.getAttachmentStream(
+      id,
+      fileName,
+    );
     res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
     res.setHeader('Content-Type', mimeType || 'application/octet-stream');
     stream.pipe(res);
+  }
+
+  @Delete(':id')
+  @Roles('ADMIN', 'USER')
+  @ApiOperation({
+    summary: 'Delete a dispatch record (and its mapped SOs, if any)',
+  })
+  removeDispatch(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthRequest,
+  ) {
+    return this.dispatchService.removeDispatch(id, req.user.userId);
   }
 }
