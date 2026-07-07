@@ -57,6 +57,8 @@ export class ErpMaterialImporterService {
     private sftpService: SftpService,
   ) {}
 
+  private readonly activeImportLocks = new Set<string>();
+
   /**
    * Helper method to unzip an xlsx buffer, repair malformed XML (e.g., unescaped &, <, >),
    * and return a repaired xlsx buffer.
@@ -290,130 +292,139 @@ export class ErpMaterialImporterService {
   ) {
     this.logger.log(`Initiating Drive Import for SO: ${saleOrderNumber}`);
 
-    const so = await this.prisma.salesOrder.findFirst({
-      where: { saleOrderNumber },
-      select: { id: true, outboundDelivery: true },
-    });
-
-    if (!so) {
+    if (this.activeImportLocks.has(saleOrderNumber)) {
       throw new BadRequestException(
-        `Sales Order not found: ${saleOrderNumber}`,
+        `SO ${saleOrderNumber} is currently being processed by the system. Please try again in a moment.`,
       );
     }
-
-    const obdToUse = obdOverride || so.outboundDelivery;
-    if (!obdToUse) {
-      throw new BadRequestException(
-        `Outbound Delivery (OBD) not found for SO: ${saleOrderNumber}`,
-      );
-    }
-
-    if (obdOverride && obdOverride !== so.outboundDelivery) {
-      await this.prisma.salesOrder.update({
-        where: { id: so.id },
-        data: { outboundDelivery: obdOverride },
-      });
-      this.logger.log(
-        `Corrected OBD for SO ${saleOrderNumber}: '${so.outboundDelivery}' -> '${obdOverride}'`,
-      );
-    }
-
-    const baseDir =
-      process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
-
-    // Ensure we use POSIX paths for SFTP
-    const activeDir = path.posix.join(baseDir, 'active');
-    const archivedDir = path.posix.join(baseDir, 'archive');
-    const errorDir = path.posix.join(baseDir, 'error');
-
-    const filename = `${saleOrderNumber}_${obdToUse}.xlsx`;
-    const filePath = path.posix.join(activeDir, filename);
-
-    this.logger.log(`Looking for file at SFTP path: ${filePath}`);
-
-    const exists = await this.sftpService.exists(filePath);
-    if (!exists) {
-      throw new NotFoundException(
-        `File '${filename}' not found in Active folder on SFTP server. Path: ${filePath}`,
-      );
-    }
-
-    let fileBuffer: Buffer;
-    try {
-      // [CORRECTED LINE]: Use sftpService to download the buffer
-      fileBuffer = await this.sftpService.getBuffer(filePath);
-    } catch (err) {
-      this.logger.error(`Failed to read file from SFTP: ${filePath}`, err);
-      throw new InternalServerErrorException(
-        'Failed to read the file from drive.',
-      );
-    }
-
-    const mockFile: Express.Multer.File = {
-      fieldname: 'file',
-      originalname: filename,
-      encoding: '7bit',
-      mimetype:
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: fileBuffer,
-      size: fileBuffer.length,
-      destination: activeDir,
-      filename: filename,
-      path: filePath,
-      stream: null as any,
-    };
+    this.activeImportLocks.add(saleOrderNumber);
 
     try {
-      const result = await this.processFile(
-        mockFile,
-        saleOrderNumber,
-        username,
-      );
-
-      await this.prisma.eRP_Data_Cron_Logs.create({
-        data: {
-          saleOrderNumber: `${saleOrderNumber}_${obdToUse}`,
-          status: 'Success',
-          message: 'Imported successfully - MANUAL',
-          createdAt: new Date(),
-        },
+      const so = await this.prisma.salesOrder.findFirst({
+        where: { saleOrderNumber },
+        select: { id: true, outboundDelivery: true },
       });
 
-      const archivePath = path.posix.join(archivedDir, filename);
-
-      if (await this.sftpService.exists(archivePath)) {
-        await this.sftpService.delete(archivePath);
+      if (!so) {
+        throw new BadRequestException(
+          `Sales Order not found: ${saleOrderNumber}`,
+        );
       }
 
-      await this.sftpService.rename(filePath, archivePath);
-      this.logger.log(
-        `Moved file to SFTP Archive (Overwrite allowed): ${archivePath}`,
-      );
+      const obdToUse = obdOverride || so.outboundDelivery;
+      if (!obdToUse) {
+        throw new BadRequestException(
+          `Outbound Delivery (OBD) not found for SO: ${saleOrderNumber}`,
+        );
+      }
 
-      return result;
-    } catch (error) {
-      this.logger.error(
-        `Import failed for ${filename}. Moving to SFTP Error folder.`,
-        error,
-      );
+      if (obdOverride && obdOverride !== so.outboundDelivery) {
+        await this.prisma.salesOrder.update({
+          where: { id: so.id },
+          data: { outboundDelivery: obdOverride },
+        });
+        this.logger.log(
+          `Corrected OBD for SO ${saleOrderNumber}: '${so.outboundDelivery}' -> '${obdOverride}'`,
+        );
+      }
+
+      const baseDir =
+        process.env.SFTP_BASE_DIR_DRIVE || 'uploads/fanuc/samba_mount_drive';
+
+      const activeDir = path.posix.join(baseDir, 'active');
+      const archivedDir = path.posix.join(baseDir, 'archive');
+      const errorDir = path.posix.join(baseDir, 'error');
+
+      const filename = `${saleOrderNumber}_${obdToUse}.xlsx`;
+      const filePath = path.posix.join(activeDir, filename);
+
+      this.logger.log(`Looking for file at SFTP path: ${filePath}`);
+
+      const exists = await this.sftpService.exists(filePath);
+      if (!exists) {
+        throw new NotFoundException(
+          `File '${filename}' not found in Active folder on SFTP server. Path: ${filePath}`,
+        );
+      }
+
+      let fileBuffer: Buffer;
       try {
-        const errorPath = path.posix.join(errorDir, filename);
+        fileBuffer = await this.sftpService.getBuffer(filePath);
+      } catch (err) {
+        this.logger.error(`Failed to read file from SFTP: ${filePath}`, err);
+        throw new InternalServerErrorException(
+          'Failed to read the file from drive.',
+        );
+      }
 
-        if (await this.sftpService.exists(errorPath)) {
-          await this.sftpService.delete(errorPath);
+      const mockFile: Express.Multer.File = {
+        fieldname: 'file',
+        originalname: filename,
+        encoding: '7bit',
+        mimetype:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        buffer: fileBuffer,
+        size: fileBuffer.length,
+        destination: activeDir,
+        filename: filename,
+        path: filePath,
+        stream: null as any,
+      };
+
+      try {
+        const result = await this.processFile(
+          mockFile,
+          saleOrderNumber,
+          username,
+        );
+
+        await this.prisma.eRP_Data_Cron_Logs.create({
+          data: {
+            saleOrderNumber: `${saleOrderNumber}_${obdToUse}`,
+            status: 'Success',
+            message: 'Imported successfully - MANUAL',
+            createdAt: new Date(),
+          },
+        });
+
+        const archivePath = path.posix.join(archivedDir, filename);
+
+        if (await this.sftpService.exists(archivePath)) {
+          await this.sftpService.delete(archivePath);
         }
 
-        await this.sftpService.rename(filePath, errorPath);
+        await this.sftpService.rename(filePath, archivePath);
         this.logger.log(
-          `Moved file to SFTP Error (Overwrite allowed): ${errorPath}`,
+          `Moved file to SFTP Archive (Overwrite allowed): ${archivePath}`,
         );
-      } catch (moveErr) {
+
+        return result;
+      } catch (error) {
         this.logger.error(
-          `Failed to move file ${filename} to Error folder on SFTP`,
-          moveErr,
+          `Import failed for ${filename}. Moving to SFTP Error folder.`,
+          error,
         );
+        try {
+          const errorPath = path.posix.join(errorDir, filename);
+
+          if (await this.sftpService.exists(errorPath)) {
+            await this.sftpService.delete(errorPath);
+          }
+
+          await this.sftpService.rename(filePath, errorPath);
+          this.logger.log(
+            `Moved file to SFTP Error (Overwrite allowed): ${errorPath}`,
+          );
+        } catch (moveErr) {
+          this.logger.error(
+            `Failed to move file ${filename} to Error folder on SFTP`,
+            moveErr,
+          );
+        }
+        throw error;
       }
-      throw error;
+    } finally {
+      this.activeImportLocks.delete(saleOrderNumber);
     }
   }
 
@@ -524,102 +535,116 @@ export class ErpMaterialImporterService {
     for (const so of salesOrders) {
       const soNumber = so.saleOrderNumber;
       const obd = so.outboundDelivery;
-
       const displayId = obd ? `${soNumber}_${obd}` : soNumber;
 
-      if (so.isErpImported === 1 || so._count.materialData > 0) {
+      if (this.activeImportLocks.has(soNumber)) {
         results.push({
           soNumber: displayId,
           status: 'Skipped',
-          reason: 'Data already imported',
+          reason: 'Currently being processed manually',
         });
         continue;
       }
-
-      if (!obd) {
-        results.push({
-          soNumber: displayId,
-          status: 'Skipped',
-          reason: 'Outbound Delivery (OBD) missing in system',
-        });
-        continue;
-      }
-
-      const filename = `${soNumber}_${obd}.xlsx`;
-      const filePath = path.posix.join(activeDir, filename);
+      this.activeImportLocks.add(soNumber);
 
       try {
-        const exists = await this.sftpService.exists(filePath);
-        if (!exists) {
+        if (so.isErpImported === 1 || so._count.materialData > 0) {
           results.push({
             soNumber: displayId,
             status: 'Skipped',
-            reason: `File not found: ${filename}`,
+            reason: 'Data already imported',
           });
           continue;
         }
-        const fileBuffer = await this.sftpService.getBuffer(filePath);
-        const mockFile: Express.Multer.File = {
-          fieldname: 'file',
-          originalname: filename,
-          encoding: '7bit',
-          mimetype:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          buffer: fileBuffer,
-          size: fileBuffer.length,
-          destination: activeDir,
-          filename: filename,
-          path: filePath,
-          stream: null as any,
-        };
 
-        await this.processFile(mockFile, soNumber, username);
-
-        const archivePath = path.posix.join(archivedDir, filename);
-        if (await this.sftpService.exists(archivePath)) {
-          await this.sftpService.delete(archivePath);
-        }
-        await this.sftpService.rename(filePath, archivePath);
-
-        results.push({
-          soNumber: displayId,
-          status: 'Success',
-          reason: 'Imported successfully',
-        });
-        if (logManualToCronTable) {
-          await this.prisma.eRP_Data_Cron_Logs.create({
-            data: {
-              saleOrderNumber: displayId,
-              status: 'Success',
-              message: 'Imported successfully - MANUAL',
-              createdAt: new Date(),
-            },
+        if (!obd) {
+          results.push({
+            soNumber: displayId,
+            status: 'Skipped',
+            reason: 'Outbound Delivery (OBD) missing in system',
           });
+          continue;
         }
-      } catch (error) {
-        this.logger.error(`Bulk import error for ${displayId}`, error);
+
+        const filename = `${soNumber}_${obd}.xlsx`;
+        const filePath = path.posix.join(activeDir, filename);
 
         try {
           const exists = await this.sftpService.exists(filePath);
-          if (exists) {
-            const errorPath = path.posix.join(errorDir, filename);
-            if (await this.sftpService.exists(errorPath)) {
-              await this.sftpService.delete(errorPath);
-            }
-            await this.sftpService.rename(filePath, errorPath);
+          if (!exists) {
+            results.push({
+              soNumber: displayId,
+              status: 'Skipped',
+              reason: `File not found: ${filename}`,
+            });
+            continue;
           }
-        } catch (moveErr) {
-          this.logger.error(
-            `Failed to move file ${filename} to Error folder`,
-            moveErr,
-          );
-        }
+          const fileBuffer = await this.sftpService.getBuffer(filePath);
+          const mockFile: Express.Multer.File = {
+            fieldname: 'file',
+            originalname: filename,
+            encoding: '7bit',
+            mimetype:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            buffer: fileBuffer,
+            size: fileBuffer.length,
+            destination: activeDir,
+            filename: filename,
+            path: filePath,
+            stream: null as any,
+          };
 
-        results.push({
-          soNumber: displayId,
-          status: 'Failed',
-          reason: error instanceof Error ? error.message : 'Processing failed',
-        });
+          await this.processFile(mockFile, soNumber, username);
+
+          const archivePath = path.posix.join(archivedDir, filename);
+          if (await this.sftpService.exists(archivePath)) {
+            await this.sftpService.delete(archivePath);
+          }
+          await this.sftpService.rename(filePath, archivePath);
+
+          results.push({
+            soNumber: displayId,
+            status: 'Success',
+            reason: 'Imported successfully',
+          });
+          if (logManualToCronTable) {
+            await this.prisma.eRP_Data_Cron_Logs.create({
+              data: {
+                saleOrderNumber: displayId,
+                status: 'Success',
+                message: 'Imported successfully - MANUAL',
+                createdAt: new Date(),
+              },
+            });
+          }
+        } catch (error) {
+          this.logger.error(`Bulk import error for ${displayId}`, error);
+
+          try {
+            const exists = await this.sftpService.exists(filePath);
+            if (exists) {
+              const errorPath = path.posix.join(errorDir, filename);
+              if (await this.sftpService.exists(errorPath)) {
+                await this.sftpService.delete(errorPath);
+              }
+              await this.sftpService.rename(filePath, errorPath);
+            }
+          } catch (moveErr) {
+            this.logger.error(
+              `Failed to move file ${filename} to Error folder`,
+              moveErr,
+            );
+          }
+
+          results.push({
+            soNumber: displayId,
+            status: 'Failed',
+            reason:
+              error instanceof Error ? error.message : 'Processing failed',
+          });
+        }
+      } finally {
+        this.activeImportLocks.delete(soNumber);
       }
     }
 
