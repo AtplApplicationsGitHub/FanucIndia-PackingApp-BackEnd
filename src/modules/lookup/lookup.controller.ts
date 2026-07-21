@@ -53,7 +53,6 @@ export class LookupController {
   constructor(private readonly lookupService: LookupService) {}
 
   @Get('products')
-  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all products' })
   @ApiResponse({ status: 200 })
   getProducts() {
@@ -87,7 +86,6 @@ export class LookupController {
   }
 
   @Get('transporters')
-  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all transporters' })
   getTransporters() {
     return this.lookupService.getTransporters();
@@ -119,7 +117,6 @@ export class LookupController {
   }
 
   @Get('plant-codes')
-  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all plant codes' })
   getPlantCodes() {
     return this.lookupService.getPlantCodes();
@@ -151,7 +148,6 @@ export class LookupController {
   }
 
   @Get('sales-zones')
-  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all sales zones' })
   getSalesZones() {
     return this.lookupService.getSalesZones();
@@ -183,7 +179,6 @@ export class LookupController {
   }
 
   @Get('pack-configs')
-  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all pack configs' })
   getPackConfigs() {
     return this.lookupService.getPackConfigs();
@@ -215,7 +210,6 @@ export class LookupController {
   }
 
   @Get('customers')
-  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all customers' })
   getCustomers() {
     return this.lookupService.getCustomers();
@@ -247,7 +241,6 @@ export class LookupController {
   }
 
   @Get('printers')
-  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all printers' })
   getPrinters() {
     return this.lookupService.getPrinters();
@@ -279,7 +272,6 @@ export class LookupController {
   }
 
   @Get('material-barcodes')
-  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all material barcodes' })
   getMaterialBarcodes() {
     return this.lookupService.getMaterialBarcodes();
