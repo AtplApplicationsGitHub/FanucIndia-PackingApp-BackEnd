@@ -42,7 +42,7 @@
     "effect": "^3.20.0",
     "defu": "^6.1.6",
     "uuid": "^14.0.0",
-    "ws": "^8.20.1"
+    "ws": "^8.21.1"
   },
   "dependencies": {
     "@mui/icons-material": "^7.2.0",
@@ -59,7 +59,7 @@
     "@prisma/client": "^6.19.3",
     "@types/helmet": "^0.0.48",
     "@types/pdfkit": "^0.17.2",
-    "adm-zip": "^0.5.17",
+    "adm-zip": "^0.6.0",
     "archiver": "^8.0.0",
     "bcryptjs": "^3.0.2",
     "class-transformer": "^0.5.1",

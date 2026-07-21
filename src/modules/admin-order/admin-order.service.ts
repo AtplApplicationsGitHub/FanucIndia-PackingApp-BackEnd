@@ -519,6 +519,11 @@ export class AdminOrderService {
     return { message: 'Sales order deleted successfully' };
   }
 
+  async getSuperPassword() {
+    const config = await this.prisma.order_Delete_Password.findFirst();
+    return { password: config?.password ?? '' };
+  }
+
   async updateSuperPassword(newPassword: string) {
     const existing = await this.prisma.order_Delete_Password.findFirst();
     if (existing) {

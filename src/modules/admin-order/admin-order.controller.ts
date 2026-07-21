@@ -149,8 +149,15 @@ export class AdminOrderController {
     return this.service.remove(id, password);
   }
 
+  @Get('super-password')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Get the current Order Delete Password (Super Admin only)' })
+  async getSuperPassword() {
+    return this.service.getSuperPassword();
+  }
+
   @Post('super-password')
-  @Roles('ADMIN')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update the Super Password for order deletion' })
   async updateSuperPassword(@Body('password') password: string) {
     if (!password) throw new BadRequestException('Password cannot be empty');

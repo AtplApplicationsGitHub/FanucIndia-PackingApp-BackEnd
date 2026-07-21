@@ -34,10 +34,10 @@ export class CreateUserDto {
 
   @ApiProperty({
     example: 'USER',
-    enum: ['ADMIN', 'SALES', 'USER'],
+    enum: ['ADMIN', 'SALES', 'USER', 'SUPER_ADMIN'],
   })
   @IsString()
-  @IsIn(['ADMIN', 'SALES', 'USER'])
+  @IsIn(['ADMIN', 'SALES', 'USER', 'SUPER_ADMIN'])
   role!: string;
 
   @ApiProperty({ description: 'Sales Zone ID (Required if role is SALES)', required: false })

@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { LookupService } from './lookup.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../auth/roles.decorator';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -52,6 +53,7 @@ export class LookupController {
   constructor(private readonly lookupService: LookupService) {}
 
   @Get('products')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all products' })
   @ApiResponse({ status: 200 })
   getProducts() {
@@ -59,6 +61,7 @@ export class LookupController {
   }
 
   @Post('products')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Create a new product' })
   @ApiBody({ type: CreateProductDto })
   @ApiResponse({ status: 201 })
@@ -67,6 +70,7 @@ export class LookupController {
   }
 
   @Patch('products/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update a product' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdateProductDto })
@@ -75,6 +79,7 @@ export class LookupController {
   }
 
   @Delete('products/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Delete a product' })
   @ApiParam({ name: 'id', type: Number })
   deleteProduct(@Param('id', ParseIntPipe) id: number) {
@@ -82,12 +87,14 @@ export class LookupController {
   }
 
   @Get('transporters')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all transporters' })
   getTransporters() {
     return this.lookupService.getTransporters();
   }
 
   @Post('transporters')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Create a transporter' })
   @ApiBody({ type: CreateTransporterDto })
   createTransporter(@Body() dto: CreateTransporterDto) {
@@ -95,6 +102,7 @@ export class LookupController {
   }
 
   @Patch('transporters/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update a transporter' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdateTransporterDto })
@@ -103,6 +111,7 @@ export class LookupController {
   }
 
   @Delete('transporters/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Delete a transporter' })
   @ApiParam({ name: 'id', type: Number })
   deleteTransporter(@Param('id', ParseIntPipe) id: number) {
@@ -110,12 +119,14 @@ export class LookupController {
   }
 
   @Get('plant-codes')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all plant codes' })
   getPlantCodes() {
     return this.lookupService.getPlantCodes();
   }
 
   @Post('plant-codes')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Create a plant code' })
   @ApiBody({ type: CreatePlantCodeDto })
   createPlantCode(@Body() dto: CreatePlantCodeDto) {
@@ -123,6 +134,7 @@ export class LookupController {
   }
 
   @Patch('plant-codes/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update a plant code' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdatePlantCodeDto })
@@ -131,6 +143,7 @@ export class LookupController {
   }
 
   @Delete('plant-codes/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Delete a plant code' })
   @ApiParam({ name: 'id', type: Number })
   deletePlantCode(@Param('id', ParseIntPipe) id: number) {
@@ -138,12 +151,14 @@ export class LookupController {
   }
 
   @Get('sales-zones')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all sales zones' })
   getSalesZones() {
     return this.lookupService.getSalesZones();
   }
 
   @Post('sales-zones')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Create a sales zone' })
   @ApiBody({ type: CreateSalesZoneDto })
   createSalesZone(@Body() dto: CreateSalesZoneDto) {
@@ -151,6 +166,7 @@ export class LookupController {
   }
 
   @Patch('sales-zones/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update a sales zone' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdateSalesZoneDto })
@@ -159,6 +175,7 @@ export class LookupController {
   }
 
   @Delete('sales-zones/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Delete a sales zone' })
   @ApiParam({ name: 'id', type: Number })
   deleteSalesZone(@Param('id', ParseIntPipe) id: number) {
@@ -166,12 +183,14 @@ export class LookupController {
   }
 
   @Get('pack-configs')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all pack configs' })
   getPackConfigs() {
     return this.lookupService.getPackConfigs();
   }
 
   @Post('pack-configs')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Create a pack config' })
   @ApiBody({ type: CreatePackConfigDto })
   createPackConfig(@Body() dto: CreatePackConfigDto) {
@@ -179,6 +198,7 @@ export class LookupController {
   }
 
   @Patch('pack-configs/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update a pack config' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdatePackConfigDto })
@@ -187,6 +207,7 @@ export class LookupController {
   }
 
   @Delete('pack-configs/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Delete a pack config' })
   @ApiParam({ name: 'id', type: Number })
   deletePackConfig(@Param('id', ParseIntPipe) id: number) {
@@ -194,12 +215,14 @@ export class LookupController {
   }
 
   @Get('customers')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all customers' })
   getCustomers() {
     return this.lookupService.getCustomers();
   }
 
   @Post('customers')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Create a customer' })
   @ApiBody({ type: CreateCustomerDto })
   createCustomer(@Body() dto: CreateCustomerDto) {
@@ -207,6 +230,7 @@ export class LookupController {
   }
 
   @Patch('customers/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update a customer' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdateCustomerDto })
@@ -215,6 +239,7 @@ export class LookupController {
   }
 
   @Delete('customers/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Delete a customer' })
   @ApiParam({ name: 'id', type: Number })
   deleteCustomer(@Param('id', ParseIntPipe) id: number) {
@@ -222,12 +247,14 @@ export class LookupController {
   }
 
   @Get('printers')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all printers' })
   getPrinters() {
     return this.lookupService.getPrinters();
   }
 
   @Post('printers')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Create a printer' })
   @ApiBody({ type: CreatePrinterDto })
   createPrinter(@Body() dto: CreatePrinterDto) {
@@ -235,6 +262,7 @@ export class LookupController {
   }
 
   @Patch('printers/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update a printer' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdatePrinterDto })
@@ -243,6 +271,7 @@ export class LookupController {
   }
 
   @Delete('printers/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Delete a printer' })
   @ApiParam({ name: 'id', type: Number })
   deletePrinter(@Param('id', ParseIntPipe) id: number) {
@@ -250,12 +279,14 @@ export class LookupController {
   }
 
   @Get('material-barcodes')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all material barcodes' })
   getMaterialBarcodes() {
     return this.lookupService.getMaterialBarcodes();
   }
 
   @Post('material-barcodes')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Create a material barcode' })
   @ApiBody({ type: CreateMaterialBarcodeDto })
   createMaterialBarcode(@Body() dto: CreateMaterialBarcodeDto) {
@@ -263,6 +294,7 @@ export class LookupController {
   }
 
   @Patch('material-barcodes/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update a material barcode' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdateMaterialBarcodeDto })
@@ -271,6 +303,7 @@ export class LookupController {
   }
 
   @Delete('material-barcodes/:id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Delete a material barcode' })
   @ApiParam({ name: 'id', type: Number })
   deleteMaterialBarcode(@Param('id', ParseIntPipe) id: number) {
@@ -278,12 +311,14 @@ export class LookupController {
   }
 
   @Get('bulk-template')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Download Excel template with all master data' })
   async downloadBulkTemplate(@Res() res: Response,@Query('type') type?:string) {
     return this.lookupService.generateBulkTemplate(res, type);
   }
 
   @Post('bulk-import')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Bulk import/update master data from Excel' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file'))
@@ -311,12 +346,14 @@ export class LookupController {
   }
 
   @Get('config/:key')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get system config by key' })
   getConfig(@Param('key') key: string) {
     return this.lookupService.getSystemConfig(key);
   }
 
   @Patch('config/:key')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update system config by key' })
   @ApiBody({ schema: { properties: { value: { type: 'string' } } } })
   updateConfig(@Param('key') key: string, @Body('value') value: string) {

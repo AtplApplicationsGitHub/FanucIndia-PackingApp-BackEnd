@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto, ResetPasswordDto } from './dto/user.dto';
+import { Roles } from '../auth/roles.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -29,6 +30,7 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post()
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Create a new user (Admin only)' })
   @ApiBody({ type: CreateUserDto })
   @ApiResponse({ status: 201, description: 'User created successfully' })
@@ -38,6 +40,7 @@ export class UserController {
   }
 
   @Get()
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Get all users (Admin only)' })
   @ApiQuery({
     name: 'role',
@@ -47,13 +50,14 @@ export class UserController {
   })
   @ApiResponse({ status: 200, description: 'List of all users' })
   findAll(
-    @Query('role') role?: 'ADMIN' | 'SALES' | 'USER',
+    @Query('role') role?: 'ADMIN' | 'SALES' | 'USER' | 'SUPER_ADMIN',
     @Query('search') search?: string,
   ) {
     return this.userService.findAll(role, search);
   }
 
   @Patch(':id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update user details by ID (Admin only)' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: UpdateUserDto })
@@ -64,6 +68,7 @@ export class UserController {
   }
 
   @Delete(':id')
+  @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Delete a user by ID (Admin only)' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, description: 'User deleted successfully' })

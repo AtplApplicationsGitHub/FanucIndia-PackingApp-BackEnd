@@ -76,7 +76,7 @@ export class UserService {
     });
   }
 
-  async findAll(role?: 'ADMIN' | 'SALES' | 'USER', search?: string) {
+  async findAll(role?: 'ADMIN' | 'SALES' | 'USER' | 'SUPER_ADMIN', search?: string) {
     const where: Prisma.UserWhereInput = {};
     if (role) {
       where.role = role;
@@ -231,7 +231,19 @@ export class UserService {
       );
     }
 
-    await this.prisma.user.delete({ where: { id } });
+    try {
+      await this.prisma.user.delete({ where: { id } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new BadRequestException(
+          'Cannot delete user: This user is linked to one or more orders, dispatches, or other records. Reassign or clear those records first.',
+        );
+      }
+      throw error;
+    }
     return { message: 'User deleted successfully' };
   }
 
