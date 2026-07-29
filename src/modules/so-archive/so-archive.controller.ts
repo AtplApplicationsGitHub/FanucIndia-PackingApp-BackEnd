@@ -1,10 +1,10 @@
-import { Controller, Post, Delete, Param, UseGuards, HttpCode, HttpStatus, Get, ParseIntPipe, Res, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Delete, Param, UseGuards, HttpCode, HttpStatus, Get, ParseIntPipe, Res, BadRequestException, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam } from '@nestjs/swagger';
 import { SoArchiveService } from './so-archive.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 
 @ApiTags('so-archive')
 @ApiBearerAuth()
@@ -18,8 +18,11 @@ export class SoArchiveController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Archive a dispatched Sales Order' })
   @ApiParam({ name: 'soNumber', type: String, description: 'The Sales Order Number to archive' })
-  async archive(@Param('soNumber') soNumber: string) {
-    return this.soArchiveService.archive(soNumber);
+  async archive(
+    @Param('soNumber') soNumber: string,
+    @Req() req: Request & { user: { name?: string } },
+  ) {
+    return this.soArchiveService.archive(soNumber, req.user?.name || 'System');
   }
 
   @Delete(':soNumber/delete')

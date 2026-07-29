@@ -128,6 +128,7 @@ model SalesOrder {
   efficiencyRecords     Efficiency_PP[]
   isErpImported         Int                     @default(0)
   binCount              Int?                    @default(0)
+  auditLogs             Json                    @default("[]") @map("audit_logs")
   createdAt             DateTime                @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime                @updatedAt @db.Timestamptz(3)
   materialData          ERP_Material_Data[]
@@ -305,6 +306,7 @@ model SalesOrderArchive {
   skipPackingStage      Boolean?
   isErpImported         Int?
   binCount              Int?
+  auditLogs             Json      @default("[]") @map("audit_logs")
   createdAt             DateTime  @db.Timestamptz(3)
   UpdatedBy             String?
   UpdatedDate           DateTime? @db.Timestamptz(3)

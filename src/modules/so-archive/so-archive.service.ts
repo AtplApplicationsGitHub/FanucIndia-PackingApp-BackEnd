@@ -19,7 +19,7 @@ export class SoArchiveService {
     private readonly sftp: SftpService,
   ) {}
 
-  async archive(saleOrderNumber: string) {
+  async archive(saleOrderNumber: string, archivedBy = 'System') {
     const so = await this.prisma.salesOrder.findFirst({
       where: {
         saleOrderNumber,
@@ -80,13 +80,28 @@ export class SoArchiveService {
         ...soData
       } = so;
 
+      const existingAuditLogs = Array.isArray(so.auditLogs)
+        ? so.auditLogs
+        : [];
+      const archivedAt = new Date();
+      const archiveAuditEntry = {
+        serialNumber: existingAuditLogs.length + 1,
+        action: 'ORDER_ARCHIVED',
+        description: `Order Archived: ${so.saleOrderNumber}_${so.outboundDelivery}`,
+        archivedBy,
+        archivedAt: archivedAt.toISOString(),
+      };
+      const archivedAuditLogs = [...existingAuditLogs, archiveAuditEntry];
+
       await tx.salesOrderArchive.create({
         data: {
           id: so.id,
           ...soData,
+          auditLogs: archivedAuditLogs as Prisma.InputJsonValue,
           transferOrder: soData.transferOrder ?? '',
           packConfigId: soData.packConfigId ?? 0,
           fgLocation: soData.fgLocation ?? Prisma.DbNull,
+          archivedAt,
         },
       });
 
