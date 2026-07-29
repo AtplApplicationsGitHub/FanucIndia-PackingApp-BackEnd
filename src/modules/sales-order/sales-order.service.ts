@@ -37,84 +37,91 @@ export class SalesOrderService {
       where.userId = authUserId;
     }
 
-    if (filters.search) {
-      const searchStr = filters.search.trim().replace(/\s+/g, ' ');
-      const s = { contains: searchStr, mode: 'insensitive' };
+    // If the user checked specific rows in the UI and asked to export just
+    // those, honor that exactly - ignore search/status/date filters, which
+    // may be stale relative to what's actually checked. Zone/user security
+    // above still applies so this can't be used to reach other zones' data.
+    const selectedIds = String(filters.ids ?? '')
+      .split(',')
+      .map((v: string) => parseInt(v.trim(), 10))
+      .filter((n: number) => Number.isFinite(n));
 
-      where.OR = [
-        { saleOrderNumber: s },
-        { outboundDelivery: s },
-        { transferOrder: s },
-        { plantCode: s },
-        { specialRemarks: s },
-        { status: s },
-        { customerNameText: s },
-        { product: { is: { name: s } } },
-        { transporter: { is: { name: s } } },
-        { salesZone: { is: { name: s } } },
-        { packConfig: { is: { configName: s } } },
-        { customer: { is: { name: s } } },
-      ];
+    if (selectedIds.length > 0) {
+      where.id = { in: selectedIds };
+    } else {
+      if (filters.search) {
+        const searchStr = filters.search.trim().replace(/\s+/g, ' ');
+        const s = { contains: searchStr, mode: 'insensitive' };
 
-      const lowerSearch = searchStr.toLowerCase();
-      if (['yes', 'true'].includes(lowerSearch)) {
-        where.OR.push({ paymentClearance: true });
-      } else if (['no', 'false'].includes(lowerSearch)) {
-        where.OR.push({ paymentClearance: false });
+        where.OR = [
+          { saleOrderNumber: s },
+          { outboundDelivery: s },
+          { transferOrder: s },
+          { plantCode: s },
+          { specialRemarks: s },
+          { status: s },
+          { customerNameText: s },
+          { product: { is: { name: s } } },
+          { transporter: { is: { name: s } } },
+          { salesZone: { is: { name: s } } },
+          { packConfig: { is: { configName: s } } },
+          { customer: { is: { name: s } } },
+        ];
+
+        const lowerSearch = searchStr.toLowerCase();
+        if (['yes', 'true'].includes(lowerSearch)) {
+          where.OR.push({ paymentClearance: true });
+        } else if (['no', 'false'].includes(lowerSearch)) {
+          where.OR.push({ paymentClearance: false });
+        }
       }
-    }
 
-    if (filters.paymentClearance !== undefined)
-      where.paymentClearance = filters.paymentClearance === 'true';
+      if (filters.paymentClearance !== undefined)
+        where.paymentClearance = filters.paymentClearance === 'true';
 
-    // Ensure frontend filters cannot bypass the user's zone restriction
-    if (filters.salesZoneId) {
-      const reqZone = parseInt(filters.salesZoneId, 10);
-      if (user?.salesZoneId && reqZone !== user.salesZoneId) {
-        where.salesZoneId = user.salesZoneId;
-      } else {
-        where.salesZoneId = reqZone;
+      // Ensure frontend filters cannot bypass the user's zone restriction
+      if (filters.salesZoneId) {
+        const reqZone = parseInt(filters.salesZoneId, 10);
+        if (user?.salesZoneId && reqZone !== user.salesZoneId) {
+          where.salesZoneId = user.salesZoneId;
+        } else {
+          where.salesZoneId = reqZone;
+        }
       }
-    }
 
-    if (filters.status) {
-      if (filters.status === 'None') {
+      if (filters.status) {
+        if (filters.status === 'None') {
+          where.AND = [
+            ...(Array.isArray(where.AND) ? where.AND : []),
+            { OR: [{ status: null }, { status: '' }] },
+          ];
+        } else {
+          where.status = filters.status;
+        }
+      } else if (filters.excludeStatus) {
         where.AND = [
           ...(Array.isArray(where.AND) ? where.AND : []),
-          { OR: [{ status: null }, { status: '' }] },
+          {
+            OR: [
+              { status: { not: filters.excludeStatus } },
+              { status: null },
+              { status: '' },
+            ],
+          },
         ];
-      } else {
-        where.status = filters.status;
       }
-    } else if (filters.excludeStatus) {
-      where.AND = [
-        ...(Array.isArray(where.AND) ? where.AND : []),
-        {
-          OR: [
-            { status: { not: filters.excludeStatus } },
-            { status: null },
-            { status: '' },
-          ],
-        },
-      ];
-    }
 
-    const parseYMD = (s: string) => {
-      const datePart = s.includes('T') ? s.split('T')[0] : s;
-      const [y, m, d] = datePart.split('-').map(Number);
-      return { y, m, d };
-    };
+      const deliveryDateRange = getDateOnlyRange(
+        filters.startDate,
+        filters.endDate,
+      );
 
-    const deliveryDateRange = getDateOnlyRange(
-      filters.startDate,
-      filters.endDate,
-    );
-
-    if (deliveryDateRange) {
-      where.deliveryDate = {
-        ...(where.deliveryDate as object),
-        ...deliveryDateRange,
-      };
+      if (deliveryDateRange) {
+        where.deliveryDate = {
+          ...(where.deliveryDate as object),
+          ...deliveryDateRange,
+        };
+      }
     }
 
     let orders: any[] = [];

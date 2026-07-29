@@ -1198,6 +1198,10 @@ export class SalesCrudService {
     // 4. Define base path from env or use a default
     const basePath = process.env.SFTP_BASE_DIR_SALESUSER_ORDER || '';
     const attachmentRecords: Prisma.SalesOrderAttachmentCreateManyInput[] = [];
+    // Captured once so the SalesOrderAttachment.createdAt rows and the
+    // ATTACHMENT_UPLOADED audit entry's uploadedAt are the exact same
+    // value, not two independently-generated timestamps.
+    const uploadTimestamp = new Date();
 
     // 5. Process each Sales Order
     for (const order of salesOrders) {
@@ -1247,6 +1251,7 @@ export class SalesCrudService {
           mimeType: file.mimetype,
           fileSizeBytes: file.size,
           uploadedBy: userId,
+          createdAt: uploadTimestamp,
         });
       }
     }
@@ -1266,7 +1271,6 @@ export class SalesCrudService {
     // 8. Append an ATTACHMENT_UPLOADED entry to each affected order's audit
     // trail. Attachments live in a separate table that the SalesOrder audit
     // trigger never sees, so this has to be recorded explicitly here.
-    const uploadedAt = new Date();
     const uploaderName = user?.name || 'System';
 
     for (const order of salesOrders) {
@@ -1290,7 +1294,7 @@ export class SalesCrudService {
         },
         files: orderFiles,
         uploadedBy: uploaderName,
-        uploadedAt: uploadedAt.toISOString(),
+        uploadedAt: uploadTimestamp.toISOString(),
       };
 
       try {

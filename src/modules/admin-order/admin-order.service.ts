@@ -1096,11 +1096,19 @@ export class AdminOrderService {
           } else {
             const u = await tx.user.findFirst({
               where: {
-                name: { equals: rowAssignedUser.trim(), mode: 'insensitive' },
+                OR: [
+                  { name: { equals: rowAssignedUser.trim(), mode: 'insensitive' } },
+                  { email: { equals: rowAssignedUser.trim(), mode: 'insensitive' } },
+                ],
                 role: 'USER',
               },
             });
-            if (u) assignedUserId = u.id;
+            if (!u) {
+              throw new BadRequestException(
+                `Row ${i}: No active USER-role account found named '${rowAssignedUser}' for Assigned User. Check spelling or the account's role.`,
+              );
+            }
+            assignedUserId = u.id;
           }
         }
 
@@ -1119,11 +1127,19 @@ export class AdminOrderService {
           } else {
             const u = await tx.user.findFirst({
               where: {
-                name: { equals: rowIssueUser.trim(), mode: 'insensitive' },
+                OR: [
+                  { name: { equals: rowIssueUser.trim(), mode: 'insensitive' } },
+                  { email: { equals: rowIssueUser.trim(), mode: 'insensitive' } },
+                ],
                 role: 'USER',
               },
             });
-            if (u) issueAssignedUserId = u.id;
+            if (!u) {
+              throw new BadRequestException(
+                `Row ${i}: No active USER-role account found named '${rowIssueUser}' for Issue Assigned User. Check spelling or the account's role.`,
+              );
+            }
+            issueAssignedUserId = u.id;
           }
         }
 
@@ -1143,11 +1159,19 @@ export class AdminOrderService {
           } else {
             const u = await tx.user.findFirst({
               where: {
-                name: { equals: rowPackingUser.trim(), mode: 'insensitive' },
+                OR: [
+                  { name: { equals: rowPackingUser.trim(), mode: 'insensitive' } },
+                  { email: { equals: rowPackingUser.trim(), mode: 'insensitive' } },
+                ],
                 role: 'USER',
               },
             });
-            if (u) packingAssignedUserId = u.id;
+            if (!u) {
+              throw new BadRequestException(
+                `Row ${i}: No active USER-role account found named '${rowPackingUser}' for Packing Assigned User. Check spelling or the account's role.`,
+              );
+            }
+            packingAssignedUserId = u.id;
           }
         }
 
@@ -1168,15 +1192,16 @@ export class AdminOrderService {
           if (!isNaN(p)) priority = p;
         }
 
-        let skipStage = dbOrder.skipStage;
+        let skipIssueStage = dbOrder.skipIssueStage;
+        let skipPackingStage = dbOrder.skipPackingStage;
         const rowSkipIssue = getCellString('SKIP ISSUE STAGE');
         const rowSkipPacking = getCellString('SKIP PACKING STAGE');
 
-        if (rowSkipIssue !== undefined || rowSkipPacking !== undefined) {
-          const isIssueSkip = rowSkipIssue?.toLowerCase() === 'yes';
-          const isPackingSkip = rowSkipPacking?.toLowerCase() === 'yes';
-
-          skipStage = isIssueSkip || isPackingSkip;
+        if (rowSkipIssue !== undefined) {
+          skipIssueStage = rowSkipIssue.toLowerCase() === 'yes';
+        }
+        if (rowSkipPacking !== undefined) {
+          skipPackingStage = rowSkipPacking.toLowerCase() === 'yes';
         }
 
         // Delivery Date
@@ -1235,7 +1260,8 @@ export class AdminOrderService {
             packingAssignedUserId,
             paymentClearance,
             priority,
-            skipStage,
+            skipIssueStage,
+            skipPackingStage,
             deliveryDate,
             plantCode: safeString(
               getCellString('PLANT CODE'),
