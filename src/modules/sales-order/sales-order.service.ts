@@ -732,6 +732,9 @@ export class SalesOrderService {
             if (paymentClearanceProvided)
               updatePayload.paymentClearance = orderData.paymentClearance;
 
+            updatePayload.UpdatedBy = user?.name || 'System';
+            updatePayload.UpdatedDate = new Date();
+
             await tx.salesOrder.update({
               where: { id: existing.id },
               data: updatePayload,
@@ -763,6 +766,7 @@ export class SalesOrderService {
                 customerId: finalCustomerId,
                 transporterId: finalTransporterId,
                 address: finalCustomerAddress,
+                UpdatedBy: user?.name || 'System',
               },
             });
 

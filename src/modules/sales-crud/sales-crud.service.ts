@@ -1169,6 +1169,7 @@ export class SalesCrudService {
         saleOrderNumber: true,
         outboundDelivery: true,
         salesZoneId: true,
+        auditLogs: true,
       },
     });
 
@@ -1260,6 +1261,52 @@ export class SalesCrudService {
         'Files uploaded to SFTP, but failed to save metadata to the database.',
         err.message,
       );
+    }
+
+    // 8. Append an ATTACHMENT_UPLOADED entry to each affected order's audit
+    // trail. Attachments live in a separate table that the SalesOrder audit
+    // trigger never sees, so this has to be recorded explicitly here.
+    const uploadedAt = new Date();
+    const uploaderName = user?.name || 'System';
+
+    for (const order of salesOrders) {
+      const orderFiles = attachmentRecords
+        .filter((r) => r.salesOrderId === order.id)
+        .map((r) => r.fileName);
+
+      if (orderFiles.length === 0) continue;
+
+      const existingLogs = Array.isArray(order.auditLogs)
+        ? (order.auditLogs as any[])
+        : [];
+
+      const auditEntry = {
+        serialNumber: existingLogs.length + 1,
+        action: 'ATTACHMENT_UPLOADED',
+        description: `Attachment(s) Uploaded: ${order.saleOrderNumber}_${order.outboundDelivery}`,
+        orderReference: {
+          saleOrderNumber: order.saleOrderNumber,
+          outboundDelivery: order.outboundDelivery,
+        },
+        files: orderFiles,
+        uploadedBy: uploaderName,
+        uploadedAt: uploadedAt.toISOString(),
+      };
+
+      try {
+        await this.prisma.$executeRaw`
+          UPDATE "SalesOrder"
+          SET "audit_logs" = COALESCE("audit_logs", '[]'::jsonb) || ${JSON.stringify([auditEntry])}::jsonb
+          WHERE "id" = ${order.id}
+        `;
+      } catch (err) {
+        // Attachment upload already succeeded; don't fail the whole request
+        // over an audit-log write. Log it for follow-up instead.
+        console.error(
+          `Failed to append attachment-upload audit entry for SO ${order.saleOrderNumber}:`,
+          err,
+        );
+      }
     }
 
     return {
