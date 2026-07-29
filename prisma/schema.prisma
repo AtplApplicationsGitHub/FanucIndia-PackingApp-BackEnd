@@ -304,6 +304,8 @@ model SalesOrderArchive {
   packingAssignedUserId Int?
   skipIssueStage        Boolean?
   skipPackingStage      Boolean?
+  IA_Time               DateTime? @db.Timestamptz(3)
+  PA_Time               DateTime? @db.Timestamptz(3)
   isErpImported         Int?
   binCount              Int?
   auditLogs             Json      @default("[]") @map("audit_logs")
