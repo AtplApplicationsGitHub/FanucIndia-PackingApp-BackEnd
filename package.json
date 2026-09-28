@@ -42,7 +42,9 @@
     "effect": "^3.20.0",
     "defu": "^6.1.6",
     "uuid": "^14.0.0",
-    "ws": "^8.21.1"
+    "ws": "^8.21.1",
+    "proxy-addr": "2.0.8",
+    "deepmerge-ts": "^8.0.2"
   },
   "dependencies": {
     "@mui/icons-material": "^7.2.0",
@@ -64,7 +66,7 @@
     "bcryptjs": "^3.0.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
-    "compression": "^1.8.1",
+    "compression": "^1.8.2",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "helmet": "^8.1.0",
