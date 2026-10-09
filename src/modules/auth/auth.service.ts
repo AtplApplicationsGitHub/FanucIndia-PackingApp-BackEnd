@@ -226,4 +226,84 @@ export class AuthService {
       },
     };
   }
+
+  // Phase 2 - RFID Warehouse Audit (Kotlin) app login.
+  async rfidLogin(dto: LoginDto, req: Request) {
+    const email = dto.email.replace(/\s+/g, '');
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: { equals: email, mode: 'insensitive' },
+      },
+    });
+
+    if (!user) {
+      logAuthFailure({
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid credentials for RFID login',
+        ip: req.ip ?? 'unknown',
+        requestId: String(req.headers['x-request-id'] ?? ''),
+      });
+      throw new UnauthorizedException({
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid credentials',
+      });
+    }
+
+    if (user.role !== 'USER') {
+      logAuthFailure({
+        code: 'INVALID_ROLE_FOR_RFID',
+        message: `User with role ${user.role} attempted RFID login`,
+        ip: req.ip ?? 'unknown',
+        userId: String(user.id),
+        requestId: String(req.headers['x-request-id'] ?? ''),
+      });
+      throw new UnauthorizedException({
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid credentials',
+      });
+    }
+
+    const valid = await bcrypt.compare(
+      dto.password.replace(/\s+/g, ''),
+      user.password,
+    );
+    if (!valid) {
+      logAuthFailure({
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid credentials for RFID login',
+        ip: req.ip ?? 'unknown',
+        userId: String(user.id),
+        requestId: String(req.headers['x-request-id'] ?? ''),
+      });
+      throw new UnauthorizedException({
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid credentials',
+      });
+    }
+
+    // No sessionId / isWeb in payload -> JwtStrategy skips the single-session check
+    const token = await this.jwtService.signAsync(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        isMobile: true,
+        isRfid: true,
+      },
+      {
+        expiresIn: '365d',
+      },
+    );
+
+    return {
+      accessToken: token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  }
 }
