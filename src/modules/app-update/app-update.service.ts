@@ -22,6 +22,15 @@ export class AppUpdateService {
       'pick-pack': pathPickPack,
       'dispatch': pathDispatch,
     };
+
+    // Phase 2 - RFID Audit (Kotlin) app. OPTIONAL: if not set, only the rfid-audit
+    // update routes return 404; the backend and the other apps keep working normally.
+    const pathRfidAudit = process.env.APK_PATH_RFID_AUDIT;
+    if (pathRfidAudit) {
+      this.appPaths['rfid-audit'] = pathRfidAudit;
+    } else {
+      this.logger.warn('APK_PATH_RFID_AUDIT is not defined - RFID Audit app updates are disabled');
+    }
   }
 
   private extractVersion(fileName: string): [number, number, number] {

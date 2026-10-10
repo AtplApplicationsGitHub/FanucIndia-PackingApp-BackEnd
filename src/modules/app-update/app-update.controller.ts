@@ -59,6 +59,33 @@ export class AppUpdateController {
     await this.appUpdateService.downloadApk('dispatch', res);
   }
 
+  // Phase 2 - RFID Audit (Kotlin) app updates. APKs are read from APK_PATH_RFID_AUDIT (SFTP),
+  // file name must contain the version, e.g. FanucRFIDAudit_V0.0.2.apk
+  @Public()
+  @Get('rfid-audit/latest-version')
+  @ApiOperation({ summary: 'Get the latest APK version info for RFID Audit App' })
+  async getRfidAuditLatestVersion(@Req() req: Request) {
+    const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+    const baseUrl = process.env.API_BASE_URL || `${protocol}://${req.get('host')}`;
+
+    const downloadRoute = '/app-update/rfid-audit/download';
+
+    return await this.appUpdateService.getLatestVersionInfo(
+      'rfid-audit',
+      baseUrl,
+      downloadRoute
+    );
+  }
+
+  @Public()
+  @Get('rfid-audit/download')
+  @ApiOperation({ summary: 'Download the latest APK for RFID Audit App' })
+  async downloadRfidAuditApk(@Res() res: Response): Promise<void> {
+    const latestInfo = await this.appUpdateService.getLatestVersionInfo('rfid-audit', '', '');
+    this.setApkHeaders(res, latestInfo.fileName);
+    await this.appUpdateService.downloadApk('rfid-audit', res);
+  }
+
   private setApkHeaders(res: Response, fileName: string) {
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
