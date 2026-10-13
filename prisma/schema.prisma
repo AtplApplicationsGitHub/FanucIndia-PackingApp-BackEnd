@@ -41,6 +41,9 @@ model User {
   soChatNotifications    SoChatNotification[]
   customerLabelPrints    CustomerLabelPrint[]
   salesOrderAttachments  SalesOrderAttachment[]
+
+  bomAuditsAsOperator BomAudit[] @relation("BomAuditOperator")
+  bomAuditsCreated    BomAudit[] @relation("BomAuditCreatedBy")
 }
 
 model Product {
@@ -616,4 +619,60 @@ model Efficiency_PP {
   salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
   @@unique([salesOrderId, stage])
+}
+
+model BomAudit {
+  id              Int       @id @default(autoincrement())
+  auditNo         String    @unique @db.VarChar(30) // e.g. AUD-BOM-2026-0001
+  fileName        String    @db.VarChar(500)
+  status          String    @default("ASSIGNED") @db.VarChar(30)
+  operatorId      Int
+  operatorName    String    @db.VarChar(255)
+  totalLocations  Int
+  totalMaterials  Int
+  createdById     Int
+  createdByName   String    @db.VarChar(255)
+  cancelledAt     DateTime? @db.Timestamptz(3)
+  cancelledByName String?   @db.VarChar(255)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+
+  operator  User               @relation("BomAuditOperator", fields: [operatorId], references: [id])
+  createdBy User               @relation("BomAuditCreatedBy", fields: [createdById], references: [id])
+  locations BomAuditLocation[]
+  materials BomAuditMaterial[]
+
+  @@index([status])
+  @@index([operatorId, status])
+}
+
+model BomAuditLocation {
+  id                Int      @id @default(autoincrement())
+  auditId           Int
+  storageBin        String   @db.VarChar(100)
+  sequenceNo        Int
+  expectedMaterials Int
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  audit     BomAudit           @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  materials BomAuditMaterial[]
+
+  @@unique([auditId, storageBin])
+}
+
+model BomAuditMaterial {
+  id              Int      @id @default(autoincrement())
+  auditLocationId Int
+  auditId         Int
+  materialCode    String   @db.VarChar(100)
+  expectedQty     Int
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  location BomAuditLocation @relation(fields: [auditLocationId], references: [id], onDelete: Cascade)
+  audit    BomAudit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@unique([auditLocationId, materialCode])
+  @@index([auditId])
 }

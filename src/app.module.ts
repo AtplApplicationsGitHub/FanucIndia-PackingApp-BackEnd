@@ -30,6 +30,7 @@ import { SambaModule } from './modules/samba/samba.module';
 import { ArchivedDataModule } from './modules/archived-data/archived-data.module';
 import { ManualFgStorageModule } from './modules/manual-fg-storage/manual-fg-location.module';
 import { EfficiencyModule } from './modules/efficiency/efficiency.module';
+import { BomAuditModule } from './modules/bom-audit/bom-audit.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { EfficiencyModule } from './modules/efficiency/efficiency.module';
     ArchivedDataModule,
     ManualFgStorageModule,
     EfficiencyModule,
+    BomAuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],
