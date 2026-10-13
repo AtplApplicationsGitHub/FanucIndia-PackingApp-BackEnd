@@ -7,6 +7,7 @@ COPY prisma ./prisma/
 RUN npx prisma generate
 COPY . .
 RUN npm run build
+RUN echo "Checking compiled files..." && find /app/dist -type f -name "main.js"
 RUN npm prune --production
 
 # Stage 2: Create the final, minimal production image
