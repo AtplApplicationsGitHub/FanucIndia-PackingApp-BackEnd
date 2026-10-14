@@ -33,6 +33,7 @@ export interface BomAuditActor {
 const AUDIT_SUMMARY_SELECT = {
   id: true,
   auditNo: true,
+  auditName: true,
   fileName: true,
   status: true,
   operatorId: true,
@@ -110,13 +111,14 @@ export class BomAuditService {
 
     const audit = await this.saveAuditWithRetry(
       parsed,
+      dto,
       fileName,
       operator,
       actor,
     );
 
     this.logger.log(
-      `BOM audit ${audit.auditNo} created by ${actor.name}: ${parsed.totalLocations} locations, ` +
+      `BOM audit ${audit.auditNo} (${audit.auditName}) created by ${actor.name}: ${parsed.totalLocations} locations, ` +
         `${parsed.totalMaterials} materials, operator ${operator.name}`,
     );
 
@@ -132,6 +134,7 @@ export class BomAuditService {
 
   private async saveAuditWithRetry(
     parsed: BomAuditParseResult,
+    dto: CreateBomAuditDto,
     fileName: string,
     operator: { id: number; name: string },
     actor: BomAuditActor,
@@ -139,7 +142,7 @@ export class BomAuditService {
     for (let attempt = 1; attempt <= MAX_AUDIT_NO_ATTEMPTS; attempt++) {
       try {
         return await this.prisma.$transaction(
-          (tx) => this.saveAudit(tx, parsed, fileName, operator, actor),
+          (tx) => this.saveAudit(tx, parsed, dto, fileName, operator, actor),
           { timeout: 60_000 },
         );
       } catch (error) {
@@ -170,6 +173,7 @@ export class BomAuditService {
   private async saveAudit(
     tx: Prisma.TransactionClient,
     parsed: BomAuditParseResult,
+    dto: CreateBomAuditDto,
     fileName: string,
     operator: { id: number; name: string },
     actor: BomAuditActor,
@@ -179,6 +183,7 @@ export class BomAuditService {
     const audit = await tx.bomAudit.create({
       data: {
         auditNo,
+        auditName: dto.auditName,
         fileName,
         status: BOM_AUDIT_STATUS.ASSIGNED,
         operatorId: operator.id,
@@ -278,6 +283,7 @@ export class BomAuditService {
     if (query.search) {
       where.OR = [
         { auditNo: { contains: query.search, mode: 'insensitive' } },
+        { auditName: { contains: query.search, mode: 'insensitive' } },
         { fileName: { contains: query.search, mode: 'insensitive' } },
         { operatorName: { contains: query.search, mode: 'insensitive' } },
       ];

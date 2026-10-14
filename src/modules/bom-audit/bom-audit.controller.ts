@@ -49,13 +49,18 @@ export class BomAuditController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['file', 'operatorId'],
+      required: ['file', 'auditName', 'operatorId'],
       properties: {
         file: {
           type: 'string',
           format: 'binary',
           description:
             '.xlsx or .csv, max 10 MB, columns: Material Code, Storage, Qty',
+        },
+        auditName: {
+          type: 'string',
+          maxLength: 255,
+          example: 'BOM Audit - Rack 12 - Oct Week 2',
         },
         operatorId: { type: 'integer', example: 12 },
       },
@@ -65,7 +70,7 @@ export class BomAuditController {
   @ApiResponse({
     status: 400,
     description:
-      'No file / wrong file type / missing columns / invalid rows (errors[] lists every bad row) / invalid operator',
+      'No file / missing audit name / wrong file type / missing columns / invalid rows (errors[] lists every bad row) / invalid operator',
   })
   @ApiResponse({ status: 413, description: 'File larger than 10 MB' })
   create(

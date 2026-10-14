@@ -40,6 +40,7 @@ export const BOM_AUDIT_COLUMN_LABELS = {
 } as const;
 
 export const BOM_AUDIT_MAX_LENGTH = {
+  auditName: 255,
   fileName: 500,
   storageBin: 100,
   materialCode: 100,

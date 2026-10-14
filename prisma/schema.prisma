@@ -623,7 +623,8 @@ model Efficiency_PP {
 
 model BomAudit {
   id              Int       @id @default(autoincrement())
-  auditNo         String    @unique @db.VarChar(30) // e.g. AUD-BOM-2026-0001
+  auditNo         String    @unique @db.VarChar(30)
+  auditName       String    @db.VarChar(255)
   fileName        String    @db.VarChar(500)
   status          String    @default("ASSIGNED") @db.VarChar(30)
   operatorId      Int
