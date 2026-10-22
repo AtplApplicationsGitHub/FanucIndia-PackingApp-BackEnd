@@ -7,12 +7,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../../prisma.service';
 import { getIstTimestampRange } from '../../common/utils/date-only.util';
 import { CreateBomAuditDto } from './dto/create-bom-audit.dto';
 import { QueryBomAuditDto } from './dto/query-bom-audit.dto';
 import {
   BOM_AUDIT_INSERT_CHUNK_SIZE,
+  BOM_AUDIT_MAX_DATA_ROWS,
+  BOM_AUDIT_MAX_LENGTH,
+  BOM_AUDIT_MAX_REPORTED_ERRORS,
+  BOM_AUDIT_TEMPLATE,
+  formatOperatorLabel,
   BOM_AUDIT_NO_DIGITS,
   BOM_AUDIT_NO_LOCK_KEY,
   BOM_AUDIT_NO_PREFIX,
@@ -21,6 +28,7 @@ import {
 import {
   BomAuditFileError,
   BomAuditParseResult,
+  ParsedBomAuditLocation,
   decodeUploadFileName,
   parseBomAuditFile,
 } from './bom-audit-file.parser';
@@ -44,6 +52,11 @@ const AUDIT_SUMMARY_SELECT = {
   createdAt: true,
   cancelledAt: true,
   cancelledByName: true,
+  downloadedAt: true,
+  startedAt: true,
+  completedAt: true,
+  submittedAt: true,
+  uploadBatchId: true,
 } satisfies Prisma.BomAuditSelect;
 
 type AuditSummary = Prisma.BomAuditGetPayload<{
@@ -72,23 +85,6 @@ export class BomAuditService {
 
     const fileName = decodeUploadFileName(file.originalname || 'upload.xlsx');
 
-    const operator = await this.prisma.user.findUnique({
-      where: { id: dto.operatorId },
-      select: { id: true, name: true, role: true },
-    });
-    if (!operator) {
-      throw new BadRequestException({
-        code: 'OPERATOR_NOT_FOUND',
-        message: 'Selected operator does not exist.',
-      });
-    }
-    if (operator.role !== 'USER') {
-      throw new BadRequestException({
-        code: 'INVALID_OPERATOR',
-        message: 'Selected user is not an operator (USER role).',
-      });
-    }
-
     let parsed: BomAuditParseResult;
     try {
       parsed = await parseBomAuditFile(
@@ -109,40 +105,159 @@ export class BomAuditService {
       throw error;
     }
 
-    const audit = await this.saveAuditWithRetry(
-      parsed,
-      dto,
-      fileName,
-      operator,
-      actor,
-    );
+    const auditName = parsed.auditName || dto.auditName || '';
+    if (!auditName) {
+      throw new BadRequestException({
+        code: 'AUDIT_NAME_REQUIRED',
+        message: 'Audit Name is missing. Type it in the "Audit Name" cell at the top of the template (row 1).',
+      });
+    }
+    if (auditName.length > BOM_AUDIT_MAX_LENGTH.auditName) {
+      throw new BadRequestException({
+        code: 'AUDIT_NAME_TOO_LONG',
+        message: `Audit Name must be at most ${BOM_AUDIT_MAX_LENGTH.auditName} characters.`,
+      });
+    }
+
+    const groups = parsed.hasOperatorColumn
+      ? await this.resolveOperatorGroups(parsed.locations)
+      : [{ operator: await this.getSingleOperator(dto.operatorId), locations: parsed.locations }];
+
+    const uploadBatchId = randomUUID();
+    const audits = await this.saveAuditsWithRetry(groups, auditName, fileName, uploadBatchId, actor);
 
     this.logger.log(
-      `BOM audit ${audit.auditNo} (${audit.auditName}) created by ${actor.name}: ${parsed.totalLocations} locations, ` +
-        `${parsed.totalMaterials} materials, operator ${operator.name}`,
+      `BOM audit "${auditName}" created by ${actor.name}: ${audits.length} audit(s) ` +
+        `[${audits.map((a) => `${a.auditNo} -> ${a.operatorName}`).join(', ')}], ` +
+        `${parsed.totalLocations} locations, ${parsed.totalMaterials} materials`,
     );
 
     return {
-      message: 'BOM audit created successfully.',
+      message:
+        audits.length === 1
+          ? 'BOM audit created successfully.'
+          : `${audits.length} BOM audits created successfully (one per operator).`,
       data: {
-        ...audit,
+        auditName,
+        uploadBatchId,
+        totalLocations: parsed.totalLocations,
+        totalMaterials: parsed.totalMaterials,
         totalRows: parsed.totalRows,
         mergedRows: parsed.mergedRows,
+        audits,
       },
     };
   }
 
-  private async saveAuditWithRetry(
-    parsed: BomAuditParseResult,
-    dto: CreateBomAuditDto,
+  private async getSingleOperator(operatorId: number | undefined) {
+    if (!operatorId) {
+      throw new BadRequestException({
+        code: 'OPERATOR_REQUIRED',
+        message:
+          'Operator column is missing. Please download the latest template and select an operator for every storage bin.',
+      });
+    }
+    const operator = await this.prisma.user.findUnique({
+      where: { id: operatorId },
+      select: { id: true, name: true, role: true },
+    });
+    if (!operator) {
+      throw new BadRequestException({
+        code: 'OPERATOR_NOT_FOUND',
+        message: 'Selected operator does not exist.',
+      });
+    }
+    if (operator.role !== 'USER') {
+      throw new BadRequestException({
+        code: 'INVALID_OPERATOR',
+        message: 'Selected user is not an operator (USER role).',
+      });
+    }
+    return { id: operator.id, name: operator.name };
+  }
+
+  private async resolveOperatorGroups(locations: ParsedBomAuditLocation[]) {
+    const users = await this.prisma.user.findMany({
+      where: { role: 'USER' },
+      select: { id: true, name: true, email: true },
+    });
+    const byEmail = new Map(users.map((u) => [u.email.trim().toLowerCase(), u]));
+
+    const resolved = new Map<string, { id: number; name: string } | null>();
+    const rowErrors: { rowNo: number; errors: string[] }[] = [];
+
+    for (const location of locations) {
+      const label = location.operatorLabel ?? '';
+      const key = label.toLowerCase();
+      if (resolved.has(key)) continue;
+
+      const emailInBrackets = /\(([^()\s]+@[^()\s]+)\)\s*$/.exec(label)?.[1];
+      const email = (emailInBrackets ?? (label.includes('@') ? label : '')).trim().toLowerCase();
+      let user: { id: number; name: string } | undefined;
+      let problem = '';
+      const exact = users.find((u) => formatOperatorLabel(u.name.trim(), u.email.trim()).toLowerCase() === key);
+
+      if (exact) {
+        user = exact;
+      } else if (email) {
+        user = byEmail.get(email);
+        if (!user) problem = `Operator "${label}" was not found or is not an operator (USER role)`;
+      } else {
+        const sameName = users.filter((u) => u.name.trim().toLowerCase() === key);
+        if (sameName.length === 1) user = sameName[0];
+        else if (sameName.length > 1) problem = `Operator "${label}" matches ${sameName.length} users - select it from the dropdown`;
+        else problem = `Operator "${label}" was not found or is not an operator (USER role)`;
+      }
+
+      resolved.set(key, user ? { id: user.id, name: user.name } : null);
+      if (problem && rowErrors.length < BOM_AUDIT_MAX_REPORTED_ERRORS) {
+        rowErrors.push({ rowNo: location.firstRowNo ?? 0, errors: [problem] });
+      }
+    }
+
+    if (rowErrors.length) {
+      rowErrors.sort((a, b) => a.rowNo - b.rowNo);
+      throw new BadRequestException({
+        code: 'INVALID_OPERATORS',
+        message: `${rowErrors.length} operator(s) in the file are not valid. Please select operators from the template dropdown.`,
+        errors: rowErrors,
+      });
+    }
+
+    const groups = new Map<number, { operator: { id: number; name: string }; locations: ParsedBomAuditLocation[]; firstRowNo: number }>();
+    for (const location of locations) {
+      const operator = resolved.get((location.operatorLabel ?? '').toLowerCase())!;
+      const group = groups.get(operator.id);
+      const rowNo = location.firstRowNo ?? 0;
+      if (group) {
+        group.locations.push(location);
+        group.firstRowNo = Math.min(group.firstRowNo, rowNo);
+      } else {
+        groups.set(operator.id, { operator, locations: [location], firstRowNo: rowNo });
+      }
+    }
+    return [...groups.values()].sort((a, b) => a.firstRowNo - b.firstRowNo);
+  }
+
+  private async saveAuditsWithRetry(
+    groups: { operator: { id: number; name: string }; locations: ParsedBomAuditLocation[] }[],
+    auditName: string,
     fileName: string,
-    operator: { id: number; name: string },
+    uploadBatchId: string,
     actor: BomAuditActor,
-  ): Promise<AuditSummary> {
+  ): Promise<AuditSummary[]> {
     for (let attempt = 1; attempt <= MAX_AUDIT_NO_ATTEMPTS; attempt++) {
       try {
         return await this.prisma.$transaction(
-          (tx) => this.saveAudit(tx, parsed, dto, fileName, operator, actor),
+          async (tx) => {
+            const saved: AuditSummary[] = [];
+            for (const group of groups) {
+              saved.push(
+                await this.saveAudit(tx, group.locations, auditName, fileName, group.operator, actor, uploadBatchId),
+              );
+            }
+            return saved;
+          },
           { timeout: 60_000 },
         );
       } catch (error) {
@@ -172,31 +287,33 @@ export class BomAuditService {
 
   private async saveAudit(
     tx: Prisma.TransactionClient,
-    parsed: BomAuditParseResult,
-    dto: CreateBomAuditDto,
+    locations: ParsedBomAuditLocation[],
+    auditName: string,
     fileName: string,
     operator: { id: number; name: string },
     actor: BomAuditActor,
+    uploadBatchId: string,
   ): Promise<AuditSummary> {
     const auditNo = await this.nextAuditNo(tx);
 
     const audit = await tx.bomAudit.create({
       data: {
         auditNo,
-        auditName: dto.auditName,
+        auditName,
         fileName,
         status: BOM_AUDIT_STATUS.ASSIGNED,
         operatorId: operator.id,
         operatorName: operator.name,
-        totalLocations: parsed.totalLocations,
-        totalMaterials: parsed.totalMaterials,
+        totalLocations: locations.length,
+        totalMaterials: locations.reduce((sum, l) => sum + l.materials.length, 0),
         createdById: actor.userId,
         createdByName: actor.name,
+        uploadBatchId,
       },
       select: AUDIT_SUMMARY_SELECT,
     });
 
-    const locationRows = parsed.locations.map((location, index) => ({
+    const locationRows = locations.map((location, index) => ({
       auditId: audit.id,
       storageBin: location.storageBin,
       sequenceNo: index + 1,
@@ -214,7 +331,7 @@ export class BomAuditService {
       savedLocations.map((l) => [l.storageBin, l.id]),
     );
 
-    const materialRows = parsed.locations.flatMap((location) => {
+    const materialRows = locations.flatMap((location) => {
       const auditLocationId = locationIdByBin.get(location.storageBin);
       if (auditLocationId === undefined) {
         throw new Error(`Location ${location.storageBin} was not saved`);
@@ -258,6 +375,87 @@ export class BomAuditService {
       chunks.push(rows.slice(i, i + BOM_AUDIT_INSERT_CHUNK_SIZE));
     }
     return chunks;
+  }
+
+  async buildTemplate(): Promise<Buffer> {
+    const T = BOM_AUDIT_TEMPLATE;
+    const operators = await this.prisma.user.findMany({
+      where: { role: 'USER' },
+      select: { name: true, email: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'DIMS';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet(T.sheetName, {
+      views: [{ state: 'frozen', ySplit: T.headerRowNo }],
+    });
+    const lastCol = T.columns.length;
+    const colLetter = (n: number) => sheet.getColumn(n).letter;
+    const thin = { style: 'thin' as const, color: { argb: 'FFBFBFBF' } };
+    const box = { top: thin, left: thin, bottom: thin, right: thin };
+
+    sheet.getCell('A1').value = 'Audit Name';
+    sheet.getCell('A1').font = { bold: true, size: 12 };
+    sheet.mergeCells('B1:E1');
+    const nameCell = sheet.getCell('B1');
+    nameCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+    nameCell.border = box;
+    nameCell.font = { bold: true, size: 12 };
+    sheet.getRow(1).height = 22;
+
+    const header = sheet.getRow(T.headerRowNo);
+    T.columns.forEach((col, i) => {
+      const cell = header.getCell(i + 1);
+      cell.value = col.header;
+      cell.font = { bold: true };
+      cell.border = box;
+      cell.alignment = { vertical: 'middle' };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'required' in col && col.required ? 'FFFFD966' : 'FFE7E6E6' },
+      };
+      sheet.getColumn(i + 1).width = col.width;
+      if ('text' in col && col.text) sheet.getColumn(i + 1).numFmt = '@';
+    });
+    header.height = 20;
+
+    const listSheet = workbook.addWorksheet(T.operatorSheetName);
+    listSheet.state = 'hidden';
+    listSheet.getCell('A1').value = 'Operator';
+    const labels = operators.length
+      ? operators.map((o) => formatOperatorLabel(o.name, o.email))
+      : ['(no operators found - add users with the USER role)'];
+    labels.forEach((label, i) => (listSheet.getCell(i + 2, 1).value = label));
+    listSheet.getColumn(1).width = 45;
+
+    const opCol = T.columns.findIndex((c) => 'operator' in c && c.operator) + 1;
+    const opLetter = colLetter(opCol);
+    const lastDataRow = T.headerRowNo + BOM_AUDIT_MAX_DATA_ROWS;
+    const validations = (
+      sheet as unknown as {
+        dataValidations: { add(address: string, validation: ExcelJS.DataValidation): void };
+      }
+    ).dataValidations;
+    validations.add(`${opLetter}${T.firstDataRowNo}:${opLetter}${lastDataRow}`, {
+      type: 'list',
+      allowBlank: true,
+      formulae: [`'${T.operatorSheetName}'!$A$2:$A$${labels.length + 1}`],
+      showErrorMessage: true,
+      errorStyle: 'stop',
+      errorTitle: 'Invalid operator',
+      error: 'Please select an operator from the list.',
+      showInputMessage: true,
+      promptTitle: 'Operator',
+      prompt: 'Select the operator for this storage bin.',
+    });
+
+    sheet.autoFilter = { from: { row: T.headerRowNo, column: 1 }, to: { row: T.headerRowNo, column: lastCol } };
+
+    return Buffer.from(await workbook.xlsx.writeBuffer());
   }
 
   async getOperators() {
@@ -343,6 +541,7 @@ export class BomAuditService {
             storageBin: true,
             expectedMaterials: true,
             materials: {
+              where: { isUnexpected: false },
               orderBy: { materialCode: 'asc' },
               select: { id: true, materialCode: true, expectedQty: true },
             },

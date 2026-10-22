@@ -2,12 +2,14 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseIntPipe,
   Patch,
   Post,
   Query,
   Req,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -26,7 +28,10 @@ import { AuthRequest } from '../auth/types/auth-request.type';
 import { BomAuditActor, BomAuditService } from './bom-audit.service';
 import { CreateBomAuditDto } from './dto/create-bom-audit.dto';
 import { QueryBomAuditDto } from './dto/query-bom-audit.dto';
-import { BOM_AUDIT_MAX_FILE_BYTES } from './bom-audit.constants';
+import {
+  BOM_AUDIT_MAX_FILE_BYTES,
+  BOM_AUDIT_TEMPLATE,
+} from './bom-audit.constants';
 
 @ApiTags('BOM Audit')
 @ApiBearerAuth()
@@ -43,30 +48,41 @@ export class BomAuditController {
   )
   @ApiOperation({
     summary:
-      'Create a BOM audit: upload Excel/CSV (Material Code, Storage, Qty) and assign an operator',
+      'Create BOM audit(s) from the template: Audit Name cell + Operator per storage bin -> one audit per operator',
+    description:
+      'Template file (GET /bom-audit/template): the file carries the Audit Name and the Operator of every storage bin; ' +
+      'auditName / operatorId are not needed. A plain file without an Operator column still works with auditName + operatorId.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['file', 'auditName', 'operatorId'],
+      required: ['file'],
       properties: {
         file: {
           type: 'string',
           format: 'binary',
           description:
-            '.xlsx or .csv, max 10 MB, columns: Material Code, Storage, Qty',
+            '.xlsx or .csv, max 10 MB. Template: Audit Name (row 1) + StorageBin, Material, Avail, Operator columns',
         },
         auditName: {
           type: 'string',
           maxLength: 255,
           example: 'BOM Audit - Rack 12 - Oct Week 2',
+          description: 'Only for a file without the Audit Name cell',
         },
-        operatorId: { type: 'integer', example: 12 },
+        operatorId: {
+          type: 'integer',
+          example: 12,
+          description: 'Only for a file without an Operator column',
+        },
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'Audit created (status ASSIGNED)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Audit(s) created (status ASSIGNED) - one per operator in the file',
+  })
   @ApiResponse({
     status: 400,
     description:
@@ -87,6 +103,25 @@ export class BomAuditController {
   @ApiResponse({ status: 200, description: 'List of operators' })
   getOperators() {
     return this.bomAuditService.getOperators();
+  }
+
+  @Get('template')
+  @Roles('ADMIN')
+  @Header(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  @Header(
+    'Content-Disposition',
+    `attachment; filename="${BOM_AUDIT_TEMPLATE.fileName}"`,
+  )
+  @ApiOperation({
+    summary:
+      'Download the BOM audit Excel template (Audit Name cell + Operator dropdown of USER-role operators)',
+  })
+  @ApiResponse({ status: 200, description: 'Excel file (.xlsx)' })
+  async downloadTemplate() {
+    return new StreamableFile(await this.bomAuditService.buildTemplate());
   }
 
   @Get()

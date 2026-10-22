@@ -5,7 +5,11 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { PinoLogger } from './common/pino-logger.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
-import { json, urlencoded } from 'express';
+import { json, NextFunction, Request, Response, urlencoded } from 'express';
+import {
+  BOM_AUDIT_MOBILE_JSON_LIMIT,
+  BOM_AUDIT_MOBILE_PATH_PREFIX,
+} from './modules/bom-audit/bom-audit.constants';
 import helmet from 'helmet';
 import compression from 'compression';
 
@@ -22,6 +26,16 @@ async function bootstrap() {
 
   // Reduced global limits to prevent OOM crashes.
   // Use Multer streams in specific controllers for large ERP file uploads.
+  // BOM Completeness handheld: a full audit submit (up to 20,000 scanned lines) is bigger than 2 MB,
+  // so ONLY the /bom-audit/mobile/ routes get a larger JSON limit. Registered BEFORE the global parser
+  // (the global one skips a body that is already parsed).
+  const bomAuditMobileJson = json({ limit: BOM_AUDIT_MOBILE_JSON_LIMIT });
+  app.use((req: Request, res: Response, next: NextFunction) =>
+    req.path.includes(BOM_AUDIT_MOBILE_PATH_PREFIX)
+      ? bomAuditMobileJson(req, res, next)
+      : next(),
+  );
+
   app.use(json({ limit: '2mb' }));
   app.use(urlencoded({ extended: true, limit: '2mb' }));
 

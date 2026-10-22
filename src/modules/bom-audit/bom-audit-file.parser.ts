@@ -8,9 +8,13 @@ import {
   BOM_AUDIT_MAX_DATA_ROWS,
   BOM_AUDIT_MAX_LENGTH,
   BOM_AUDIT_MAX_REPORTED_ERRORS,
+  BOM_AUDIT_HEADER_SEARCH_ROWS,
+  BOM_AUDIT_NAME_LABEL,
+  BOM_AUDIT_OPTIONAL_HEADER_ALIASES,
 } from './bom-audit.constants';
 
 type FieldKey = keyof typeof BOM_AUDIT_HEADER_ALIASES;
+type OptionalFieldKey = keyof typeof BOM_AUDIT_OPTIONAL_HEADER_ALIASES;
 
 export interface BomAuditRowError {
   rowNo: number;
@@ -25,9 +29,13 @@ export interface ParsedBomAuditMaterial {
 export interface ParsedBomAuditLocation {
   storageBin: string;
   materials: ParsedBomAuditMaterial[];
+  operatorLabel?: string;
+  firstRowNo?: number;
 }
 
 export interface BomAuditParseResult {
+  auditName: string | null;
+  hasOperatorColumn: boolean;
   locations: ParsedBomAuditLocation[];
   totalLocations: number;
   totalMaterials: number;
@@ -125,21 +133,31 @@ async function loadWorksheet(
 function locateColumns(worksheet: ExcelJS.Worksheet): {
   headerRowNo: number;
   columns: Record<FieldKey, number>;
+  optionalColumns: Partial<Record<OptionalFieldKey, number>>;
 } {
-  let headerRow: ExcelJS.Row | undefined;
+  let firstRow: ExcelJS.Row | undefined;
+  let best: { row: ExcelJS.Row; index: Map<string, number>; found: number } | undefined;
+  const requiredCount = Object.keys(BOM_AUDIT_HEADER_ALIASES).length;
+
   worksheet.eachRow({ includeEmpty: false }, (row) => {
-    if (!headerRow) headerRow = row;
+    if (row.number > BOM_AUDIT_HEADER_SEARCH_ROWS) return;
+    if (!firstRow) firstRow = row;
+    const index = new Map<string, number>();
+    row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      const key = normaliseHeader(cellToText(cell.value));
+      if (key && !index.has(key)) index.set(key, colNumber);
+    });
+    const found = (Object.keys(BOM_AUDIT_HEADER_ALIASES) as FieldKey[]).filter((field) =>
+      BOM_AUDIT_HEADER_ALIASES[field].some((alias) => index.has(alias)),
+    ).length;
+    if (best && best.found === requiredCount) return;
+    if (!best || found > best.found) best = { row, index, found };
   });
-  if (!headerRow) {
+  if (!firstRow || !best) {
     throw new BomAuditFileError('The uploaded file is empty.', 'EMPTY_FILE');
   }
 
-  const headerIndex = new Map<string, number>();
-  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    const key = normaliseHeader(cellToText(cell.value));
-    if (key && !headerIndex.has(key)) headerIndex.set(key, colNumber);
-  });
-
+  const headerIndex = best.index;
   const columns = {} as Record<FieldKey, number>;
   const missing: string[] = [];
   (Object.keys(BOM_AUDIT_HEADER_ALIASES) as FieldKey[]).forEach((field) => {
@@ -153,13 +171,35 @@ function locateColumns(worksheet: ExcelJS.Worksheet): {
   if (missing.length) {
     throw new BomAuditFileError(
       `Required column(s) missing: ${missing.join(', ')}. ` +
-        `The file must have the columns Material Code, Storage and Qty in the first row.`,
+        `The file must have the columns Material Code, Storage and Qty in the header row.`,
       'MISSING_COLUMNS',
     );
   }
 
-  return { headerRowNo: headerRow.number, columns };
+  const optionalColumns: Partial<Record<OptionalFieldKey, number>> = {};
+  (Object.keys(BOM_AUDIT_OPTIONAL_HEADER_ALIASES) as OptionalFieldKey[]).forEach((field) => {
+    const col = BOM_AUDIT_OPTIONAL_HEADER_ALIASES[field]
+      .map((alias) => headerIndex.get(alias))
+      .find((c) => c !== undefined);
+    if (col !== undefined) optionalColumns[field] = col;
+  });
+
+  return { headerRowNo: best.row.number, columns, optionalColumns };
 }
+
+function readAuditNameAbove(worksheet: ExcelJS.Worksheet, headerRowNo: number): string | null {
+  for (let rowNo = 1; rowNo < headerRowNo; rowNo++) {
+    const row = worksheet.getRow(rowNo);
+    let labelCol = 0;
+    row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      if (!labelCol && normaliseHeader(cellToText(cell.value)) === BOM_AUDIT_NAME_LABEL) labelCol = colNumber;
+    });
+    if (labelCol) return cleanAuditName(cellToText(row.getCell(labelCol + 1).value));
+  }
+  return null;
+}
+
+const cleanAuditName = (value: string) => cleanText(value).replace(/\s+/g, ' ');
 
 function parseQty(raw: string): number | null {
   const text = raw.replace(/,/g, '');
@@ -185,7 +225,13 @@ export async function parseBomAuditFile(
   }
 
   const worksheet = await loadWorksheet(buffer, extension);
-  const { headerRowNo, columns } = locateColumns(worksheet);
+  const { headerRowNo, columns, optionalColumns } = locateColumns(worksheet);
+  const hasOperatorColumn = optionalColumns.operator !== undefined;
+
+  let auditName = readAuditNameAbove(worksheet, headerRowNo);
+  const auditNamesInColumn = new Set<string>();
+
+  const binOperator = new Map<string, { label: string; key: string; rowNo: number }>();
 
   const grouped = new Map<string, Map<string, number>>();
   const rowErrors: BomAuditRowError[] = [];
@@ -203,8 +249,16 @@ export async function parseBomAuditFile(
       row.getCell(columns.storageBin).value,
     ).toUpperCase();
     const qtyText = cellToText(row.getCell(columns.qty).value);
+    const operatorLabel = hasOperatorColumn
+      ? cleanText(cellToText(row.getCell(optionalColumns.operator as number).value)).replace(/\s+/g, ' ')
+      : '';
 
     if (!materialCode && !storageBin && !qtyText) return;
+
+    if (optionalColumns.auditName !== undefined) {
+      const name = cleanAuditName(cellToText(row.getCell(optionalColumns.auditName).value));
+      if (name) auditNamesInColumn.add(name);
+    }
 
     totalRows += 1;
     if (totalRows > BOM_AUDIT_MAX_DATA_ROWS) return;
@@ -233,6 +287,24 @@ export async function parseBomAuditFile(
       errors.push(
         `${BOM_AUDIT_COLUMN_LABELS.qty} "${qtyText}" must be a whole number greater than 0`,
       );
+    }
+
+    if (hasOperatorColumn) {
+      if (!operatorLabel) {
+        errors.push('Operator is missing (select one from the dropdown)');
+      } else if (operatorLabel.length > BOM_AUDIT_MAX_LENGTH.operator) {
+        errors.push(`Operator is longer than ${BOM_AUDIT_MAX_LENGTH.operator} characters`);
+      } else if (storageBin) {
+        const key = operatorLabel.toLowerCase();
+        const assigned = binOperator.get(storageBin);
+        if (!assigned) {
+          binOperator.set(storageBin, { label: operatorLabel, key, rowNo });
+        } else if (assigned.key !== key) {
+          errors.push(
+            `Storage bin ${storageBin} is already assigned to "${assigned.label}" (row ${assigned.rowNo}). One storage bin can have only one operator`,
+          );
+        }
+      }
     }
 
     if (errors.length) {
@@ -280,6 +352,20 @@ export async function parseBomAuditFile(
     );
   }
 
+  if (auditNamesInColumn.size > 1) {
+    throw new BomAuditFileError(
+      `The Audit Name column has ${auditNamesInColumn.size} different values (${[...auditNamesInColumn]
+        .slice(0, 3)
+        .join(', ')}). One file can have only one Audit Name.`,
+      'MULTIPLE_AUDIT_NAMES',
+    );
+  }
+  if (auditName === null && auditNamesInColumn.size === 1) {
+    auditName = [...auditNamesInColumn][0];
+  } else if (auditName === '' && auditNamesInColumn.size === 1) {
+    auditName = [...auditNamesInColumn][0];
+  }
+
   const locations: ParsedBomAuditLocation[] = [...grouped.entries()]
     .sort(([a], [b]) => naturalCompare(a, b))
     .map(([storageBin, materials]) => ({
@@ -287,9 +373,17 @@ export async function parseBomAuditFile(
       materials: [...materials.entries()]
         .sort(([a], [b]) => naturalCompare(a, b))
         .map(([materialCode, expectedQty]) => ({ materialCode, expectedQty })),
+      ...(hasOperatorColumn
+        ? {
+            operatorLabel: binOperator.get(storageBin)?.label,
+            firstRowNo: binOperator.get(storageBin)?.rowNo,
+          }
+        : {}),
     }));
 
   return {
+    auditName,
+    hasOperatorColumn,
     locations,
     totalLocations: locations.length,
     totalMaterials: locations.reduce((sum, l) => sum + l.materials.length, 0),

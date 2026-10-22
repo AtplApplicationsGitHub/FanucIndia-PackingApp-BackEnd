@@ -638,6 +638,14 @@ model BomAudit {
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
+  downloadedAt       DateTime? @db.Timestamptz(3)
+  startedAt          DateTime? @db.Timestamptz(3)
+  completedAt        DateTime? @db.Timestamptz(3)
+  submittedAt        DateTime? @db.Timestamptz(3)
+  clientSubmissionId String?   @unique @db.VarChar(64)
+
+  uploadBatchId String? @db.VarChar(36)
+
   operator  User               @relation("BomAuditOperator", fields: [operatorId], references: [id])
   createdBy User               @relation("BomAuditCreatedBy", fields: [createdById], references: [id])
   locations BomAuditLocation[]
@@ -645,6 +653,7 @@ model BomAudit {
 
   @@index([status])
   @@index([operatorId, status])
+  @@index([uploadBatchId])
 }
 
 model BomAuditLocation {
@@ -653,8 +662,9 @@ model BomAuditLocation {
   storageBin        String   @db.VarChar(100)
   sequenceNo        Int
   expectedMaterials Int
-  createdAt         DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+  verifiedAt        DateTime? @db.Timestamptz(3)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
 
   audit     BomAudit           @relation(fields: [auditId], references: [id], onDelete: Cascade)
   materials BomAuditMaterial[]
@@ -668,8 +678,12 @@ model BomAuditMaterial {
   auditId         Int
   materialCode    String   @db.VarChar(100)
   expectedQty     Int
-  createdAt       DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  actualQty       Int?
+  lineStatus      String?   @db.VarChar(20)
+  isUnexpected    Boolean   @default(false)
+  lastScannedAt   DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
   location BomAuditLocation @relation(fields: [auditLocationId], references: [id], onDelete: Cascade)
   audit    BomAudit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
