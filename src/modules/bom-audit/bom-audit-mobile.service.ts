@@ -18,6 +18,7 @@ import {
   BOM_AUDIT_UPDATE_CHUNK_SIZE,
 } from './bom-audit.constants';
 import { cleanText } from './bom-audit-file.parser';
+import { BomAuditReportService } from './bom-audit-report.service';
 import {
   StartBomAuditDto,
   SubmitBomAuditDto,
@@ -72,7 +73,10 @@ interface MaterialResult {
 export class BomAuditMobileService {
   private readonly logger = new Logger(BomAuditMobileService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reports: BomAuditReportService,
+  ) {}
 
   // ================================================================ 1. my tasks
 
@@ -319,6 +323,9 @@ export class BomAuditMobileService {
         `BOM audit ${outcome.audit.auditNo} submitted by ${operator.name}: ` +
           `valid ${c?.valid}, mismatch ${c?.mismatch}, missing ${c?.missing}, unexpected ${c?.unexpected}`,
       );
+      // Report Excel -> SFTP, in the background: the handheld gets its answer now, and a failed
+      // upload never fails the submit (it is retried automatically - BomAuditReportService)
+      this.reports.generateInBackground(outcome.audit.id);
     }
 
     return {

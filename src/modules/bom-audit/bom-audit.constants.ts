@@ -70,6 +70,24 @@ export const BOM_AUDIT_LINE_STATUS = {
 
 export const BOM_AUDIT_LINE_STATUS_VALUES = Object.values(BOM_AUDIT_LINE_STATUS);
 
+/** Report Excel created after submit and saved on the SFTP server (see sftp/audit-report-paths.ts). */
+export const BOM_AUDIT_REPORT = {
+  sheetName: 'Report',
+  locationSheetName: 'Locations',
+  /** Times in the report are shown in India time */
+  timeZone: 'Asia/Kolkata',
+  /** Failed uploads are retried every 10 minutes (BOM_AUDIT_REPORT_RETRY_MS in .env to change) ... */
+  retryIntervalMs: Number(process.env.BOM_AUDIT_REPORT_RETRY_MS) || 10 * 60 * 1000,
+  /** ... up to this many times; after that only "Download Report" on the web tries again */
+  maxAttempts: 10,
+  /** Audits handled per retry round */
+  retryBatchSize: 20,
+  maxErrorLength: 1000,
+} as const;
+
+/** e.g. AUD-BOM-2026-0010_Report.xlsx */
+export const bomAuditReportFileName = (auditNo: string) => `${auditNo}_Report.xlsx`;
+
 /** Submit limits: the file allows 20,000 lines; unexpected scans can add more. */
 export const BOM_AUDIT_MAX_SUBMIT_LINES = 40000;
 export const BOM_AUDIT_MAX_ACTUAL_QTY = 1_000_000;

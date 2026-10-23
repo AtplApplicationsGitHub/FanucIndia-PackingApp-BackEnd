@@ -26,6 +26,7 @@ import {
 import { Roles } from '../auth/roles.decorator';
 import { AuthRequest } from '../auth/types/auth-request.type';
 import { BomAuditActor, BomAuditService } from './bom-audit.service';
+import { BomAuditReportService } from './bom-audit-report.service';
 import { CreateBomAuditDto } from './dto/create-bom-audit.dto';
 import { QueryBomAuditDto } from './dto/query-bom-audit.dto';
 import {
@@ -37,7 +38,10 @@ import {
 @ApiBearerAuth()
 @Controller('bom-audit')
 export class BomAuditController {
-  constructor(private readonly bomAuditService: BomAuditService) {}
+  constructor(
+    private readonly bomAuditService: BomAuditService,
+    private readonly bomAuditReportService: BomAuditReportService,
+  ) {}
 
   @Post()
   @Roles('ADMIN')
@@ -145,6 +149,25 @@ export class BomAuditController {
   @ApiResponse({ status: 404, description: 'Audit not found' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.bomAuditService.findOne(id);
+  }
+
+  @Get(':id/report')
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary:
+      'Download the report Excel of a submitted BOM audit (saved on SFTP; built from the database if it is not there)',
+  })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Excel file (.xlsx)' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({ status: 409, description: 'Audit not submitted yet' })
+  async downloadReport(@Param('id', ParseIntPipe) id: number) {
+    const report = await this.bomAuditReportService.getReportForDownload(id);
+    return new StreamableFile(report.buffer, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="${report.fileName}"`,
+      length: report.buffer.length,
+    });
   }
 
   @Patch(':id/cancel')

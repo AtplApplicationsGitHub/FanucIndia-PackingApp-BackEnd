@@ -52,11 +52,15 @@ const AUDIT_SUMMARY_SELECT = {
   createdAt: true,
   cancelledAt: true,
   cancelledByName: true,
+  // Stage B - handheld timeline (null until it happens)
   downloadedAt: true,
   startedAt: true,
   completedAt: true,
   submittedAt: true,
   uploadBatchId: true,
+  // Report Excel on the SFTP server (null until the upload worked)
+  reportPath: true,
+  reportGeneratedAt: true,
 } satisfies Prisma.BomAuditSelect;
 
 type AuditSummary = Prisma.BomAuditGetPayload<{
@@ -105,6 +109,7 @@ export class BomAuditService {
       throw error;
     }
 
+    // Audit Name: from the file (template cell / column); the form field is only a fallback
     const auditName = parsed.auditName || dto.auditName || '';
     if (!auditName) {
       throw new BadRequestException({
@@ -119,6 +124,7 @@ export class BomAuditService {
       });
     }
 
+    // Operators: template -> one per storage bin (Operator column); plain file -> one for the whole file
     const groups = parsed.hasOperatorColumn
       ? await this.resolveOperatorGroups(parsed.locations)
       : [{ operator: await this.getSingleOperator(dto.operatorId), locations: parsed.locations }];
@@ -149,6 +155,7 @@ export class BomAuditService {
     };
   }
 
+  /** Plain file without an Operator column: the operator chosen in the form (previous behaviour). */
   private async getSingleOperator(operatorId: number | undefined) {
     if (!operatorId) {
       throw new BadRequestException({
@@ -176,6 +183,11 @@ export class BomAuditService {
     return { id: operator.id, name: operator.name };
   }
 
+  /**
+   * Template file: turns the Operator text of each storage bin into a user and groups the bins per operator.
+   * Accepted text: "Name (email)" from the dropdown (the email decides), a plain email, or a unique name.
+   * Only USER-role users are valid. One audit is created per operator, in file order.
+   */
   private async resolveOperatorGroups(locations: ParsedBomAuditLocation[]) {
     const users = await this.prisma.user.findMany({
       where: { role: 'USER' },
@@ -195,6 +207,7 @@ export class BomAuditService {
       const email = (emailInBrackets ?? (label.includes('@') ? label : '')).trim().toLowerCase();
       let user: { id: number; name: string } | undefined;
       let problem = '';
+      // Exact dropdown label "Name (email)" always wins (also works when an email has no "@")
       const exact = users.find((u) => formatOperatorLabel(u.name.trim(), u.email.trim()).toLowerCase() === key);
 
       if (exact) {
@@ -224,6 +237,7 @@ export class BomAuditService {
       });
     }
 
+    // Group bins per user (two spellings of the same user end up in one audit)
     const groups = new Map<number, { operator: { id: number; name: string }; locations: ParsedBomAuditLocation[]; firstRowNo: number }>();
     for (const location of locations) {
       const operator = resolved.get((location.operatorLabel ?? '').toLowerCase())!;
@@ -248,6 +262,7 @@ export class BomAuditService {
   ): Promise<AuditSummary[]> {
     for (let attempt = 1; attempt <= MAX_AUDIT_NO_ATTEMPTS; attempt++) {
       try {
+        // All audits of one file are saved together: all or nothing
         return await this.prisma.$transaction(
           async (tx) => {
             const saved: AuditSummary[] = [];
@@ -313,6 +328,7 @@ export class BomAuditService {
       select: AUDIT_SUMMARY_SELECT,
     });
 
+    // sequenceNo restarts at 1 in every audit (each operator walks only their own bins)
     const locationRows = locations.map((location, index) => ({
       auditId: audit.id,
       storageBin: location.storageBin,
@@ -377,6 +393,11 @@ export class BomAuditService {
     return chunks;
   }
 
+  /**
+   * Downloadable Excel template: "Audit Name" cell at the top, the SAP / LX03 columns and an Operator
+   * column with a dropdown of all operators (USER role) shown as "Name (email)".
+   * Built fresh on every download, so new operators appear automatically.
+   */
   async buildTemplate(): Promise<Buffer> {
     const T = BOM_AUDIT_TEMPLATE;
     const operators = await this.prisma.user.findMany({
@@ -397,6 +418,7 @@ export class BomAuditService {
     const thin = { style: 'thin' as const, color: { argb: 'FFBFBFBF' } };
     const box = { top: thin, left: thin, bottom: thin, right: thin };
 
+    // Row 1 - Audit Name (typed once)
     sheet.getCell('A1').value = 'Audit Name';
     sheet.getCell('A1').font = { bold: true, size: 12 };
     sheet.mergeCells('B1:E1');
@@ -406,6 +428,8 @@ export class BomAuditService {
     nameCell.font = { bold: true, size: 12 };
     sheet.getRow(1).height = 22;
 
+    // Row 2 - column headers (required ones highlighted).
+    // (The instruction line that used to be here was removed on client request - the steps are shown on the web screen.)
     const header = sheet.getRow(T.headerRowNo);
     T.columns.forEach((col, i) => {
       const cell = header.getCell(i + 1);
@@ -419,10 +443,12 @@ export class BomAuditService {
         fgColor: { argb: 'required' in col && col.required ? 'FFFFD966' : 'FFE7E6E6' },
       };
       sheet.getColumn(i + 1).width = col.width;
+      // Material codes as text, so codes like 0123 keep their leading zero
       if ('text' in col && col.text) sheet.getColumn(i + 1).numFmt = '@';
     });
     header.height = 20;
 
+    // Hidden list of operators for the dropdown
     const listSheet = workbook.addWorksheet(T.operatorSheetName);
     listSheet.state = 'hidden';
     listSheet.getCell('A1').value = 'Operator';
@@ -435,6 +461,7 @@ export class BomAuditService {
     const opCol = T.columns.findIndex((c) => 'operator' in c && c.operator) + 1;
     const opLetter = colLetter(opCol);
     const lastDataRow = T.headerRowNo + BOM_AUDIT_MAX_DATA_ROWS;
+    // ExcelJS supports worksheet.dataValidations (range addresses too), but its type definitions omit it
     const validations = (
       sheet as unknown as {
         dataValidations: { add(address: string, validation: ExcelJS.DataValidation): void };
@@ -541,6 +568,7 @@ export class BomAuditService {
             storageBin: true,
             expectedMaterials: true,
             materials: {
+              // Uploaded lines only - handheld UNEXPECTED rows are part of the Stage C review
               where: { isUnexpected: false },
               orderBy: { materialCode: 'asc' },
               select: { id: true, materialCode: true, expectedQty: true },
