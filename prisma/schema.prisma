@@ -44,6 +44,11 @@ model User {
 
   bomAuditsAsOperator BomAudit[] @relation("BomAuditOperator")
   bomAuditsCreated    BomAudit[] @relation("BomAuditCreatedBy")
+
+  // Phase 2 - Cycle Count audit
+  cycleCountAuditsAsOperator CycleCountAudit[]       @relation("CycleCountOperator")
+  cycleCountAuditsCreated    CycleCountAudit[]       @relation("CycleCountCreatedBy")
+  cycleCountStockUploads     CycleCountStockUpload[] @relation("CycleCountStockUploadedBy")
 }
 
 model Product {
@@ -695,4 +700,126 @@ model BomAuditMaterial {
 
   @@unique([auditLocationId, materialCode])
   @@index([auditId])
+}
+
+// ============================================================
+// Phase 2 - Cycle Count audit (Phase A: create audit on the web)
+// ============================================================
+
+/// One uploaded SAP LX03 stock file. Valid AND excluded rows are kept, so the admin can see why a row was left out.
+model CycleCountStockUpload {
+  id              Int      @id @default(autoincrement())
+  fileName        String   @db.VarChar(500)
+  totalRows       Int
+  validRows       Int
+  excludedRows    Int
+  totalLocations  Int
+  totalPackages   Int
+  hasCertNoColumn Boolean  @default(false)
+  hasCncColumn    Boolean  @default(false)
+  hasClassColumn  Boolean  @default(false)
+  uploadedById    Int
+  uploadedByName  String   @db.VarChar(255)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  uploadedBy User                 @relation("CycleCountStockUploadedBy", fields: [uploadedById], references: [id])
+  rows       CycleCountStockRow[]
+  audits     CycleCountAudit[]
+
+  @@index([createdAt])
+}
+
+/// One row of the LX03 file. excludeReason = null -> valid row (used for planning).
+model CycleCountStockRow {
+  id              Int      @id @default(autoincrement())
+  uploadId        Int
+  rowNo           Int
+  storageBin      String   @db.VarChar(100)
+  materialCode    String   @db.VarChar(100)
+  qty             Decimal? @db.Decimal(15, 3)
+  certNo          String?  @db.VarChar(100)
+  batch           String?  @db.VarChar(100)
+  plant           String?  @db.VarChar(50)
+  storageLocation String?  @db.VarChar(50)
+  isCnc           Boolean?
+  materialClass   String?  @db.VarChar(10)
+  excludeReason   String?  @db.VarChar(40)
+
+  upload CycleCountStockUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@index([uploadId, storageBin])
+  @@index([uploadId, excludeReason])
+}
+
+/// One Cycle Count audit = the locations of ONE operator (a released plan creates one audit per operator).
+model CycleCountAudit {
+  id              Int       @id @default(autoincrement())
+  auditNo         String    @unique @db.VarChar(30)
+  auditName       String    @db.VarChar(255)
+  status          String    @default("ASSIGNED") @db.VarChar(30)
+  operatorId      Int
+  operatorName    String    @db.VarChar(255)
+  stockUploadId   Int
+  stockFileName   String    @db.VarChar(500)
+  movementFrom    DateTime  @db.Date
+  movementTo      DateTime  @db.Date
+  includeArchived Boolean   @default(true)
+  selectionMethod String    @db.VarChar(20)
+  cncFilter       String    @db.VarChar(20)
+  materialClasses String?   @db.VarChar(20)
+  totalLocations  Int
+  totalLines      Int
+  uploadBatchId   String    @db.VarChar(36)
+  createdById     Int
+  createdByName   String    @db.VarChar(255)
+  cancelledAt     DateTime? @db.Timestamptz(3)
+  cancelledByName String?   @db.VarChar(255)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+
+  operator    User                  @relation("CycleCountOperator", fields: [operatorId], references: [id])
+  createdBy   User                  @relation("CycleCountCreatedBy", fields: [createdById], references: [id])
+  stockUpload CycleCountStockUpload @relation(fields: [stockUploadId], references: [id])
+  locations   CycleCountLocation[]
+  materials   CycleCountMaterial[]
+
+  @@index([status])
+  @@index([operatorId, status])
+  @@index([uploadBatchId])
+}
+
+model CycleCountLocation {
+  id            Int      @id @default(autoincrement())
+  auditId       Int
+  storageBin    String   @db.VarChar(100)
+  sequenceNo    Int
+  movementLines Int      @default(0)
+  movementLevel String   @db.VarChar(10)
+  expectedLines Int
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  audit     CycleCountAudit      @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  materials CycleCountMaterial[]
+
+  @@unique([auditId, storageBin])
+}
+
+/// Expected stock line at a location (from the LX03 file at release time).
+model CycleCountMaterial {
+  id              Int      @id @default(autoincrement())
+  auditId         Int
+  auditLocationId Int
+  materialCode    String   @db.VarChar(100)
+  certNo          String?  @db.VarChar(100)
+  batch           String?  @db.VarChar(100)
+  expectedQty     Decimal  @db.Decimal(15, 3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  location CycleCountLocation @relation(fields: [auditLocationId], references: [id], onDelete: Cascade)
+  audit    CycleCountAudit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@index([auditId])
+  @@index([auditLocationId])
 }

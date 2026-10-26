@@ -31,6 +31,7 @@ import { ArchivedDataModule } from './modules/archived-data/archived-data.module
 import { ManualFgStorageModule } from './modules/manual-fg-storage/manual-fg-location.module';
 import { EfficiencyModule } from './modules/efficiency/efficiency.module';
 import { BomAuditModule } from './modules/bom-audit/bom-audit.module';
+import { CycleCountModule } from './modules/cycle-count/cycle-count.module';
 
 @Module({
   imports: [
@@ -64,6 +65,8 @@ import { BomAuditModule } from './modules/bom-audit/bom-audit.module';
     ManualFgStorageModule,
     EfficiencyModule,
     BomAuditModule,
+    // Phase 2 - Cycle Count audit
+    CycleCountModule,
   ],
   controllers: [AppController],
   providers: [AppService],
