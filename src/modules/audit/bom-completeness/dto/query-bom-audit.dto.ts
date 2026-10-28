@@ -19,7 +19,7 @@ const trimOrUndefined = ({ value }: { value: unknown }) =>
 
 export class QueryBomAuditDto {
   @ApiPropertyOptional({
-    description: 'Search by Audit No, audit name, file name or operator name',
+    description: 'Search by Audit No, audit name, file name, operator name or storage bin',
     example: 'AUD-BOM-2026',
   })
   @Transform(trimOrUndefined)

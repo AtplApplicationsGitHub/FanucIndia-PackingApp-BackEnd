@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -8,18 +9,21 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomInt, randomUUID } from 'crypto';
-import { PrismaService } from '../../prisma.service';
-import { getIstTimestampRange, parseYmdDateOnly } from '../../common/utils/date-only.util';
-import { decodeUploadFileName } from '../bom-audit/bom-audit-file.parser';
+import { PrismaService } from '../../../prisma.service';
+import { getIstTimestampRange, parseYmdDateOnly } from '../../../common/utils/date-only.util';
+import { decodeUploadFileName } from '../shared/audit-excel.util';
+import { nextAuditNo } from '../shared/audit-number.util';
+import { AuditOperatorsService } from '../shared/audit-operators.service';
+import { AUDIT_EDITABLE_STATUSES } from '../shared/audit.constants';
 import {
   CYCLE_COUNT_CNC_FILTER,
+  CYCLE_COUNT_EXCLUDE_REASON,
   CYCLE_COUNT_EXCLUDE_REASON_LABELS,
   CYCLE_COUNT_INSERT_CHUNK_SIZE,
   CYCLE_COUNT_MATERIAL_CLASSES,
   CYCLE_COUNT_MAX_EXCLUDED_RETURNED,
   CYCLE_COUNT_MOVEMENT,
   CYCLE_COUNT_MOVEMENT_LEVEL,
-  CYCLE_COUNT_NO_DIGITS,
   CYCLE_COUNT_NO_LOCK_KEY,
   CYCLE_COUNT_NO_PREFIX,
   CYCLE_COUNT_SELECTION_METHOD,
@@ -39,7 +43,6 @@ export interface CycleCountActor {
   name: string;
 }
 
-/** Valid stock of one storage bin (from the uploaded LX03 file). */
 interface LocationStock {
   storageBin: string;
   lines: number;
@@ -50,7 +53,6 @@ interface LocationStock {
   cncNo: number;
 }
 
-/** One location that can be planned, with its movement in the selected period. */
 export interface CycleCountCandidate {
   storageBin: string;
   movementLines: number;
@@ -61,7 +63,6 @@ export interface CycleCountCandidate {
   lines: number;
   totalQty: number;
   classes: string[];
-  /** null = the stock file has no CNC column */
   hasCnc: boolean | null;
 }
 
@@ -85,11 +86,17 @@ const AUDIT_SUMMARY_SELECT = {
   uploadBatchId: true,
   createdByName: true,
   createdAt: true,
-  cancelledAt: true,
-  cancelledByName: true,
 } satisfies Prisma.CycleCountAuditSelect;
 
 type AuditSummaryRow = Prisma.CycleCountAuditGetPayload<{ select: typeof AUDIT_SUMMARY_SELECT }>;
+
+const AUDIT_LIST_SELECT = {
+  ...AUDIT_SUMMARY_SELECT,
+  locations: {
+    select: { sequenceNo: true, storageBin: true },
+    orderBy: { sequenceNo: 'asc' },
+  },
+} satisfies Prisma.CycleCountAuditSelect;
 
 const MAX_AUDIT_NO_ATTEMPTS = 3;
 const natural = (a: string, b: string) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' });
@@ -102,9 +109,8 @@ export class CycleCountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly movement: CycleCountMovementService,
+    private readonly operators: AuditOperatorsService,
   ) {}
-
-  // ================================================================ A1 + A3: stock upload & validation
 
   async uploadStock(file: Express.Multer.File | undefined, actor: CycleCountActor) {
     if (!file || !file.buffer || file.size === 0) {
@@ -173,34 +179,32 @@ export class CycleCountService {
     return { ...result, message: 'Stock file uploaded and validated successfully.' };
   }
 
-  /** Upload summary + reasons + the excluded rows (for the "View excluded rows" table). */
   async getStockUpload(id: number) {
     const upload = await this.getUploadOrThrow(id);
-    const [reasonGroups, excluded] = await this.prisma.$transaction([
-      this.prisma.cycleCountStockRow.groupBy({
-        by: ['excludeReason'],
-        where: { uploadId: id, excludeReason: { not: null } },
-        _count: { _all: true },
-        orderBy: { excludeReason: 'asc' },
-      }),
+    const reasons = Object.values(CYCLE_COUNT_EXCLUDE_REASON).sort();
+    const [excluded, ...reasonCounts] = await this.prisma.$transaction([
       this.prisma.cycleCountStockRow.findMany({
         where: { uploadId: id, excludeReason: { not: null } },
         orderBy: { rowNo: 'asc' },
         take: CYCLE_COUNT_MAX_EXCLUDED_RETURNED,
         select: { rowNo: true, storageBin: true, materialCode: true, qty: true, certNo: true, excludeReason: true },
       }),
+      ...reasons.map((reason) =>
+        this.prisma.cycleCountStockRow.count({ where: { uploadId: id, excludeReason: reason } }),
+      ),
     ]);
 
     return {
       message: 'Stock upload fetched successfully.',
       data: {
         ...upload,
-        excludedByReason: reasonGroups.map((g) => ({
-          reason: g.excludeReason as string,
-          label: CYCLE_COUNT_EXCLUDE_REASON_LABELS[g.excludeReason as string] ?? g.excludeReason,
-          count: (g._count as { _all: number })._all,
-        })),
-        // First CYCLE_COUNT_MAX_EXCLUDED_RETURNED excluded rows (excludedRows above is the full count)
+        excludedByReason: reasons
+          .map((reason, i) => ({
+            reason,
+            label: CYCLE_COUNT_EXCLUDE_REASON_LABELS[reason] ?? reason,
+            count: reasonCounts[i] as number,
+          }))
+          .filter((r) => r.count > 0),
         excludedSample: excluded.map((r) => ({
           ...r,
           qty: r.qty === null ? null : r.qty.toNumber(),
@@ -209,8 +213,6 @@ export class CycleCountService {
       },
     };
   }
-
-  // ================================================================ A2 + A4: plan preview
 
   async previewPlan(dto: PreviewCycleCountPlanDto) {
     const upload = await this.getUploadOrThrow(dto.stockUploadId);
@@ -227,7 +229,6 @@ export class CycleCountService {
     } else if (dto.selectionMethod === CYCLE_COUNT_SELECTION_METHOD.RANDOM) {
       plan = this.shuffle([...candidates]).slice(0, dto.locationCount);
     } else {
-      // BUSIEST - candidates are already sorted busiest first
       plan = candidates.slice(0, dto.locationCount);
     }
 
@@ -244,7 +245,6 @@ export class CycleCountService {
         },
         filters,
         candidateCount: candidates.length,
-        // MANUAL: every candidate is listed so the admin can tick them
         candidates: dto.selectionMethod === CYCLE_COUNT_SELECTION_METHOD.MANUAL ? candidates : undefined,
         plan,
         planTotals: {
@@ -256,13 +256,10 @@ export class CycleCountService {
     };
   }
 
-  // ================================================================ A5: release (one audit per operator)
-
   async createAudits(dto: CreateCycleCountDto, actor: CycleCountActor) {
     const upload = await this.getUploadOrThrow(dto.stockUploadId);
     const range = this.resolveRange(dto.fromDate, dto.toDate);
 
-    // Operators: USER role only, in the order the admin picked them
     const users = await this.prisma.user.findMany({
       where: { id: { in: dto.operatorIds } },
       select: { id: true, name: true, role: true },
@@ -282,13 +279,11 @@ export class CycleCountService {
       });
     }
 
-    // The bins must still match the same criteria the admin previewed (movement level is taken from here)
     const { candidates } = await this.buildCandidates(dto, upload, range);
     const byBin = new Map(candidates.map((c) => [c.storageBin, c]));
     const unknown = dto.storageBins.filter((b) => !byBin.has(b));
     if (unknown.length) throw this.binsNotPlannable(unknown);
 
-    // Expected stock of the planned bins (same material + package + batch merged)
     const stockRows = await this.prisma.cycleCountStockRow.findMany({
       where: { uploadId: upload.id, excludeReason: null, storageBin: { in: dto.storageBins } },
       orderBy: { rowNo: 'asc' },
@@ -305,7 +300,6 @@ export class CycleCountService {
       else lines.set(key, { materialCode: r.materialCode, certNo: r.certNo, batch: r.batch, qty });
     }
 
-    // Share the bins: sorted by bin, one block of neighbouring bins per operator
     const sortedBins = [...dto.storageBins].sort(natural);
     const size = Math.ceil(sortedBins.length / dto.operatorIds.length);
     const groups = dto.operatorIds.map((id, i) => ({
@@ -342,7 +336,6 @@ export class CycleCountService {
   ): Promise<AuditSummaryRow[]> {
     for (let attempt = 1; attempt <= MAX_AUDIT_NO_ATTEMPTS; attempt++) {
       try {
-        // All audits of one plan are saved together: all or nothing
         return await this.prisma.$transaction(
           async (tx) => {
             const saved: AuditSummaryRow[] = [];
@@ -373,7 +366,6 @@ export class CycleCountService {
                 select: AUDIT_SUMMARY_SELECT,
               });
 
-              // sequenceNo restarts at 1 in every audit (each operator walks only their own bins)
               await tx.cycleCountLocation.createMany({
                 data: group.bins.map((bin, index) => ({
                   auditId: audit.id,
@@ -408,6 +400,7 @@ export class CycleCountService {
           { timeout: 60_000 },
         );
       } catch (error) {
+        if (error instanceof HttpException) throw error;
         const isAuditNoClash =
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === 'P2002' &&
@@ -421,27 +414,21 @@ export class CycleCountService {
     throw new InternalServerErrorException({ code: 'CYCLE_COUNT_SAVE_FAILED', message: 'Failed to release the Cycle Count audit. Please try again.' });
   }
 
-  /** AUD-CC-2026-0001 ... (per year, India time). The advisory lock serialises parallel releases. */
   private async nextAuditNo(tx: Prisma.TransactionClient): Promise<string> {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CYCLE_COUNT_NO_LOCK_KEY}::bigint)`;
-    const year = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', year: 'numeric' }).format(new Date());
-    const prefix = `${CYCLE_COUNT_NO_PREFIX}-${year}-`;
-    const last = await tx.cycleCountAudit.findFirst({
-      where: { auditNo: { startsWith: prefix } },
-      orderBy: { auditNo: 'desc' },
-      select: { auditNo: true },
+    return nextAuditNo(tx, {
+      prefix: CYCLE_COUNT_NO_PREFIX,
+      lockKey: CYCLE_COUNT_NO_LOCK_KEY,
+      findLastAuditNo: async (startsWith) =>
+        (
+          await tx.cycleCountAudit.findFirst({
+            where: { auditNo: { startsWith } },
+            orderBy: { auditNo: 'desc' },
+            select: { auditNo: true },
+          })
+        )?.auditNo ?? null,
     });
-    const lastNumber = last ? Number(last.auditNo.slice(prefix.length)) : 0;
-    const next = (Number.isFinite(lastNumber) ? lastNumber : 0) + 1;
-    return `${prefix}${String(next).padStart(CYCLE_COUNT_NO_DIGITS, '0')}`;
   }
 
-  // ================================================================ shared planning logic
-
-  /**
-   * Locations of the stock file that pass the CNC / class filters, with their movement in the period.
-   * Sorted busiest first. Movement level: the busiest third = HIGH, next third = MEDIUM, rest = LOW, no movement = NONE.
-   */
   private async buildCandidates(
     criteria: CycleCountPlanCriteriaDto,
     upload: { id: number; hasCncColumn: boolean; hasClassColumn: boolean },
@@ -534,7 +521,6 @@ export class CycleCountService {
     return map;
   }
 
-  /** YYYY-MM-DD (India time) -> [from, toExclusive). Checks order and the maximum range. */
   private resolveRange(fromDate: string, toDate: string) {
     const from = getIstTimestampRange(fromDate);
     const to = getIstTimestampRange(toDate);
@@ -585,7 +571,6 @@ export class CycleCountService {
     });
   }
 
-  /** Fisher-Yates with a crypto random source. */
   private shuffle<T>(items: T[]): T[] {
     for (let i = items.length - 1; i > 0; i--) {
       const j = randomInt(i + 1);
@@ -594,15 +579,8 @@ export class CycleCountService {
     return items;
   }
 
-  // ================================================================ list / detail / cancel / operators
-
   async getOperators() {
-    const operators = await this.prisma.user.findMany({
-      where: { role: 'USER' },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: 'asc' },
-    });
-    return { message: 'Operators fetched successfully.', count: operators.length, data: operators };
+    return this.operators.getOperators();
   }
 
   async findAll(query: QueryCycleCountDto) {
@@ -616,6 +594,7 @@ export class CycleCountService {
         { auditName: { contains: query.search, mode: 'insensitive' } },
         { stockFileName: { contains: query.search, mode: 'insensitive' } },
         { operatorName: { contains: query.search, mode: 'insensitive' } },
+        { locations: { some: { storageBin: { contains: query.search, mode: 'insensitive' } } } },
       ];
     }
     if (query.fromDate || query.toDate) {
@@ -631,7 +610,7 @@ export class CycleCountService {
       this.prisma.cycleCountAudit.count({ where }),
       this.prisma.cycleCountAudit.findMany({
         where,
-        select: AUDIT_SUMMARY_SELECT,
+        select: AUDIT_LIST_SELECT,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -640,7 +619,11 @@ export class CycleCountService {
 
     return {
       message: 'Cycle Count audits fetched successfully.',
-      data: audits.map((a) => this.toSummary(a)),
+      data: audits.map(({ locations, ...a }) => ({
+        ...this.toSummary(a),
+        storageBinCount: locations.length,
+        storageBins: locations,
+      })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -684,27 +667,39 @@ export class CycleCountService {
     };
   }
 
-  async cancel(id: number, actor: CycleCountActor) {
-    const result = await this.prisma.cycleCountAudit.updateMany({
+  async remove(id: number, actor: CycleCountActor) {
+    const audit = await this.prisma.cycleCountAudit.findUnique({
+      where: { id },
+      select: { id: true, auditNo: true, auditName: true, status: true, operatorName: true },
+    });
+    if (!audit) {
+      throw new NotFoundException({ code: 'CYCLE_COUNT_NOT_FOUND', message: `Cycle Count audit with ID ${id} not found.` });
+    }
+    const notDeletable = (status: string) =>
+      new ConflictException({
+        code: 'CYCLE_COUNT_NOT_DELETABLE',
+        message: `Only ASSIGNED audits can be deleted. This audit is ${status}.`,
+      });
+    if (!(AUDIT_EDITABLE_STATUSES as string[]).includes(audit.status)) throw notDeletable(audit.status);
+
+    const result = await this.prisma.cycleCountAudit.deleteMany({
       where: { id, status: CYCLE_COUNT_STATUS.ASSIGNED },
-      data: { status: CYCLE_COUNT_STATUS.CANCELLED, cancelledAt: new Date(), cancelledByName: actor.name },
     });
     if (result.count === 0) {
-      const existing = await this.prisma.cycleCountAudit.findUnique({ where: { id }, select: { status: true } });
-      if (!existing) {
+      const latest = await this.prisma.cycleCountAudit.findUnique({ where: { id }, select: { status: true } });
+      if (!latest) {
         throw new NotFoundException({ code: 'CYCLE_COUNT_NOT_FOUND', message: `Cycle Count audit with ID ${id} not found.` });
       }
-      throw new ConflictException({
-        code: 'CYCLE_COUNT_NOT_CANCELLABLE',
-        message: `Only ASSIGNED audits can be cancelled. This audit is ${existing.status}.`,
-      });
+      throw notDeletable(latest.status);
     }
-    const audit = await this.prisma.cycleCountAudit.findUniqueOrThrow({ where: { id }, select: AUDIT_SUMMARY_SELECT });
-    this.logger.log(`Cycle Count ${audit.auditNo} cancelled by ${actor.name}`);
-    return { message: 'Cycle Count audit cancelled successfully.', data: this.toSummary(audit) };
+
+    this.logger.log(`Cycle Count ${audit.auditNo} (${audit.auditName}, ${audit.operatorName}) deleted permanently by ${actor.name}`);
+    return {
+      message: `Cycle Count audit ${audit.auditNo} deleted permanently.`,
+      data: { id: audit.id, auditNo: audit.auditNo },
+    };
   }
 
-  /** DATE columns go out as YYYY-MM-DD; material classes as a list. */
   private toSummary<T extends AuditSummaryRow>(a: T) {
     return {
       ...a,

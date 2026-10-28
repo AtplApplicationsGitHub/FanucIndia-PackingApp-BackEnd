@@ -31,7 +31,6 @@ import {
 const upperTrimList = ({ value }: { value: unknown }) =>
   Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? v.trim().toUpperCase() : v)) : value;
 
-/** A2 + A4: everything that decides which locations are planned. */
 export class CycleCountPlanCriteriaDto {
   @ApiProperty({ description: 'Id from POST /cycle-count/stock-uploads', example: 3 })
   @Type(() => Number)
@@ -70,7 +69,6 @@ export class CycleCountPlanCriteriaDto {
   materialClasses!: string[];
 }
 
-/** POST /cycle-count/plan-preview */
 export class PreviewCycleCountPlanDto extends CycleCountPlanCriteriaDto {
   @ApiPropertyOptional({
     description: 'How many locations to pick (BUSIEST / RANDOM). Not used for MANUAL.',
@@ -99,7 +97,6 @@ export class PreviewCycleCountPlanDto extends CycleCountPlanCriteriaDto {
   storageBins?: string[];
 }
 
-/** POST /cycle-count - release the plan the admin previewed (one audit per operator). */
 export class CreateCycleCountDto extends CycleCountPlanCriteriaDto {
   @ApiProperty({ example: 'Cycle Count - Oct Week 4', maxLength: CYCLE_COUNT_MAX_LENGTH.auditName })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value))

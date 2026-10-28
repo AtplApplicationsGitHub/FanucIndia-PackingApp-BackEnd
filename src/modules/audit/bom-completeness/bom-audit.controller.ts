@@ -1,8 +1,8 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
-  Header,
   Param,
   ParseIntPipe,
   Patch,
@@ -23,16 +23,13 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Roles } from '../auth/roles.decorator';
-import { AuthRequest } from '../auth/types/auth-request.type';
+import { Roles } from '../../auth/roles.decorator';
+import { AuthRequest } from '../../auth/types/auth-request.type';
 import { BomAuditActor, BomAuditService } from './bom-audit.service';
 import { BomAuditReportService } from './bom-audit-report.service';
-import { CreateBomAuditDto } from './dto/create-bom-audit.dto';
+import { CreateBomAuditDto, ReassignBomAuditDto } from './dto/create-bom-audit.dto';
 import { QueryBomAuditDto } from './dto/query-bom-audit.dto';
-import {
-  BOM_AUDIT_MAX_FILE_BYTES,
-  BOM_AUDIT_TEMPLATE,
-} from './bom-audit.constants';
+import { BOM_AUDIT_MAX_FILE_BYTES } from './bom-audit.constants';
 
 @ApiTags('BOM Audit')
 @ApiBearerAuth()
@@ -52,33 +49,28 @@ export class BomAuditController {
   )
   @ApiOperation({
     summary:
-      'Create BOM audit(s) from the template: Audit Name cell + Operator per storage bin -> one audit per operator',
+      'Create BOM audit(s): Audit Name (typed on the screen) + Excel with an Operator ID per storage bin -> one audit per operator',
     description:
-      'Template file (GET /bom-audit/template): the file carries the Audit Name and the Operator of every storage bin; ' +
-      'auditName / operatorId are not needed. A plain file without an Operator column still works with auditName + operatorId.',
+      'No template: the admin uploads their own Excel with the columns StorageBin, Material, Qty (or Avail) and Operator ' +
+      '(the User ID of a Terminal Operator, role USER) - in any order. Every row is checked; all problems are returned in errors[] ' +
+      'with the Excel row number. Operator IDs that do not exist or are not role USER are rejected.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['file'],
+      required: ['file', 'auditName'],
       properties: {
         file: {
           type: 'string',
           format: 'binary',
-          description:
-            '.xlsx or .csv, max 10 MB. Template: Audit Name (row 1) + StorageBin, Material, Avail, Operator columns',
+          description: '.xlsx or .csv, max 10 MB. Columns: StorageBin, Material, Qty (or Avail), Operator (Operator ID)',
         },
         auditName: {
           type: 'string',
           maxLength: 255,
           example: 'BOM Audit - Rack 12 - Oct Week 2',
-          description: 'Only for a file without the Audit Name cell',
-        },
-        operatorId: {
-          type: 'integer',
-          example: 12,
-          description: 'Only for a file without an Operator column',
+          description: 'Audit Name typed on the screen',
         },
       },
     },
@@ -90,7 +82,7 @@ export class BomAuditController {
   @ApiResponse({
     status: 400,
     description:
-      'No file / missing audit name / wrong file type / missing columns / invalid rows (errors[] lists every bad row) / invalid operator',
+      'No file / missing audit name / wrong file type / missing columns / invalid rows / invalid Operator IDs (errors[] lists every problem with its Excel row)',
   })
   @ApiResponse({ status: 413, description: 'File larger than 10 MB' })
   create(
@@ -103,29 +95,10 @@ export class BomAuditController {
 
   @Get('operators')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Operator dropdown: users with USER role' })
+  @ApiOperation({ summary: 'Operator dropdown: users with USER role (same as GET /audit/operators)' })
   @ApiResponse({ status: 200, description: 'List of operators' })
   getOperators() {
     return this.bomAuditService.getOperators();
-  }
-
-  @Get('template')
-  @Roles('ADMIN')
-  @Header(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  )
-  @Header(
-    'Content-Disposition',
-    `attachment; filename="${BOM_AUDIT_TEMPLATE.fileName}"`,
-  )
-  @ApiOperation({
-    summary:
-      'Download the BOM audit Excel template (Audit Name cell + Operator dropdown of USER-role operators)',
-  })
-  @ApiResponse({ status: 200, description: 'Excel file (.xlsx)' })
-  async downloadTemplate() {
-    return new StreamableFile(await this.bomAuditService.buildTemplate());
   }
 
   @Get()
@@ -170,18 +143,37 @@ export class BomAuditController {
     });
   }
 
-  @Patch(':id/cancel')
+  @Patch(':id/operator')
   @Roles('ADMIN')
   @ApiOperation({
     summary:
-      'Cancel a BOM audit (allowed only while ASSIGNED, before the operator downloads it)',
+      'Re-assign the audit to another operator (inline "Assigned To"). Only while ASSIGNED - not after the operator downloaded it.',
   })
   @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Audit cancelled' })
+  @ApiResponse({ status: 200, description: 'Audit re-assigned (or already assigned to that operator)' })
+  @ApiResponse({ status: 400, description: 'Operator ID does not exist / is not a Terminal Operator (role USER)' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
-  @ApiResponse({ status: 409, description: 'Audit is not in ASSIGNED status' })
-  cancel(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
-    return this.bomAuditService.cancel(id, this.actor(req));
+  @ApiResponse({ status: 409, description: 'Audit is no longer ASSIGNED (already downloaded to the handheld)' })
+  reassign(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReassignBomAuditDto,
+    @Req() req: AuthRequest,
+  ) {
+    return this.bomAuditService.reassign(id, dto.operatorId, this.actor(req));
+  }
+
+  @Delete(':id')
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary:
+      'Delete a BOM audit PERMANENTLY (with its locations and materials). Only while ASSIGNED - not after the operator downloaded it.',
+  })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Audit deleted permanently' })
+  @ApiResponse({ status: 404, description: 'Audit not found' })
+  @ApiResponse({ status: 409, description: 'Audit is no longer ASSIGNED (already downloaded to the handheld)' })
+  remove(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    return this.bomAuditService.remove(id, this.actor(req));
   }
 
   private actor(req: AuthRequest): BomAuditActor {

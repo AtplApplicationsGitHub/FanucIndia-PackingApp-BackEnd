@@ -8,6 +8,7 @@ import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { ResetPasswordDto } from './dto/user.dto';
+import { Workbook } from 'exceljs';
 
 @Injectable()
 export class UserService {
@@ -76,18 +77,28 @@ export class UserService {
     });
   }
 
-  async findAll(role?: 'ADMIN' | 'SALES' | 'USER' | 'SUPER_ADMIN', search?: string) {
+  private buildUserWhere(
+    role?: 'ADMIN' | 'SALES' | 'USER' | 'SUPER_ADMIN',
+    search?: string,
+  ): Prisma.UserWhereInput {
     const where: Prisma.UserWhereInput = {};
     if (role) {
       where.role = role;
     }
-    if (search) {   
+    if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
-        { salesZone: { name: { contains: search, mode: 'insensitive' } } },
+        ...(role === 'USER'
+          ? []
+          : [{ salesZone: { name: { contains: search, mode: 'insensitive' as const } } }]),
       ];
     }
+    return where;
+  }
+
+  async findAll(role?: 'ADMIN' | 'SALES' | 'USER' | 'SUPER_ADMIN', search?: string) {
+    const where = this.buildUserWhere(role, search);
 
     return this.prisma.user.findMany({
       where,
@@ -119,6 +130,30 @@ export class UserService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async exportTerminalOperators(search?: string): Promise<Buffer> {
+    const users = await this.prisma.user.findMany({
+      where: this.buildUserWhere('USER', search),
+      select: { id: true, name: true, email: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const workbook = new Workbook();
+    workbook.creator = 'DIMS';
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet('Terminal Operators', {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+    sheet.columns = [
+      { header: 'ID', key: 'id', width: 10 },
+      { header: 'Name', key: 'name', width: 32 },
+      { header: 'Email', key: 'email', width: 40 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+    users.forEach((u) => sheet.addRow(u));
+
+    return Buffer.from(await workbook.xlsx.writeBuffer());
   }
 
   async update(id: number, dto: UpdateUserDto) {

@@ -5,7 +5,7 @@ import {
   cleanText,
   getFileExtension,
   normaliseHeader,
-} from '../bom-audit/bom-audit-file.parser';
+} from '../shared/audit-excel.util';
 import {
   CYCLE_COUNT_ALLOWED_EXTENSIONS,
   CYCLE_COUNT_COLUMN_LABELS,
@@ -19,14 +19,6 @@ import {
   CYCLE_COUNT_REQUIRED_HEADERS,
 } from './cycle-count.constants';
 
-/*
- * Cycle Count - SAP LX03 stock file reader (Phase A, step A1 + A3).
- *
- * Unlike the BOM template, a bad row does NOT reject the whole file: the client asked to
- * "exclude locations / materials with zero stock or invalid records" (M2 email, step 2).
- * Every row is returned with excludeReason = null (valid) or the reason it is left out.
- */
-
 type RequiredKey = keyof typeof CYCLE_COUNT_REQUIRED_HEADERS;
 type OptionalKey = keyof typeof CYCLE_COUNT_OPTIONAL_HEADERS;
 
@@ -34,7 +26,6 @@ export interface ParsedStockRow {
   rowNo: number;
   storageBin: string;
   materialCode: string;
-  /** null when the cell is empty / not a number */
   qty: number | null;
   certNo: string | null;
   batch: string | null;
@@ -77,7 +68,6 @@ async function loadWorksheet(buffer: Buffer, extension: string): Promise<ExcelJS
       'INVALID_FILE',
     );
   }
-  // First visible sheet with data
   const worksheet = workbook.worksheets.find((ws) => ws.actualRowCount > 0 && ws.state === 'visible');
   if (!worksheet) {
     throw new CycleCountFileError('The uploaded file is empty.', 'EMPTY_FILE');
@@ -85,7 +75,6 @@ async function loadWorksheet(buffer: Buffer, extension: string): Promise<ExcelJS
   return worksheet;
 }
 
-/** Header row = the row (within the first rows) that has StorageBin, Material and Avail. */
 function locateColumns(worksheet: ExcelJS.Worksheet) {
   const requiredKeys = Object.keys(CYCLE_COUNT_REQUIRED_HEADERS) as RequiredKey[];
   let best: { rowNo: number; index: Map<string, number>; found: number } | undefined;
@@ -126,14 +115,12 @@ function locateColumns(worksheet: ExcelJS.Worksheet) {
   const optional: Partial<Record<OptionalKey, number>> = {};
   (Object.keys(CYCLE_COUNT_OPTIONAL_HEADERS) as OptionalKey[]).forEach((key) => {
     const col = pick(CYCLE_COUNT_OPTIONAL_HEADERS[key]);
-    // A column can only be used once (e.g. "Location" is the storage location, never the bin)
     if (col !== undefined && !Object.values(required).includes(col)) optional[key] = col;
   });
 
   return { headerRowNo: best.rowNo, required, optional };
 }
 
-/** "1", "1.000", "1,250.5" -> number; anything else -> null. */
 function parseQty(raw: string): number | null {
   const text = raw.replace(/,/g, '').trim();
   if (!/^-?\d+(\.\d+)?$/.test(text)) return null;
@@ -141,7 +128,6 @@ function parseQty(raw: string): number | null {
   return Number.isFinite(qty) && Math.abs(qty) <= CYCLE_COUNT_MAX_QTY ? Math.round(qty * 1000) / 1000 : null;
 }
 
-/** Yes / Y / X / True / 1 -> true; No / N / False / 0 -> false; empty or other -> null (unknown). */
 function parseFlag(raw: string): boolean | null {
   const v = raw.trim().toLowerCase();
   if (!v) return null;
@@ -180,7 +166,7 @@ export async function parseCycleCountStockFile(buffer: Buffer, fileName: string)
     const storageBin = text(row, required.storageBin).toUpperCase();
     const materialCode = text(row, required.materialCode).toUpperCase();
     const qtyText = text(row, required.qty);
-    if (!storageBin && !materialCode && !qtyText) return; // blank line
+    if (!storageBin && !materialCode && !qtyText) return;
 
     totalRows += 1;
     if (totalRows > CYCLE_COUNT_MAX_DATA_ROWS) return;
@@ -205,7 +191,6 @@ export async function parseCycleCountStockFile(buffer: Buffer, fileName: string)
 
     rows.push({
       rowNo,
-      // Cut to the column size so even an excluded row can be stored for review
       storageBin: storageBin.slice(0, CYCLE_COUNT_MAX_LENGTH.storageBin),
       materialCode: materialCode.slice(0, CYCLE_COUNT_MAX_LENGTH.materialCode),
       qty,

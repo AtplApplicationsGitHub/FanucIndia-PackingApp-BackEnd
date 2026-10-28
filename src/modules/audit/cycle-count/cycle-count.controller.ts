@@ -1,12 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
   Query,
   Req,
@@ -23,26 +23,19 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Roles } from '../auth/roles.decorator';
-import { AuthRequest } from '../auth/types/auth-request.type';
+import { Roles } from '../../auth/roles.decorator';
+import { AuthRequest } from '../../auth/types/auth-request.type';
 import { CycleCountActor, CycleCountService } from './cycle-count.service';
 import { CreateCycleCountDto, PreviewCycleCountPlanDto } from './dto/plan-cycle-count.dto';
 import { QueryCycleCountDto } from './dto/query-cycle-count.dto';
 import { CYCLE_COUNT_MAX_FILE_BYTES } from './cycle-count.constants';
 
-/**
- * Cycle Count - WEB (admin) APIs, Phase A: create the audit.
- * Order of use: upload stock (A1/A3) -> plan preview (A2/A4, repeat as needed) -> release (A5).
- * Static routes are declared before ":id" so they are not taken as an id.
- */
 @ApiTags('Cycle Count')
 @ApiBearerAuth()
 @Roles('ADMIN')
 @Controller('cycle-count')
 export class CycleCountController {
   constructor(private readonly cycleCountService: CycleCountService) {}
-
-  // ---------------------------------------------------------------- A1 + A3
 
   @Post('stock-uploads')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: CYCLE_COUNT_MAX_FILE_BYTES, files: 1 } }))
@@ -79,8 +72,6 @@ export class CycleCountController {
     return this.cycleCountService.getStockUpload(id);
   }
 
-  // ---------------------------------------------------------------- A2 + A4
-
   @Post('plan-preview')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -93,8 +84,6 @@ export class CycleCountController {
   previewPlan(@Body() dto: PreviewCycleCountPlanDto) {
     return this.cycleCountService.previewPlan(dto);
   }
-
-  // ---------------------------------------------------------------- A5
 
   @Post()
   @ApiOperation({ summary: 'Release the previewed plan: one ASSIGNED audit per operator (locations shared between them)' })
@@ -128,14 +117,14 @@ export class CycleCountController {
     return this.cycleCountService.findOne(id);
   }
 
-  @Patch(':id/cancel')
-  @ApiOperation({ summary: 'Cancel a Cycle Count audit (only while ASSIGNED)' })
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a Cycle Count audit PERMANENTLY (with its locations and expected stock). Only while ASSIGNED.' })
   @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Audit cancelled' })
+  @ApiResponse({ status: 200, description: 'Audit deleted permanently' })
   @ApiResponse({ status: 404, description: 'Audit not found' })
   @ApiResponse({ status: 409, description: 'Audit is not in ASSIGNED status' })
-  cancel(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
-    return this.cycleCountService.cancel(id, this.actor(req));
+  remove(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    return this.cycleCountService.remove(id, this.actor(req));
   }
 
   private actor(req: AuthRequest): CycleCountActor {

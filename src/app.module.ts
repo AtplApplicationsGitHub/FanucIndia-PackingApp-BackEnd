@@ -30,8 +30,7 @@ import { SambaModule } from './modules/samba/samba.module';
 import { ArchivedDataModule } from './modules/archived-data/archived-data.module';
 import { ManualFgStorageModule } from './modules/manual-fg-storage/manual-fg-location.module';
 import { EfficiencyModule } from './modules/efficiency/efficiency.module';
-import { BomAuditModule } from './modules/bom-audit/bom-audit.module';
-import { CycleCountModule } from './modules/cycle-count/cycle-count.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -64,9 +63,7 @@ import { CycleCountModule } from './modules/cycle-count/cycle-count.module';
     ArchivedDataModule,
     ManualFgStorageModule,
     EfficiencyModule,
-    BomAuditModule,
-    // Phase 2 - Cycle Count audit
-    CycleCountModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -9,26 +9,19 @@ import { json, NextFunction, Request, Response, urlencoded } from 'express';
 import {
   BOM_AUDIT_MOBILE_JSON_LIMIT,
   BOM_AUDIT_MOBILE_PATH_PREFIX,
-} from './modules/bom-audit/bom-audit.constants';
+} from './modules/audit/bom-completeness/bom-audit.constants';
 import helmet from 'helmet';
 import compression from 'compression';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Security headers
   app.use(helmet());
 
-  // Response compression for large JSON payloads
   app.use(compression());
 
   app.set('trust proxy', 1);
 
-  // Reduced global limits to prevent OOM crashes.
-  // Use Multer streams in specific controllers for large ERP file uploads.
-  // BOM Completeness handheld: a full audit submit (up to 20,000 scanned lines) is bigger than 2 MB,
-  // so ONLY the /bom-audit/mobile/ routes get a larger JSON limit. Registered BEFORE the global parser
-  // (the global one skips a body that is already parsed).
   const bomAuditMobileJson = json({ limit: BOM_AUDIT_MOBILE_JSON_LIMIT });
   app.use((req: Request, res: Response, next: NextFunction) =>
     req.path.includes(BOM_AUDIT_MOBILE_PATH_PREFIX)
@@ -68,8 +61,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3011;
   const server = await app.listen(port, '0.0.0.0');
-  
-  // Reduced timeout to 60 seconds to prevent resource starvation & slow-loris attacks
+
   server.setTimeout(60000); 
   
   pinoAdapter.log(`Application is listening on port ${port}`, 'bootstrap');

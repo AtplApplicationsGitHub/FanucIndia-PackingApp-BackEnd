@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma.service';
+import { PrismaService } from '../../../prisma.service';
 import {
   BOM_AUDIT_INSERT_CHUNK_SIZE,
   BOM_AUDIT_LINE_STATUS,
@@ -17,20 +17,18 @@ import {
   BOM_AUDIT_SUBMIT_TX_TIMEOUT_MS,
   BOM_AUDIT_UPDATE_CHUNK_SIZE,
 } from './bom-audit.constants';
-import { cleanText } from './bom-audit-file.parser';
+import { cleanText } from '../shared/audit-excel.util';
 import { BomAuditReportService } from './bom-audit-report.service';
 import {
   StartBomAuditDto,
   SubmitBomAuditDto,
 } from './dto/mobile-bom-audit.dto';
 
-/** Logged-in handheld operator (from the RFID app JWT). */
 export interface BomAuditOperator {
   userId: number;
   name: string;
 }
 
-/** Fields returned for one task card on the handheld. */
 const MOBILE_TASK_SELECT = {
   id: true,
   auditNo: true,
@@ -41,13 +39,8 @@ const MOBILE_TASK_SELECT = {
   totalMaterials: true,
 } satisfies Prisma.BomAuditSelect;
 
-/** Audit statuses in which the operator may still change / submit results on the handheld. */
-const SUBMITTABLE_STATUSES: string[] = [
-  BOM_AUDIT_STATUS.DOWNLOADED,
-  BOM_AUDIT_STATUS.IN_PROGRESS,
-];
+const SUBMITTABLE_STATUSES: string[] = [BOM_AUDIT_STATUS.IN_PROGRESS];
 
-/** How many lines of each result a submit saved (for the log). */
 interface SubmitCounts {
   valid: number;
   mismatch: number;
@@ -55,7 +48,6 @@ interface SubmitCounts {
   unexpected: number;
 }
 
-/** One expected-material update prepared during submit. */
 interface MaterialResult {
   id: number;
   actualQty: number;
@@ -63,12 +55,6 @@ interface MaterialResult {
   lastScannedAt: Date | null;
 }
 
-/**
- * BOM Completeness - HANDHELD side (Stage B).
- * Only the operator the audit is assigned to can see / download / start / submit it.
- *
- * Status flow: ASSIGNED -> DOWNLOADED (download) -> IN_PROGRESS (start) -> PENDING_RECONCILIATION (submit)
- */
 @Injectable()
 export class BomAuditMobileService {
   private readonly logger = new Logger(BomAuditMobileService.name);
@@ -78,9 +64,6 @@ export class BomAuditMobileService {
     private readonly reports: BomAuditReportService,
   ) {}
 
-  // ================================================================ 1. my tasks
-
-  /** Audits assigned to the logged-in operator that are not finished yet (newest first). */
   async myTasks(operator: BomAuditOperator) {
     const tasks = await this.prisma.bomAudit.findMany({
       where: {
@@ -98,13 +81,6 @@ export class BomAuditMobileService {
     };
   }
 
-  // ================================================================ 2. download
-
-  /**
-   * Full audit (locations + expected materials) for offline work on the handheld.
-   * First download: ASSIGNED -> DOWNLOADED (from now on the admin can no longer cancel it).
-   * Downloading again (phone reset / reinstalled) is allowed while DOWNLOADED / IN_PROGRESS - status is not changed.
-   */
   async download(id: number, operator: BomAuditOperator) {
     const audit = await this.getOwnAudit(id, operator);
 
@@ -113,13 +89,11 @@ export class BomAuditMobileService {
     }
 
     if (audit.status === BOM_AUDIT_STATUS.ASSIGNED) {
-      // Conditional update: if the admin cancelled it at the same moment, only one of the two wins
       const result = await this.prisma.bomAudit.updateMany({
         where: { id, status: BOM_AUDIT_STATUS.ASSIGNED },
-        data: { status: BOM_AUDIT_STATUS.DOWNLOADED, downloadedAt: new Date() },
+        data: { status: BOM_AUDIT_STATUS.IN_PROGRESS, downloadedAt: new Date() },
       });
       if (result.count === 0) {
-        // Status changed in between (e.g. cancelled) -> check again and answer accordingly
         const latest = await this.getOwnAudit(id, operator);
         if (!BOM_AUDIT_OPERATOR_OPEN_STATUSES.includes(latest.status)) {
           throw this.alreadySubmitted(latest.status);
@@ -139,7 +113,6 @@ export class BomAuditMobileService {
             storageBin: true,
             expectedMaterials: true,
             materials: {
-              // Only the lines from the uploaded file (never earlier UNEXPECTED rows)
               where: { isUnexpected: false },
               orderBy: { materialCode: 'asc' },
               select: { id: true, materialCode: true, expectedQty: true },
@@ -156,36 +129,31 @@ export class BomAuditMobileService {
     return { message: 'BOM audit downloaded successfully.', data: detail };
   }
 
-  // ================================================================ 3. start
-
-  /**
-   * Operator opened the audit on the handheld: ASSIGNED / DOWNLOADED -> IN_PROGRESS.
-   * Calling it again while IN_PROGRESS is fine (nothing changes) - the handheld may retry.
-   */
   async start(id: number, dto: StartBomAuditDto, operator: BomAuditOperator) {
     const audit = await this.getOwnAudit(id, operator);
 
-    if (audit.status === BOM_AUDIT_STATUS.IN_PROGRESS) {
+    if (!BOM_AUDIT_OPERATOR_OPEN_STATUSES.includes(audit.status)) {
+      throw this.alreadySubmitted(audit.status);
+    }
+
+    if (audit.status === BOM_AUDIT_STATUS.IN_PROGRESS && audit.startedAt) {
       return {
         message: 'BOM audit already started.',
         data: { id: audit.id, auditNo: audit.auditNo, status: audit.status },
       };
     }
 
-    if (!BOM_AUDIT_OPERATOR_OPEN_STATUSES.includes(audit.status)) {
-      throw this.alreadySubmitted(audit.status);
-    }
-
     const startedAt = this.toDate(dto.startedAt, 'startedAt');
     const result = await this.prisma.bomAudit.updateMany({
       where: {
         id,
-        status: { in: [BOM_AUDIT_STATUS.ASSIGNED, BOM_AUDIT_STATUS.DOWNLOADED] },
+        operatorId: operator.userId,
+        status: { in: [BOM_AUDIT_STATUS.ASSIGNED, BOM_AUDIT_STATUS.IN_PROGRESS] },
+        startedAt: null,
       },
       data: {
         status: BOM_AUDIT_STATUS.IN_PROGRESS,
         startedAt,
-        // Started without a recorded download (should not happen) -> keep the timeline complete
         ...(audit.downloadedAt ? {} : { downloadedAt: startedAt }),
       },
     });
@@ -195,9 +163,9 @@ export class BomAuditMobileService {
       if (latest.status !== BOM_AUDIT_STATUS.IN_PROGRESS) {
         throw this.alreadySubmitted(latest.status);
       }
+    } else {
+      this.logger.log(`BOM audit ${audit.auditNo} started by ${operator.name}`);
     }
-
-    this.logger.log(`BOM audit ${audit.auditNo} started by ${operator.name}`);
 
     return {
       message: 'BOM audit started successfully.',
@@ -205,12 +173,6 @@ export class BomAuditMobileService {
     };
   }
 
-  // ================================================================ 4. submit
-
-  /**
-   * Saves all scan results in ONE transaction and sets the audit to PENDING_RECONCILIATION.
-   * Safe to retry: the same clientSubmissionId again returns success without saving twice.
-   */
   async submit(id: number, dto: SubmitBomAuditDto, operator: BomAuditOperator) {
     const startedAt = this.toDate(dto.startedAt, 'startedAt');
     const completedAt = this.toDate(dto.completedAt, 'completedAt');
@@ -225,7 +187,6 @@ export class BomAuditMobileService {
 
     const outcome = await this.prisma.$transaction(
       async (tx) => {
-        // Lock the audit row: two submits of the same audit run one after the other
         await tx.$queryRaw`SELECT "id" FROM "BomAudit" WHERE "id" = ${id} FOR UPDATE`;
 
         const audit = await tx.bomAudit.findUnique({
@@ -241,7 +202,6 @@ export class BomAuditMobileService {
         });
         this.assertOwnAudit(id, audit, operator);
 
-        // Repeated submit (handheld retry after a timeout / lost answer)
         if (audit.clientSubmissionId) {
           if (audit.clientSubmissionId === dto.clientSubmissionId) {
             return { audit, alreadySaved: true, counts: null as SubmitCounts | null };
@@ -261,7 +221,6 @@ export class BomAuditMobileService {
 
         const plan = await this.buildSubmitPlan(tx, id, dto);
 
-        // Expected lines: actual quantity + status (bulk, chunked)
         for (let i = 0; i < plan.materials.length; i += BOM_AUDIT_UPDATE_CHUNK_SIZE) {
           const chunk = plan.materials.slice(i, i + BOM_AUDIT_UPDATE_CHUNK_SIZE);
           await tx.$executeRaw`
@@ -279,14 +238,12 @@ export class BomAuditMobileService {
             WHERE m."id" = v."id" AND m."auditId" = ${id}`;
         }
 
-        // Unexpected lines: new rows (expectedQty 0)
         for (let i = 0; i < plan.unexpected.length; i += BOM_AUDIT_INSERT_CHUNK_SIZE) {
           await tx.bomAuditMaterial.createMany({
             data: plan.unexpected.slice(i, i + BOM_AUDIT_INSERT_CHUNK_SIZE),
           });
         }
 
-        // Locations: time each one was completed on the handheld
         for (let i = 0; i < plan.locations.length; i += BOM_AUDIT_UPDATE_CHUNK_SIZE) {
           const chunk = plan.locations.slice(i, i + BOM_AUDIT_UPDATE_CHUNK_SIZE);
           await tx.$executeRaw`
@@ -301,7 +258,7 @@ export class BomAuditMobileService {
         const updated = await tx.bomAudit.update({
           where: { id },
           data: {
-            status: BOM_AUDIT_STATUS.PENDING_RECONCILIATION,
+            status: BOM_AUDIT_STATUS.RECONCILIATION_PENDING,
             startedAt: audit.startedAt ?? startedAt,
             completedAt,
             submittedAt: new Date(),
@@ -323,8 +280,6 @@ export class BomAuditMobileService {
         `BOM audit ${outcome.audit.auditNo} submitted by ${operator.name}: ` +
           `valid ${c?.valid}, mismatch ${c?.mismatch}, missing ${c?.missing}, unexpected ${c?.unexpected}`,
       );
-      // Report Excel -> SFTP, in the background: the handheld gets its answer now, and a failed
-      // upload never fails the submit (it is retried automatically - BomAuditReportService)
       this.reports.generateInBackground(outcome.audit.id);
     }
 
@@ -335,17 +290,11 @@ export class BomAuditMobileService {
       data: {
         id: outcome.audit.id,
         auditNo: outcome.audit.auditNo,
-        status: BOM_AUDIT_STATUS.PENDING_RECONCILIATION,
+        status: BOM_AUDIT_STATUS.RECONCILIATION_PENDING,
       },
     };
   }
 
-  /**
-   * Checks the submitted data against the audit in the database and prepares what to save.
-   * Rules: every location exactly once; every expected material of a location exactly once;
-   * unexpected codes must not be an expected code of that location and not repeat.
-   * The line status is ALWAYS re-calculated here (the handheld value is not trusted).
-   */
   private async buildSubmitPlan(tx: Prisma.TransactionClient, auditId: number, dto: SubmitBomAuditDto) {
     const dbLocations = await tx.bomAuditLocation.findMany({
       where: { auditId },
@@ -365,7 +314,6 @@ export class BomAuditMobileService {
       if (errors.length < 50) errors.push(message);
     };
 
-    // ---- locations: all of them, each once
     const seenLocations = new Set<number>();
     for (const loc of dto.locations) {
       if (!locationsById.has(loc.locationId)) addError(`Location ${loc.locationId} does not belong to this audit.`);
@@ -402,7 +350,6 @@ export class BomAuditMobileService {
         const lastScannedAt = line.lastScannedAt ? this.toDate(line.lastScannedAt, 'lastScannedAt') : null;
 
         if (line.materialId !== undefined && line.materialId !== null) {
-          // ---- expected line
           const expected = expectedById.get(line.materialId);
           if (!expected) {
             addError(`${dbLoc.storageBin}: material ${line.materialId} does not belong to this location.`);
@@ -430,7 +377,6 @@ export class BomAuditMobileService {
 
           materials.push({ id: expected.id, actualQty: line.actualQty, lineStatus, lastScannedAt });
         } else {
-          // ---- unexpected line (scanned here, not in the file for this location)
           if (!code) {
             addError(`${dbLoc.storageBin}: an unexpected material has an empty code.`);
             continue;
@@ -444,7 +390,7 @@ export class BomAuditMobileService {
             continue;
           }
           seenUnexpectedCodes.add(code);
-          if (line.actualQty < 1) continue; // nothing was really scanned - ignore
+          if (line.actualQty < 1) continue;
 
           counts.unexpected++;
           unexpected.push({
@@ -476,13 +422,10 @@ export class BomAuditMobileService {
     return { materials, unexpected, locations, counts };
   }
 
-  // ================================================================ helpers
-
-  /** Loads the audit and checks it belongs to the operator (404 / 403 otherwise). */
   private async getOwnAudit(id: number, operator: BomAuditOperator) {
     const audit = await this.prisma.bomAudit.findUnique({
       where: { id },
-      select: { id: true, auditNo: true, status: true, operatorId: true, downloadedAt: true },
+      select: { id: true, auditNo: true, status: true, operatorId: true, downloadedAt: true, startedAt: true },
     });
     this.assertOwnAudit(id, audit, operator);
     return audit;
@@ -493,11 +436,10 @@ export class BomAuditMobileService {
     audit: T | null,
     operator: BomAuditOperator,
   ): asserts audit is T {
-    // A cancelled audit is "gone" for the handheld
-    if (!audit || audit.status === BOM_AUDIT_STATUS.CANCELLED) {
+    if (!audit) {
       throw new NotFoundException({
         code: 'BOM_AUDIT_NOT_FOUND',
-        message: 'Audit not found. It may have been cancelled.',
+        message: 'Audit not found. It may have been deleted.',
       });
     }
     if (audit.operatorId !== operator.userId) {
@@ -523,7 +465,6 @@ export class BomAuditMobileService {
     });
   }
 
-  /** ISO text -> Date. Times more than 1 day in the future (wrong phone clock) are replaced by "now". */
   private toDate(value: string, field: string): Date {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {

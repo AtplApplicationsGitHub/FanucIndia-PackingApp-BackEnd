@@ -45,7 +45,6 @@ model User {
   bomAuditsAsOperator BomAudit[] @relation("BomAuditOperator")
   bomAuditsCreated    BomAudit[] @relation("BomAuditCreatedBy")
 
-  // Phase 2 - Cycle Count audit
   cycleCountAuditsAsOperator CycleCountAudit[]       @relation("CycleCountOperator")
   cycleCountAuditsCreated    CycleCountAudit[]       @relation("CycleCountCreatedBy")
   cycleCountStockUploads     CycleCountStockUpload[] @relation("CycleCountStockUploadedBy")
@@ -631,15 +630,13 @@ model BomAudit {
   auditNo         String    @unique @db.VarChar(30)
   auditName       String    @db.VarChar(255)
   fileName        String    @db.VarChar(500)
-  status          String    @default("ASSIGNED") @db.VarChar(30)
+  status          String    @default("ASSIGNED") @db.VarChar(30) // ASSIGNED | IN_PROGRESS | RECONCILIATION_PENDING | CLOSED (shared by all audit types)
   operatorId      Int
   operatorName    String    @db.VarChar(255)
   totalLocations  Int
   totalMaterials  Int
   createdById     Int
   createdByName   String    @db.VarChar(255)
-  cancelledAt     DateTime? @db.Timestamptz(3)
-  cancelledByName String?   @db.VarChar(255)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -702,11 +699,6 @@ model BomAuditMaterial {
   @@index([auditId])
 }
 
-// ============================================================
-// Phase 2 - Cycle Count audit (Phase A: create audit on the web)
-// ============================================================
-
-/// One uploaded SAP LX03 stock file. Valid AND excluded rows are kept, so the admin can see why a row was left out.
 model CycleCountStockUpload {
   id              Int      @id @default(autoincrement())
   fileName        String   @db.VarChar(500)
@@ -729,7 +721,6 @@ model CycleCountStockUpload {
   @@index([createdAt])
 }
 
-/// One row of the LX03 file. excludeReason = null -> valid row (used for planning).
 model CycleCountStockRow {
   id              Int      @id @default(autoincrement())
   uploadId        Int
@@ -756,7 +747,7 @@ model CycleCountAudit {
   id              Int       @id @default(autoincrement())
   auditNo         String    @unique @db.VarChar(30)
   auditName       String    @db.VarChar(255)
-  status          String    @default("ASSIGNED") @db.VarChar(30)
+  status          String    @default("ASSIGNED") @db.VarChar(30) // ASSIGNED | IN_PROGRESS | RECONCILIATION_PENDING | CLOSED (shared by all audit types)
   operatorId      Int
   operatorName    String    @db.VarChar(255)
   stockUploadId   Int
@@ -772,8 +763,6 @@ model CycleCountAudit {
   uploadBatchId   String    @db.VarChar(36)
   createdById     Int
   createdByName   String    @db.VarChar(255)
-  cancelledAt     DateTime? @db.Timestamptz(3)
-  cancelledByName String?   @db.VarChar(255)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -805,7 +794,6 @@ model CycleCountLocation {
   @@unique([auditId, storageBin])
 }
 
-/// Expected stock line at a location (from the LX03 file at release time).
 model CycleCountMaterial {
   id              Int      @id @default(autoincrement())
   auditId         Int
@@ -822,4 +810,13 @@ model CycleCountMaterial {
 
   @@index([auditId])
   @@index([auditLocationId])
+}
+
+model AuditNoSequence {
+  prefix     String   @db.VarChar(10)
+  period     String   @db.VarChar(7)
+  lastNumber Int
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([prefix, period])
 }

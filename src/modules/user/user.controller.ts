@@ -10,6 +10,7 @@ import {
   Req,
   ForbiddenException,
   Query,
+  StreamableFile,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto, ResetPasswordDto } from './dto/user.dto';
@@ -21,8 +22,11 @@ import {
   ApiBody,
   ApiParam,
   ApiQuery,
+  ApiProduces,
 } from '@nestjs/swagger';
 import { AuthRequest } from '../auth/types/auth-request.type';
+
+const TERMINAL_OPERATOR_FILE_NAME = 'Terminal Operator User List.xlsx';
 
 @ApiTags('Users')
 @Controller('users')
@@ -54,6 +58,31 @@ export class UserController {
     @Query('search') search?: string,
   ) {
     return this.userService.findAll(role, search);
+  }
+
+  @Get('export/terminal-operators')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({
+    summary:
+      'Download role USER accounts (ID, Name, Email) as "Terminal Operator User List.xlsx", filtered by the table search',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search applied in the Users table (matches name or email)',
+  })
+  @ApiProduces(
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  @ApiResponse({ status: 200, description: 'Excel file (.xlsx)' })
+  async exportTerminalOperators(@Query('search') search?: string) {
+    const buffer = await this.userService.exportTerminalOperators(search);
+    return new StreamableFile(buffer, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="${TERMINAL_OPERATOR_FILE_NAME}"; filename*=UTF-8''${encodeURIComponent(TERMINAL_OPERATOR_FILE_NAME)}`,
+      length: buffer.length,
+    });
   }
 
   @Patch(':id')

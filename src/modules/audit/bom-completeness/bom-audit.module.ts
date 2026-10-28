@@ -4,13 +4,13 @@ import { BomAuditService } from './bom-audit.service';
 import { BomAuditMobileController } from './bom-audit-mobile.controller';
 import { BomAuditMobileService } from './bom-audit-mobile.service';
 import { BomAuditReportService } from './bom-audit-report.service';
-import { SftpModule } from '../sftp/sftp.module';
+import { SftpModule } from '../../sftp/sftp.module';
+import { AuditSharedModule } from '../shared/audit-shared.module';
 
 @Module({
-  // SftpModule: the report Excel is saved on the SFTP server after submit
-  imports: [SftpModule],
-  // BomAuditController = web (admin), BomAuditMobileController = handheld (Stage B)
+  imports: [SftpModule, AuditSharedModule],
   controllers: [BomAuditController, BomAuditMobileController],
   providers: [BomAuditService, BomAuditMobileService, BomAuditReportService],
+  exports: [BomAuditService],
 })
 export class BomAuditModule {}

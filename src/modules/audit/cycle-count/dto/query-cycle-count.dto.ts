@@ -6,9 +6,8 @@ import { CYCLE_COUNT_STATUS_VALUES } from '../cycle-count.constants';
 const trimOrUndefined = ({ value }: { value: unknown }) =>
   value === undefined || value === null || String(value).trim() === '' ? undefined : String(value).trim();
 
-/** GET /cycle-count - same filters as the BOM audit list. */
 export class QueryCycleCountDto {
-  @ApiPropertyOptional({ description: 'Search by Audit No, audit name, stock file or operator name' })
+  @ApiPropertyOptional({ description: 'Search by Audit No, audit name, stock file, operator name or storage bin' })
   @Transform(trimOrUndefined)
   @IsOptional()
   @IsString()

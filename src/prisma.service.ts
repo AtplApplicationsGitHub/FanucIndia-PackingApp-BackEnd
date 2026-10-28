@@ -13,7 +13,6 @@ export class PrismaService extends PrismaClient
 
   constructor() {
     super({
-      // Log queries in dev mode to catch performance issues early
       log:
         process.env.NODE_ENV === 'development'
           ? ['query', 'info', 'warn', 'error']

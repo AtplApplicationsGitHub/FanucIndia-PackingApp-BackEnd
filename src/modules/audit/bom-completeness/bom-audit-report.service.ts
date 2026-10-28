@@ -6,32 +6,17 @@ import {
 } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import * as ExcelJS from 'exceljs';
-import { PrismaService } from '../../prisma.service';
-import { SftpService } from '../sftp/sftp.service';
+import { PrismaService } from '../../../prisma.service';
+import { SftpService } from '../../sftp/sftp.service';
 import {
   buildAuditFilePath,
   isInsideAuditBaseDir,
-} from '../sftp/audit-report-paths';
+} from '../shared/audit-report-paths';
 import {
   BOM_AUDIT_LINE_STATUS,
   BOM_AUDIT_REPORT,
-  BOM_AUDIT_STATUS,
   bomAuditReportFileName,
 } from './bom-audit.constants';
-
-/*
- * BOM Completeness - REPORT Excel (Phase B).
- *
- * After the handheld submits an audit, the server builds the report from the DATABASE
- * (the server-calculated statuses) and saves it on the SFTP server:
- *     <SFTP_BASE_DIR_BOM_AUDIT>/<Audit No>/<Audit No>_Report.xlsx
- *
- * Rules (agreed):
- *  - The submit NEVER fails because of the report / SFTP. The scan data is already saved;
- *    a failed upload is stored in reportError and retried automatically (retryPendingReports).
- *  - "Download Report" on the web returns the saved SFTP file; if it is not there (yet),
- *    the report is built fresh from the database, so the admin always gets the file.
- */
 
 const LINE_STATUS_LABEL: Record<string, string> = {
   [BOM_AUDIT_LINE_STATUS.VALID]: 'Valid',
@@ -40,7 +25,6 @@ const LINE_STATUS_LABEL: Record<string, string> = {
   [BOM_AUDIT_LINE_STATUS.UNEXPECTED]: 'Unexpected',
 };
 
-/** Excel colours per line status (fill / font) - same meaning as the handheld colours */
 const LINE_STATUS_STYLE: Record<string, { fill: string; font: string }> = {
   [BOM_AUDIT_LINE_STATUS.VALID]: { fill: 'FFC6EFCE', font: 'FF006100' },
   [BOM_AUDIT_LINE_STATUS.MISMATCH]: { fill: 'FFFFEB9C', font: 'FF9C5700' },
@@ -48,7 +32,6 @@ const LINE_STATUS_STYLE: Record<string, { fill: string; font: string }> = {
   [BOM_AUDIT_LINE_STATUS.UNEXPECTED]: { fill: 'FFE4DFEC', font: 'FF5B2C83' },
 };
 
-/** Everything the report needs, in one query */
 const REPORT_AUDIT_SELECT = {
   id: true,
   auditNo: true,
@@ -70,7 +53,6 @@ const REPORT_AUDIT_SELECT = {
       expectedMaterials: true,
       verifiedAt: true,
       materials: {
-        // File order first, then the unexpected materials of that location
         orderBy: [{ isUnexpected: 'asc' as const }, { id: 'asc' as const }],
         select: {
           materialCode: true,
@@ -91,7 +73,6 @@ export type BomAuditReportFile = { fileName: string; buffer: Buffer };
 export class BomAuditReportService {
   private readonly logger = new Logger(BomAuditReportService.name);
 
-  /** Audits being uploaded right now (submit + retry job never upload the same audit twice at once) */
   private readonly inFlight = new Set<number>();
   private retryRunning = false;
 
@@ -100,17 +81,10 @@ export class BomAuditReportService {
     private readonly sftp: SftpService,
   ) {}
 
-  // ================================================================ after submit
-
-  /** Called right after a successful submit. Runs in the background - the handheld does not wait for SFTP. */
   generateInBackground(auditId: number): void {
     void this.generateAndUpload(auditId);
   }
 
-  /**
-   * Builds the report and saves it on SFTP. NEVER throws: a failure is stored on the audit
-   * (reportError, reportAttempts + 1) and retried later. Returns true when the file is on SFTP.
-   */
   async generateAndUpload(auditId: number): Promise<boolean> {
     if (this.inFlight.has(auditId)) return false;
     this.inFlight.add(auditId);
@@ -148,12 +122,6 @@ export class BomAuditReportService {
     }
   }
 
-  // ================================================================ automatic retry
-
-  /**
-   * Every BOM_AUDIT_REPORT.retryIntervalMs: submitted audits whose report is not on SFTP yet
-   * (upload failed, or the server restarted before it ran) are tried again, up to maxAttempts times.
-   */
   @Interval(BOM_AUDIT_REPORT.retryIntervalMs)
   async retryPendingReports(): Promise<void> {
     if (this.retryRunning) return;
@@ -163,7 +131,6 @@ export class BomAuditReportService {
         where: {
           submittedAt: { not: null },
           reportPath: null,
-          status: { not: BOM_AUDIT_STATUS.CANCELLED },
           reportAttempts: { lt: BOM_AUDIT_REPORT.maxAttempts },
         },
         orderBy: { submittedAt: 'asc' },
@@ -171,7 +138,7 @@ export class BomAuditReportService {
         select: { id: true },
       });
       for (const { id } of pending) {
-        await this.generateAndUpload(id); // one by one - keeps the SFTP server load low
+        await this.generateAndUpload(id);
       }
     } catch (err) {
       this.logger.error(`BOM audit report retry failed: ${err instanceof Error ? err.message : err}`);
@@ -180,12 +147,6 @@ export class BomAuditReportService {
     }
   }
 
-  // ================================================================ web download
-
-  /**
-   * File for "Download Report" (web). Uses the saved SFTP file; when it is missing or SFTP cannot be
-   * reached, the same report is built from the database (and the upload is tried again in the background).
-   */
   async getReportForDownload(auditId: number): Promise<BomAuditReportFile> {
     const audit = await this.prisma.bomAudit.findUnique({
       where: { id: auditId },
@@ -217,13 +178,10 @@ export class BomAuditReportService {
     }
 
     const report = await this.buildReport(auditId);
-    this.generateInBackground(auditId); // put it (back) on SFTP
+    this.generateInBackground(auditId);
     return { fileName: report.fileName, buffer: report.buffer };
   }
 
-  // ================================================================ the Excel file
-
-  /** Builds the report Excel from the database. */
   async buildReport(auditId: number): Promise<BomAuditReportFile & { auditNo: string }> {
     const audit = await this.prisma.bomAudit.findUnique({
       where: { id: auditId },
@@ -233,7 +191,6 @@ export class BomAuditReportService {
       throw new NotFoundException({ code: 'BOM_AUDIT_NOT_FOUND', message: 'BOM audit not found.' });
     }
 
-    // ---- counts
     const counts = { lines: 0, valid: 0, mismatch: 0, missing: 0, unexpected: 0 };
     const perLocation = audit.locations.map((location) => {
       const c = { valid: 0, mismatch: 0, missing: 0, unexpected: 0 };
@@ -260,7 +217,6 @@ export class BomAuditReportService {
     const headerFill = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFD966' } };
     const labelFill = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFF2F2F2' } };
 
-    // ================= Sheet 1 - Report (header, summary, every material line)
     const sheet = workbook.addWorksheet(BOM_AUDIT_REPORT.sheetName);
     const columns = [
       { header: 'S/No', width: 7 },
@@ -280,7 +236,6 @@ export class BomAuditReportService {
     sheet.getCell('A1').font = { bold: true, size: 14 };
     sheet.getRow(1).height = 22;
 
-    // Audit details: two label / value pairs per row (A:B label, C:E value, F:G label, H:I value)
     const details: [string, string, string, string][] = [
       ['Audit No', audit.auditNo, 'Audit Name', audit.auditName],
       ['Operator', audit.operatorName, 'Status', this.titleCase(audit.status)],
@@ -312,7 +267,6 @@ export class BomAuditReportService {
       rowNo += 1;
     }
 
-    // Summary
     rowNo += 1;
     sheet.getCell(`A${rowNo}`).value = 'Summary';
     sheet.getCell(`A${rowNo}`).font = { bold: true, size: 12 };
@@ -341,7 +295,6 @@ export class BomAuditReportService {
     });
     rowNo += 3;
 
-    // Detail table
     const headerRowNo = rowNo;
     const header = sheet.getRow(headerRowNo);
     columns.forEach((c, i) => {
@@ -379,7 +332,6 @@ export class BomAuditReportService {
     }
 
     sheet.views = [{ state: 'frozen', ySplit: headerRowNo }];
-    // Printing / PDF: A4 landscape, all columns on one page width, table header repeated on every page
     sheet.pageSetup = {
       paperSize: 9,
       orientation: 'landscape',
@@ -393,7 +345,6 @@ export class BomAuditReportService {
       to: { row: headerRowNo + Math.max(serialNo, 1), column: columns.length },
     };
 
-    // ================= Sheet 2 - one row per storage bin
     const locSheet = workbook.addWorksheet(BOM_AUDIT_REPORT.locationSheetName, {
       views: [{ state: 'frozen', ySplit: 1 }],
     });
@@ -438,8 +389,6 @@ export class BomAuditReportService {
     };
   }
 
-  // ================================================================ helpers
-
   private readonly timeFormat = new Intl.DateTimeFormat('en-GB', {
     timeZone: BOM_AUDIT_REPORT.timeZone,
     day: '2-digit',
@@ -451,12 +400,10 @@ export class BomAuditReportService {
     hour12: false,
   });
 
-  /** "22/10/2026 15:21:05" (India time), "-" when empty */
   private formatTime(value: Date | null | undefined): string {
     return value ? this.timeFormat.format(value).replace(',', '') : '-';
   }
 
-  /** PENDING_RECONCILIATION -> "Pending Reconciliation" */
   private titleCase(value: string): string {
     return value
       .toLowerCase()
