@@ -652,7 +652,8 @@ model BomAudit {
   reportGeneratedAt DateTime? @db.Timestamptz(3)
   reportAttempts    Int       @default(0)
   reportError       String?   @db.VarChar(1000)
-
+  closedAt          DateTime? @db.Timestamptz(3)
+  closedByName      String?   @db.VarChar(255)
   operator  User               @relation("BomAuditOperator", fields: [operatorId], references: [id])
   createdBy User               @relation("BomAuditCreatedBy", fields: [createdById], references: [id])
   locations BomAuditLocation[]
@@ -691,6 +692,11 @@ model BomAuditMaterial {
   lastScannedAt   DateTime? @db.Timestamptz(3)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+  reconDecision    String?   @db.VarChar(40)
+  reconSapAction   String    @default("NONE") @db.VarChar(40)
+  reconRemarks     String?   @db.Text
+  resolvedAt       DateTime? @db.Timestamptz(3)
+  resolvedByName   String?   @db.VarChar(255)
 
   location BomAuditLocation @relation(fields: [auditLocationId], references: [id], onDelete: Cascade)
   audit    BomAudit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
