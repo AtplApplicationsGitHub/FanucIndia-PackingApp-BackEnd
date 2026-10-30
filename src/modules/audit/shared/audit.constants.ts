@@ -20,6 +20,14 @@ export const AUDIT_STATUS_LABELS: Record<AuditStatus, string> = {
   CLOSED: 'Closed',
 };
 
+export const AUDIT_STATUS_FILTER_ALL = 'ALL';
+
+export function toStatusFilter(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).trim().toUpperCase();
+  return text === '' || text === AUDIT_STATUS_FILTER_ALL ? undefined : text;
+}
+
 export const AUDIT_EDITABLE_STATUSES: AuditStatus[] = [AUDIT_STATUS.ASSIGNED];
 
 export const AUDIT_OPERATOR_OPEN_STATUSES: AuditStatus[] = [

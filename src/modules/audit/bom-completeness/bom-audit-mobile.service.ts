@@ -126,7 +126,38 @@ export class BomAuditMobileService {
       this.logger.log(`BOM audit ${detail.auditNo} downloaded by ${operator.name}`);
     }
 
-    return { message: 'BOM audit downloaded successfully.', data: detail };
+    const mappingByCode = await this.findMappingBarcodes(
+      detail.locations.flatMap((location) => location.materials.map((m) => m.materialCode)),
+    );
+    const data = {
+      ...detail,
+      locations: detail.locations.map((location) => ({
+        ...location,
+        materials: location.materials.map((material) => ({
+          ...material,
+          mappingBarcode: mappingByCode.get(material.materialCode.toUpperCase()) ?? null,
+        })),
+      })),
+    };
+
+    return { message: 'BOM audit downloaded successfully.', data };
+  }
+
+  private async findMappingBarcodes(materialCodes: string[]): Promise<Map<string, string>> {
+    const codes = [...new Set(materialCodes.map((code) => code.trim()).filter(Boolean))];
+    const result = new Map<string, string>();
+    if (codes.length === 0) return result;
+
+    const rows = await this.prisma.materialBarcode.findMany({
+      where: { erpCode: { in: codes, mode: 'insensitive' } },
+      select: { erpCode: true, mappingBarcode: true },
+    });
+    for (const row of rows) {
+      const barcode = row.mappingBarcode?.trim();
+      const key = row.erpCode.trim().toUpperCase();
+      if (barcode && !result.has(key)) result.set(key, barcode);
+    }
+    return result;
   }
 
   async start(id: number, dto: StartBomAuditDto, operator: BomAuditOperator) {

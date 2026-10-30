@@ -1,7 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { AUDIT_STATUS_VALUES, AUDIT_TYPE, AUDIT_TYPE_VALUES } from '../shared/audit.constants';
+import {
+  AUDIT_STATUS_FILTER_ALL,
+  AUDIT_STATUS_VALUES,
+  AUDIT_TYPE,
+  AUDIT_TYPE_VALUES,
+  toStatusFilter,
+} from '../shared/audit.constants';
 
 const trimOrUndefined = ({ value }: { value: unknown }) =>
   value === undefined || value === null || String(value).trim() === ''
@@ -30,11 +36,14 @@ export class QueryAuditListDto {
   @MaxLength(255)
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by audit status', enum: AUDIT_STATUS_VALUES })
-  @Transform(({ value }) => trimOrUndefined({ value })?.toUpperCase())
+  @ApiPropertyOptional({
+    description: 'Filter by audit status. Not sent or "ALL" = every status (default)',
+    enum: [AUDIT_STATUS_FILTER_ALL, ...AUDIT_STATUS_VALUES],
+  })
+  @Transform(({ value }) => toStatusFilter(value))
   @IsOptional()
   @IsIn(AUDIT_STATUS_VALUES, {
-    message: `status must be one of: ${AUDIT_STATUS_VALUES.join(', ')}`,
+    message: `status must be ALL or one of: ${AUDIT_STATUS_VALUES.join(', ')}`,
   })
   status?: string;
 

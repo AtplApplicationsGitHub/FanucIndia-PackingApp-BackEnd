@@ -4,6 +4,7 @@ import { getIstTimestampRange } from '../../common/utils/date-only.util';
 import { AuditOperatorsService } from './shared/audit-operators.service';
 import {
   AUDIT_EDITABLE_STATUSES,
+  AUDIT_OPERATOR_OPEN_STATUSES,
   AUDIT_STATUS,
   AUDIT_STATUS_LABELS,
   AUDIT_STATUS_VALUES,
@@ -21,6 +22,7 @@ import { CycleCountService } from './cycle-count/cycle-count.service';
 type AuditCountWhere = {
   status: AuditStatus;
   createdAt?: { gte?: Date; lt?: Date };
+  operatorId?: number;
 };
 
 type StatusCounts = Record<AuditStatus, number>;
@@ -64,8 +66,8 @@ export class AuditService {
     this.counters = {
       [AUDIT_TYPE.BOM_COMPLETENESS]: (where) => this.prisma.bomAudit.count({ where }),
       [AUDIT_TYPE.CYCLE_COUNT]: (where) => this.prisma.cycleCountAudit.count({ where }),
-      [AUDIT_TYPE.LOCATION_AUDIT]: null,
-      [AUDIT_TYPE.FREE_STOCK]: null,
+      [AUDIT_TYPE.LOCATION_AUDIT]: null, // TODO: Location Audit module (next)
+      [AUDIT_TYPE.FREE_STOCK]: null, // TODO: Free Stock / 4th Axis module (next)
     };
   }
 
@@ -206,6 +208,35 @@ export class AuditService {
           auditType === AUDIT_TYPE.BOM_COMPLETENESS && REPORT_READY_STATUSES.includes(row.status),
       },
       details,
+    };
+  }
+
+  async getMyTaskCounts(operatorId: number) {
+    const data = await Promise.all(
+      AUDIT_TYPE_VALUES.map(async (auditType) => {
+        const counter = this.counters[auditType];
+        const [assigned, inProgress] = counter
+          ? await Promise.all([
+              counter({ status: AUDIT_STATUS.ASSIGNED, operatorId }),
+              counter({ status: AUDIT_STATUS.IN_PROGRESS, operatorId }),
+            ])
+          : [0, 0];
+        return {
+          auditType,
+          label: AUDIT_TYPE_LABELS[auditType],
+          available: counter !== null,
+          assigned,
+          inProgress,
+          total: assigned + inProgress,
+        };
+      }),
+    );
+
+    return {
+      message: 'My audit task counts fetched successfully.',
+      data,
+      countedStatuses: AUDIT_OPERATOR_OPEN_STATUSES,
+      total: data.reduce((acc, row) => acc + row.total, 0),
     };
   }
 

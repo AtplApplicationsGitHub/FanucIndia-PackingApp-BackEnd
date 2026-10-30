@@ -11,6 +11,7 @@ import {
   Min,
 } from 'class-validator';
 import { BOM_AUDIT_STATUS_VALUES } from '../bom-audit.constants';
+import { AUDIT_STATUS_FILTER_ALL, toStatusFilter } from '../../shared/audit.constants';
 
 const trimOrUndefined = ({ value }: { value: unknown }) =>
   value === undefined || value === null || String(value).trim() === ''
@@ -29,13 +30,13 @@ export class QueryBomAuditDto {
   search?: string;
 
   @ApiPropertyOptional({
-    description: 'Filter by audit status',
-    enum: BOM_AUDIT_STATUS_VALUES,
+    description: 'Filter by audit status. Not sent or "ALL" = every status (default)',
+    enum: [AUDIT_STATUS_FILTER_ALL, ...BOM_AUDIT_STATUS_VALUES],
   })
-  @Transform(({ value }) => trimOrUndefined({ value })?.toUpperCase())
+  @Transform(({ value }) => toStatusFilter(value))
   @IsOptional()
   @IsIn(BOM_AUDIT_STATUS_VALUES, {
-    message: `status must be one of: ${BOM_AUDIT_STATUS_VALUES.join(', ')}`,
+    message: `status must be ALL or one of: ${BOM_AUDIT_STATUS_VALUES.join(', ')}`,
   })
   status?: string;
 

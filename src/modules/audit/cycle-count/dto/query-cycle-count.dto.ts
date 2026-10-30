@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { CYCLE_COUNT_STATUS_VALUES } from '../cycle-count.constants';
+import { AUDIT_STATUS_FILTER_ALL, toStatusFilter } from '../../shared/audit.constants';
 
 const trimOrUndefined = ({ value }: { value: unknown }) =>
   value === undefined || value === null || String(value).trim() === '' ? undefined : String(value).trim();
@@ -14,10 +15,13 @@ export class QueryCycleCountDto {
   @MaxLength(255)
   search?: string;
 
-  @ApiPropertyOptional({ enum: CYCLE_COUNT_STATUS_VALUES })
-  @Transform(({ value }) => trimOrUndefined({ value })?.toUpperCase())
+  @ApiPropertyOptional({
+    description: 'Filter by audit status. Not sent or "ALL" = every status (default)',
+    enum: [AUDIT_STATUS_FILTER_ALL, ...CYCLE_COUNT_STATUS_VALUES],
+  })
+  @Transform(({ value }) => toStatusFilter(value))
   @IsOptional()
-  @IsIn(CYCLE_COUNT_STATUS_VALUES, { message: `status must be one of: ${CYCLE_COUNT_STATUS_VALUES.join(', ')}` })
+  @IsIn(CYCLE_COUNT_STATUS_VALUES, { message: `status must be ALL or one of: ${CYCLE_COUNT_STATUS_VALUES.join(', ')}` })
   status?: string;
 
   @ApiPropertyOptional({ description: 'Created from (YYYY-MM-DD, IST)', example: '2026-10-01' })
