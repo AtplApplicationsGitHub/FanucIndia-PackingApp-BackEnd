@@ -6,6 +6,7 @@ import {
 import { AUDIT_TYPE, AUDIT_TYPE_VALUES } from '../shared/audit.constants';
 import { BomReconciliationService } from '../bom-completeness/bom-reconciliation.service';
 import { ReviewReconciliationDto } from './dto/review-reconciliation.dto';
+import { BulkReviewReconciliationDto } from './dto/bulk-review-reconciliation.dto';
 
 @Injectable()
 export class ReconciliationService {
@@ -41,6 +42,24 @@ export class ReconciliationService {
     return this.getService(auditType).review(
       id,
       varianceId,
+      {
+        decision: dto.decision,
+        sapAction: dto.sapAction ?? 'NONE',
+        remarks: dto.remarks,
+      },
+      userName,
+    );
+  }
+
+  bulkReview(
+    auditType: string,
+    id: number,
+    dto: BulkReviewReconciliationDto,
+    userName: string,
+  ) {
+    return this.getService(auditType).bulkReview(
+      id,
+      dto.varianceIds,
       {
         decision: dto.decision,
         sapAction: dto.sapAction ?? 'NONE',

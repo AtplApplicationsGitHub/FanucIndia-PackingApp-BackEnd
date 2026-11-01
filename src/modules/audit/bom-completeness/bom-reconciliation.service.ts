@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -23,11 +24,24 @@ export class BomReconciliationService {
         location: {
           select: {
             storageBin: true,
+            verifiedAt: true,
           },
         },
       },
       orderBy: {
         id: 'asc' as const,
+      },
+    },
+    locations: {
+      select: {
+        id: true,
+        sequenceNo: true,
+        storageBin: true,
+        expectedMaterials: true,
+        verifiedAt: true,
+      },
+      orderBy: {
+        sequenceNo: 'asc' as const,
       },
     },
   };
@@ -89,6 +103,7 @@ export class BomReconciliationService {
         sapAction: material.reconSapAction,
         remarks: material.reconRemarks ?? '',
         scannedAt: material.lastScannedAt,
+        locationCompletedAt: material.location.verifiedAt,
         resolvedAt: material.resolvedAt,
         resolvedByName: material.resolvedByName,
       };
@@ -129,22 +144,32 @@ export class BomReconciliationService {
       reviewStatus = 'IN_PROGRESS';
     }
 
-    const locations = Array.from(
-      new Set(variances.map((variance) => variance.storageBin)),
-    ).map((storageBin) => {
-      const locationVariances = variances.filter(
-        (variance) => variance.storageBin === storageBin,
+    const locations = audit.locations.map((location) => {
+      const locationMaterials = materials.filter(
+        (material) => material.auditLocationId === location.id,
       );
+      const countStatus = (lineStatus: string) =>
+        locationMaterials.filter((material) => material.lineStatus === lineStatus)
+          .length;
+      const locationVariances = variances.filter(
+        (variance) => variance.storageBin === location.storageBin,
+      );
+      const openCount = locationVariances.filter(
+        (variance) => variance.status === 'OPEN',
+      ).length;
 
       return {
-        storageBin,
+        sequenceNo: location.sequenceNo,
+        storageBin: location.storageBin,
+        expectedMaterials: location.expectedMaterials,
+        valid: countStatus(BOM_AUDIT_LINE_STATUS.VALID),
+        mismatch: countStatus(BOM_AUDIT_LINE_STATUS.MISMATCH),
+        missing: countStatus(BOM_AUDIT_LINE_STATUS.MISSING),
+        unexpected: countStatus(BOM_AUDIT_LINE_STATUS.UNEXPECTED),
         totalVariances: locationVariances.length,
-        openVariances: locationVariances.filter(
-          (variance) => variance.status === 'OPEN',
-        ).length,
-        resolvedVariances: locationVariances.filter(
-          (variance) => variance.status === 'RESOLVED',
-        ).length,
+        openVariances: openCount,
+        resolvedVariances: locationVariances.length - openCount,
+        completedAt: location.verifiedAt,
       };
     });
 
@@ -246,6 +271,88 @@ export class BomReconciliationService {
     });
 
     return this.detail(id);
+  }
+
+  async bulkReview(
+    id: number,
+    varianceIds: number[],
+    input: ReviewInput,
+    userName: string,
+  ) {
+    const remarks = input.remarks.trim();
+
+    if (!remarks) {
+      throw new BadRequestException('Remarks are required.');
+    }
+
+    const ids = Array.from(new Set(varianceIds));
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: number }[]>`
+        SELECT "id"
+        FROM "BomAudit"
+        WHERE "id" = ${id}
+        FOR UPDATE
+      `;
+
+      if (locked.length === 0) {
+        throw new NotFoundException('BOM audit not found.');
+      }
+
+      const audit = await tx.bomAudit.findUnique({
+        where: { id },
+      });
+
+      if (audit?.status !== AUDIT_STATUS.RECONCILIATION_PENDING) {
+        throw new ConflictException('Audit is not pending reconciliation.');
+      }
+
+      const found = await tx.bomAuditMaterial.findMany({
+        where: {
+          id: { in: ids },
+          auditId: id,
+          lineStatus: {
+            in: [
+              BOM_AUDIT_LINE_STATUS.MISSING,
+              BOM_AUDIT_LINE_STATUS.MISMATCH,
+              BOM_AUDIT_LINE_STATUS.UNEXPECTED,
+            ],
+          },
+        },
+        select: { id: true },
+      });
+
+      if (found.length !== ids.length) {
+        const foundIds = new Set(found.map((material) => material.id));
+        const missingIds = ids.filter((varianceId) => !foundIds.has(varianceId));
+        throw new NotFoundException(
+          `Discrepancy not found: ${missingIds.join(', ')}.`,
+        );
+      }
+
+      const result = await tx.bomAuditMaterial.updateMany({
+        where: {
+          id: { in: ids },
+          auditId: id,
+        },
+        data: {
+          reconDecision: input.decision,
+          reconSapAction: input.sapAction,
+          reconRemarks: remarks,
+          resolvedAt: new Date(),
+          resolvedByName: userName,
+        },
+      });
+
+      return result.count;
+    });
+
+    const audit = await this.getAudit(id);
+
+    return {
+      message: `${updated} ${updated === 1 ? 'discrepancy' : 'discrepancies'} reviewed successfully.`,
+      data: this.toDetail(audit),
+    };
   }
 
   async close(id: number, userName: string) {

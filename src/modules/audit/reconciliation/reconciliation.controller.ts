@@ -19,6 +19,7 @@ import { Roles } from '../../auth/roles.decorator';
 import { AuthRequest } from '../../auth/types/auth-request.type';
 import { ReconciliationService } from './reconciliation.service';
 import { ReviewReconciliationDto } from './dto/review-reconciliation.dto';
+import { BulkReviewReconciliationDto } from './dto/bulk-review-reconciliation.dto';
 
 @ApiTags('Audit - Reconciliation')
 @ApiBearerAuth()
@@ -49,6 +50,41 @@ export class ReconciliationController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.reconciliationService.detail(auditType, id);
+  }
+
+  @Patch(':auditType/:id/variances/bulk')
+  @ApiOperation({
+    summary: 'Review and resolve many audit discrepancies at once',
+  })
+  @ApiParam({
+    name: 'auditType',
+    enum: ['BOM_COMPLETENESS', 'CYCLE_COUNT', 'LOCATION_AUDIT', 'FREE_STOCK'],
+  })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Discrepancies reviewed successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Audit or one of the discrepancies not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Audit is not pending reconciliation',
+  })
+  bulkReview(
+    @Param('auditType') auditType: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: BulkReviewReconciliationDto,
+    @Req() req: AuthRequest,
+  ) {
+    return this.reconciliationService.bulkReview(
+      auditType,
+      id,
+      dto,
+      req.user.name,
+    );
   }
 
   @Patch(':auditType/:id/variances/:varianceId')
