@@ -7,6 +7,18 @@ import {
 import { PrismaService } from '../../../prisma.service';
 import { AUDIT_STATUS } from '../shared/audit.constants';
 import { BOM_AUDIT_LINE_STATUS } from './bom-audit.constants';
+import { BomAuditReportService } from './bom-audit-report.service';
+
+export const RECON_ERROR = {
+  INVALID_AUDIT_TYPE: 'RECON_INVALID_AUDIT_TYPE',
+  NOT_AVAILABLE: 'RECON_NOT_AVAILABLE',
+  AUDIT_NOT_FOUND: 'RECON_AUDIT_NOT_FOUND',
+  AUDIT_NOT_SUBMITTED: 'RECON_AUDIT_NOT_SUBMITTED',
+  AUDIT_NOT_PENDING: 'RECON_AUDIT_NOT_PENDING',
+  DISCREPANCY_NOT_FOUND: 'RECON_DISCREPANCY_NOT_FOUND',
+  REMARKS_REQUIRED: 'RECON_REMARKS_REQUIRED',
+  UNRESOLVED_REMAINING: 'RECON_UNRESOLVED_REMAINING',
+} as const;
 
 type ReviewInput = {
   decision: string;
@@ -16,7 +28,10 @@ type ReviewInput = {
 
 @Injectable()
 export class BomReconciliationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reportService: BomAuditReportService,
+  ) {}
 
   private readonly auditInclude = {
     materials: {
@@ -53,16 +68,20 @@ export class BomReconciliationService {
     });
 
     if (!audit) {
-      throw new NotFoundException('BOM audit not found.');
+      throw new NotFoundException({
+        code: RECON_ERROR.AUDIT_NOT_FOUND,
+        message: 'BOM audit not found.',
+      });
     }
 
     if (
       audit.status !== AUDIT_STATUS.RECONCILIATION_PENDING &&
       audit.status !== AUDIT_STATUS.CLOSED
     ) {
-      throw new ConflictException(
-        'Audit has not been submitted for reconciliation.',
-      );
+      throw new ConflictException({
+        code: RECON_ERROR.AUDIT_NOT_SUBMITTED,
+        message: 'Audit has not been submitted for reconciliation.',
+      });
     }
 
     return audit;
@@ -134,14 +153,14 @@ export class BomReconciliationService {
         ? Math.round((matchedComponents / expectedComponents) * 1000) / 10
         : 100;
 
-    let reviewStatus = 'PENDING_RECONCILIATION';
+    let reviewStatus = 'NOT_STARTED';
 
     if (audit.status === AUDIT_STATUS.CLOSED) {
       reviewStatus = 'CLOSED';
     } else if (totalVariances === 0 || openVariances === 0) {
-      reviewStatus = 'RECONCILED';
+      reviewStatus = 'ALL_REVIEWED';
     } else if (resolvedVariances > 0) {
-      reviewStatus = 'IN_PROGRESS';
+      reviewStatus = 'REVIEWING';
     }
 
     const locations = audit.locations.map((location) => {
@@ -149,8 +168,9 @@ export class BomReconciliationService {
         (material) => material.auditLocationId === location.id,
       );
       const countStatus = (lineStatus: string) =>
-        locationMaterials.filter((material) => material.lineStatus === lineStatus)
-          .length;
+        locationMaterials.filter(
+          (material) => material.lineStatus === lineStatus,
+        ).length;
       const locationVariances = variances.filter(
         (variance) => variance.storageBin === location.storageBin,
       );
@@ -227,7 +247,10 @@ export class BomReconciliationService {
       `;
 
       if (locked.length === 0) {
-        throw new NotFoundException('BOM audit not found.');
+        throw new NotFoundException({
+          code: RECON_ERROR.AUDIT_NOT_FOUND,
+          message: 'BOM audit not found.',
+        });
       }
 
       const audit = await tx.bomAudit.findUnique({
@@ -235,7 +258,10 @@ export class BomReconciliationService {
       });
 
       if (audit?.status !== AUDIT_STATUS.RECONCILIATION_PENDING) {
-        throw new ConflictException('Audit is not pending reconciliation.');
+        throw new ConflictException({
+          code: RECON_ERROR.AUDIT_NOT_PENDING,
+          message: 'Audit is not pending reconciliation.',
+        });
       }
 
       const material = await tx.bomAuditMaterial.findFirst({
@@ -253,7 +279,17 @@ export class BomReconciliationService {
           BOM_AUDIT_LINE_STATUS.UNEXPECTED,
         ].includes(material.lineStatus as any)
       ) {
-        throw new NotFoundException('Discrepancy not found.');
+        throw new NotFoundException({
+          code: RECON_ERROR.DISCREPANCY_NOT_FOUND,
+          message: 'Discrepancy not found.',
+        });
+      }
+
+      if (!input.remarks.trim()) {
+        throw new BadRequestException({
+          code: RECON_ERROR.REMARKS_REQUIRED,
+          message: 'Remarks are required.',
+        });
       }
 
       await tx.bomAuditMaterial.update({
@@ -282,7 +318,10 @@ export class BomReconciliationService {
     const remarks = input.remarks.trim();
 
     if (!remarks) {
-      throw new BadRequestException('Remarks are required.');
+      throw new BadRequestException({
+        code: RECON_ERROR.REMARKS_REQUIRED,
+        message: 'Remarks are required.',
+      });
     }
 
     const ids = Array.from(new Set(varianceIds));
@@ -296,7 +335,10 @@ export class BomReconciliationService {
       `;
 
       if (locked.length === 0) {
-        throw new NotFoundException('BOM audit not found.');
+        throw new NotFoundException({
+          code: RECON_ERROR.AUDIT_NOT_FOUND,
+          message: 'BOM audit not found.',
+        });
       }
 
       const audit = await tx.bomAudit.findUnique({
@@ -304,7 +346,10 @@ export class BomReconciliationService {
       });
 
       if (audit?.status !== AUDIT_STATUS.RECONCILIATION_PENDING) {
-        throw new ConflictException('Audit is not pending reconciliation.');
+        throw new ConflictException({
+          code: RECON_ERROR.AUDIT_NOT_PENDING,
+          message: 'Audit is not pending reconciliation.',
+        });
       }
 
       const found = await tx.bomAuditMaterial.findMany({
@@ -324,10 +369,13 @@ export class BomReconciliationService {
 
       if (found.length !== ids.length) {
         const foundIds = new Set(found.map((material) => material.id));
-        const missingIds = ids.filter((varianceId) => !foundIds.has(varianceId));
-        throw new NotFoundException(
-          `Discrepancy not found: ${missingIds.join(', ')}.`,
+        const missingIds = ids.filter(
+          (varianceId) => !foundIds.has(varianceId),
         );
+        throw new NotFoundException({
+          code: RECON_ERROR.DISCREPANCY_NOT_FOUND,
+          message: `Discrepancy not found: ${missingIds.join(', ')}.`,
+        });
       }
 
       const result = await tx.bomAuditMaterial.updateMany({
@@ -365,7 +413,10 @@ export class BomReconciliationService {
       `;
 
       if (locked.length === 0) {
-        throw new NotFoundException('BOM audit not found.');
+        throw new NotFoundException({
+          code: RECON_ERROR.AUDIT_NOT_FOUND,
+          message: 'BOM audit not found.',
+        });
       }
 
       const audit = await tx.bomAudit.findUnique({
@@ -373,7 +424,10 @@ export class BomReconciliationService {
       });
 
       if (audit?.status !== AUDIT_STATUS.RECONCILIATION_PENDING) {
-        throw new ConflictException('Audit is not pending reconciliation.');
+        throw new ConflictException({
+          code: RECON_ERROR.AUDIT_NOT_PENDING,
+          message: 'Audit is not pending reconciliation.',
+        });
       }
 
       const unresolved = await tx.bomAuditMaterial.count({
@@ -391,9 +445,10 @@ export class BomReconciliationService {
       });
 
       if (unresolved > 0) {
-        throw new ConflictException(
-          `${unresolved} discrepancies remain unresolved.`,
-        );
+        throw new ConflictException({
+          code: RECON_ERROR.UNRESOLVED_REMAINING,
+          message: `${unresolved} ${unresolved === 1 ? 'discrepancy remains' : 'discrepancies remain'} unresolved.`,
+        });
       }
 
       await tx.bomAudit.update({
@@ -402,9 +457,15 @@ export class BomReconciliationService {
           status: AUDIT_STATUS.CLOSED,
           closedAt: new Date(),
           closedByName: userName,
+          reportPath: null,
+          reportGeneratedAt: null,
+          reportError: null,
+          reportAttempts: 0,
         },
       });
     });
+
+    this.reportService.generateInBackground(id);
 
     return this.detail(id);
   }

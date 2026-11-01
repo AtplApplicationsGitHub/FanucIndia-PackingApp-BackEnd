@@ -112,10 +112,18 @@ export class BomAuditMobileService {
             sequenceNo: true,
             storageBin: true,
             expectedMaterials: true,
+            verifiedAt: true,
+            uploadedAt: true,
             materials: {
-              where: { isUnexpected: false },
-              orderBy: { materialCode: 'asc' },
-              select: { id: true, materialCode: true, expectedQty: true },
+              orderBy: [{ isUnexpected: 'asc' }, { materialCode: 'asc' }],
+              select: {
+                id: true,
+                materialCode: true,
+                expectedQty: true,
+                actualQty: true,
+                isUnexpected: true,
+                lastScannedAt: true,
+              },
             },
           },
         },
@@ -131,13 +139,21 @@ export class BomAuditMobileService {
     );
     const data = {
       ...detail,
-      locations: detail.locations.map((location) => ({
-        ...location,
-        materials: location.materials.map((material) => ({
-          ...material,
-          mappingBarcode: mappingByCode.get(material.materialCode.toUpperCase()) ?? null,
-        })),
-      })),
+      uploadedLocations: detail.locations.filter((location) => location.uploadedAt).length,
+      locations: detail.locations.map(({ materials, ...location }) => {
+        const uploaded = location.uploadedAt !== null;
+        return {
+          ...location,
+          uploaded,
+          materials: materials
+            .filter((material) => uploaded || !material.isUnexpected)
+            .map(({ actualQty, isUnexpected, lastScannedAt, ...material }) => ({
+              ...material,
+              mappingBarcode: mappingByCode.get(material.materialCode.toUpperCase()) ?? null,
+              ...(uploaded ? { actualQty: actualQty ?? 0, isUnexpected, lastScannedAt } : {}),
+            })),
+        };
+      }),
     };
 
     return { message: 'BOM audit downloaded successfully.', data };
@@ -229,18 +245,23 @@ export class BomAuditMobileService {
             operatorId: true,
             startedAt: true,
             clientSubmissionId: true,
+            totalLocations: true,
           },
         });
         this.assertOwnAudit(id, audit, operator);
 
-        if (audit.clientSubmissionId) {
-          if (audit.clientSubmissionId === dto.clientSubmissionId) {
-            return { audit, alreadySaved: true, counts: null as SubmitCounts | null };
-          }
-          throw this.alreadySubmitted(audit.status);
-        }
+        const repeated = await tx.bomAuditLocation.count({
+          where: { auditId: id, uploadSubmissionId: dto.clientSubmissionId },
+        });
+        const isRepeat = repeated > 0 || audit.clientSubmissionId === dto.clientSubmissionId;
 
         if (!SUBMITTABLE_STATUSES.includes(audit.status)) {
+          if (isRepeat) {
+            const uploaded = await tx.bomAuditLocation.count({
+              where: { auditId: id, uploadedAt: { not: null } },
+            });
+            return this.submitOutcome(audit, [], [], true, false, null, uploaded);
+          }
           if (audit.status === BOM_AUDIT_STATUS.ASSIGNED) {
             throw new ConflictException({
               code: 'BOM_AUDIT_NOT_DOWNLOADED',
@@ -251,6 +272,13 @@ export class BomAuditMobileService {
         }
 
         const plan = await this.buildSubmitPlan(tx, id, dto);
+
+        if (dto.locations.length === 0 && plan.pendingAfter > 0) {
+          throw new BadRequestException({
+            code: 'BOM_SUBMIT_NOTHING_TO_UPLOAD',
+            message: 'There are no completed locations to submit.',
+          });
+        }
 
         for (let i = 0; i < plan.materials.length; i += BOM_AUDIT_UPDATE_CHUNK_SIZE) {
           const chunk = plan.materials.slice(i, i + BOM_AUDIT_UPDATE_CHUNK_SIZE);
@@ -275,30 +303,53 @@ export class BomAuditMobileService {
           });
         }
 
+        const uploadedAt = new Date();
         for (let i = 0; i < plan.locations.length; i += BOM_AUDIT_UPDATE_CHUNK_SIZE) {
           const chunk = plan.locations.slice(i, i + BOM_AUDIT_UPDATE_CHUNK_SIZE);
           await tx.$executeRaw`
             UPDATE "BomAuditLocation" AS l
-            SET "verifiedAt" = v."verifiedAt", "updatedAt" = NOW()
+            SET "verifiedAt" = v."verifiedAt",
+                "uploadedAt" = ${uploadedAt}::timestamptz,
+                "uploadSubmissionId" = ${dto.clientSubmissionId}::varchar,
+                "updatedAt" = NOW()
             FROM (VALUES ${Prisma.join(
               chunk.map((r) => Prisma.sql`(${r.id}::int, ${r.verifiedAt}::timestamptz)`),
             )}) AS v("id", "verifiedAt")
-            WHERE l."id" = v."id" AND l."auditId" = ${id}`;
+            WHERE l."id" = v."id" AND l."auditId" = ${id} AND l."uploadedAt" IS NULL`;
         }
 
+        const finished = plan.pendingAfter === 0;
         const updated = await tx.bomAudit.update({
           where: { id },
-          data: {
-            status: BOM_AUDIT_STATUS.RECONCILIATION_PENDING,
-            startedAt: audit.startedAt ?? startedAt,
-            completedAt,
-            submittedAt: new Date(),
-            clientSubmissionId: dto.clientSubmissionId,
+          data: finished
+            ? {
+                status: BOM_AUDIT_STATUS.RECONCILIATION_PENDING,
+                startedAt: audit.startedAt ?? startedAt,
+                completedAt,
+                submittedAt: new Date(),
+                clientSubmissionId: dto.clientSubmissionId,
+              }
+            : { startedAt: audit.startedAt ?? startedAt },
+          select: {
+            id: true,
+            auditNo: true,
+            status: true,
+            operatorId: true,
+            startedAt: true,
+            clientSubmissionId: true,
+            totalLocations: true,
           },
-          select: { id: true, auditNo: true, status: true, operatorId: true, startedAt: true, clientSubmissionId: true },
         });
 
-        return { audit: updated, alreadySaved: false, counts: plan.counts as SubmitCounts | null };
+        return this.submitOutcome(
+          updated,
+          plan.locations.map((l) => l.id),
+          plan.alreadyUploaded,
+          plan.locations.length === 0 && !finished,
+          finished,
+          plan.counts,
+          plan.totalLocations - plan.pendingAfter,
+        );
       },
       { timeout: BOM_AUDIT_SUBMIT_TX_TIMEOUT_MS, maxWait: 10_000 },
     );
@@ -308,21 +359,56 @@ export class BomAuditMobileService {
     } else {
       const c = outcome.counts;
       this.logger.log(
-        `BOM audit ${outcome.audit.auditNo} submitted by ${operator.name}: ` +
+        `BOM audit ${outcome.audit.auditNo}: ${outcome.savedLocationIds.length} location(s) uploaded by ${operator.name} ` +
+          `(${outcome.uploadedLocations}/${outcome.audit.totalLocations}): ` +
           `valid ${c?.valid}, mismatch ${c?.mismatch}, missing ${c?.missing}, unexpected ${c?.unexpected}`,
       );
-      this.reports.generateInBackground(outcome.audit.id);
+      if (outcome.finished) {
+        this.logger.log(`BOM audit ${outcome.audit.auditNo} submitted by ${operator.name}`);
+        this.reports.generateInBackground(outcome.audit.id);
+      }
     }
+
+    const status = outcome.audit.status;
+    const completed = status !== BOM_AUDIT_STATUS.IN_PROGRESS;
 
     return {
       message: outcome.alreadySaved
-        ? 'BOM audit was already submitted.'
-        : 'BOM audit submitted successfully.',
+        ? 'These locations were already submitted.'
+        : completed
+          ? 'BOM audit submitted successfully.'
+          : `${outcome.savedLocationIds.length} location(s) submitted successfully.`,
       data: {
         id: outcome.audit.id,
         auditNo: outcome.audit.auditNo,
-        status: BOM_AUDIT_STATUS.RECONCILIATION_PENDING,
+        status,
+        completed,
+        totalLocations: outcome.audit.totalLocations,
+        uploadedLocations: outcome.uploadedLocations,
+        pendingLocations: outcome.audit.totalLocations - outcome.uploadedLocations,
+        savedLocationIds: outcome.savedLocationIds,
+        alreadyUploadedLocationIds: outcome.alreadyUploadedLocationIds,
       },
+    };
+  }
+
+  private submitOutcome(
+    audit: { id: number; auditNo: string; status: string; totalLocations: number },
+    savedLocationIds: number[],
+    alreadyUploadedLocationIds: number[],
+    alreadySaved: boolean,
+    finished: boolean,
+    counts: SubmitCounts | null,
+    uploadedLocations: number,
+  ) {
+    return {
+      audit,
+      savedLocationIds,
+      alreadyUploadedLocationIds,
+      alreadySaved,
+      finished,
+      counts,
+      uploadedLocations,
     };
   }
 
@@ -332,6 +418,7 @@ export class BomAuditMobileService {
       select: {
         id: true,
         storageBin: true,
+        uploadedAt: true,
         materials: {
           where: { isUnexpected: false },
           select: { id: true, materialCode: true, expectedQty: true },
@@ -351,23 +438,22 @@ export class BomAuditMobileService {
       else if (seenLocations.has(loc.locationId)) addError(`Location ${loc.locationId} is sent more than once.`);
       seenLocations.add(loc.locationId);
     }
-    const missingLocations = dbLocations.filter((l) => !seenLocations.has(l.id));
-    if (missingLocations.length) {
-      addError(
-        `${missingLocations.length} location(s) are missing, e.g. ${missingLocations
-          .slice(0, 5)
-          .map((l) => l.storageBin)
-          .join(', ')}.`,
-      );
-    }
     if (errors.length) throw this.invalidSubmit(errors);
+
+    const alreadyUploaded = dto.locations
+      .filter((loc) => locationsById.get(loc.locationId)!.uploadedAt !== null)
+      .map((loc) => loc.locationId);
+    const toUpload = dto.locations.filter((loc) => locationsById.get(loc.locationId)!.uploadedAt === null);
+    const pendingAfter = dbLocations.filter(
+      (l) => l.uploadedAt === null && !toUpload.some((loc) => loc.locationId === l.id),
+    ).length;
 
     const materials: MaterialResult[] = [];
     const unexpected: Prisma.BomAuditMaterialCreateManyInput[] = [];
     const locations: { id: number; verifiedAt: Date }[] = [];
     const counts: SubmitCounts = { valid: 0, mismatch: 0, missing: 0, unexpected: 0 };
 
-    for (const loc of dto.locations) {
+    for (const loc of toUpload) {
       const dbLoc = locationsById.get(loc.locationId)!;
       locations.push({ id: dbLoc.id, verifiedAt: this.toDate(loc.verifiedAt, 'verifiedAt') });
 
@@ -450,7 +536,15 @@ export class BomAuditMobileService {
 
     if (errors.length) throw this.invalidSubmit(errors);
 
-    return { materials, unexpected, locations, counts };
+    return {
+      materials,
+      unexpected,
+      locations,
+      counts,
+      alreadyUploaded,
+      pendingAfter,
+      totalLocations: dbLocations.length,
+    };
   }
 
   private async getOwnAudit(id: number, operator: BomAuditOperator) {

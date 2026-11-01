@@ -671,6 +671,8 @@ model BomAuditLocation {
   sequenceNo        Int
   expectedMaterials Int
   verifiedAt        DateTime? @db.Timestamptz(3)
+  uploadedAt        DateTime? @db.Timestamptz(3)
+  uploadSubmissionId String?  @db.VarChar(64)
   createdAt         DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -678,6 +680,7 @@ model BomAuditLocation {
   materials BomAuditMaterial[]
 
   @@unique([auditId, storageBin])
+  @@index([auditId, uploadedAt])
 }
 
 model BomAuditMaterial {

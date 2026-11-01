@@ -2,7 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
-  ArrayMinSize,
   IsArray,
   IsIn,
   IsInt,
@@ -100,7 +99,7 @@ export class SubmitBomLocationDto {
 export class SubmitBomAuditDto {
   @ApiProperty({
     description:
-      'Random id created once on the handheld for this submission. Sending the same id again (retry) is answered with success and nothing is saved twice.',
+      'Random id created on the handheld for each press of Submit. Sending the same id again (retry) is answered with success and nothing is saved twice.',
     example: '5f1c2d0e-8a3b-4c1d-9f6e-2b7a4c9d1e00',
     maxLength: BOM_AUDIT_CLIENT_SUBMISSION_ID_MAX,
   })
@@ -114,13 +113,19 @@ export class SubmitBomAuditDto {
   @IsISO8601({ strict: true }, { message: 'startedAt must be an ISO-8601 date-time' })
   startedAt!: string;
 
-  @ApiProperty({ description: 'Time Submit was pressed on the handheld', example: '2026-10-14T08:45:10.120Z' })
+  @ApiProperty({
+    description: 'Time Submit was pressed on the handheld. Saved as the audit completion time when this submit uploads the last location.',
+    example: '2026-10-14T08:45:10.120Z',
+  })
   @IsISO8601({ strict: true }, { message: 'completedAt must be an ISO-8601 date-time' })
   completedAt!: string;
 
-  @ApiProperty({ type: [SubmitBomLocationDto] })
+  @ApiProperty({
+    type: [SubmitBomLocationDto],
+    description:
+      'Completed locations that are not uploaded yet. Uploaded locations are locked: sending one again is ignored. When no location is left pending, the audit becomes RECONCILIATION_PENDING.',
+  })
   @IsArray({ message: 'locations must be a list' })
-  @ArrayMinSize(1, { message: 'locations must not be empty' })
   @ArrayMaxSize(BOM_AUDIT_MAX_DATA_ROWS)
   @ValidateNested({ each: true })
   @Type(() => SubmitBomLocationDto)

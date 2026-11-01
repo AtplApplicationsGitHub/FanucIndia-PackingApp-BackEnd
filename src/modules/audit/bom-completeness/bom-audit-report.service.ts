@@ -12,6 +12,7 @@ import {
   buildAuditFilePath,
   isInsideAuditBaseDir,
 } from '../shared/audit-report-paths';
+import { AUDIT_STATUS } from '../shared/audit.constants';
 import {
   BOM_AUDIT_LINE_STATUS,
   BOM_AUDIT_REPORT,
@@ -32,6 +33,16 @@ const LINE_STATUS_STYLE: Record<string, { fill: string; font: string }> = {
   [BOM_AUDIT_LINE_STATUS.UNEXPECTED]: { fill: 'FFE4DFEC', font: 'FF5B2C83' },
 };
 
+const RECON_DECISION_LABEL: Record<string, string> = {
+  CORRECT_SYSTEM_RECORD: 'Correct System Record',
+  CORRECT_PHYSICAL_STOCK: 'Correct Physical Stock',
+};
+
+const RECON_SAP_ACTION_LABEL: Record<string, string> = {
+  NONE: 'No SAP action',
+  FLAG_FOR_ADJUSTMENT: 'Flag for SAP adjustment',
+};
+
 const REPORT_AUDIT_SELECT = {
   id: true,
   auditNo: true,
@@ -45,6 +56,8 @@ const REPORT_AUDIT_SELECT = {
   startedAt: true,
   completedAt: true,
   submittedAt: true,
+  closedAt: true,
+  closedByName: true,
   locations: {
     orderBy: { sequenceNo: 'asc' as const },
     select: {
@@ -61,6 +74,11 @@ const REPORT_AUDIT_SELECT = {
           lineStatus: true,
           isUnexpected: true,
           lastScannedAt: true,
+          reconDecision: true,
+          reconSapAction: true,
+          reconRemarks: true,
+          resolvedAt: true,
+          resolvedByName: true,
         },
       },
     },
@@ -150,7 +168,7 @@ export class BomAuditReportService {
   async getReportForDownload(auditId: number): Promise<BomAuditReportFile> {
     const audit = await this.prisma.bomAudit.findUnique({
       where: { id: auditId },
-      select: { id: true, auditNo: true, submittedAt: true, reportPath: true },
+      select: { id: true, auditNo: true, status: true, submittedAt: true, reportPath: true },
     });
     if (!audit) {
       throw new NotFoundException({ code: 'BOM_AUDIT_NOT_FOUND', message: 'BOM audit not found.' });
@@ -163,6 +181,11 @@ export class BomAuditReportService {
     }
 
     const fileName = bomAuditReportFileName(audit.auditNo);
+
+    if (audit.status === AUDIT_STATUS.RECONCILIATION_PENDING) {
+      const live = await this.buildReport(auditId);
+      return { fileName: live.fileName, buffer: live.buffer };
+    }
 
     if (audit.reportPath && isInsideAuditBaseDir('BOM_AUDIT', audit.reportPath)) {
       try {
@@ -228,10 +251,15 @@ export class BomAuditReportService {
       { header: 'Status', width: 13 },
       { header: 'Last Scanned', width: 21 },
       { header: 'Location Completed', width: 21 },
+      { header: 'Decision', width: 24 },
+      { header: 'SAP Action', width: 22 },
+      { header: 'Remarks', width: 36 },
+      { header: 'Resolved By', width: 18 },
+      { header: 'Resolved On', width: 21 },
     ];
     columns.forEach((c, i) => (sheet.getColumn(i + 1).width = c.width));
 
-    sheet.mergeCells('A1:I1');
+    sheet.mergeCells(1, 1, 1, columns.length);
     sheet.getCell('A1').value = 'BOM Completeness Audit Report';
     sheet.getCell('A1').font = { bold: true, size: 14 };
     sheet.getRow(1).height = 22;
@@ -243,6 +271,7 @@ export class BomAuditReportService {
       ['Uploaded File', audit.fileName, 'Report Generated', this.formatTime(new Date())],
       ['Downloaded On', this.formatTime(audit.downloadedAt), 'Started On', this.formatTime(audit.startedAt)],
       ['Completed On', this.formatTime(audit.completedAt), 'Submitted On', this.formatTime(audit.submittedAt)],
+      ['Closed By', audit.closedByName ?? '-', 'Closed On', this.formatTime(audit.closedAt)],
     ];
     let rowNo = 3;
     for (const [l1, v1, l2, v2] of details) {
@@ -324,8 +353,16 @@ export class BomAuditReportService {
           m.lineStatus ? (LINE_STATUS_LABEL[m.lineStatus] ?? m.lineStatus) : '-',
           this.formatTime(m.lastScannedAt),
           completed,
+          m.reconDecision ? (RECON_DECISION_LABEL[m.reconDecision] ?? m.reconDecision) : '',
+          m.resolvedAt && m.reconSapAction
+            ? (RECON_SAP_ACTION_LABEL[m.reconSapAction] ?? m.reconSapAction)
+            : '',
+          m.reconRemarks ?? '',
+          m.resolvedByName ?? '',
+          m.resolvedAt ? this.formatTime(m.resolvedAt) : '',
         ];
         row.getCell(3).numFmt = '@';
+        row.getCell(12).alignment = { wrapText: true, vertical: 'top' };
         row.eachCell({ includeEmpty: true }, (cell) => (cell.border = box));
         if (m.lineStatus) this.applyStatusStyle(row.getCell(7), m.lineStatus);
       }

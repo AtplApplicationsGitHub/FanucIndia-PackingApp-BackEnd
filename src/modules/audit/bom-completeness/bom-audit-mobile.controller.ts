@@ -77,11 +77,11 @@ export class BomAuditMobileController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Upload all scan results: sets RECONCILIATION_PENDING. Same clientSubmissionId again = already saved (200).',
+      'Upload the completed locations (partial upload). Uploaded locations are locked. When the last location is uploaded the audit becomes RECONCILIATION_PENDING. Same clientSubmissionId again = already saved (200).',
   })
   @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Results saved (or already saved before)' })
-  @ApiResponse({ status: 400, description: 'Results do not match the audit (errors[] lists the problems)' })
+  @ApiResponse({ status: 200, description: 'Locations saved (or already saved before). data.completed = true when the whole audit is submitted' })
+  @ApiResponse({ status: 400, description: 'Results do not match the audit (errors[] lists the problems) / no completed locations to submit' })
   @ApiResponse({ status: 403, description: 'Audit is not assigned to me' })
   @ApiResponse({ status: 404, description: 'Audit not found (deleted)' })
   @ApiResponse({ status: 409, description: 'Audit not downloaded yet / already submitted with another submission' })

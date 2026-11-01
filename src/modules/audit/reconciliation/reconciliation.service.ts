@@ -4,7 +4,10 @@ import {
   NotImplementedException,
 } from '@nestjs/common';
 import { AUDIT_TYPE, AUDIT_TYPE_VALUES } from '../shared/audit.constants';
-import { BomReconciliationService } from '../bom-completeness/bom-reconciliation.service';
+import {
+  BomReconciliationService,
+  RECON_ERROR,
+} from '../bom-completeness/bom-reconciliation.service';
 import { ReviewReconciliationDto } from './dto/review-reconciliation.dto';
 import { BulkReviewReconciliationDto } from './dto/bulk-review-reconciliation.dto';
 
@@ -16,16 +19,20 @@ export class ReconciliationService {
 
   private getService(auditType: string): BomReconciliationService {
     if (!AUDIT_TYPE_VALUES.some((value) => value === auditType)) {
-      throw new BadRequestException('Invalid auditType.');
+      throw new BadRequestException({
+        code: RECON_ERROR.INVALID_AUDIT_TYPE,
+        message: 'Invalid auditType.',
+      });
     }
 
     if (auditType === AUDIT_TYPE.BOM_COMPLETENESS) {
       return this.bomReconciliationService;
     }
 
-    throw new NotImplementedException(
-      `${auditType} reconciliation is not available yet.`,
-    );
+    throw new NotImplementedException({
+      code: RECON_ERROR.NOT_AVAILABLE,
+      message: `${auditType} reconciliation is not available yet.`,
+    });
   }
 
   detail(auditType: string, id: number) {

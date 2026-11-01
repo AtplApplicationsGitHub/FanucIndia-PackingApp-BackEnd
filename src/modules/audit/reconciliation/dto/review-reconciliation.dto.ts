@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsIn,
   IsNotEmpty,
@@ -23,8 +24,9 @@ export class ReviewReconciliationDto {
   sapAction?: string;
 
   @ApiProperty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Remarks are required.' })
   @MaxLength(2000)
   remarks: string;
 }

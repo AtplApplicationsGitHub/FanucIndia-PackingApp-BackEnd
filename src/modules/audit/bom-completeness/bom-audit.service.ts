@@ -61,7 +61,7 @@ const AUDIT_SUMMARY_SELECT = {
 const AUDIT_LIST_SELECT = {
   ...AUDIT_SUMMARY_SELECT,
   locations: {
-    select: { sequenceNo: true, storageBin: true },
+    select: { sequenceNo: true, storageBin: true, uploadedAt: true },
     orderBy: { sequenceNo: 'asc' },
   },
 } satisfies Prisma.BomAuditSelect;
@@ -393,6 +393,7 @@ export class BomAuditService {
         ...audit,
         storageBinCount: locations.length,
         storageBins: locations,
+        uploadedLocations: locations.filter((location) => location.uploadedAt).length,
       })),
       pagination: {
         page,
@@ -416,6 +417,8 @@ export class BomAuditService {
             sequenceNo: true,
             storageBin: true,
             expectedMaterials: true,
+            verifiedAt: true,
+            uploadedAt: true,
             materials: {
               where: { isUnexpected: false },
               orderBy: { materialCode: 'asc' },
@@ -433,7 +436,13 @@ export class BomAuditService {
       });
     }
 
-    return { message: 'BOM audit fetched successfully.', data: audit };
+    return {
+      message: 'BOM audit fetched successfully.',
+      data: {
+        ...audit,
+        uploadedLocations: audit.locations.filter((location) => location.uploadedAt).length,
+      },
+    };
   }
 
   async reassign(id: number, operatorId: number, actor: BomAuditActor) {
