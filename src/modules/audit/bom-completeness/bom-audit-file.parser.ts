@@ -18,6 +18,8 @@ import {
 
 type FieldKey = keyof typeof BOM_AUDIT_HEADER_ALIASES;
 
+const OPTIONAL_FIELDS: FieldKey[] = ['operatorId'];
+
 export interface BomAuditRowError {
   rowNo: number;
   errors: string[];
@@ -31,7 +33,7 @@ export interface ParsedBomAuditMaterial {
 export interface ParsedBomAuditLocation {
   storageBin: string;
   materials: ParsedBomAuditMaterial[];
-  operatorId: number;
+  operatorId: number | null;
   firstRowNo: number;
 }
 
@@ -87,7 +89,7 @@ async function loadWorksheet(
 
 function locateColumns(worksheet: ExcelJS.Worksheet): {
   headerRowNo: number;
-  columns: Record<FieldKey, number>;
+  columns: Partial<Record<FieldKey, number>> & Record<Exclude<FieldKey, 'operatorId'>, number>;
 } {
   let firstRow: ExcelJS.Row | undefined;
   let best: { row: ExcelJS.Row; index: Map<string, number>; found: number } | undefined;
@@ -118,14 +120,14 @@ function locateColumns(worksheet: ExcelJS.Worksheet): {
     const col = BOM_AUDIT_HEADER_ALIASES[field]
       .map((alias) => headerIndex.get(alias))
       .find((c) => c !== undefined);
-    if (col === undefined) missing.push(BOM_AUDIT_COLUMN_LABELS[field]);
-    else columns[field] = col;
+    if (col !== undefined) columns[field] = col;
+    else if (!OPTIONAL_FIELDS.includes(field)) missing.push(BOM_AUDIT_COLUMN_LABELS[field]);
   });
 
   if (missing.length) {
     throw new BomAuditFileError(
       `Required column(s) missing: ${missing.join(', ')}. ` +
-        `The file must have the columns StorageBin, Material, Qty (or Avail) and Operator in the header row.`,
+        `The file must have the columns StorageBin, Material and Qty (or Avail) in the header row. Operator is optional.`,
       'MISSING_COLUMNS',
     );
   }
@@ -168,6 +170,7 @@ export async function parseBomAuditFile(
   const { headerRowNo, columns } = locateColumns(worksheet);
 
   const binOperator = new Map<string, { operatorId: number; rowNo: number }>();
+  const binFirstRow = new Map<string, number>();
   const operatorRows = new Map<number, number[]>();
 
   const grouped = new Map<string, Map<string, number>>();
@@ -186,7 +189,8 @@ export async function parseBomAuditFile(
       row.getCell(columns.storageBin).value,
     ).toUpperCase();
     const qtyText = cellToText(row.getCell(columns.qty).value);
-    const operatorText = cellToText(row.getCell(columns.operatorId).value);
+    const operatorText =
+      columns.operatorId === undefined ? '' : cellToText(row.getCell(columns.operatorId).value);
 
     if (!materialCode && !storageBin && !qtyText && !operatorText) return;
 
@@ -220,13 +224,11 @@ export async function parseBomAuditFile(
     }
 
     const operatorId = operatorText ? parseOperatorId(operatorText) : null;
-    if (!operatorText) {
-      errors.push(`${BOM_AUDIT_COLUMN_LABELS.operatorId} is missing (enter the Operator ID)`);
-    } else if (operatorId === null) {
+    if (operatorText && operatorId === null) {
       errors.push(
         `${BOM_AUDIT_COLUMN_LABELS.operatorId} "${operatorText}" must be the Operator ID (a whole number, e.g. 12)`,
       );
-    } else if (storageBin) {
+    } else if (operatorId !== null && storageBin) {
       const assigned = binOperator.get(storageBin);
       if (!assigned) {
         binOperator.set(storageBin, { operatorId, rowNo });
@@ -245,9 +247,12 @@ export async function parseBomAuditFile(
       return;
     }
 
-    const rows = operatorRows.get(operatorId as number);
-    if (rows) rows.push(rowNo);
-    else operatorRows.set(operatorId as number, [rowNo]);
+    if (operatorId !== null) {
+      const rows = operatorRows.get(operatorId);
+      if (rows) rows.push(rowNo);
+      else operatorRows.set(operatorId, [rowNo]);
+    }
+    if (!binFirstRow.has(storageBin)) binFirstRow.set(storageBin, rowNo);
 
     let materials = grouped.get(storageBin);
     if (!materials) {
@@ -293,8 +298,8 @@ export async function parseBomAuditFile(
       materials: [...materials.entries()]
         .sort(([a], [b]) => naturalCompare(a, b))
         .map(([materialCode, expectedQty]) => ({ materialCode, expectedQty })),
-      operatorId: binOperator.get(storageBin)!.operatorId,
-      firstRowNo: binOperator.get(storageBin)!.rowNo,
+      operatorId: binOperator.get(storageBin)?.operatorId ?? null,
+      firstRowNo: binFirstRow.get(storageBin) ?? 0,
     }));
 
   return {

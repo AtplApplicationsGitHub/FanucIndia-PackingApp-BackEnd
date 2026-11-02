@@ -16,6 +16,7 @@ import { QueryBomAuditDto } from './dto/query-bom-audit.dto';
 import {
   BOM_AUDIT_INSERT_CHUNK_SIZE,
   BOM_AUDIT_MAX_LENGTH,
+  BOM_AUDIT_MAX_OPERATOR_ID,
   BOM_AUDIT_MAX_REPORTED_ERRORS,
   BOM_AUDIT_NO_LOCK_KEY,
   BOM_AUDIT_NO_PREFIX,
@@ -81,11 +82,82 @@ export class BomAuditService {
     private readonly operators: AuditOperatorsService,
   ) {}
 
+  async previewAudit(file: Express.Multer.File | undefined) {
+    const { fileName, parsed } = await this.readUpload(file);
+    const { valid } = await this.checkOperators(parsed, []);
+
+    return {
+      message: 'BOM audit file checked successfully.',
+      data: {
+        fileName,
+        totalLocations: parsed.totalLocations,
+        totalMaterials: parsed.totalMaterials,
+        totalRows: parsed.totalRows,
+        mergedRows: parsed.mergedRows,
+        locations: parsed.locations.map((location) => ({
+          storageBin: location.storageBin,
+          operatorId: location.operatorId,
+          operatorName:
+            location.operatorId === null ? null : (valid.get(location.operatorId)?.name ?? null),
+          materials: location.materials,
+        })),
+      },
+    };
+  }
+
   async createAudit(
     file: Express.Multer.File | undefined,
     dto: CreateBomAuditDto,
     actor: BomAuditActor,
   ) {
+    const { fileName, parsed } = await this.readUpload(file);
+
+    const auditName = (dto.auditName ?? '').trim().replace(/\s+/g, ' ');
+    if (!auditName) {
+      throw new BadRequestException({
+        code: 'AUDIT_NAME_REQUIRED',
+        message: 'Audit Name is required.',
+      });
+    }
+    if (auditName.length > BOM_AUDIT_MAX_LENGTH.auditName) {
+      throw new BadRequestException({
+        code: 'AUDIT_NAME_TOO_LONG',
+        message: `Audit Name must be at most ${BOM_AUDIT_MAX_LENGTH.auditName} characters.`,
+      });
+    }
+
+    const binOperators = this.parseBinOperators(dto.binOperators, parsed);
+    const groups = await this.resolveOperatorGroups(parsed, binOperators);
+
+    const uploadBatchId = randomUUID();
+    const audits = await this.saveAuditsWithRetry(groups, auditName, fileName, uploadBatchId, actor);
+
+    this.logger.log(
+      `BOM audit "${auditName}" created by ${actor.name}: ${audits.length} audit(s) ` +
+        `[${audits.map((a) => `${a.auditNo} -> ${a.operatorName}`).join(', ')}], ` +
+        `${parsed.totalLocations} locations, ${parsed.totalMaterials} materials`,
+    );
+
+    return {
+      message:
+        audits.length === 1
+          ? 'BOM audit created successfully.'
+          : `${audits.length} BOM audits created successfully (one per operator).`,
+      data: {
+        auditName,
+        uploadBatchId,
+        totalLocations: parsed.totalLocations,
+        totalMaterials: parsed.totalMaterials,
+        totalRows: parsed.totalRows,
+        mergedRows: parsed.mergedRows,
+        audits,
+      },
+    };
+  }
+
+  private async readUpload(
+    file: Express.Multer.File | undefined,
+  ): Promise<{ fileName: string; parsed: BomAuditParseResult }> {
     if (!file || !file.buffer || file.size === 0) {
       throw new BadRequestException({
         code: 'FILE_REQUIRED',
@@ -115,52 +187,50 @@ export class BomAuditService {
       throw error;
     }
 
-    const auditName = (dto.auditName ?? '').trim().replace(/\s+/g, ' ');
-    if (!auditName) {
-      throw new BadRequestException({
-        code: 'AUDIT_NAME_REQUIRED',
-        message: 'Audit Name is required.',
-      });
-    }
-    if (auditName.length > BOM_AUDIT_MAX_LENGTH.auditName) {
-      throw new BadRequestException({
-        code: 'AUDIT_NAME_TOO_LONG',
-        message: `Audit Name must be at most ${BOM_AUDIT_MAX_LENGTH.auditName} characters.`,
-      });
-    }
-
-    const groups = await this.resolveOperatorGroups(parsed);
-
-    const uploadBatchId = randomUUID();
-    const audits = await this.saveAuditsWithRetry(groups, auditName, fileName, uploadBatchId, actor);
-
-    this.logger.log(
-      `BOM audit "${auditName}" created by ${actor.name}: ${audits.length} audit(s) ` +
-        `[${audits.map((a) => `${a.auditNo} -> ${a.operatorName}`).join(', ')}], ` +
-        `${parsed.totalLocations} locations, ${parsed.totalMaterials} materials`,
-    );
-
-    return {
-      message:
-        audits.length === 1
-          ? 'BOM audit created successfully.'
-          : `${audits.length} BOM audits created successfully (one per operator).`,
-      data: {
-        auditName,
-        uploadBatchId,
-        totalLocations: parsed.totalLocations,
-        totalMaterials: parsed.totalMaterials,
-        totalRows: parsed.totalRows,
-        mergedRows: parsed.mergedRows,
-        audits,
-      },
-    };
+    return { fileName, parsed };
   }
 
-  private async resolveOperatorGroups(parsed: BomAuditParseResult) {
-    const { valid, notFound, notOperator } = await this.operators.checkOperatorIds([
-      ...parsed.operatorRows.keys(),
-    ]);
+  private parseBinOperators(raw: string | undefined, parsed: BomAuditParseResult): Map<string, number> {
+    const result = new Map<string, number>();
+    if (raw === undefined || raw.trim() === '') return result;
+
+    const invalid = (message: string) =>
+      new BadRequestException({ code: 'INVALID_BIN_OPERATORS', message });
+
+    let list: unknown;
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      throw invalid('binOperators must be a JSON list like [{"storageBin":"15-C-22","operatorId":12}].');
+    }
+    if (!Array.isArray(list)) {
+      throw invalid('binOperators must be a JSON list like [{"storageBin":"15-C-22","operatorId":12}].');
+    }
+
+    const knownBins = new Set(parsed.locations.map((l) => l.storageBin));
+    for (const item of list) {
+      const storageBin =
+        item && typeof item === 'object' && typeof (item as { storageBin?: unknown }).storageBin === 'string'
+          ? (item as { storageBin: string }).storageBin.trim().toUpperCase()
+          : '';
+      const operatorId = Number((item as { operatorId?: unknown } | null)?.operatorId);
+      if (!storageBin || !Number.isSafeInteger(operatorId) || operatorId <= 0 || operatorId > BOM_AUDIT_MAX_OPERATOR_ID) {
+        throw invalid('Every binOperators entry needs a storageBin and a valid operatorId.');
+      }
+      if (!knownBins.has(storageBin)) {
+        throw invalid(`Storage bin ${storageBin} is not in the uploaded file.`);
+      }
+      if (result.has(storageBin)) {
+        throw invalid(`Storage bin ${storageBin} is listed more than once in binOperators.`);
+      }
+      result.set(storageBin, operatorId);
+    }
+    return result;
+  }
+
+  private async checkOperators(parsed: BomAuditParseResult, extraIds: number[]) {
+    const result = await this.operators.checkOperatorIds([...parsed.operatorRows.keys(), ...extraIds]);
+    const { notFound, notOperator } = result;
 
     const rowText = (id: number) => {
       const rows = parsed.operatorRows.get(id) ?? [];
@@ -168,16 +238,21 @@ export class BomAuditService {
       return rows.length > 10 ? `rows ${shown} ... (${rows.length} rows)` : `row${rows.length === 1 ? '' : 's'} ${shown}`;
     };
     const firstRow = (id: number) => parsed.operatorRows.get(id)?.[0] ?? 0;
+    const fileIds = new Set(parsed.operatorRows.keys());
 
     const rowErrors: { rowNo: number; errors: string[] }[] = [
-      ...notFound.map((id) => ({
-        rowNo: firstRow(id),
-        errors: [`Operator ID ${id} does not exist (${rowText(id)})`],
-      })),
-      ...notOperator.map((u) => ({
-        rowNo: firstRow(u.id),
-        errors: [`User ID ${u.id} (${u.name}) is not a Terminal Operator - role ${u.role}, must be USER (${rowText(u.id)})`],
-      })),
+      ...notFound
+        .filter((id) => fileIds.has(id))
+        .map((id) => ({
+          rowNo: firstRow(id),
+          errors: [`Operator ID ${id} does not exist (${rowText(id)})`],
+        })),
+      ...notOperator
+        .filter((u) => fileIds.has(u.id))
+        .map((u) => ({
+          rowNo: firstRow(u.id),
+          errors: [`User ID ${u.id} (${u.name}) is not a Terminal Operator - role ${u.role}, must be USER (${rowText(u.id)})`],
+        })),
     ];
 
     if (rowErrors.length) {
@@ -189,15 +264,52 @@ export class BomAuditService {
       });
     }
 
+    return result;
+  }
+
+  private async resolveOperatorGroups(parsed: BomAuditParseResult, binOperators: Map<string, number>) {
+    const { valid } = await this.checkOperators(parsed, [...binOperators.values()]);
+
+    const invalidChosen = [...binOperators.entries()].filter(([, id]) => !valid.has(id));
+    if (invalidChosen.length) {
+      throw new BadRequestException({
+        code: 'INVALID_OPERATORS',
+        message:
+          `Operator chosen for ${invalidChosen.length} storage bin(s) is not a Terminal Operator (role USER): ` +
+          invalidChosen
+            .slice(0, 10)
+            .map(([bin, id]) => `${bin} -> ${id}`)
+            .join(', '),
+      });
+    }
+
+    const unassigned = parsed.locations.filter(
+      (location) => !binOperators.has(location.storageBin) && location.operatorId === null,
+    );
+    if (unassigned.length) {
+      throw new BadRequestException({
+        code: 'BINS_WITHOUT_OPERATOR',
+        message:
+          `${unassigned.length} storage bin(s) have no operator. Assign an operator to every storage bin, e.g. ` +
+          unassigned
+            .slice(0, 10)
+            .map((l) => l.storageBin)
+            .join(', ') +
+          '.',
+      });
+    }
+
     const groups = new Map<number, { operator: { id: number; name: string }; locations: ParsedBomAuditLocation[]; firstRowNo: number }>();
     for (const location of parsed.locations) {
-      const operator = valid.get(location.operatorId)!;
+      const operatorId = binOperators.get(location.storageBin) ?? (location.operatorId as number);
+      const operator = valid.get(operatorId)!;
+      const assigned = { ...location, operatorId };
       const group = groups.get(operator.id);
       if (group) {
-        group.locations.push(location);
+        group.locations.push(assigned);
         group.firstRowNo = Math.min(group.firstRowNo, location.firstRowNo);
       } else {
-        groups.set(operator.id, { operator, locations: [location], firstRowNo: location.firstRowNo });
+        groups.set(operator.id, { operator, locations: [assigned], firstRowNo: location.firstRowNo });
       }
     }
     return [...groups.values()].sort((a, b) => a.firstRowNo - b.firstRowNo);

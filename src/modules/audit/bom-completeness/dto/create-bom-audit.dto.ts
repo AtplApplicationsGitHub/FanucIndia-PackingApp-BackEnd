@@ -1,7 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsString, Max, MaxLength, Min } from 'class-validator';
-import { BOM_AUDIT_MAX_LENGTH, BOM_AUDIT_MAX_OPERATOR_ID } from '../bom-audit.constants';
+import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  BOM_AUDIT_BIN_OPERATORS_MAX_LENGTH,
+  BOM_AUDIT_MAX_LENGTH,
+  BOM_AUDIT_MAX_OPERATOR_ID,
+} from '../bom-audit.constants';
 
 export class CreateBomAuditDto {
   @ApiProperty({
@@ -18,6 +22,17 @@ export class CreateBomAuditDto {
     message: `Audit Name must be at most ${BOM_AUDIT_MAX_LENGTH.auditName} characters`,
   })
   auditName!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Operators chosen on the screen per storage bin, as a JSON text: [{"storageBin":"15-C-22","operatorId":12}]. ' +
+      'Fills bins without an Operator in the file and replaces the Operator of the file for the bins listed.',
+    example: '[{"storageBin":"15-C-22","operatorId":12}]',
+  })
+  @IsOptional()
+  @IsString({ message: 'binOperators must be a JSON text' })
+  @MaxLength(BOM_AUDIT_BIN_OPERATORS_MAX_LENGTH, { message: 'binOperators is too long' })
+  binOperators?: string;
 }
 
 export class ReassignBomAuditDto {

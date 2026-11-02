@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -49,11 +51,12 @@ export class BomAuditController {
   )
   @ApiOperation({
     summary:
-      'Create BOM audit(s): Audit Name (typed on the screen) + Excel with an Operator ID per storage bin -> one audit per operator',
+      'Create BOM audit(s): Audit Name (typed on the screen) + Excel; operator per storage bin from the file and/or chosen on the screen -> one audit per operator',
     description:
-      'No template: the admin uploads their own Excel with the columns StorageBin, Material, Qty (or Avail) and Operator ' +
-      '(the User ID of a Terminal Operator, role USER) - in any order. Every row is checked; all problems are returned in errors[] ' +
-      'with the Excel row number. Operator IDs that do not exist or are not role USER are rejected.',
+      'No template: the admin uploads their own Excel with the columns StorageBin, Material, Qty (or Avail) and optionally Operator ' +
+      '(the User ID of a Terminal Operator, role USER) - in any order. Bins without an Operator in the file get the operator chosen ' +
+      'on the screen (binOperators), which also replaces the file Operator for the bins listed. Every storage bin must end up with an operator. ' +
+      'Every row is checked; all problems are returned in errors[] with the Excel row number. Operator IDs that do not exist or are not role USER are rejected.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -64,13 +67,18 @@ export class BomAuditController {
         file: {
           type: 'string',
           format: 'binary',
-          description: '.xlsx or .csv, max 10 MB. Columns: StorageBin, Material, Qty (or Avail), Operator (Operator ID)',
+          description: '.xlsx or .csv, max 10 MB. Columns: StorageBin, Material, Qty (or Avail), Operator (Operator ID, optional)',
         },
         auditName: {
           type: 'string',
           maxLength: 255,
           example: 'BOM Audit - Rack 12 - Oct Week 2',
           description: 'Audit Name typed on the screen',
+        },
+        binOperators: {
+          type: 'string',
+          example: '[{"storageBin":"15-C-22","operatorId":12}]',
+          description: 'Optional JSON list of operators chosen on the screen per storage bin',
         },
       },
     },
@@ -82,7 +90,7 @@ export class BomAuditController {
   @ApiResponse({
     status: 400,
     description:
-      'No file / missing audit name / wrong file type / missing columns / invalid rows / invalid Operator IDs (errors[] lists every problem with its Excel row)',
+      'No file / missing audit name / wrong file type / missing columns / invalid rows / invalid Operator IDs / storage bins without an operator (errors[] lists every problem with its Excel row)',
   })
   @ApiResponse({ status: 413, description: 'File larger than 10 MB' })
   create(
@@ -91,6 +99,44 @@ export class BomAuditController {
     @Req() req: AuthRequest,
   ) {
     return this.bomAuditService.createAudit(file, dto, this.actor(req));
+  }
+
+  @Post('preview')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: BOM_AUDIT_MAX_FILE_BYTES, files: 1 },
+    }),
+  )
+  @ApiOperation({
+    summary: 'Check a BOM audit Excel and return the preview (nothing is saved)',
+    description:
+      'Same reading and checks as Create: columns, every row, Operator IDs in the file. Duplicate materials of a storage bin are merged ' +
+      '(quantities added). Returns the storage bins (sorted) with their materials and the Operator given in the file (null = to be assigned on the screen).',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: '.xlsx or .csv, max 10 MB. Columns: StorageBin, Material, Qty (or Avail), Operator (Operator ID, optional)',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'File is valid - preview of storage bins, materials and file operators' })
+  @ApiResponse({
+    status: 400,
+    description: 'No file / wrong file type / missing columns / invalid rows / invalid Operator IDs (errors[] lists every problem with its Excel row)',
+  })
+  @ApiResponse({ status: 413, description: 'File larger than 10 MB' })
+  preview(@UploadedFile() file: Express.Multer.File) {
+    return this.bomAuditService.previewAudit(file);
   }
 
   @Get('operators')
