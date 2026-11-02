@@ -99,6 +99,27 @@ export class BomReconciliationService {
         material.lineStatus === BOM_AUDIT_LINE_STATUS.UNEXPECTED,
     );
 
+    const toLine = (
+      material: (typeof materials)[number],
+      issueType: string,
+      status: string | null,
+    ) => ({
+      id: material.id,
+      storageBin: material.location.storageBin,
+      materialCode: material.materialCode,
+      expectedQty: material.expectedQty,
+      scannedQty: material.actualQty ?? 0,
+      issueType,
+      status,
+      decision: status ? material.reconDecision : null,
+      sapAction: status ? material.reconSapAction : null,
+      remarks: status ? (material.reconRemarks ?? '') : '',
+      scannedAt: material.lastScannedAt,
+      locationCompletedAt: material.location.verifiedAt,
+      resolvedAt: status ? material.resolvedAt : null,
+      resolvedByName: status ? material.resolvedByName : null,
+    });
+
     const variances = discrepancies.map((material) => {
       let issueType = 'MISSING';
 
@@ -110,23 +131,14 @@ export class BomReconciliationService {
         issueType = 'EXCESS';
       }
 
-      return {
-        id: material.id,
-        storageBin: material.location.storageBin,
-        materialCode: material.materialCode,
-        expectedQty: material.expectedQty,
-        scannedQty: material.actualQty ?? 0,
-        issueType,
-        status: material.resolvedAt ? 'RESOLVED' : 'OPEN',
-        decision: material.reconDecision,
-        sapAction: material.reconSapAction,
-        remarks: material.reconRemarks ?? '',
-        scannedAt: material.lastScannedAt,
-        locationCompletedAt: material.location.verifiedAt,
-        resolvedAt: material.resolvedAt,
-        resolvedByName: material.resolvedByName,
-      };
+      return toLine(material, issueType, material.resolvedAt ? 'RESOLVED' : 'OPEN');
     });
+
+    const validLines = materials
+      .filter((material) => material.lineStatus === BOM_AUDIT_LINE_STATUS.VALID)
+      .map((material) => toLine(material, 'VALID', null));
+
+    const lines = [...variances, ...validLines].sort((a, b) => a.id - b.id);
 
     const expectedComponents = materials.filter(
       (material) => !material.isUnexpected,
@@ -214,7 +226,7 @@ export class BomReconciliationService {
       openVariances,
       resolvedVariances,
       locations,
-      variances,
+      variances: lines,
       closedAt: audit.closedAt,
       closedByName: audit.closedByName,
       canClose:
