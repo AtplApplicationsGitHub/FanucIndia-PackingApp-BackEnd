@@ -13,6 +13,7 @@ import {
   isInsideAuditBaseDir,
 } from '../shared/audit-report-paths';
 import { AUDIT_STATUS } from '../shared/audit.constants';
+import { reconDecisionLabel, reconSapActionLabel } from '../shared/reconciliation-options';
 import {
   BOM_AUDIT_LINE_STATUS,
   BOM_AUDIT_REPORT,
@@ -31,16 +32,6 @@ const LINE_STATUS_STYLE: Record<string, { fill: string; font: string }> = {
   [BOM_AUDIT_LINE_STATUS.MISMATCH]: { fill: 'FFFFEB9C', font: 'FF9C5700' },
   [BOM_AUDIT_LINE_STATUS.MISSING]: { fill: 'FFFFC7CE', font: 'FF9C0006' },
   [BOM_AUDIT_LINE_STATUS.UNEXPECTED]: { fill: 'FFE4DFEC', font: 'FF5B2C83' },
-};
-
-const RECON_DECISION_LABEL: Record<string, string> = {
-  CORRECT_SYSTEM_RECORD: 'Correct System Record',
-  CORRECT_PHYSICAL_STOCK: 'Correct Physical Stock',
-};
-
-const RECON_SAP_ACTION_LABEL: Record<string, string> = {
-  NONE: 'No SAP action',
-  FLAG_FOR_ADJUSTMENT: 'Flag for SAP adjustment',
 };
 
 const REPORT_AUDIT_SELECT = {
@@ -353,10 +344,8 @@ export class BomAuditReportService {
           m.lineStatus ? (LINE_STATUS_LABEL[m.lineStatus] ?? m.lineStatus) : '-',
           this.formatTime(m.lastScannedAt),
           completed,
-          m.reconDecision ? (RECON_DECISION_LABEL[m.reconDecision] ?? m.reconDecision) : '',
-          m.resolvedAt && m.reconSapAction
-            ? (RECON_SAP_ACTION_LABEL[m.reconSapAction] ?? m.reconSapAction)
-            : '',
+          reconDecisionLabel(m.reconDecision),
+          m.resolvedAt ? reconSapActionLabel(m.reconSapAction) : '',
           m.reconRemarks ?? '',
           m.resolvedByName ?? '',
           m.resolvedAt ? this.formatTime(m.resolvedAt) : '',

@@ -7,20 +7,25 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
+import {
+  RECON_DECISION_VALUES,
+  RECON_DEFAULT_SAP_ACTION,
+  RECON_SAP_ACTION_VALUES,
+} from '../../shared/reconciliation-options';
 
 export class ReviewReconciliationDto {
   @ApiProperty({
-    enum: ['CORRECT_SYSTEM_RECORD', 'CORRECT_PHYSICAL_STOCK'],
+    enum: RECON_DECISION_VALUES,
   })
-  @IsIn(['CORRECT_SYSTEM_RECORD', 'CORRECT_PHYSICAL_STOCK'])
+  @IsIn(RECON_DECISION_VALUES)
   decision: string;
 
   @ApiPropertyOptional({
-    enum: ['NONE', 'FLAG_FOR_ADJUSTMENT'],
-    default: 'NONE',
+    enum: RECON_SAP_ACTION_VALUES,
+    default: RECON_DEFAULT_SAP_ACTION,
   })
   @IsOptional()
-  @IsIn(['NONE', 'FLAG_FOR_ADJUSTMENT'])
+  @IsIn(RECON_SAP_ACTION_VALUES)
   sapAction?: string;
 
   @ApiProperty()

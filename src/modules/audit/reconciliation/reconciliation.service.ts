@@ -10,6 +10,12 @@ import {
 } from '../bom-completeness/bom-reconciliation.service';
 import { ReviewReconciliationDto } from './dto/review-reconciliation.dto';
 import { BulkReviewReconciliationDto } from './dto/bulk-review-reconciliation.dto';
+import {
+  RECON_DECISION_OPTIONS,
+  RECON_DEFAULT_SAP_ACTION,
+  RECON_SAP_ACTION_OPTIONS,
+} from '../shared/reconciliation-options';
+import { QueryReconciliationLinesDto } from './dto/query-reconciliation-lines.dto';
 
 @Injectable()
 export class ReconciliationService {
@@ -35,8 +41,23 @@ export class ReconciliationService {
     });
   }
 
+  options() {
+    return {
+      message: 'Reconciliation options fetched successfully.',
+      data: {
+        decisions: RECON_DECISION_OPTIONS,
+        sapActions: RECON_SAP_ACTION_OPTIONS,
+        defaultSapAction: RECON_DEFAULT_SAP_ACTION,
+      },
+    };
+  }
+
   detail(auditType: string, id: number) {
     return this.getService(auditType).detail(id);
+  }
+
+  lines(auditType: string, id: number, query: QueryReconciliationLinesDto) {
+    return this.getService(auditType).lines(id, query);
   }
 
   review(
@@ -51,7 +72,7 @@ export class ReconciliationService {
       varianceId,
       {
         decision: dto.decision,
-        sapAction: dto.sapAction ?? 'NONE',
+        sapAction: dto.sapAction ?? RECON_DEFAULT_SAP_ACTION,
         remarks: dto.remarks,
       },
       userName,
@@ -69,7 +90,7 @@ export class ReconciliationService {
       dto.varianceIds,
       {
         decision: dto.decision,
-        sapAction: dto.sapAction ?? 'NONE',
+        sapAction: dto.sapAction ?? RECON_DEFAULT_SAP_ACTION,
         remarks: dto.remarks,
       },
       userName,
