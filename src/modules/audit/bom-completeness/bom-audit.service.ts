@@ -31,6 +31,7 @@ import {
 import { decodeUploadFileName } from '../shared/audit-excel.util';
 import { nextAuditNo } from '../shared/audit-number.util';
 import { AuditOperatorsService } from '../shared/audit-operators.service';
+import { BomAuditColumnConfigService } from './bom-audit-column-config.service';
 import { AUDIT_EDITABLE_STATUSES } from '../shared/audit.constants';
 
 export interface BomAuditActor {
@@ -80,6 +81,7 @@ export class BomAuditService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly operators: AuditOperatorsService,
+    private readonly columnConfig: BomAuditColumnConfigService,
   ) {}
 
   async previewAudit(file: Express.Multer.File | undefined) {
@@ -167,11 +169,14 @@ export class BomAuditService {
 
     const fileName = decodeUploadFileName(file.originalname || 'upload.xlsx');
 
+    const headerAliases = await this.columnConfig.getHeaderAliases();
+
     let parsed: BomAuditParseResult;
     try {
       parsed = await parseBomAuditFile(
         Buffer.isBuffer(file.buffer) ? file.buffer : Buffer.from(file.buffer),
         fileName,
+        headerAliases,
       );
     } catch (error) {
       if (error instanceof BomAuditFileError) {

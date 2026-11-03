@@ -227,7 +227,6 @@ export class AuthService {
     };
   }
 
-  // Phase 2 - RFID Warehouse Audit (Kotlin) app login.
   async rfidLogin(dto: LoginDto, req: Request) {
     const email = dto.email.replace(/\s+/g, '');
     const user = await this.prisma.user.findFirst({

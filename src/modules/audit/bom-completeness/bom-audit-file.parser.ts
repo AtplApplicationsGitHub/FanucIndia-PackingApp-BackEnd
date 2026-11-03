@@ -14,6 +14,7 @@ import {
   BOM_AUDIT_MAX_REPORTED_ERRORS,
   BOM_AUDIT_HEADER_SEARCH_ROWS,
   BOM_AUDIT_MAX_OPERATOR_ID,
+  type BomAuditHeaderAliases,
 } from './bom-audit.constants';
 
 type FieldKey = keyof typeof BOM_AUDIT_HEADER_ALIASES;
@@ -87,13 +88,16 @@ async function loadWorksheet(
   return worksheet;
 }
 
-function locateColumns(worksheet: ExcelJS.Worksheet): {
+function locateColumns(
+  worksheet: ExcelJS.Worksheet,
+  aliases: BomAuditHeaderAliases,
+): {
   headerRowNo: number;
   columns: Partial<Record<FieldKey, number>> & Record<Exclude<FieldKey, 'operatorId'>, number>;
 } {
   let firstRow: ExcelJS.Row | undefined;
   let best: { row: ExcelJS.Row; index: Map<string, number>; found: number } | undefined;
-  const requiredCount = Object.keys(BOM_AUDIT_HEADER_ALIASES).length;
+  const requiredCount = Object.keys(aliases).length;
 
   worksheet.eachRow({ includeEmpty: false }, (row) => {
     if (row.number > BOM_AUDIT_HEADER_SEARCH_ROWS) return;
@@ -103,8 +107,8 @@ function locateColumns(worksheet: ExcelJS.Worksheet): {
       const key = normaliseHeader(cellToText(cell.value));
       if (key && !index.has(key)) index.set(key, colNumber);
     });
-    const found = (Object.keys(BOM_AUDIT_HEADER_ALIASES) as FieldKey[]).filter((field) =>
-      BOM_AUDIT_HEADER_ALIASES[field].some((alias) => index.has(alias)),
+    const found = (Object.keys(aliases) as FieldKey[]).filter((field) =>
+      aliases[field].some((alias) => index.has(alias)),
     ).length;
     if (best && best.found === requiredCount) return;
     if (!best || found > best.found) best = { row, index, found };
@@ -116,18 +120,20 @@ function locateColumns(worksheet: ExcelJS.Worksheet): {
   const headerIndex = best.index;
   const columns = {} as Record<FieldKey, number>;
   const missing: string[] = [];
-  (Object.keys(BOM_AUDIT_HEADER_ALIASES) as FieldKey[]).forEach((field) => {
-    const col = BOM_AUDIT_HEADER_ALIASES[field]
+  (Object.keys(aliases) as FieldKey[]).forEach((field) => {
+    const col = aliases[field]
       .map((alias) => headerIndex.get(alias))
       .find((c) => c !== undefined);
     if (col !== undefined) columns[field] = col;
-    else if (!OPTIONAL_FIELDS.includes(field)) missing.push(BOM_AUDIT_COLUMN_LABELS[field]);
+    else if (!OPTIONAL_FIELDS.includes(field)) {
+      missing.push(`${BOM_AUDIT_COLUMN_LABELS[field]} (expected header: ${aliases[field].join(' / ')})`);
+    }
   });
 
   if (missing.length) {
     throw new BomAuditFileError(
       `Required column(s) missing: ${missing.join(', ')}. ` +
-        `The file must have the columns StorageBin, Material and Qty (or Avail) in the header row. Operator is optional.`,
+        `The file must have the Storage Bin, Material and Qty columns in the header row. Operator is optional.`,
       'MISSING_COLUMNS',
     );
   }
@@ -157,6 +163,7 @@ const naturalCompare = (a: string, b: string) =>
 export async function parseBomAuditFile(
   buffer: Buffer,
   fileName: string,
+  aliases: BomAuditHeaderAliases = BOM_AUDIT_HEADER_ALIASES,
 ): Promise<BomAuditParseResult> {
   const extension = getFileExtension(fileName);
   if (!BOM_AUDIT_ALLOWED_EXTENSIONS.includes(extension)) {
@@ -167,7 +174,7 @@ export async function parseBomAuditFile(
   }
 
   const worksheet = await loadWorksheet(buffer, extension);
-  const { headerRowNo, columns } = locateColumns(worksheet);
+  const { headerRowNo, columns } = locateColumns(worksheet, aliases);
 
   const binOperator = new Map<string, { operatorId: number; rowNo: number }>();
   const binFirstRow = new Map<string, number>();

@@ -98,7 +98,6 @@ export class AuthController {
     return this.authService.mobileLogin(dto, req);
   }
 
-  // Phase 2 - RFID Warehouse Audit (Kotlin) app login.
   @Public()
   @Post('rfid-login')
   @ApiOperation({ summary: 'Login for RFID Audit mobile app users and receive JWT' })

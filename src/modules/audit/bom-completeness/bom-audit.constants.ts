@@ -33,9 +33,20 @@ export const BOM_AUDIT_HEADER_ALIASES = {
     'partnumber',
   ],
   storageBin: ['storage', 'storagebin', 'bin', 'binno', 'binnumber'],
-  qty: ['qty', 'quantity', 'avail', 'expectedqty', 'availableqty'],
+  qty: ['stock'],
   operatorId: ['operator', 'operatorid'],
 } as const;
+
+export type BomAuditHeaderField = keyof typeof BOM_AUDIT_HEADER_ALIASES;
+
+export type BomAuditHeaderAliases = Record<BomAuditHeaderField, readonly string[]>;
+
+export const BOM_AUDIT_COLUMN_CONFIG_KEYS: Record<BomAuditHeaderField, string> = {
+  materialCode: 'BOM_AUDIT_COLUMN_MATERIAL',
+  storageBin: 'BOM_AUDIT_COLUMN_STORAGE_BIN',
+  qty: 'BOM_AUDIT_COLUMN_QTY',
+  operatorId: 'BOM_AUDIT_COLUMN_OPERATOR',
+};
 
 export const BOM_AUDIT_COLUMN_LABELS = {
   materialCode: 'Material',

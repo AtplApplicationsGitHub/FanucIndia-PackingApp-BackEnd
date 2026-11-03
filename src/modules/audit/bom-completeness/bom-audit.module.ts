@@ -5,6 +5,7 @@ import { BomAuditMobileController } from './bom-audit-mobile.controller';
 import { BomAuditMobileService } from './bom-audit-mobile.service';
 import { BomAuditReportService } from './bom-audit-report.service';
 import { BomReconciliationService } from './bom-reconciliation.service';
+import { BomAuditColumnConfigService } from './bom-audit-column-config.service';
 import { SftpModule } from '../../sftp/sftp.module';
 import { AuditSharedModule } from '../shared/audit-shared.module';
 
@@ -16,6 +17,7 @@ import { AuditSharedModule } from '../shared/audit-shared.module';
     BomAuditMobileService,
     BomAuditReportService,
     BomReconciliationService,
+    BomAuditColumnConfigService,
   ],
   exports: [BomAuditService, BomReconciliationService],
 })
