@@ -308,16 +308,19 @@ export class BomReconciliationService {
       filters.push({ location: { storageBin: { equals: storageBin, mode: 'insensitive' } } });
     }
 
+    const countFilters = [...filters];
     const category = query.category ?? RECON_CATEGORY.ALL;
     const lineStatuses = RECON_CATEGORY_LINE_STATUSES[category];
     if (lineStatuses) filters.push({ lineStatus: { in: lineStatuses } });
 
     const status = query.status ?? RECON_LINE_STATUS_FILTER.ALL;
     if (status !== RECON_LINE_STATUS_FILTER.ALL) {
-      filters.push({
+      const reviewFilter: Prisma.BomAuditMaterialWhereInput = {
         lineStatus: { in: DISCREPANCY_STATUSES },
         resolvedAt: status === RECON_LINE_STATUS_FILTER.RESOLVED ? { not: null } : null,
-      });
+      };
+      filters.push(reviewFilter);
+      countFilters.push(reviewFilter);
     }
 
     if (partial && (lineStatuses || status !== RECON_LINE_STATUS_FILTER.ALL)) {
@@ -326,7 +329,23 @@ export class BomReconciliationService {
 
     const where: Prisma.BomAuditMaterialWhereInput = { auditId: id, AND: filters };
 
-    const [total, rows] = await this.prisma.$transaction([
+    const allCountWhere: Prisma.BomAuditMaterialWhereInput = {
+      auditId: id,
+      AND: [
+        ...countFilters,
+        ...(partial && status !== RECON_LINE_STATUS_FILTER.ALL
+          ? [{ location: { uploadedAt: { not: null } } }]
+          : []),
+      ],
+    };
+    const categoryCountWhere: Prisma.BomAuditMaterialWhereInput = {
+      auditId: id,
+      AND: [
+        ...countFilters,
+        ...(partial ? [{ location: { uploadedAt: { not: null } } }] : []),
+      ],
+    };
+    const [total, rows, allCount, groupedCategories] = await this.prisma.$transaction([
       this.prisma.bomAuditMaterial.count({ where }),
       this.prisma.bomAuditMaterial.findMany({
         where,
@@ -343,10 +362,29 @@ export class BomReconciliationService {
         skip: (page - 1) * limit,
         take: limit,
       }),
+      this.prisma.bomAuditMaterial.count({ where: allCountWhere }),
+      this.prisma.bomAuditMaterial.groupBy({
+        by: ['lineStatus'],
+        where: categoryCountWhere,
+        _count: { _all: true },
+      }),
     ]);
+    const countCategory = (statuses: string[]) => groupedCategories.reduce(
+      (sum, group) => sum + (group.lineStatus && statuses.includes(group.lineStatus) ? group._count._all : 0),
+      0,
+    );
+    const categoryCounts = {
+      ALL: allCount,
+      ALL_EXCEPT_VALID: countCategory(DISCREPANCY_STATUSES),
+      VALID: countCategory([BOM_AUDIT_LINE_STATUS.VALID]),
+      MISSING: countCategory([BOM_AUDIT_LINE_STATUS.MISSING]),
+      QUANTITY_MISMATCH: countCategory([BOM_AUDIT_LINE_STATUS.MISMATCH]),
+      EXCESS: countCategory([BOM_AUDIT_LINE_STATUS.UNEXPECTED]),
+    };
 
     return {
       message: 'Audit reconciliation lines fetched successfully.',
+      categoryCounts,
       data: rows.map((material) => this.toLine(material, partial)),
       pagination: {
         page,

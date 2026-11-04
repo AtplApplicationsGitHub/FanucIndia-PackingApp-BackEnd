@@ -144,6 +144,7 @@ export class AuditService {
     let rows: ReturnType<AuditService['toListRow']>[] = [];
     let pagination = { page: filters.page, limit: filters.limit, total: 0, totalPages: 0 };
     let available = true;
+    let statusCounts = { ASSIGNED: 0, IN_PROGRESS: 0, RECONCILIATION_PENDING: 0, CLOSED: 0 };
 
     switch (auditType) {
       case AUDIT_TYPE.BOM_COMPLETENESS: {
@@ -157,6 +158,7 @@ export class AuditService {
           }, details);
         });
         pagination = result.pagination;
+        statusCounts = result.statusCounts;
         break;
       }
       case AUDIT_TYPE.CYCLE_COUNT: {
@@ -170,6 +172,7 @@ export class AuditService {
           }, details);
         });
         pagination = result.pagination;
+        statusCounts = result.statusCounts;
         break;
       }
       default:
@@ -182,6 +185,7 @@ export class AuditService {
       label: AUDIT_TYPE_LABELS[auditType],
       available,
       data: rows,
+      statusCounts,
       pagination,
     };
   }

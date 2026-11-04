@@ -493,7 +493,10 @@ export class BomAuditService {
       };
     }
 
-    const [total, audits] = await this.prisma.$transaction([
+    // Status pills share the search/date scope, independent of the selected status and page.
+    const countsWhere = { ...where };
+    delete countsWhere.status;
+    const [total, audits, groupedStatuses] = await this.prisma.$transaction([
       this.prisma.bomAudit.count({ where }),
       this.prisma.bomAudit.findMany({
         where,
@@ -502,9 +505,21 @@ export class BomAuditService {
         skip: (page - 1) * limit,
         take: limit,
       }),
+      this.prisma.bomAudit.groupBy({
+        by: ['status'],
+        where: countsWhere,
+        _count: { _all: true },
+      }),
     ]);
+    const statusCounts = { ASSIGNED: 0, IN_PROGRESS: 0, RECONCILIATION_PENDING: 0, CLOSED: 0 };
+    for (const group of groupedStatuses) {
+      if (Object.prototype.hasOwnProperty.call(statusCounts, group.status)) {
+        statusCounts[group.status as keyof typeof statusCounts] = group._count._all;
+      }
+    }
 
     return {
+      statusCounts,
       message: 'BOM audits fetched successfully.',
       data: audits.map(({ locations, ...audit }) => ({
         ...audit,
