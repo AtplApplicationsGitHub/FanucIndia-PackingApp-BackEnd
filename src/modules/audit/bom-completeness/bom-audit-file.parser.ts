@@ -80,7 +80,10 @@ async function loadWorksheet(
   }
 
   const worksheet = workbook.worksheets.find(
-    (ws) => ws.actualRowCount > 0 && ws.state !== 'hidden' && ws.state !== 'veryHidden',
+    (ws) =>
+      ws.actualRowCount > 0 &&
+      ws.state !== 'hidden' &&
+      ws.state !== 'veryHidden',
   );
   if (!worksheet) {
     throw new BomAuditFileError('The uploaded file is empty.', 'EMPTY_FILE');
@@ -93,10 +96,13 @@ function locateColumns(
   aliases: BomAuditHeaderAliases,
 ): {
   headerRowNo: number;
-  columns: Partial<Record<FieldKey, number>> & Record<Exclude<FieldKey, 'operatorId'>, number>;
+  columns: Partial<Record<FieldKey, number>> &
+    Record<Exclude<FieldKey, 'operatorId'>, number>;
 } {
   let firstRow: ExcelJS.Row | undefined;
-  let best: { row: ExcelJS.Row; index: Map<string, number>; found: number } | undefined;
+  let best:
+    | { row: ExcelJS.Row; index: Map<string, number>; found: number }
+    | undefined;
   const requiredCount = Object.keys(aliases).length;
 
   worksheet.eachRow({ includeEmpty: false }, (row) => {
@@ -126,7 +132,9 @@ function locateColumns(
       .find((c) => c !== undefined);
     if (col !== undefined) columns[field] = col;
     else if (!OPTIONAL_FIELDS.includes(field)) {
-      missing.push(`${BOM_AUDIT_COLUMN_LABELS[field]} (expected header: ${aliases[field].join(' / ')})`);
+      missing.push(
+        `${BOM_AUDIT_COLUMN_LABELS[field]} (expected header: ${aliases[field].join(' / ')})`,
+      );
     }
   });
 
@@ -153,7 +161,8 @@ function parseOperatorId(raw: string): number | null {
   const text = raw.trim();
   if (!/^\d+(\.0+)?$/.test(text)) return null;
   const id = Number(text);
-  if (!Number.isSafeInteger(id) || id <= 0 || id > BOM_AUDIT_MAX_OPERATOR_ID) return null;
+  if (!Number.isSafeInteger(id) || id <= 0 || id > BOM_AUDIT_MAX_OPERATOR_ID)
+    return null;
   return id;
 }
 
@@ -192,12 +201,20 @@ export async function parseBomAuditFile(
     const materialCode = cellToText(
       row.getCell(columns.materialCode).value,
     ).toUpperCase();
+
+    if (/^[0-9]/.test(materialCode)) {
+      return;
+    }
+
     const storageBin = cellToText(
       row.getCell(columns.storageBin).value,
     ).toUpperCase();
+
     const qtyText = cellToText(row.getCell(columns.qty).value);
     const operatorText =
-      columns.operatorId === undefined ? '' : cellToText(row.getCell(columns.operatorId).value);
+      columns.operatorId === undefined
+        ? ''
+        : cellToText(row.getCell(columns.operatorId).value);
 
     if (!materialCode && !storageBin && !qtyText && !operatorText) return;
 

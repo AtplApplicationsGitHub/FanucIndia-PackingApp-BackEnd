@@ -181,7 +181,19 @@ export class BomAuditReportService {
     if (audit.reportPath && isInsideAuditBaseDir('BOM_AUDIT', audit.reportPath)) {
       try {
         const data = await this.sftp.getStream(audit.reportPath);
-        if (Buffer.isBuffer(data)) return { fileName, buffer: data };
+        if (Buffer.isBuffer(data)) {
+          // Preserve existing single-sheet reports on SFTP.
+          // Regenerate legacy two-sheet reports using the approved layout.
+          const savedWorkbook = new ExcelJS.Workbook();
+          await savedWorkbook.xlsx.load(data as unknown as Parameters<typeof savedWorkbook.xlsx.load>[0]);
+          if (savedWorkbook.worksheets.length === 1) {
+            return { fileName, buffer: data };
+          }
+
+          const updatedReport = await this.buildReport(auditId);
+          this.generateInBackground(auditId);
+          return { fileName: updatedReport.fileName, buffer: updatedReport.buffer };
+        }
       } catch (err) {
         this.logger.warn(
           `BOM audit ${audit.auditNo}: saved report could not be read from SFTP, building it again - ${
@@ -205,20 +217,14 @@ export class BomAuditReportService {
       throw new NotFoundException({ code: 'BOM_AUDIT_NOT_FOUND', message: 'BOM audit not found.' });
     }
 
-    const counts = { lines: 0, valid: 0, mismatch: 0, missing: 0, unexpected: 0 };
     const perLocation = audit.locations.map((location) => {
       const c = { valid: 0, mismatch: 0, missing: 0, unexpected: 0 };
       for (const m of location.materials) {
-        counts.lines += 1;
         if (m.lineStatus === BOM_AUDIT_LINE_STATUS.VALID) c.valid += 1;
         else if (m.lineStatus === BOM_AUDIT_LINE_STATUS.MISMATCH) c.mismatch += 1;
         else if (m.lineStatus === BOM_AUDIT_LINE_STATUS.MISSING) c.missing += 1;
         else if (m.lineStatus === BOM_AUDIT_LINE_STATUS.UNEXPECTED) c.unexpected += 1;
       }
-      counts.valid += c.valid;
-      counts.mismatch += c.mismatch;
-      counts.missing += c.missing;
-      counts.unexpected += c.unexpected;
       return { location, ...c };
     });
 
@@ -287,33 +293,57 @@ export class BomAuditReportService {
       rowNo += 1;
     }
 
+    // Integrate the original Locations worksheet here; omit the duplicate overall Summary.
     rowNo += 1;
-    sheet.getCell(`A${rowNo}`).value = 'Summary';
-    sheet.getCell(`A${rowNo}`).font = { bold: true, size: 12 };
+    sheet.mergeCells(rowNo, 1, rowNo, columns.length);
+    const locationTitle = sheet.getCell(rowNo, 1);
+    locationTitle.value = 'Location-wise Summary';
+    locationTitle.font = { bold: true, size: 12 };
+
     rowNo += 1;
-    const summary: [string, number, string | null][] = [
-      ['Locations', audit.locations.length, null],
-      ['Total Lines', counts.lines, null],
-      ['Valid', counts.valid, BOM_AUDIT_LINE_STATUS.VALID],
-      ['Mismatch', counts.mismatch, BOM_AUDIT_LINE_STATUS.MISMATCH],
-      ['Missing', counts.missing, BOM_AUDIT_LINE_STATUS.MISSING],
-      ['Unexpected', counts.unexpected, BOM_AUDIT_LINE_STATUS.UNEXPECTED],
+    const locationHeaders = [
+      'Seq',
+      'Storage Bin',
+      'Expected Materials',
+      'Valid',
+      'Mismatch',
+      'Missing',
+      'Unexpected',
+      'Completed On',
     ];
-    summary.forEach(([label, value, status], i) => {
-      const head = sheet.getCell(rowNo, i + 2);
-      const val = sheet.getCell(rowNo + 1, i + 2);
-      head.value = label;
-      head.font = { bold: true };
-      head.alignment = { horizontal: 'center' };
-      head.border = box;
-      head.fill = labelFill;
-      val.value = value;
-      val.font = { bold: true, size: 12 };
-      val.alignment = { horizontal: 'center' };
-      val.border = box;
-      if (status) this.applyStatusStyle(head, status);
+    locationHeaders.forEach((label, index) => {
+      const cell = sheet.getCell(rowNo, index + 2); // B:I, as in the approved sample
+      cell.value = label;
+      cell.font = { bold: true };
+      cell.fill = headerFill;
+      cell.border = box;
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     });
-    rowNo += 3;
+    sheet.getRow(rowNo).height = 30;
+
+    perLocation.forEach((p, index) => {
+      const row = sheet.getRow(rowNo + index + 1);
+      const values = [
+        p.location.sequenceNo,
+        p.location.storageBin,
+        p.location.expectedMaterials,
+        p.valid,
+        p.mismatch,
+        p.missing,
+        p.unexpected,
+        this.formatTime(p.location.verifiedAt),
+      ];
+      values.forEach((value, columnIndex) => {
+        const cell = row.getCell(columnIndex + 2);
+        cell.value = value;
+        cell.border = box;
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: columnIndex === 1 || columnIndex === 7 ? 'left' : 'center',
+        };
+      });
+    });
+    rowNo += perLocation.length + 2;
 
     const headerRowNo = rowNo;
     const header = sheet.getRow(headerRowNo);
@@ -371,42 +401,6 @@ export class BomAuditReportService {
       to: { row: headerRowNo + Math.max(serialNo, 1), column: columns.length },
     };
 
-    const locSheet = workbook.addWorksheet(BOM_AUDIT_REPORT.locationSheetName, {
-      views: [{ state: 'frozen', ySplit: 1 }],
-    });
-    const locColumns = [
-      { header: 'Seq', width: 6 },
-      { header: 'Storage Bin', width: 16 },
-      { header: 'Expected Materials', width: 19 },
-      { header: 'Valid', width: 9, status: BOM_AUDIT_LINE_STATUS.VALID },
-      { header: 'Mismatch', width: 11, status: BOM_AUDIT_LINE_STATUS.MISMATCH },
-      { header: 'Missing', width: 10, status: BOM_AUDIT_LINE_STATUS.MISSING },
-      { header: 'Unexpected', width: 12, status: BOM_AUDIT_LINE_STATUS.UNEXPECTED },
-      { header: 'Completed On', width: 21 },
-    ];
-    locColumns.forEach((c, i) => {
-      locSheet.getColumn(i + 1).width = c.width;
-      const cell = locSheet.getCell(1, i + 1);
-      cell.value = c.header;
-      cell.font = { bold: true };
-      cell.fill = headerFill;
-      cell.border = box;
-    });
-    locSheet.pageSetup = { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
-    perLocation.forEach((p, i) => {
-      const row = locSheet.getRow(i + 2);
-      row.values = [
-        p.location.sequenceNo,
-        p.location.storageBin,
-        p.location.expectedMaterials,
-        p.valid,
-        p.mismatch,
-        p.missing,
-        p.unexpected,
-        this.formatTime(p.location.verifiedAt),
-      ];
-      row.eachCell({ includeEmpty: true }, (cell) => (cell.border = box));
-    });
 
     return {
       auditNo: audit.auditNo,
