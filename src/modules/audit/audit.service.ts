@@ -1,3 +1,4 @@
+import { CycleCountAuditService } from './cycle-count/cycle-count-audit.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { getIstTimestampRange } from '../../common/utils/date-only.util';
@@ -17,7 +18,6 @@ import {
 import { QueryAuditStatusCountsDto } from './dto/query-audit-status-counts.dto';
 import { QueryAuditListDto } from './dto/query-audit-list.dto';
 import { BomAuditService } from './bom-completeness/bom-audit.service';
-import { CycleCountService } from './cycle-count/cycle-count.service';
 
 type AuditCountWhere = {
   status: AuditStatus;
@@ -61,7 +61,7 @@ export class AuditService {
     private readonly operators: AuditOperatorsService,
     private readonly prisma: PrismaService,
     private readonly bomAudits: BomAuditService,
-    private readonly cycleCounts: CycleCountService,
+    private readonly cycleCountAudits: CycleCountAuditService,
   ) {
     this.counters = {
       [AUDIT_TYPE.BOM_COMPLETENESS]: (where) => this.prisma.bomAudit.count({ where }),
@@ -162,7 +162,7 @@ export class AuditService {
         break;
       }
       case AUDIT_TYPE.CYCLE_COUNT: {
-        const result = await this.cycleCounts.findAll(filters);
+        const result = await this.cycleCountAudits.findAll(filters);
         rows = result.data.map((a) => {
           const { id, auditNo, auditName, status, operatorId, operatorName, createdByName, createdAt,
             storageBinCount, storageBins, ...details } = a;
@@ -207,7 +207,7 @@ export class AuditService {
       createdAt: row.createdAt,
       actions: {
         canReassign: auditType === AUDIT_TYPE.BOM_COMPLETENESS && editable,
-        canDelete: editable,
+        canDelete: auditType === AUDIT_TYPE.BOM_COMPLETENESS && editable,
         canDownloadReport:
           auditType === AUDIT_TYPE.BOM_COMPLETENESS && REPORT_READY_STATUSES.includes(row.status),
       },

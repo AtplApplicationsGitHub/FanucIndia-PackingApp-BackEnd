@@ -17,7 +17,7 @@ export class AuditMobileController {
       'Home "MY AUDIT TASKS" badges: how many audits I still have open (ASSIGNED + IN_PROGRESS) per audit type, in one call',
     description:
       'assigned = new (not downloaded yet), inProgress = downloaded, total = both. Submitted / closed audits are not counted. ' +
-      'Location Audit and Free Stock / 4th Axis return 0 (available: false) until those modules are built.',
+      'Cycle Count includes created audits; its scanning flow will be added separately. Location Audit and Free Stock / 4th Axis audit return 0 (available: false) until built.',
   })
   @ApiResponse({ status: 200, description: 'Open audit counts per audit type for the logged-in operator' })
   getMyTaskCounts(@Req() req: AuthRequest) {

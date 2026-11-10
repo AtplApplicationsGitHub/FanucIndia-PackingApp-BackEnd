@@ -42,12 +42,16 @@ model User {
   customerLabelPrints    CustomerLabelPrint[]
   salesOrderAttachments  SalesOrderAttachment[]
 
+  cycleCountAuditsAsOperator CycleCountAudit[] @relation("CycleCountAuditOperator")
+  cycleCountAuditsCreated CycleCountAudit[] @relation("CycleCountAuditCreatedBy")
+
   bomAuditsAsOperator BomAudit[] @relation("BomAuditOperator")
   bomAuditsCreated    BomAudit[] @relation("BomAuditCreatedBy")
 
-  cycleCountAuditsAsOperator CycleCountAudit[]       @relation("CycleCountOperator")
-  cycleCountAuditsCreated    CycleCountAudit[]       @relation("CycleCountCreatedBy")
-  cycleCountStockUploads     CycleCountStockUpload[] @relation("CycleCountStockUploadedBy")
+  freeStockUploads      FreeStockUpload[]      @relation("FreeStockUploadedBy")
+  freeStockReservations FreeStockReservation[] @relation("FreeStockReservedBy")
+  freeStockReleases     FreeStockReservation[] @relation("FreeStockReleasedBy")
+
 }
 
 model Product {
@@ -213,6 +217,9 @@ model ERP_Material_Data {
   PackingUpdatedBy   String?     @db.VarChar(50)
   salesOrderId       Int?
   salesOrder         SalesOrder? @relation(fields: [salesOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  @@index([IssueUpdatedDate])
+  @@index([salesOrderId])
+
 }
 
 model ERPMaterialLog {
@@ -360,6 +367,9 @@ model ERP_Material_DataArchive {
   PackingUpdatedDate DateTime? @db.Timestamptz(3)
   PackingUpdatedBy   String?   @db.VarChar(50)
   archivedAt         DateTime  @default(now()) @db.Timestamptz(3)
+  @@index([IssueUpdatedDate])
+  @@index([salesOrderId])
+
 }
 
 model ERP_Material_FileArchive {
@@ -708,119 +718,6 @@ model BomAuditMaterial {
   @@index([auditId])
 }
 
-model CycleCountStockUpload {
-  id              Int      @id @default(autoincrement())
-  fileName        String   @db.VarChar(500)
-  totalRows       Int
-  validRows       Int
-  excludedRows    Int
-  totalLocations  Int
-  totalPackages   Int
-  hasCertNoColumn Boolean  @default(false)
-  hasCncColumn    Boolean  @default(false)
-  hasClassColumn  Boolean  @default(false)
-  uploadedById    Int
-  uploadedByName  String   @db.VarChar(255)
-  createdAt       DateTime @default(now()) @db.Timestamptz(3)
-
-  uploadedBy User                 @relation("CycleCountStockUploadedBy", fields: [uploadedById], references: [id])
-  rows       CycleCountStockRow[]
-  audits     CycleCountAudit[]
-
-  @@index([createdAt])
-}
-
-model CycleCountStockRow {
-  id              Int      @id @default(autoincrement())
-  uploadId        Int
-  rowNo           Int
-  storageBin      String   @db.VarChar(100)
-  materialCode    String   @db.VarChar(100)
-  qty             Decimal? @db.Decimal(15, 3)
-  certNo          String?  @db.VarChar(100)
-  batch           String?  @db.VarChar(100)
-  plant           String?  @db.VarChar(50)
-  storageLocation String?  @db.VarChar(50)
-  isCnc           Boolean?
-  materialClass   String?  @db.VarChar(10)
-  excludeReason   String?  @db.VarChar(40)
-
-  upload CycleCountStockUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
-
-  @@index([uploadId, storageBin])
-  @@index([uploadId, excludeReason])
-}
-
-/// One Cycle Count audit = the locations of ONE operator (a released plan creates one audit per operator).
-model CycleCountAudit {
-  id              Int       @id @default(autoincrement())
-  auditNo         String    @unique @db.VarChar(30)
-  auditName       String    @db.VarChar(255)
-  status          String    @default("ASSIGNED") @db.VarChar(30) // ASSIGNED | IN_PROGRESS | RECONCILIATION_PENDING | CLOSED (shared by all audit types)
-  operatorId      Int
-  operatorName    String    @db.VarChar(255)
-  stockUploadId   Int
-  stockFileName   String    @db.VarChar(500)
-  movementFrom    DateTime  @db.Date
-  movementTo      DateTime  @db.Date
-  includeArchived Boolean   @default(true)
-  selectionMethod String    @db.VarChar(20)
-  cncFilter       String    @db.VarChar(20)
-  materialClasses String?   @db.VarChar(20)
-  totalLocations  Int
-  totalLines      Int
-  uploadBatchId   String    @db.VarChar(36)
-  createdById     Int
-  createdByName   String    @db.VarChar(255)
-  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
-
-  operator    User                  @relation("CycleCountOperator", fields: [operatorId], references: [id])
-  createdBy   User                  @relation("CycleCountCreatedBy", fields: [createdById], references: [id])
-  stockUpload CycleCountStockUpload @relation(fields: [stockUploadId], references: [id])
-  locations   CycleCountLocation[]
-  materials   CycleCountMaterial[]
-
-  @@index([status])
-  @@index([operatorId, status])
-  @@index([uploadBatchId])
-}
-
-model CycleCountLocation {
-  id            Int      @id @default(autoincrement())
-  auditId       Int
-  storageBin    String   @db.VarChar(100)
-  sequenceNo    Int
-  movementLines Int      @default(0)
-  movementLevel String   @db.VarChar(10)
-  expectedLines Int
-  createdAt     DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
-
-  audit     CycleCountAudit      @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  materials CycleCountMaterial[]
-
-  @@unique([auditId, storageBin])
-}
-
-model CycleCountMaterial {
-  id              Int      @id @default(autoincrement())
-  auditId         Int
-  auditLocationId Int
-  materialCode    String   @db.VarChar(100)
-  certNo          String?  @db.VarChar(100)
-  batch           String?  @db.VarChar(100)
-  expectedQty     Decimal  @db.Decimal(15, 3)
-  createdAt       DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
-
-  location CycleCountLocation @relation(fields: [auditLocationId], references: [id], onDelete: Cascade)
-  audit    CycleCountAudit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
-
-  @@index([auditId])
-  @@index([auditLocationId])
-}
-
 model AuditNoSequence {
   prefix     String   @db.VarChar(10)
   period     String   @db.VarChar(7)
@@ -828,4 +725,166 @@ model AuditNoSequence {
   updatedAt  DateTime @updatedAt @db.Timestamptz(3)
 
   @@id([prefix, period])
+}
+
+enum FreeStockStatus {
+  OPEN
+  RESERVED
+  CLOSED
+}
+
+enum FreeStockUploadStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model FreeStockUpload {
+  id               Int                   @id @default(autoincrement())
+  fileName         String                @db.VarChar(500)
+  uploadedById     Int
+  uploadedByName   String                @db.VarChar(255)
+  status           FreeStockUploadStatus @default(PROCESSING)
+  totalRows        Int                   @default(0)
+  insertedRows     Int                   @default(0)
+  updatedRows      Int                   @default(0)
+  closedRows       Int                   @default(0)
+  errorMessage     String?               @db.Text
+  createdAt        DateTime              @default(now()) @db.Timestamptz(3)
+  completedAt      DateTime?             @db.Timestamptz(3)
+
+  uploadedBy       User                  @relation("FreeStockUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  lastSeenItems    FreeStockItem[]       @relation("FreeStockLastSeenUpload")
+  closedItems      FreeStockItem[]       @relation("FreeStockClosedUpload")
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model FreeStockItem {
+  id                 Int             @id @default(autoincrement())
+  storageType        String?         @db.VarChar(100)
+  storageBin         String?         @db.VarChar(100)
+  materialCode       String          @db.VarChar(100)
+  plant              String?         @db.VarChar(100)
+  storageLocation    String?         @db.VarChar(100)
+  availableQty       Decimal?        @db.Decimal(18, 3)
+  batch              String          @db.VarChar(100)
+  stockQty           Decimal         @db.Decimal(18, 3)
+  certificateNo      String?         @db.VarChar(255)
+  grDate             DateTime?       @db.Date
+  grNumber           String?         @db.VarChar(100)
+  delivery           String?         @db.VarChar(255)
+  lastMovementDate   DateTime?       @db.Date
+  lastChanger        String?         @db.VarChar(255)
+
+  status             FreeStockStatus @default(OPEN)
+  lastSeenUploadId   Int
+  closedByUploadId   Int?
+  closedAt           DateTime?       @db.Timestamptz(3)
+  createdAt          DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(3)
+
+  lastSeenUpload     FreeStockUpload @relation("FreeStockLastSeenUpload", fields: [lastSeenUploadId], references: [id], onDelete: Restrict)
+  closedByUpload     FreeStockUpload? @relation("FreeStockClosedUpload", fields: [closedByUploadId], references: [id], onDelete: Restrict)
+  reservations       FreeStockReservation[]
+
+  @@index([materialCode, batch])
+  @@index([status, id])
+  @@index([lastSeenUploadId])
+  @@index([closedByUploadId])
+}
+
+model FreeStockReservation {
+  id                 Int             @id @default(autoincrement())
+  bulkReservationId  String          @default(uuid()) @db.VarChar(36)
+  stockItemId        Int
+  reservedQty        Decimal         @db.Decimal(18, 3)
+  soNumber           String?         @db.VarChar(100)
+  reservedById       Int
+  reservedByName     String          @db.VarChar(255)
+  reservedZoneId     Int?
+  reservedZoneName   String          @db.VarChar(255)
+  reservedAt         DateTime        @default(now()) @db.Timestamptz(3)
+  sourceFileName     String?         @db.VarChar(500)
+
+  releasedAt         DateTime?       @db.Timestamptz(3)
+  releasedById       Int?
+  releasedByName     String?         @db.VarChar(255)
+  closedAt           DateTime?       @db.Timestamptz(3)
+
+  stockItem          FreeStockItem   @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  reservedBy         User            @relation("FreeStockReservedBy", fields: [reservedById], references: [id], onDelete: Restrict)
+  releasedBy         User?           @relation("FreeStockReleasedBy", fields: [releasedById], references: [id], onDelete: Restrict)
+
+  @@index([stockItemId, reservedAt])
+  @@index([reservedById, releasedAt, closedAt])
+  @@index([bulkReservationId])
+}
+
+
+model CycleCountAudit {
+  id                 Int      @id @default(autoincrement())
+  auditNo            String   @unique @db.VarChar(30)
+  auditName          String   @db.VarChar(255)
+  fileName           String   @db.VarChar(500)
+  status             String   @default("ASSIGNED") @db.VarChar(30)
+  operatorId         Int
+  operatorName       String   @db.VarChar(255)
+  totalLocations     Int
+  totalMaterials     Int
+  issueFromDate      DateTime @db.Date
+  issueToDate        DateTime @db.Date
+  sourceSoCount      Int
+  qualifyingSoCount  Int
+  sourceBinCount     Int
+  uploadedBinCount   Int
+  matchedBinCount    Int
+  createdById        Int
+  createdByName      String   @db.VarChar(255)
+  uploadBatchId      String   @db.VarChar(36)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+
+  operator  User @relation("CycleCountAuditOperator", fields: [operatorId], references: [id])
+  createdBy User @relation("CycleCountAuditCreatedBy", fields: [createdById], references: [id])
+  locations CycleCountAuditLocation[]
+  materials CycleCountAuditMaterial[]
+
+  @@index([status])
+  @@index([operatorId, status])
+  @@index([uploadBatchId])
+  @@index([createdAt])
+}
+
+model CycleCountAuditLocation {
+  id                Int      @id @default(autoincrement())
+  auditId           Int
+  storageBin        String   @db.VarChar(100)
+  sequenceNo        Int
+  expectedMaterials Int
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  audit     CycleCountAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  materials CycleCountAuditMaterial[]
+
+  @@unique([auditId, storageBin])
+  @@unique([auditId, sequenceNo])
+}
+
+model CycleCountAuditMaterial {
+  id              Int      @id @default(autoincrement())
+  auditLocationId Int
+  auditId         Int
+  materialCode    String   @db.VarChar(100)
+  expectedQty     Int
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  location CycleCountAuditLocation @relation(fields: [auditLocationId], references: [id], onDelete: Cascade)
+  audit    CycleCountAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@unique([auditLocationId, materialCode])
+  @@index([auditId])
 }

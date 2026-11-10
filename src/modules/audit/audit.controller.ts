@@ -37,7 +37,7 @@ export class AuditController {
       'How many audits are in each status (ASSIGNED, IN_PROGRESS, RECONCILIATION_PENDING, CLOSED) for every audit type + overall total',
     description:
       'One API for all 4 audit types. Optional filters: auditType, fromDate / toDate (audit created date, IST, both days included). ' +
-      'Location Audit and Free Stock / 4th Axis return 0 (available: false) until those modules are built.',
+      'Cycle Count includes created audits; its scanning flow will be added separately. Location Audit and Free Stock / 4th Axis audit return 0 (available: false) until built.',
   })
   @ApiResponse({ status: 200, description: 'Counts per audit type and status' })
   @ApiResponse({ status: 400, description: 'Invalid auditType or date / date range' })
@@ -53,7 +53,7 @@ export class AuditController {
       'Each row has the common columns + storageBinCount (table cell) + storageBins (popup) + actions (which buttons to show) ' +
       '+ details (fields only that audit type has). Search also finds a storage bin. ' +
       'View / re-assign / delete / report: use the audit type\'s own APIs (/bom-audit/..., /cycle-count/...). ' +
-      'Location Audit and Free Stock / 4th Axis return an empty list (available: false) until those modules are built.',
+      'Cycle Count returns created audits. Location Audit and Free Stock / 4th Axis return an empty list (available: false) until built.',
   })
   @ApiResponse({ status: 200, description: 'Paginated audits of the selected audit type' })
   @ApiResponse({ status: 400, description: 'Invalid auditType / status / date / date range' })
