@@ -507,6 +507,7 @@ export class BomAuditService {
       }),
       this.prisma.bomAudit.groupBy({
         by: ['status'],
+        orderBy: { status: 'asc' },
         where: countsWhere,
         _count: { _all: true },
       }),
@@ -514,7 +515,7 @@ export class BomAuditService {
     const statusCounts = { ASSIGNED: 0, IN_PROGRESS: 0, RECONCILIATION_PENDING: 0, CLOSED: 0 };
     for (const group of groupedStatuses) {
       if (Object.prototype.hasOwnProperty.call(statusCounts, group.status)) {
-        statusCounts[group.status as keyof typeof statusCounts] = group._count._all;
+        statusCounts[group.status as keyof typeof statusCounts] = (typeof group._count === 'object' ? (group._count._all ?? 0) : 0);
       }
     }
 

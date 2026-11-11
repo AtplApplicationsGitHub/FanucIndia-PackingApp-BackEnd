@@ -1,3 +1,4 @@
+import { CYCLE_COUNT_AUDIT_MOBILE_PATH_PREFIX } from './modules/audit/cycle-count/cycle-count-mobile.constants';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -24,7 +25,8 @@ async function bootstrap() {
 
   const bomAuditMobileJson = json({ limit: BOM_AUDIT_MOBILE_JSON_LIMIT });
   app.use((req: Request, res: Response, next: NextFunction) =>
-    req.path.includes(BOM_AUDIT_MOBILE_PATH_PREFIX)
+    req.path.includes(BOM_AUDIT_MOBILE_PATH_PREFIX) ||
+    req.path.includes(CYCLE_COUNT_AUDIT_MOBILE_PATH_PREFIX)
       ? bomAuditMobileJson(req, res, next)
       : next(),
   );
@@ -55,15 +57,17 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   app.enableCors({
-    origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : true,
+    origin: process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(',')
+      : true,
     credentials: true,
   });
 
   const port = process.env.PORT || 3011;
   const server = await app.listen(port, '0.0.0.0');
 
-  server.setTimeout(60000); 
-  
+  server.setTimeout(60000);
+
   pinoAdapter.log(`Application is listening on port ${port}`, 'bootstrap');
   pinoAdapter.log('Application started', 'bootstrap');
 }

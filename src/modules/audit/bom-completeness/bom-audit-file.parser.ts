@@ -9,7 +9,6 @@ import {
   BOM_AUDIT_ALLOWED_EXTENSIONS,
   BOM_AUDIT_COLUMN_LABELS,
   BOM_AUDIT_HEADER_ALIASES,
-  BOM_AUDIT_MAX_DATA_ROWS,
   BOM_AUDIT_MAX_LENGTH,
   BOM_AUDIT_MAX_REPORTED_ERRORS,
   BOM_AUDIT_HEADER_SEARCH_ROWS,
@@ -219,7 +218,6 @@ export async function parseBomAuditFile(
     if (!materialCode && !storageBin && !qtyText && !operatorText) return;
 
     totalRows += 1;
-    if (totalRows > BOM_AUDIT_MAX_DATA_ROWS) return;
 
     const errors: string[] = [];
     if (!materialCode) {
@@ -287,13 +285,6 @@ export async function parseBomAuditFile(
     if (existingQty !== undefined) mergedRows += 1;
     materials.set(materialCode, (existingQty ?? 0) + (qty as number));
   });
-
-  if (totalRows > BOM_AUDIT_MAX_DATA_ROWS) {
-    throw new BomAuditFileError(
-      `The file has ${totalRows} data rows. Maximum allowed is ${BOM_AUDIT_MAX_DATA_ROWS} rows per upload.`,
-      'TOO_MANY_ROWS',
-    );
-  }
 
   if (totalRowErrors > 0) {
     const shown =

@@ -24,7 +24,15 @@ export class FreeStockController {
   constructor(private readonly service: FreeStockService) {}
 
   @Get('stocks')
-  @ApiOperation({ summary: 'Stock across all zones, with current reservations, shortages, action permissions and status counts' })
+  @ApiOperation({
+    summary: 'Stock with status counts, stock totals and My Reservations summary',
+    description: 'statusCounts retains the existing OPEN/RESERVED/CLOSED row counts. '
+      + 'statusSummary contains ALL/OPEN/RESERVED/CLOSED, each with count and stockQty (the exact Stock sum as a decimal string). '
+      + 'Summaries follow search and mine, across all pages, independently of the selected status. '
+      + 'For SALES, myReservations contains count and stockQty for the logged-in user’s active RESERVED rows; '
+      + 'it follows search independently of status/mine and is null for ADMIN. '
+      + 'Use mine=true&status=RESERVED to list the My Reservations card’s rows.',
+  })
   list(@Query() query: FreeStockQueryDto, @Req() req: AuthRequest) {
     return this.service.list(query, Number(req.user.userId));
   }

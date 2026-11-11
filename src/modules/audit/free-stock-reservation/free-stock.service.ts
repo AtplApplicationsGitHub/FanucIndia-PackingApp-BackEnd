@@ -143,22 +143,50 @@ export class FreeStockService {
         { reservations: { some: { releasedAt: null, OR: [{ reservedByName: contains }, { reservedZoneName: contains }, { soNumber: contains }] } } },
       ];
     }
+    // Card summaries follow search, independently of the selected status/page.
+    const myReservationsWhere: Prisma.FreeStockItemWhereInput = {
+      ...base, status: 'RESERVED',
+      reservations: { some: { reservedById: actor.id, releasedAt: null, closedAt: null } },
+    };
     if (query.mine) base.reservations = { some: { reservedById: actor.id, releasedAt: null } };
     const where: Prisma.FreeStockItemWhereInput = {
       ...base, ...(query.status && query.status !== 'ALL' ? { status: query.status as FreeStockStatus } : {}),
     };
-    const { rows, total, grouped } = await this.prisma.$transaction(async (tx) => {
+    const { rows, total, grouped, mine } = await this.prisma.$transaction(async (tx) => {
       const rows = await tx.freeStockItem.findMany({
         where, include: STOCK_INCLUDE, orderBy: { id: 'desc' }, skip: (query.page - 1) * query.limit, take: query.limit,
       });
       const total = await tx.freeStockItem.count({ where });
-      const grouped = await tx.freeStockItem.groupBy({ by: ['status'], where: base, _count: { _all: true } });
-      return { rows, total, grouped };
+      const grouped = await tx.freeStockItem.groupBy({
+        by: ['status'], where: base, _count: { _all: true }, _sum: { stockQty: true },
+      });
+      const mine = actor.role === 'SALES' ? await tx.freeStockItem.aggregate({
+        where: myReservationsWhere, _count: { _all: true }, _sum: { stockQty: true },
+      }) : null;
+      return { rows, total, grouped, mine };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
     const statusCounts = { OPEN: 0, RESERVED: 0, CLOSED: 0 };
-    grouped.forEach((r) => { statusCounts[r.status] = r._count._all; });
+    const statusSummary = {
+      ALL: { count: 0, stockQty: '0' },
+      OPEN: { count: 0, stockQty: '0' },
+      RESERVED: { count: 0, stockQty: '0' },
+      CLOSED: { count: 0, stockQty: '0' },
+    };
+    let allStock = new Prisma.Decimal(0);
+    for (const group of grouped) {
+      const stockQty = group._sum.stockQty ?? new Prisma.Decimal(0);
+      statusCounts[group.status] = group._count._all;
+      statusSummary[group.status] = { count: group._count._all, stockQty: stockQty.toFixed() };
+      statusSummary.ALL.count += group._count._all;
+      allStock = allStock.plus(stockQty);
+    }
+    statusSummary.ALL.stockQty = allStock.toFixed();
     return {
-      data: rows.map((row) => this.display(row, actor)), statusCounts,
+      data: rows.map((row) => this.display(row, actor)), statusCounts, statusSummary,
+      // Stock totals use Stock, not requested reservation quantity; decimals stay exact.
+      myReservations: mine ? {
+        count: mine._count._all, stockQty: (mine._sum.stockQty ?? new Prisma.Decimal(0)).toFixed(),
+      } : null,
       pagination: { page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit) },
     };
   }

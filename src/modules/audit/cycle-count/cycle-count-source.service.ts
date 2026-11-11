@@ -17,11 +17,13 @@ export class CycleCountSourceService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getBins(start: Date, end: Date) {
-    const [result] = await this.prisma.$queryRaw<{
-      sourceSoCount: number;
-      qualifyingSoCount: number;
-      bins: string[];
-    }[]>`
+    const [result] = await this.prisma.$queryRaw<
+      {
+        sourceSoCount: number;
+        qualifyingSoCount: number;
+        bins: string[];
+      }[]
+    >`
       WITH orders AS (
         SELECT "id", "saleOrderNumber", "outboundDelivery", "binCount" FROM "SalesOrder"
         UNION ALL

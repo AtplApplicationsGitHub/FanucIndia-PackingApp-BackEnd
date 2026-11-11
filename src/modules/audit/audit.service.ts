@@ -166,10 +166,14 @@ export class AuditService {
         rows = result.data.map((a) => {
           const { id, auditNo, auditName, status, operatorId, operatorName, createdByName, createdAt,
             storageBinCount, storageBins, ...details } = a;
-          return this.toListRow(auditType, {
-            id, auditNo, auditName, status, operatorId, operatorName, createdByName, createdAt,
-            storageBinCount, storageBins,
-          }, details);
+          return {
+            ...this.toListRow(auditType, {
+              id, auditNo, auditName, status, operatorId, operatorName, createdByName, createdAt,
+              storageBinCount, storageBins,
+            }, details),
+            issueFromDate: a.issueFromDate,
+            issueToDate: a.issueToDate,
+          };
         });
         pagination = result.pagination;
         statusCounts = result.statusCounts;
@@ -206,10 +210,10 @@ export class AuditService {
       createdByName: row.createdByName,
       createdAt: row.createdAt,
       actions: {
-        canReassign: auditType === AUDIT_TYPE.BOM_COMPLETENESS && editable,
+        canReassign: (auditType === AUDIT_TYPE.BOM_COMPLETENESS || auditType === AUDIT_TYPE.CYCLE_COUNT) && editable,
         canDelete: auditType === AUDIT_TYPE.BOM_COMPLETENESS && editable,
         canDownloadReport:
-          auditType === AUDIT_TYPE.BOM_COMPLETENESS && REPORT_READY_STATUSES.includes(row.status),
+          (auditType === AUDIT_TYPE.BOM_COMPLETENESS || auditType === AUDIT_TYPE.CYCLE_COUNT) && REPORT_READY_STATUSES.includes(row.status),
       },
       details,
     };

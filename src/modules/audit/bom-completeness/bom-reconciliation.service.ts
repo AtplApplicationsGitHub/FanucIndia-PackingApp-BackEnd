@@ -365,12 +365,13 @@ export class BomReconciliationService {
       this.prisma.bomAuditMaterial.count({ where: allCountWhere }),
       this.prisma.bomAuditMaterial.groupBy({
         by: ['lineStatus'],
+        orderBy: { lineStatus: 'asc' },
         where: categoryCountWhere,
         _count: { _all: true },
       }),
     ]);
     const countCategory = (statuses: string[]) => groupedCategories.reduce(
-      (sum, group) => sum + (group.lineStatus && statuses.includes(group.lineStatus) ? group._count._all : 0),
+      (sum, group) => sum + (group.lineStatus && statuses.includes(group.lineStatus) ? (typeof group._count === 'object' ? (group._count._all ?? 0) : 0) : 0),
       0,
     );
     const categoryCounts = {

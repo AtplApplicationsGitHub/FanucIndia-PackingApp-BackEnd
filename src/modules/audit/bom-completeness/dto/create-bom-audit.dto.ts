@@ -2,7 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import {
-  BOM_AUDIT_BIN_OPERATORS_MAX_LENGTH,
   BOM_AUDIT_MAX_LENGTH,
   BOM_AUDIT_MAX_OPERATOR_ID,
 } from '../bom-audit.constants';
@@ -31,7 +30,6 @@ export class CreateBomAuditDto {
   })
   @IsOptional()
   @IsString({ message: 'binOperators must be a JSON text' })
-  @MaxLength(BOM_AUDIT_BIN_OPERATORS_MAX_LENGTH, { message: 'binOperators is too long' })
   binOperators?: string;
 }
 

@@ -110,7 +110,7 @@ export async function parseStockFile(filePath: string): Promise<StockInput[]> {
       break;
     }
   }
-  if (!header) throw new BadRequestException('Sheet1 columns A-N must match the supplied SAP format.');
+  if (!header) throw new BadRequestException('The stock file format is incorrect. Please check the file and upload it again.');
   const rows: StockInput[] = [];
   const keys = new Set<string>();
   const errors: { rowNo: number; message: string }[] = [];

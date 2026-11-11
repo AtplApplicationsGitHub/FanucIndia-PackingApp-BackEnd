@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   Injectable,
   InternalServerErrorException,
@@ -51,6 +52,14 @@ const AUDIT_SUMMARY_SELECT = {
   createdByName: true,
   createdAt: true,
   uploadBatchId: true,
+  downloadedAt: true,
+  startedAt: true,
+  completedAt: true,
+  submittedAt: true,
+  closedAt: true,
+  closedByName: true,
+  reportPath: true,
+  reportGeneratedAt: true,
   issueFromDate: true,
   issueToDate: true,
   sourceSoCount: true,
@@ -63,7 +72,7 @@ const AUDIT_SUMMARY_SELECT = {
 const AUDIT_LIST_SELECT = {
   ...AUDIT_SUMMARY_SELECT,
   locations: {
-    select: { sequenceNo: true, storageBin: true },
+    select: { sequenceNo: true, storageBin: true, uploadedAt: true },
     orderBy: { sequenceNo: 'asc' },
   },
 } satisfies Prisma.CycleCountAuditSelect;
@@ -548,7 +557,7 @@ export class CycleCountAuditService {
     }
     return {
       message: 'Cycle Count audits fetched successfully.',
-      data: audits.map(({ locations, ...audit }) => ({ ...audit, storageBinCount: locations.length, storageBins: locations, uploadedLocations: 0 })),
+      data: audits.map(({ locations, ...audit }) => ({ ...audit, storageBinCount: locations.length, storageBins: locations, uploadedLocations: locations.filter((location) => location.uploadedAt !== null).length })),
       statusCounts,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
@@ -557,9 +566,63 @@ export class CycleCountAuditService {
   async findOne(id: number) {
     const audit = await this.prisma.cycleCountAudit.findUnique({
       where: { id },
-      include: { locations: { orderBy: { sequenceNo: 'asc' }, include: { materials: { orderBy: { materialCode: 'asc' } } } } },
+      include: { locations: { orderBy: { sequenceNo: 'asc' }, include: { materials: { where: { isUnexpected: false }, orderBy: { materialCode: 'asc' } } } } },
     });
     if (!audit) throw new NotFoundException({ code: 'CYCLE_COUNT_AUDIT_NOT_FOUND', message: 'Cycle Count audit not found.' });
     return { message: 'Cycle Count audit fetched successfully.', data: audit };
+  }
+
+  async reassign(id: number, operatorId: number, actor: CycleCountAuditActor) {
+    const audit = await this.getAuditOrThrow(id);
+    this.assertEditable(audit.status, 're-assigned');
+
+    const operator = await this.operators.getOperatorOrThrow(operatorId);
+    if (operator.id === audit.operatorId) {
+      return {
+        message: `Cycle Count audit is already assigned to ${operator.name}.`,
+        data: await this.prisma.cycleCountAudit.findUniqueOrThrow({ where: { id }, select: AUDIT_SUMMARY_SELECT }),
+      };
+    }
+
+    const result = await this.prisma.cycleCountAudit.updateMany({
+      where: { id, status: BOM_AUDIT_STATUS.ASSIGNED },
+      data: { operatorId: operator.id, operatorName: operator.name },
+    });
+    if (result.count === 0) {
+      const latest = await this.getAuditOrThrow(id);
+      this.assertEditable(latest.status, 're-assigned');
+    }
+
+    const updated = await this.prisma.cycleCountAudit.findUniqueOrThrow({
+      where: { id },
+      select: AUDIT_SUMMARY_SELECT,
+    });
+    this.logger.log(
+      `Cycle Count audit ${updated.auditNo} re-assigned by ${actor.name}: ${audit.operatorName} (${audit.operatorId}) -> ${operator.name} (${operator.id})`,
+    );
+    return { message: `Cycle Count audit re-assigned to ${operator.name}.`, data: updated };
+  }
+
+  private async getAuditOrThrow(id: number) {
+    const audit = await this.prisma.cycleCountAudit.findUnique({
+      where: { id },
+      select: { id: true, auditNo: true, auditName: true, status: true, operatorId: true, operatorName: true },
+    });
+    if (!audit) {
+      throw new NotFoundException({
+        code: 'CYCLE_COUNT_AUDIT_NOT_FOUND',
+        message: `Cycle Count audit with ID ${id} not found.`,
+      });
+    }
+    return audit;
+  }
+
+  private assertEditable(status: string, action: 're-assigned') {
+    if (status !== BOM_AUDIT_STATUS.ASSIGNED) {
+      throw new ConflictException({
+        code: 'CYCLE_COUNT_AUDIT_NOT_REASSIGNABLE',
+        message: `This audit can no longer be ${action} (status ${status}). Only ASSIGNED audits can be ${action}.`,
+      });
+    }
   }
 }

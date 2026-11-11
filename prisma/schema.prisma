@@ -843,6 +843,17 @@ model CycleCountAudit {
   createdById        Int
   createdByName      String   @db.VarChar(255)
   uploadBatchId      String   @db.VarChar(36)
+  downloadedAt       DateTime? @db.Timestamptz(3)
+  startedAt          DateTime? @db.Timestamptz(3)
+  completedAt        DateTime? @db.Timestamptz(3)
+  submittedAt        DateTime? @db.Timestamptz(3)
+  clientSubmissionId String? @unique @db.VarChar(64)
+  reportPath         String? @db.VarChar(500)
+  reportGeneratedAt  DateTime? @db.Timestamptz(3)
+  reportAttempts     Int @default(0)
+  reportError        String? @db.VarChar(1000)
+  closedAt           DateTime? @db.Timestamptz(3)
+  closedByName       String? @db.VarChar(255)
   createdAt          DateTime @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime @updatedAt @db.Timestamptz(3)
 
@@ -863,6 +874,9 @@ model CycleCountAuditLocation {
   storageBin        String   @db.VarChar(100)
   sequenceNo        Int
   expectedMaterials Int
+  verifiedAt        DateTime? @db.Timestamptz(3)
+  uploadedAt        DateTime? @db.Timestamptz(3)
+  uploadSubmissionId String? @db.VarChar(64)
   createdAt         DateTime @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime @updatedAt @db.Timestamptz(3)
 
@@ -871,6 +885,7 @@ model CycleCountAuditLocation {
 
   @@unique([auditId, storageBin])
   @@unique([auditId, sequenceNo])
+  @@index([auditId, uploadedAt])
 }
 
 model CycleCountAuditMaterial {
@@ -879,6 +894,15 @@ model CycleCountAuditMaterial {
   auditId         Int
   materialCode    String   @db.VarChar(100)
   expectedQty     Int
+  actualQty       Int?
+  lineStatus      String? @db.VarChar(20)
+  isUnexpected    Boolean @default(false)
+  lastScannedAt   DateTime? @db.Timestamptz(3)
+  reconDecision   String? @db.VarChar(40)
+  reconSapAction  String @default("NONE") @db.VarChar(40)
+  reconRemarks    String? @db.Text
+  resolvedAt      DateTime? @db.Timestamptz(3)
+  resolvedByName  String? @db.VarChar(255)
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 

@@ -1,0 +1,438 @@
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
+import * as ExcelJS from 'exceljs';
+import { PrismaService } from '../../../prisma.service';
+import { SftpService } from '../../sftp/sftp.service';
+import {
+  buildAuditFilePath,
+  isInsideAuditBaseDir,
+} from '../shared/audit-report-paths';
+import { AUDIT_STATUS } from '../shared/audit.constants';
+import { reconDecisionLabel, reconSapActionLabel } from '../shared/reconciliation-options';
+import {
+  CYCLE_COUNT_AUDIT_LINE_STATUS,
+  CYCLE_COUNT_AUDIT_REPORT,
+  cycleCountAuditReportFileName,
+} from './cycle-count-mobile.constants';
+
+const LINE_STATUS_LABEL: Record<string, string> = {
+  [CYCLE_COUNT_AUDIT_LINE_STATUS.VALID]: 'Valid',
+  [CYCLE_COUNT_AUDIT_LINE_STATUS.MISMATCH]: 'Mismatch',
+  [CYCLE_COUNT_AUDIT_LINE_STATUS.MISSING]: 'Missing',
+  [CYCLE_COUNT_AUDIT_LINE_STATUS.UNEXPECTED]: 'Unexpected',
+};
+
+const LINE_STATUS_STYLE: Record<string, { fill: string; font: string }> = {
+  [CYCLE_COUNT_AUDIT_LINE_STATUS.VALID]: { fill: 'FFC6EFCE', font: 'FF006100' },
+  [CYCLE_COUNT_AUDIT_LINE_STATUS.MISMATCH]: { fill: 'FFFFEB9C', font: 'FF9C5700' },
+  [CYCLE_COUNT_AUDIT_LINE_STATUS.MISSING]: { fill: 'FFFFC7CE', font: 'FF9C0006' },
+  [CYCLE_COUNT_AUDIT_LINE_STATUS.UNEXPECTED]: { fill: 'FFE4DFEC', font: 'FF5B2C83' },
+};
+
+const REPORT_AUDIT_SELECT = {
+  id: true,
+  auditNo: true,
+  auditName: true,
+  status: true,
+  fileName: true,
+  operatorName: true,
+  createdByName: true,
+  createdAt: true,
+  downloadedAt: true,
+  startedAt: true,
+  completedAt: true,
+  submittedAt: true,
+  closedAt: true,
+  closedByName: true,
+  locations: {
+    orderBy: { sequenceNo: 'asc' as const },
+    select: {
+      sequenceNo: true,
+      storageBin: true,
+      expectedMaterials: true,
+      verifiedAt: true,
+      materials: {
+        orderBy: [{ isUnexpected: 'asc' as const }, { id: 'asc' as const }],
+        select: {
+          materialCode: true,
+          expectedQty: true,
+          actualQty: true,
+          lineStatus: true,
+          isUnexpected: true,
+          lastScannedAt: true,
+          reconDecision: true,
+          reconSapAction: true,
+          reconRemarks: true,
+          resolvedAt: true,
+          resolvedByName: true,
+        },
+      },
+    },
+  },
+};
+
+export type CycleCountAuditReportFile = { fileName: string; buffer: Buffer };
+
+@Injectable()
+export class CycleCountAuditReportService {
+  private readonly logger = new Logger(CycleCountAuditReportService.name);
+
+  private readonly inFlight = new Set<number>();
+  private retryRunning = false;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sftp: SftpService,
+  ) {}
+
+  generateInBackground(auditId: number): void {
+    void this.generateAndUpload(auditId);
+  }
+
+  async generateAndUpload(auditId: number): Promise<boolean> {
+    if (this.inFlight.has(auditId)) return false;
+    this.inFlight.add(auditId);
+    let auditNo = `#${auditId}`;
+    try {
+      const report = await this.buildReport(auditId);
+      auditNo = report.auditNo;
+      const remotePath = buildAuditFilePath('CYCLE_COUNT', report.auditNo, report.fileName);
+
+      await this.sftp.put(report.buffer, remotePath);
+
+      await this.prisma.cycleCountAudit.update({
+        where: { id: auditId },
+        data: { reportPath: remotePath, reportGeneratedAt: new Date(), reportError: null },
+      });
+      this.logger.log(`Cycle Count audit ${report.auditNo}: report saved to SFTP ${remotePath}`);
+      return true;
+    } catch (err) {
+      const message = (err instanceof Error ? err.message : String(err)) || 'Unknown error';
+      this.logger.warn(`Cycle Count audit ${auditNo}: report upload failed (will retry) - ${message}`);
+      await this.prisma.cycleCountAudit
+        .update({
+          where: { id: auditId },
+          data: {
+            reportError: message.slice(0, CYCLE_COUNT_AUDIT_REPORT.maxErrorLength),
+            reportAttempts: { increment: 1 },
+          },
+        })
+        .catch((dbErr) =>
+          this.logger.error(`Cycle Count audit ${auditNo}: could not save the report error - ${dbErr?.message ?? dbErr}`),
+        );
+      return false;
+    } finally {
+      this.inFlight.delete(auditId);
+    }
+  }
+
+  @Interval(CYCLE_COUNT_AUDIT_REPORT.retryIntervalMs)
+  async retryPendingReports(): Promise<void> {
+    if (this.retryRunning) return;
+    this.retryRunning = true;
+    try {
+      const pending = await this.prisma.cycleCountAudit.findMany({
+        where: {
+          submittedAt: { not: null },
+          reportPath: null,
+          reportAttempts: { lt: CYCLE_COUNT_AUDIT_REPORT.maxAttempts },
+        },
+        orderBy: { submittedAt: 'asc' },
+        take: CYCLE_COUNT_AUDIT_REPORT.retryBatchSize,
+        select: { id: true },
+      });
+      for (const { id } of pending) {
+        await this.generateAndUpload(id);
+      }
+    } catch (err) {
+      this.logger.error(`Cycle Count audit report retry failed: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      this.retryRunning = false;
+    }
+  }
+
+  async getReportForDownload(auditId: number): Promise<CycleCountAuditReportFile> {
+    const audit = await this.prisma.cycleCountAudit.findUnique({
+      where: { id: auditId },
+      select: { id: true, auditNo: true, status: true, submittedAt: true, reportPath: true },
+    });
+    if (!audit) {
+      throw new NotFoundException({ code: 'CYCLE_COUNT_AUDIT_NOT_FOUND', message: 'Cycle Count audit not found.' });
+    }
+    if (!audit.submittedAt) {
+      throw new ConflictException({
+        code: 'CYCLE_COUNT_REPORT_NOT_READY',
+        message: 'The report is available after the operator submits the audit from the handheld.',
+      });
+    }
+
+    const fileName = cycleCountAuditReportFileName(audit.auditNo);
+
+    if (audit.status === AUDIT_STATUS.RECONCILIATION_PENDING) {
+      const live = await this.buildReport(auditId);
+      return { fileName: live.fileName, buffer: live.buffer };
+    }
+
+    if (audit.reportPath && isInsideAuditBaseDir('CYCLE_COUNT', audit.reportPath)) {
+      try {
+        const data = await this.sftp.getStream(audit.reportPath);
+        if (Buffer.isBuffer(data)) {
+
+          const savedWorkbook = new ExcelJS.Workbook();
+          await savedWorkbook.xlsx.load(data as unknown as Parameters<typeof savedWorkbook.xlsx.load>[0]);
+          if (savedWorkbook.worksheets.length === 1) {
+            return { fileName, buffer: data };
+          }
+
+          const updatedReport = await this.buildReport(auditId);
+          this.generateInBackground(auditId);
+          return { fileName: updatedReport.fileName, buffer: updatedReport.buffer };
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Cycle Count audit ${audit.auditNo}: saved report could not be read from SFTP, building it again - ${
+            err instanceof Error ? err.message : err
+          }`,
+        );
+      }
+    }
+
+    const report = await this.buildReport(auditId);
+    this.generateInBackground(auditId);
+    return { fileName: report.fileName, buffer: report.buffer };
+  }
+
+  async buildReport(auditId: number): Promise<CycleCountAuditReportFile & { auditNo: string }> {
+    const audit = await this.prisma.cycleCountAudit.findUnique({
+      where: { id: auditId },
+      select: REPORT_AUDIT_SELECT,
+    });
+    if (!audit) {
+      throw new NotFoundException({ code: 'CYCLE_COUNT_AUDIT_NOT_FOUND', message: 'Cycle Count audit not found.' });
+    }
+
+    const perLocation = audit.locations.map((location) => {
+      const c = { valid: 0, mismatch: 0, missing: 0, unexpected: 0 };
+      for (const m of location.materials) {
+        if (m.lineStatus === CYCLE_COUNT_AUDIT_LINE_STATUS.VALID) c.valid += 1;
+        else if (m.lineStatus === CYCLE_COUNT_AUDIT_LINE_STATUS.MISMATCH) c.mismatch += 1;
+        else if (m.lineStatus === CYCLE_COUNT_AUDIT_LINE_STATUS.MISSING) c.missing += 1;
+        else if (m.lineStatus === CYCLE_COUNT_AUDIT_LINE_STATUS.UNEXPECTED) c.unexpected += 1;
+      }
+      return { location, ...c };
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'DIMS';
+    workbook.created = new Date();
+
+    const thin = { style: 'thin' as const, color: { argb: 'FFBFBFBF' } };
+    const box = { top: thin, left: thin, bottom: thin, right: thin };
+    const headerFill = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFD966' } };
+    const labelFill = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFF2F2F2' } };
+
+    const sheet = workbook.addWorksheet(CYCLE_COUNT_AUDIT_REPORT.sheetName);
+    const columns = [
+      { header: 'S/No', width: 7 },
+      { header: 'Storage Bin', width: 16 },
+      { header: 'Material Code', width: 24 },
+      { header: 'Expected Qty', width: 13 },
+      { header: 'Scanned Qty', width: 13 },
+      { header: 'Difference', width: 12 },
+      { header: 'Status', width: 13 },
+      { header: 'Last Scanned', width: 21 },
+      { header: 'Location Completed', width: 21 },
+      { header: 'Decision', width: 24 },
+      { header: 'SAP Action', width: 22 },
+      { header: 'Remarks', width: 36 },
+      { header: 'Resolved By', width: 18 },
+      { header: 'Resolved On', width: 21 },
+    ];
+    columns.forEach((c, i) => (sheet.getColumn(i + 1).width = c.width));
+
+    sheet.mergeCells(1, 1, 1, columns.length);
+    sheet.getCell('A1').value = 'Cycle Count Audit Report';
+    sheet.getCell('A1').font = { bold: true, size: 14 };
+    sheet.getRow(1).height = 22;
+
+    const details: [string, string, string, string][] = [
+      ['Audit No', audit.auditNo, 'Audit Name', audit.auditName],
+      ['Operator', audit.operatorName, 'Status', this.titleCase(audit.status)],
+      ['Created By', audit.createdByName, 'Created On', this.formatTime(audit.createdAt)],
+      ['Uploaded File', audit.fileName, 'Report Generated', this.formatTime(new Date())],
+      ['Downloaded On', this.formatTime(audit.downloadedAt), 'Started On', this.formatTime(audit.startedAt)],
+      ['Completed On', this.formatTime(audit.completedAt), 'Submitted On', this.formatTime(audit.submittedAt)],
+      ['Closed By', audit.closedByName ?? '-', 'Closed On', this.formatTime(audit.closedAt)],
+    ];
+    let rowNo = 3;
+    for (const [l1, v1, l2, v2] of details) {
+      sheet.mergeCells(`A${rowNo}:B${rowNo}`);
+      sheet.mergeCells(`C${rowNo}:E${rowNo}`);
+      sheet.mergeCells(`F${rowNo}:G${rowNo}`);
+      sheet.mergeCells(`H${rowNo}:I${rowNo}`);
+      for (const [cell, value, isLabel] of [
+        [`A${rowNo}`, l1, true],
+        [`C${rowNo}`, v1, false],
+        [`F${rowNo}`, l2, true],
+        [`H${rowNo}`, v2, false],
+      ] as [string, string, boolean][]) {
+        const c = sheet.getCell(cell);
+        c.value = value;
+        c.border = box;
+        if (isLabel) {
+          c.font = { bold: true };
+          c.fill = labelFill;
+        }
+      }
+      rowNo += 1;
+    }
+
+    rowNo += 1;
+    sheet.mergeCells(rowNo, 1, rowNo, columns.length);
+    const locationTitle = sheet.getCell(rowNo, 1);
+    locationTitle.value = 'Location-wise Summary';
+    locationTitle.font = { bold: true, size: 12 };
+
+    rowNo += 1;
+    const locationHeaders = [
+      'Seq',
+      'Storage Bin',
+      'Expected Materials',
+      'Valid',
+      'Mismatch',
+      'Missing',
+      'Unexpected',
+      'Completed On',
+    ];
+    locationHeaders.forEach((label, index) => {
+      const cell = sheet.getCell(rowNo, index + 2); // B:I, as in the approved sample
+      cell.value = label;
+      cell.font = { bold: true };
+      cell.fill = headerFill;
+      cell.border = box;
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    });
+    sheet.getRow(rowNo).height = 30;
+
+    perLocation.forEach((p, index) => {
+      const row = sheet.getRow(rowNo + index + 1);
+      const values = [
+        p.location.sequenceNo,
+        p.location.storageBin,
+        p.location.expectedMaterials,
+        p.valid,
+        p.mismatch,
+        p.missing,
+        p.unexpected,
+        this.formatTime(p.location.verifiedAt),
+      ];
+      values.forEach((value, columnIndex) => {
+        const cell = row.getCell(columnIndex + 2);
+        cell.value = value;
+        cell.border = box;
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: columnIndex === 1 || columnIndex === 7 ? 'left' : 'center',
+        };
+      });
+    });
+    rowNo += perLocation.length + 2;
+
+    const headerRowNo = rowNo;
+    const header = sheet.getRow(headerRowNo);
+    columns.forEach((c, i) => {
+      const cell = header.getCell(i + 1);
+      cell.value = c.header;
+      cell.font = { bold: true };
+      cell.fill = headerFill;
+      cell.border = box;
+      cell.alignment = { vertical: 'middle', horizontal: i >= 3 && i <= 5 ? 'right' : 'left' };
+    });
+    header.height = 20;
+
+    let serialNo = 0;
+    for (const location of audit.locations) {
+      const completed = this.formatTime(location.verifiedAt);
+      for (const m of location.materials) {
+        serialNo += 1;
+        const scanned = m.actualQty ?? 0;
+        const row = sheet.getRow(headerRowNo + serialNo);
+        row.values = [
+          serialNo,
+          location.storageBin,
+          m.materialCode,
+          m.expectedQty,
+          m.actualQty ?? null,
+          m.lineStatus ? scanned - m.expectedQty : null,
+          m.lineStatus ? (LINE_STATUS_LABEL[m.lineStatus] ?? m.lineStatus) : '-',
+          this.formatTime(m.lastScannedAt),
+          completed,
+          reconDecisionLabel(m.reconDecision),
+          m.resolvedAt ? reconSapActionLabel(m.reconSapAction) : '',
+          m.reconRemarks ?? '',
+          m.resolvedByName ?? '',
+          m.resolvedAt ? this.formatTime(m.resolvedAt) : '',
+        ];
+        row.getCell(3).numFmt = '@';
+        row.getCell(12).alignment = { wrapText: true, vertical: 'top' };
+        row.eachCell({ includeEmpty: true }, (cell) => (cell.border = box));
+        if (m.lineStatus) this.applyStatusStyle(row.getCell(7), m.lineStatus);
+      }
+    }
+
+    sheet.views = [{ state: 'frozen', ySplit: headerRowNo }];
+    sheet.pageSetup = {
+      paperSize: 9,
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      printTitlesRow: `${headerRowNo}:${headerRowNo}`,
+    };
+    sheet.autoFilter = {
+      from: { row: headerRowNo, column: 1 },
+      to: { row: headerRowNo + Math.max(serialNo, 1), column: columns.length },
+    };
+
+    return {
+      auditNo: audit.auditNo,
+      fileName: cycleCountAuditReportFileName(audit.auditNo),
+      buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
+    };
+  }
+
+  private readonly timeFormat = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CYCLE_COUNT_AUDIT_REPORT.timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  private formatTime(value: Date | null | undefined): string {
+    return value ? this.timeFormat.format(value).replace(',', '') : '-';
+  }
+
+  private titleCase(value: string): string {
+    return value
+      .toLowerCase()
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+
+  private applyStatusStyle(cell: ExcelJS.Cell, status: string) {
+    const style = LINE_STATUS_STYLE[status];
+    if (!style) return;
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: style.fill } };
+    cell.font = { ...(cell.font ?? {}), bold: true, color: { argb: style.font } };
+  }
+}

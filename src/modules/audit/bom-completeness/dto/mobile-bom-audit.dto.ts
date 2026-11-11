@@ -19,7 +19,6 @@ import {
   BOM_AUDIT_CLIENT_SUBMISSION_ID_MAX,
   BOM_AUDIT_LINE_STATUS_VALUES,
   BOM_AUDIT_MAX_ACTUAL_QTY,
-  BOM_AUDIT_MAX_DATA_ROWS,
   BOM_AUDIT_MAX_LENGTH,
   BOM_AUDIT_MAX_SUBMIT_LINES,
 } from '../bom-audit.constants';
@@ -126,7 +125,6 @@ export class SubmitBomAuditDto {
       'Completed locations that are not uploaded yet. Uploaded locations are locked: sending one again is ignored. When no location is left pending, the audit becomes RECONCILIATION_PENDING.',
   })
   @IsArray({ message: 'locations must be a list' })
-  @ArrayMaxSize(BOM_AUDIT_MAX_DATA_ROWS)
   @ValidateNested({ each: true })
   @Type(() => SubmitBomLocationDto)
   locations!: SubmitBomLocationDto[];

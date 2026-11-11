@@ -31,7 +31,6 @@ import { BomAuditActor, BomAuditService } from './bom-audit.service';
 import { BomAuditReportService } from './bom-audit-report.service';
 import { CreateBomAuditDto, ReassignBomAuditDto } from './dto/create-bom-audit.dto';
 import { QueryBomAuditDto } from './dto/query-bom-audit.dto';
-import { BOM_AUDIT_MAX_FILE_BYTES } from './bom-audit.constants';
 
 @ApiTags('BOM Audit')
 @ApiBearerAuth()
@@ -46,7 +45,7 @@ export class BomAuditController {
   @Roles('ADMIN')
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: BOM_AUDIT_MAX_FILE_BYTES, files: 1 },
+      limits: { files: 1, fieldSize: Infinity },
     }),
   )
   @ApiOperation({
@@ -67,7 +66,7 @@ export class BomAuditController {
         file: {
           type: 'string',
           format: 'binary',
-          description: '.xlsx or .csv, max 10 MB. Columns: StorageBin, Material, Qty (or Avail), Operator (Operator ID, optional)',
+          description: '.xlsx or .csv; no application file-size or row-count limit. Columns: StorageBin, Material, Qty (or Avail), Operator (Operator ID, optional)',
         },
         auditName: {
           type: 'string',
@@ -92,7 +91,6 @@ export class BomAuditController {
     description:
       'No file / missing audit name / wrong file type / missing columns / invalid rows / invalid Operator IDs / storage bins without an operator (errors[] lists every problem with its Excel row)',
   })
-  @ApiResponse({ status: 413, description: 'File larger than 10 MB' })
   create(
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: CreateBomAuditDto,
@@ -106,7 +104,7 @@ export class BomAuditController {
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: BOM_AUDIT_MAX_FILE_BYTES, files: 1 },
+      limits: { files: 1, fieldSize: Infinity },
     }),
   )
   @ApiOperation({
@@ -124,7 +122,7 @@ export class BomAuditController {
         file: {
           type: 'string',
           format: 'binary',
-          description: '.xlsx or .csv, max 10 MB. Columns: StorageBin, Material, Qty (or Avail), Operator (Operator ID, optional)',
+          description: '.xlsx or .csv; no application file-size or row-count limit. Columns: StorageBin, Material, Qty (or Avail), Operator (Operator ID, optional)',
         },
       },
     },
@@ -134,7 +132,6 @@ export class BomAuditController {
     status: 400,
     description: 'No file / wrong file type / missing columns / invalid rows / invalid Operator IDs (errors[] lists every problem with its Excel row)',
   })
-  @ApiResponse({ status: 413, description: 'File larger than 10 MB' })
   preview(@UploadedFile() file: Express.Multer.File) {
     return this.bomAuditService.previewAudit(file);
   }

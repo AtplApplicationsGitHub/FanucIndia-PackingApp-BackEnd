@@ -1,3 +1,4 @@
+import { CycleCountReconciliationService } from '../cycle-count/cycle-count-reconciliation.service';
 import {
   BadRequestException,
   Injectable,
@@ -21,9 +22,10 @@ import { QueryReconciliationLinesDto } from './dto/query-reconciliation-lines.dt
 export class ReconciliationService {
   constructor(
     private readonly bomReconciliationService: BomReconciliationService,
+    private readonly cycleCountReconciliationService: CycleCountReconciliationService,
   ) {}
 
-  private getService(auditType: string): BomReconciliationService {
+  private getService(auditType: string) {
     if (!AUDIT_TYPE_VALUES.some((value) => value === auditType)) {
       throw new BadRequestException({
         code: RECON_ERROR.INVALID_AUDIT_TYPE,
@@ -33,6 +35,10 @@ export class ReconciliationService {
 
     if (auditType === AUDIT_TYPE.BOM_COMPLETENESS) {
       return this.bomReconciliationService;
+    }
+
+    if (auditType === AUDIT_TYPE.CYCLE_COUNT) {
+      return this.cycleCountReconciliationService;
     }
 
     throw new NotImplementedException({
