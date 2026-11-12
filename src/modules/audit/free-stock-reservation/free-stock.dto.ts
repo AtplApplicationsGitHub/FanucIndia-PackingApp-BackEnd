@@ -28,6 +28,18 @@ export class FreeStockPageDto {
 }
 
 export class FreeStockQueryDto extends FreeStockPageDto {
+  @ApiPropertyOptional({ description: 'Reservation owner Sales Zone ID. Omit for all zones.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  zoneId?: number;
+
+  @ApiPropertyOptional({ enum: ['ALL', '0_30', '31_90', 'OVER_90'], description: 'Reserved calendar days in IST: 0–30 inclusive, 31–90 inclusive, or over 90.' })
+  @IsOptional()
+  @IsIn(['ALL', '0_30', '31_90', 'OVER_90'])
+  reservedDays?: 'ALL' | '0_30' | '31_90' | 'OVER_90';
+
   @ApiPropertyOptional({ enum: ['ALL', 'OPEN', 'RESERVED', 'CLOSED'] })
   @IsOptional()
   @IsIn(['ALL', 'OPEN', 'RESERVED', 'CLOSED'])
@@ -41,12 +53,27 @@ export class FreeStockQueryDto extends FreeStockPageDto {
 }
 
 export class StockSnapshotDto {
+  @ApiProperty({ description: 'Token returned by the preview for this file.' })
+  @IsString()
+  @MaxLength(1000)
+  previewToken!: string;
+
+  @ApiPropertyOptional({ enum: ['true', 'false'], description: 'Explicit approval to skip invalid rows. Existing matching stock is preserved.' })
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  skipInvalidRows?: string;
+
   @ApiProperty({ enum: ['true'] })
   @Equals('true', { message: 'confirmFullSnapshot must be true: this file must contain the complete current SAP stock list.' })
   confirmFullSnapshot!: string;
 }
 
 export class FreeStockReservationLineDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(100)
+  storageBin!: string;
+
   @ApiProperty()
   @IsString()
   @MaxLength(100)
@@ -77,6 +104,20 @@ export class ReserveFreeStockDto {
   @ValidateNested({ each: true })
   @Type(() => FreeStockReservationLineDto)
   lines!: FreeStockReservationLineDto[];
+}
+
+export class ConfirmSelectedFreeStockDto extends ReserveFreeStockDto {
+  @ApiProperty({ description: 'Signed preview token for these selected rows and quantities.' })
+  @IsString()
+  @MaxLength(1000)
+  previewToken!: string;
+}
+
+export class ConfirmBulkFreeStockDto {
+  @ApiProperty({ description: 'Signed token returned by the bulk preview; valid for 15 minutes.' })
+  @IsString()
+  @MaxLength(1000)
+  previewToken!: string;
 }
 
 export class ReleaseFreeStockDto {

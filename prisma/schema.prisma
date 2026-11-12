@@ -764,6 +764,7 @@ model FreeStockUpload {
 model FreeStockItem {
   id                 Int             @id @default(autoincrement())
   storageType        String?         @db.VarChar(100)
+  /// Nullable for legacy data; all new stock imports and reservations require Storage Bin.
   storageBin         String?         @db.VarChar(100)
   materialCode       String          @db.VarChar(100)
   plant              String?         @db.VarChar(100)
@@ -789,6 +790,7 @@ model FreeStockItem {
   closedByUpload     FreeStockUpload? @relation("FreeStockClosedUpload", fields: [closedByUploadId], references: [id], onDelete: Restrict)
   reservations       FreeStockReservation[]
 
+  @@index([storageBin, materialCode, batch])
   @@index([materialCode, batch])
   @@index([status, id])
   @@index([lastSeenUploadId])
