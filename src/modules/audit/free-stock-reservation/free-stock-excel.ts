@@ -123,6 +123,16 @@ export function quantity(value: string, positive = false): string {
   return number.toFixed();
 }
 
+function wholeQuantity(value: string): string {
+  const raw = value.trim();
+
+  if (raw.includes('.')) {
+    throw new Error('Decimal values are not allowed. Enter a whole number.');
+  }
+
+  return quantity(raw);
+}
+
 function text(row: ExcelJS.Row, column: number, max: number): string | null {
   const value = cellToText(row.getCell(column).value);
   if (value.length > max)
@@ -311,21 +321,26 @@ export async function parseStockFile(
       storageType: capture('Type', 1, () => text(row, 1, 100), null),
       plant: capture('Plant', 4, () => text(row, 4, 100), null),
       storageLocation: capture('Location', 5, () => text(row, 5, 100), null),
-      availableQty: capture(
-        'Avail',
-        6,
-        () =>
-          text(row, 6, 100) === null
-            ? null
-            : quantity(cellToText(row.getCell(6).value)),
-        null,
-      ),
+
+      availableQty: (() => {
+        const raw = cellToText(row.getCell(6).value).trim();
+
+        if (!raw) return null;
+
+        try {
+          return quantity(raw);
+        } catch {
+          return null;
+        }
+      })(),
+
       stockQty: capture(
         'Stock',
         8,
-        () => quantity(cellToText(row.getCell(8).value)),
+        () => wholeQuantity(cellToText(row.getCell(8).value)),
         '0',
       ),
+
       certificateNo: capture(
         'Certificate No.',
         9,
