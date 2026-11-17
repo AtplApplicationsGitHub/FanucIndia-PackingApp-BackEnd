@@ -56,10 +56,16 @@ const REPORT_AUDIT_SELECT = {
       storageBin: true,
       expectedMaterials: true,
       verifiedAt: true,
+      skipReason: true,
+      skippedAt: true,
       materials: {
         orderBy: [{ isUnexpected: 'asc' as const }, { id: 'asc' as const }],
         select: {
           materialCode: true,
+          ydNumber: true,
+          batch: true,
+          soNumber: true,
+          operatorRemarks: true,
           expectedQty: true,
           actualQty: true,
           lineStatus: true,
@@ -253,6 +259,12 @@ export class BomAuditReportService {
       { header: 'Remarks', width: 36 },
       { header: 'Resolved By', width: 18 },
       { header: 'Resolved On', width: 21 },
+      { header: 'YD (Cert. No.)', width: 24 },
+      { header: 'Operator SO Reference', width: 24 },
+      { header: 'Operator Remarks', width: 45 },
+      { header: 'Skip Reason', width: 40 },
+      { header: 'Skipped On', width: 24 },
+      { header: 'Batch', width: 24 },
     ];
     columns.forEach((c, i) => (sheet.getColumn(i + 1).width = c.width));
 
@@ -379,8 +391,19 @@ export class BomAuditReportService {
           m.reconRemarks ?? '',
           m.resolvedByName ?? '',
           m.resolvedAt ? this.formatTime(m.resolvedAt) : '',
+          m.ydNumber ?? '',
+          m.soNumber ?? '',
+          m.operatorRemarks ?? '',
+          location.skipReason ?? '',
+          this.formatTime(location.skippedAt),
+          m.batch ?? '',
         ];
         row.getCell(3).numFmt = '@';
+        row.getCell(15).numFmt = '@';
+        row.getCell(16).numFmt = '@';
+        row.getCell(20).numFmt = '@';
+        row.getCell(17).alignment = { wrapText: true, vertical: 'top' };
+        row.getCell(18).alignment = { wrapText: true, vertical: 'top' };
         row.getCell(12).alignment = { wrapText: true, vertical: 'top' };
         row.eachCell({ includeEmpty: true }, (cell) => (cell.border = box));
         if (m.lineStatus) this.applyStatusStyle(row.getCell(7), m.lineStatus);

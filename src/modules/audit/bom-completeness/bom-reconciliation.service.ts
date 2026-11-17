@@ -101,6 +101,8 @@ export class BomReconciliationService {
           select: {
             storageBin: true,
             verifiedAt: true,
+            skipReason: true,
+            skippedAt: true,
             uploadedAt: true,
           },
         },
@@ -116,6 +118,8 @@ export class BomReconciliationService {
         storageBin: true,
         expectedMaterials: true,
         verifiedAt: true,
+        skipReason: true,
+        skippedAt: true,
         uploadedAt: true,
       },
       orderBy: {
@@ -235,6 +239,8 @@ export class BomReconciliationService {
         openVariances: openCount,
         resolvedVariances: locationVariances.length - openCount,
         completedAt: location.verifiedAt,
+        skipReason: location.skipReason,
+        skippedAt: location.skippedAt,
       };
     });
 
@@ -298,6 +304,11 @@ export class BomReconciliationService {
       filters.push({
         OR: [
           { materialCode: { contains: search, mode: 'insensitive' } },
+          { ydNumber: { contains: search, mode: 'insensitive' } },
+          { batch: { contains: search, mode: 'insensitive' } },
+          { soNumber: { contains: search, mode: 'insensitive' } },
+          { operatorRemarks: { contains: search, mode: 'insensitive' } },
+          { location: { skipReason: { contains: search, mode: 'insensitive' } } },
           { location: { storageBin: { contains: search, mode: 'insensitive' } } },
         ],
       });
@@ -351,7 +362,7 @@ export class BomReconciliationService {
         where,
         include: {
           location: {
-            select: { storageBin: true, verifiedAt: true, uploadedAt: true },
+            select: { storageBin: true, verifiedAt: true, uploadedAt: true, skipReason: true, skippedAt: true },
           },
         },
         orderBy: [
@@ -398,7 +409,7 @@ export class BomReconciliationService {
 
   private toLine(
     material: Prisma.BomAuditMaterialGetPayload<{
-      include: { location: { select: { storageBin: true; verifiedAt: true; uploadedAt: true } } };
+      include: { location: { select: { storageBin: true; verifiedAt: true; uploadedAt: true; skipReason: true; skippedAt: true } } };
     }>,
     partial: boolean,
   ) {
@@ -410,6 +421,13 @@ export class BomReconciliationService {
       id: material.id,
       storageBin: material.location.storageBin,
       materialCode: material.materialCode,
+      ydNumber: material.ydNumber,
+      certNo: material.ydNumber,
+      batch: material.batch,
+      soNumber: material.soNumber,
+      operatorRemarks: material.operatorRemarks,
+      skipReason: material.location.skipReason,
+      skippedAt: material.location.skippedAt,
       expectedQty: material.expectedQty,
       scannedQty: pending ? null : (material.actualQty ?? 0),
       pending,

@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { cellToText, normaliseHeader } from '../shared/audit-excel.util';
+import { STOCK_HEADERS, RESERVATION_HEADERS, type StockHeaders, type ReservationHeaders } from './free-stock-column-config.service';
 
 export type StockInput = {
   storageType: string | null;
@@ -21,12 +22,10 @@ export type StockInput = {
 };
 
 export type ReservationInput = {
-  storageBin: string;
   rowNo: number;
   materialCode: string;
-  batch: string;
   qty: string;
-  soNumber: string | null;
+  soNumber: string;
 };
 
 export type StockIdentity = {
@@ -49,14 +48,6 @@ export type StockFileResult = {
   issues: StockRowIssue[];
   skippedIdentities: StockIdentity[];
 };
-export function stockKey(
-  storageBin: string | null,
-  materialCode: string,
-  batch: string,
-): string {
-  return JSON.stringify([storageBin, materialCode, batch]);
-}
-
 /** Match invalid rows conservatively, including rows with an incomplete identity. */
 export function skippedStockMatcher(identities: StockIdentity[]) {
   const patterns = new Set<string>();
@@ -157,7 +148,7 @@ function excelDate(value: ExcelJS.CellValue, date1904: boolean): Date | null {
   const raw = cellToText(value);
   if (!raw) throw new Error('Date has no readable value.');
   const ymd = /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/.exec(raw);
-  const dmy = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(raw);
+  const dmy = /^(\d{1,2})[.,/-](\d{1,2})[.,/-](\d{4})$/.exec(raw);
   if (!ymd && !dmy)
     throw new Error('Date must be an Excel date or DD.MM.YYYY / YYYY-MM-DD.');
   const year = Number(ymd ? ymd[1] : dmy![3]);
@@ -203,6 +194,7 @@ function fail(
 
 export async function parseStockFile(
   filePath: string,
+  aliases: StockHeaders = STOCK_HEADERS,
 ): Promise<StockFileResult> {
   const book = await workbook(filePath);
   const sheet = book.worksheets.find(
@@ -213,55 +205,20 @@ export async function parseStockFile(
       'The stock workbook must contain a visible Sheet1.',
     );
   }
-  const expected = [
-    'typ',
-    'storagebin',
-    'material',
-    'plnt',
-    'location',
-    'avail',
-    'batch',
-    'stock',
-    'certno',
-    'grdate',
-    'grnumber',
-    'delivery',
-    'lastmvmt',
-    'lastchanger',
-  ];
-  let header = 0;
-  for (let row = 1; row <= Math.min(sheet.rowCount, 30); row++) {
-    if (
-      expected.every(
-        (value, i) =>
-          normaliseHeader(
-            cellToText(sheet.getRow(row).getCell(i + 1).value),
-          ) === value,
-      )
-    ) {
-      header = row;
-      break;
-    }
-  }
-  if (!header)
-    throw new BadRequestException(
-      'The stock file format is incorrect. Please check the file and upload it again.',
-    );
+  const found = locateHeaders(sheet, aliases);
+  if (!found) throw new BadRequestException('The stock file format is incorrect. Check the configured Excel headers and upload again.');
+  const { header, columns } = found;
   const records: {
     rowNo: number;
     raw: { storageBin: string; materialCode: string; batch: string };
     identity: StockIdentity;
-    key: string | null;
     item: StockInput;
     problems: { column: string; value: string; message: string }[];
   }[] = [];
-  const occurrences = new Map<string, number[]>();
   for (let rowNo = header + 1; rowNo <= sheet.rowCount; rowNo++) {
     const row = sheet.getRow(rowNo);
     if (
-      !Array.from({ length: 14 }, (_, i) =>
-        cellToText(row.getCell(i + 1).value),
-      ).some(Boolean)
+      !Object.values(columns).some((column) => cellToText(row.getCell(column).value))
     )
       continue;
     const problems: { column: string; value: string; message: string }[] = [];
@@ -283,47 +240,38 @@ export async function parseStockFile(
       }
     }
     const raw = {
-      storageBin: cellToText(row.getCell(2).value),
-      materialCode: cellToText(row.getCell(3).value),
-      batch: cellToText(row.getCell(7).value),
+      storageBin: cellToText(row.getCell(columns.storageBin).value),
+      materialCode: cellToText(row.getCell(columns.materialCode).value),
+      batch: cellToText(row.getCell(columns.batch).value),
     };
     const storageBin = capture(
       'Storage Bin',
-      2,
+      columns.storageBin,
       () => identifier(raw.storageBin, 'Storage Bin'),
       '',
     );
     const materialCode = capture(
       'Material',
-      3,
+      columns.materialCode,
       () => identifier(raw.materialCode, 'Material'),
       '',
     );
-    const batch = capture('Batch', 7, () => identifier(raw.batch, 'Batch'), '');
+    const batch = capture('Batch', columns.batch, () => identifier(raw.batch, 'Batch'), '');
     const identity: StockIdentity = {
       ...(storageBin ? { storageBin } : {}),
       ...(materialCode ? { materialCode } : {}),
       ...(batch ? { batch } : {}),
     };
-    const key =
-      storageBin && materialCode && batch
-        ? stockKey(storageBin, materialCode, batch)
-        : null;
-    if (key) {
-      const indices = occurrences.get(key);
-      if (indices) indices.push(records.length);
-      else occurrences.set(key, [records.length]);
-    }
     const item: StockInput = {
       storageBin,
       materialCode,
       batch,
-      storageType: capture('Type', 1, () => text(row, 1, 100), null),
-      plant: capture('Plant', 4, () => text(row, 4, 100), null),
-      storageLocation: capture('Location', 5, () => text(row, 5, 100), null),
+      storageType: capture('Type', columns.storageType, () => text(row, columns.storageType, 100), null),
+      plant: capture('Plant', columns.plant, () => text(row, columns.plant, 100), null),
+      storageLocation: capture('Location', columns.storageLocation, () => text(row, columns.storageLocation, 100), null),
 
       availableQty: (() => {
-        const raw = cellToText(row.getCell(6).value).trim();
+        const raw = cellToText(row.getCell(columns.availableQty).value).trim();
 
         if (!raw) return null;
 
@@ -336,52 +284,41 @@ export async function parseStockFile(
 
       stockQty: capture(
         'Stock',
-        8,
-        () => wholeQuantity(cellToText(row.getCell(8).value)),
+        columns.stockQty,
+        () => wholeQuantity(cellToText(row.getCell(columns.stockQty).value)),
         '0',
       ),
 
       certificateNo: capture(
         'Certificate No.',
-        9,
-        () => text(row, 9, 255),
+        columns.certificateNo,
+        () => text(row, columns.certificateNo, 255),
         null,
       ),
       grDate: capture(
         'GR Date',
-        10,
+        columns.grDate,
         () =>
-          excelDate(row.getCell(10).value, Boolean(book.properties.date1904)),
+          excelDate(row.getCell(columns.grDate).value, Boolean(book.properties.date1904)),
         null,
       ),
-      grNumber: capture('GR Number', 11, () => text(row, 11, 100), null),
-      delivery: capture('Delivery', 12, () => text(row, 12, 255), null),
+      grNumber: capture('GR Number', columns.grNumber, () => text(row, columns.grNumber, 100), null),
+      delivery: capture('Delivery', columns.delivery, () => text(row, columns.delivery, 255), null),
       lastMovementDate: capture(
         'Last Movement',
-        13,
+        columns.lastMovementDate,
         () =>
-          excelDate(row.getCell(13).value, Boolean(book.properties.date1904)),
+          excelDate(row.getCell(columns.lastMovementDate).value, Boolean(book.properties.date1904)),
         null,
       ),
-      lastChanger: capture('Last Changer', 14, () => text(row, 14, 255), null),
+      lastChanger: capture('Last Changer', columns.lastChanger, () => text(row, columns.lastChanger, 255), null),
     };
-    records.push({ rowNo, raw, identity, key, item, problems });
+    records.push({ rowNo, raw, identity, item, problems });
   }
   if (!records.length)
     throw new BadRequestException(
       'The stock file contains no stock rows. An empty file cannot close existing stock.',
     );
-  // Skip all conflicting copies rather than silently selecting a quantity from one row.
-  for (const indices of occurrences.values()) {
-    if (indices.length < 2) continue;
-    for (const index of indices)
-      records[index].problems.push({
-        column: 'Storage Bin + Material + Batch',
-        value: '',
-        message:
-          'This Storage Bin, Material and Batch combination appears more than once in the file. All copies will be skipped.',
-      });
-  }
   const invalid = records.filter((record) => record.problems.length);
   return {
     totalRows: records.length,
@@ -404,146 +341,66 @@ export async function parseStockFile(
   };
 }
 
+/** Duplicates are separate requests, processed in original file order. */
 export function normalizeReservationLines(
-  lines: {
-    storageBin: string;
-    materialCode: string;
-    batch: string;
-    qty: string;
-    soNumber?: string | null;
-    rowNo?: number;
-  }[],
+  lines: { materialCode: string; qty: string; soNumber?: string | null; rowNo?: number }[],
 ): ReservationInput[] {
-  if (!lines.length)
-    throw new BadRequestException('At least one reservation row is required.');
-  const keys = new Set<string>();
+  if (!lines.length) throw new BadRequestException('At least one reservation row is required.');
   const errors: { rowNo: number; message: string }[] = [];
   let totalErrors = 0;
   const result: ReservationInput[] = [];
   lines.forEach((line, index) => {
     const rowNo = line.rowNo ?? index + 1;
     try {
-      const storageBin = identifier(line.storageBin, 'Storage Bin');
-      const materialCode = identifier(line.materialCode, 'Material');
-      const batch = identifier(line.batch, 'Batch');
-      const key = stockKey(storageBin, materialCode, batch);
-      if (keys.has(key))
-        throw new Error(
-          'Duplicate Storage Bin + Material + Batch in the reservation request.',
-        );
-      const soNumber = line.soNumber?.trim() || null;
-      if (soNumber && soNumber.length > 100)
-        throw new Error('SO Number exceeds 100 characters.');
-      result.push({
-        rowNo,
-        storageBin,
-        materialCode,
-        batch,
-        qty: quantity(line.qty, true),
-        soNumber,
-      });
-      keys.add(key);
+      result.push({ rowNo, materialCode: identifier(line.materialCode, 'Material'), qty: quantity(line.qty, true),
+        soNumber: identifier(line.soNumber ?? '', 'SO Number') });
     } catch (error) {
       totalErrors++;
-      if (errors.length < 100)
-        errors.push({
-          rowNo,
-          message: error instanceof Error ? error.message : 'Invalid row.',
-        });
+      if (errors.length < 100) errors.push({ rowNo, message: error instanceof Error ? error.message : 'Invalid row.' });
     }
   });
   if (totalErrors) fail(errors, totalErrors);
   return result;
 }
 
-export async function parseReservationFile(
-  filePath: string,
-): Promise<ReservationInput[]> {
-  const book = await workbook(filePath);
-  let chosen: {
-    sheet: ExcelJS.Worksheet;
-    header: number;
-    bin: number;
-    material: number;
-    batch: number;
-    qty: number;
-    so: number | null;
-  } | null = null;
-  for (const sheet of book.worksheets.filter(
-    (s) => s.state !== 'hidden' && s.state !== 'veryHidden',
-  )) {
-    for (let header = 1; header <= Math.min(sheet.rowCount, 30); header++) {
-      const columns = new Map<string, number>();
-      sheet
-        .getRow(header)
-        .eachCell((cell, column) =>
-          columns.set(normaliseHeader(cellToText(cell.value)), column),
-        );
-      const bin =
-        columns.get('storagebin') ?? columns.get('bin') ?? columns.get('binno');
-      const material = columns.get('material') ?? columns.get('materialcode');
-      const batch = columns.get('batch');
-      const qty =
-        columns.get('reqqty') ?? columns.get('qty') ?? columns.get('quantity');
-      if (bin && material && batch && qty) {
-        chosen = {
-          sheet,
-          header,
-          bin,
-          material,
-          batch,
-          qty,
-          so:
-            columns.get('sonumber') ??
-            columns.get('so') ??
-            columns.get('sono') ??
-            null,
-        };
-        break;
-      }
+/** Header aliases are configurable; column positions and ordering are not hard-coded. */
+function locateHeaders<T extends string>(sheet: ExcelJS.Worksheet, aliases: Record<T, readonly string[]>) {
+  for (let header = 1; header <= Math.min(sheet.rowCount, 30); header++) {
+    const index = new Map<string, number>();
+    sheet.getRow(header).eachCell((cell, column) => {
+      const key = normaliseHeader(cellToText(cell.value));
+      if (key && !index.has(key)) index.set(key, column);
+    });
+    const columns = {} as Record<T, number>;
+    let complete = true;
+    for (const field of Object.keys(aliases) as T[]) {
+      const column = aliases[field].map((alias) => index.get(normaliseHeader(alias))).find((value) => value !== undefined);
+      if (column === undefined) { complete = false; break; }
+      columns[field] = column;
     }
-    if (chosen) break;
+    if (complete) {
+      if (new Set(Object.values(columns)).size !== Object.keys(aliases).length) throw new BadRequestException('Configured fields must use different Excel columns.');
+      return { header, columns };
+    }
   }
-  if (!chosen)
-    throw new BadRequestException(
-      'A sheet with Storage Bin, Material, Batch and Qty / Req Qty columns is required.',
-    );
-  const { sheet, header, bin, material, batch, qty, so } = chosen;
-  let defaultSo: string | null = null;
-  for (let i = 1; i < header; i++) {
-    sheet.getRow(i).eachCell((cell, column) => {
-      if (
-        ['requiredso', 'sonumber', 'sono', 'so'].includes(
-          normaliseHeader(cellToText(cell.value)),
-        )
-      ) {
-        defaultSo =
-          cellToText(sheet.getRow(i).getCell(column + 1).value) || null;
-      }
-    });
+  return null;
+}
+
+export async function parseReservationFile(filePath: string, aliases: ReservationHeaders = RESERVATION_HEADERS): Promise<ReservationInput[]> {
+  const book = await workbook(filePath);
+  for (const sheet of book.worksheets.filter((s) => s.state !== 'hidden' && s.state !== 'veryHidden')) {
+    const found = locateHeaders(sheet, aliases);
+    if (!found) continue;
+    const lines: { rowNo: number; materialCode: string; qty: string; soNumber: string }[] = [];
+    for (let rowNo = found.header + 1; rowNo <= sheet.rowCount; rowNo++) {
+      const row = sheet.getRow(rowNo);
+      const materialCode = cellToText(row.getCell(found.columns.materialCode).value);
+      const qty = cellToText(row.getCell(found.columns.qty).value);
+      const soNumber = cellToText(row.getCell(found.columns.soNumber).value);
+      if (!materialCode && !qty && !soNumber) continue;
+      lines.push({ rowNo, materialCode, qty, soNumber });
+    }
+    return normalizeReservationLines(lines);
   }
-  const lines: {
-    storageBin: string;
-    materialCode: string;
-    batch: string;
-    qty: string;
-    soNumber: string | null;
-    rowNo: number;
-  }[] = [];
-  for (let rowNo = header + 1; rowNo <= sheet.rowCount; rowNo++) {
-    const row = sheet.getRow(rowNo);
-    const values = [bin, material, batch, qty, ...(so ? [so] : [])].map(
-      (column) => cellToText(row.getCell(column).value),
-    );
-    if (!values.some(Boolean)) continue;
-    lines.push({
-      rowNo,
-      storageBin: values[0],
-      materialCode: values[1],
-      batch: values[2],
-      qty: values[3],
-      soNumber: (so ? cellToText(row.getCell(so).value) : '') || defaultSo,
-    });
-  }
-  return normalizeReservationLines(lines);
+  throw new BadRequestException('MATERIAL, QTY and SO NUMBER columns are required. Check the configured Excel headers.');
 }

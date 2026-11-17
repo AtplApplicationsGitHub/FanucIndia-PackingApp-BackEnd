@@ -18,7 +18,7 @@ import {
 
 type FieldKey = keyof typeof BOM_AUDIT_HEADER_ALIASES;
 
-const OPTIONAL_FIELDS: FieldKey[] = ['operatorId'];
+const OPTIONAL_FIELDS: FieldKey[] = ['operatorId', 'ydNumber', 'batch'];
 
 export interface BomAuditRowError {
   rowNo: number;
@@ -27,6 +27,8 @@ export interface BomAuditRowError {
 
 export interface ParsedBomAuditMaterial {
   materialCode: string;
+  ydNumber: string | null;
+  batch: string | null;
   expectedQty: number;
 }
 
@@ -96,7 +98,7 @@ function locateColumns(
 ): {
   headerRowNo: number;
   columns: Partial<Record<FieldKey, number>> &
-    Record<Exclude<FieldKey, 'operatorId'>, number>;
+    Record<Exclude<FieldKey, 'operatorId' | 'ydNumber' | 'batch'>, number>;
 } {
   let firstRow: ExcelJS.Row | undefined;
   let best:
@@ -152,7 +154,7 @@ function parseQty(raw: string): number | null {
   const text = raw.replace(/,/g, '');
   if (!/^\d+(\.0+)?$/.test(text)) return null;
   const qty = Number(text);
-  if (!Number.isSafeInteger(qty) || qty <= 0) return null;
+  if (!Number.isSafeInteger(qty) || qty <= 0 || qty > 2_147_483_647) return null;
   return qty;
 }
 
@@ -188,11 +190,11 @@ export async function parseBomAuditFile(
   const binFirstRow = new Map<string, number>();
   const operatorRows = new Map<number, number[]>();
 
-  const grouped = new Map<string, Map<string, number>>();
+  const grouped = new Map<string, ParsedBomAuditMaterial[]>();
   const rowErrors: BomAuditRowError[] = [];
   let totalRowErrors = 0;
   let totalRows = 0;
-  let mergedRows = 0;
+  const mergedRows = 0; // Rows are never merged, including identical material / certificate pairs.
 
   worksheet.eachRow({ includeEmpty: false }, (row, rowNo) => {
     if (rowNo <= headerRowNo) return;
@@ -209,6 +211,12 @@ export async function parseBomAuditFile(
       row.getCell(columns.storageBin).value,
     ).toUpperCase();
 
+    const ydNumber = columns.ydNumber === undefined
+      ? null
+      : cellToText(row.getCell(columns.ydNumber).value).toUpperCase() || null;
+    const batch = columns.batch === undefined
+      ? null
+      : cellToText(row.getCell(columns.batch).value) || null;
     const qtyText = cellToText(row.getCell(columns.qty).value);
     const operatorText =
       columns.operatorId === undefined
@@ -220,6 +228,12 @@ export async function parseBomAuditFile(
     totalRows += 1;
 
     const errors: string[] = [];
+    if (batch && batch.length > BOM_AUDIT_MAX_LENGTH.batch) {
+      errors.push(`Batch is longer than ${BOM_AUDIT_MAX_LENGTH.batch} characters`);
+    }
+    if (ydNumber && ydNumber.length > BOM_AUDIT_MAX_LENGTH.ydNumber) {
+      errors.push(`Cert. No. (YD) is longer than ${BOM_AUDIT_MAX_LENGTH.ydNumber} characters`);
+    }
     if (!materialCode) {
       errors.push(`${BOM_AUDIT_COLUMN_LABELS.materialCode} is missing`);
     } else if (materialCode.length > BOM_AUDIT_MAX_LENGTH.materialCode) {
@@ -276,14 +290,10 @@ export async function parseBomAuditFile(
     }
     if (!binFirstRow.has(storageBin)) binFirstRow.set(storageBin, rowNo);
 
-    let materials = grouped.get(storageBin);
-    if (!materials) {
-      materials = new Map<string, number>();
-      grouped.set(storageBin, materials);
-    }
-    const existingQty = materials.get(materialCode);
-    if (existingQty !== undefined) mergedRows += 1;
-    materials.set(materialCode, (existingQty ?? 0) + (qty as number));
+    const materials = grouped.get(storageBin) ?? [];
+    if (!grouped.has(storageBin)) grouped.set(storageBin, materials);
+    // A separate row ID will identify this exact Excel line through scanning and submission.
+    materials.push({ materialCode, ydNumber, batch, expectedQty: qty as number });
   });
 
   if (totalRowErrors > 0) {
@@ -310,9 +320,8 @@ export async function parseBomAuditFile(
     .sort(([a], [b]) => naturalCompare(a, b))
     .map(([storageBin, materials]) => ({
       storageBin,
-      materials: [...materials.entries()]
-        .sort(([a], [b]) => naturalCompare(a, b))
-        .map(([materialCode, expectedQty]) => ({ materialCode, expectedQty })),
+      materials: [...materials].sort((a, b) =>
+        naturalCompare(a.materialCode, b.materialCode) || naturalCompare(a.ydNumber ?? '', b.ydNumber ?? '')),
       operatorId: binOperator.get(storageBin)?.operatorId ?? null,
       firstRowNo: binFirstRow.get(storageBin) ?? 0,
     }));

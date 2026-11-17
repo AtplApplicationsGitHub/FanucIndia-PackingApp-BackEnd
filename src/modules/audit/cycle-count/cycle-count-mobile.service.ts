@@ -114,12 +114,17 @@ export class CycleCountAuditMobileService {
             storageBin: true,
             expectedMaterials: true,
             verifiedAt: true,
+            skipReason: true,
+            skippedAt: true,
             uploadedAt: true,
             materials: {
               orderBy: [{ isUnexpected: 'asc' }, { materialCode: 'asc' }],
               select: {
                 id: true,
                 materialCode: true,
+                ydNumber: true,
+                operatorRemarks: true,
+                soNumber: true,
                 expectedQty: true,
                 actualQty: true,
                 isUnexpected: true,
@@ -315,12 +320,14 @@ export class CycleCountAuditMobileService {
           await tx.$executeRaw`
             UPDATE "CycleCountAuditLocation" AS l
             SET "verifiedAt" = v."verifiedAt",
+                "skipReason" = v."skipReason",
+                "skippedAt" = v."skippedAt",
                 "uploadedAt" = ${uploadedAt}::timestamptz,
                 "uploadSubmissionId" = ${dto.clientSubmissionId}::varchar,
                 "updatedAt" = NOW()
             FROM (VALUES ${Prisma.join(
-              chunk.map((r) => Prisma.sql`(${r.id}::int, ${r.verifiedAt}::timestamptz)`),
-            )}) AS v("id", "verifiedAt")
+              chunk.map((r) => Prisma.sql`(${r.id}::int, ${r.verifiedAt}::timestamptz, ${r.skipReason}::varchar, ${r.skippedAt}::timestamptz)`),
+            )}) AS v("id", "verifiedAt", "skipReason", "skippedAt")
             WHERE l."id" = v."id" AND l."auditId" = ${id} AND l."uploadedAt" IS NULL`;
         }
 
@@ -427,7 +434,7 @@ export class CycleCountAuditMobileService {
         uploadedAt: true,
         materials: {
           where: { isUnexpected: false },
-          select: { id: true, materialCode: true, expectedQty: true },
+          select: { id: true, materialCode: true, ydNumber: true, expectedQty: true },
         },
       },
     });
@@ -457,12 +464,15 @@ export class CycleCountAuditMobileService {
 
     const materials: MaterialResult[] = [];
     const unexpected: Prisma.CycleCountAuditMaterialCreateManyInput[] = [];
-    const locations: { id: number; verifiedAt: Date }[] = [];
+    const locations: { id: number; verifiedAt: Date; skipReason: string | null; skippedAt: Date | null }[] = [];
     const counts: SubmitCounts = { valid: 0, mismatch: 0, missing: 0, unexpected: 0 };
 
     for (const loc of toUpload) {
       const dbLoc = locationsById.get(loc.locationId)!;
-      locations.push({ id: dbLoc.id, verifiedAt: this.toDate(loc.verifiedAt, 'verifiedAt') });
+      const skipReason = cleanText(loc.skipReason ?? '') || null;
+      const skippedAt = loc.skippedAt ? this.toDate(loc.skippedAt, 'skippedAt') : null;
+      if (Boolean(skipReason) !== Boolean(skippedAt)) addError(`${dbLoc.storageBin}: skipping requires both a reason and a time.`);
+      locations.push({ id: dbLoc.id, verifiedAt: this.toDate(loc.verifiedAt, 'verifiedAt'), skipReason, skippedAt });
 
       const expectedById = new Map(dbLoc.materials.map((m) => [m.id, m]));
       const expectedCodes = new Set(dbLoc.materials.map((m) => m.materialCode));
@@ -489,6 +499,15 @@ export class CycleCountAuditMobileService {
             continue;
           }
 
+          const submittedYd = cleanText(line.ydNumber ?? '').toUpperCase();
+          if (submittedYd !== (expected.ydNumber ?? '')) {
+            addError(`${dbLoc.storageBin}: certificate for material row ${expected.id} does not match. Use the updated handheld and select the correct YD.`);
+            continue;
+          }
+
+          if (skipReason && line.actualQty !== expected.expectedQty) {
+            addError(`${dbLoc.storageBin}: every expected row must equal its expected quantity when skipped.`);
+          }
           const lineStatus =
             line.actualQty === expected.expectedQty
               ? CYCLE_COUNT_AUDIT_LINE_STATUS.VALID
@@ -521,6 +540,9 @@ export class CycleCountAuditMobileService {
             auditId,
             auditLocationId: dbLoc.id,
             materialCode: code,
+            ydNumber: cleanText(line.ydNumber ?? '').toUpperCase() || null,
+            soNumber: cleanText(line.soNumber ?? '') || null,
+            operatorRemarks: cleanText(line.operatorRemarks ?? '') || 'Unexpected item found in this location.', 
             expectedQty: 0,
             actualQty: line.actualQty,
             lineStatus: CYCLE_COUNT_AUDIT_LINE_STATUS.UNEXPECTED,

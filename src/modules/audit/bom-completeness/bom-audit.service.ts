@@ -422,6 +422,8 @@ export class BomAuditService {
         auditLocationId,
         auditId: audit.id,
         materialCode: material.materialCode,
+        ydNumber: material.ydNumber,
+        batch: material.batch,
         expectedQty: material.expectedQty,
       }));
     });
@@ -555,7 +557,7 @@ export class BomAuditService {
             materials: {
               where: { isUnexpected: false },
               orderBy: { materialCode: 'asc' },
-              select: { id: true, materialCode: true, expectedQty: true },
+              select: { id: true, materialCode: true, ydNumber: true, batch: true, expectedQty: true },
             },
           },
         },

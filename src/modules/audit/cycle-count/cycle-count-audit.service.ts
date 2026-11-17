@@ -29,7 +29,7 @@ import {
 import { decodeUploadFileName } from '../shared/audit-excel.util';
 import { nextAuditNo } from '../shared/audit-number.util';
 import { AuditOperatorsService } from '../shared/audit-operators.service';
-import { BomAuditColumnConfigService } from '../bom-completeness/bom-audit-column-config.service';
+import { CycleCountColumnConfigService } from './cycle-count-column-config.service';
 import { AUDIT_NO_REGISTRY } from '../shared/audit.constants';
 import { cycleCountDateRange, parseCycleCountDate } from './cycle-count-date.util';
 import { CycleCountSourceService, CycleCountSelection } from './cycle-count-source.service';
@@ -90,7 +90,7 @@ export class CycleCountAuditService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly operators: AuditOperatorsService,
-    private readonly columnConfig: BomAuditColumnConfigService,
+    private readonly columnConfig: CycleCountColumnConfigService,
     private readonly source: CycleCountSourceService,
   ) {}
 
@@ -443,6 +443,8 @@ export class CycleCountAuditService {
         auditLocationId,
         auditId: audit.id,
         materialCode: material.materialCode,
+        ydNumber: material.ydNumber,
+        batch: material.batch,
         expectedQty: material.expectedQty,
       }));
     });
@@ -492,7 +494,7 @@ export class CycleCountAuditService {
     for (const location of locations) {
       for (const material of location.materials) {
         if (!Number.isSafeInteger(material.expectedQty) || material.expectedQty > 2_147_483_647) {
-          throw new BadRequestException({ code: 'INVALID_EXPECTED_QUANTITY', message: `Combined quantity for ${location.storageBin} / ${material.materialCode} exceeds the supported whole-number range.` });
+          throw new BadRequestException({ code: 'INVALID_EXPECTED_QUANTITY', message: `Quantity for ${location.storageBin} / ${material.materialCode} exceeds the supported whole-number range.` });
         }
       }
     }

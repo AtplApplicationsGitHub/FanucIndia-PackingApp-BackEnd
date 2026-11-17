@@ -59,6 +59,25 @@ export class SubmitCycleCountMaterialDto {
   })
   materialCode!: string;
 
+  @ApiPropertyOptional({ description: 'Cert. No. (YD) of the exact downloaded row', nullable: true, maxLength: 255 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  ydNumber?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, maxLength: 1000, description: 'Operator remarks for an unexpected item' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  operatorRemarks?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, maxLength: 100, description: 'SO reference of an unexpected item' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  soNumber?: string | null;
+
+
   @ApiProperty({ description: 'Scanned quantity', example: 2 })
   @IsInt({ message: 'actualQty must be a whole number' })
   @Min(0, { message: 'actualQty cannot be negative' })
@@ -104,6 +123,17 @@ export class SubmitCycleCountLocationDto {
     { message: 'verifiedAt must be an ISO-8601 date-time' },
   )
   verifiedAt!: string;
+
+  @ApiPropertyOptional({ nullable: true, maxLength: 1000, description: 'Mandatory reason when a bin is skipped' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  skipReason?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Time Skip All was confirmed' })
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  skippedAt?: string | null;
 
   @ApiProperty({ type: [SubmitCycleCountMaterialDto] })
   @IsArray({ message: 'materials must be a list' })

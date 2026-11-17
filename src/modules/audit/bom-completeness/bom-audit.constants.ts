@@ -32,6 +32,8 @@ export const BOM_AUDIT_HEADER_ALIASES = {
   ],
   storageBin: ['storage', 'storagebin', 'bin', 'binno', 'binnumber'],
   qty: ['stock'],
+  ydNumber: ['certno', 'certificateno', 'certificatenumber', 'yd', 'ydnumber'],
+  batch: ['batch', 'batchno', 'batchnumber'],
   operatorId: ['operator', 'operatorid'],
 } as const;
 
@@ -43,6 +45,8 @@ export const BOM_AUDIT_COLUMN_CONFIG_KEYS: Record<BomAuditHeaderField, string> =
   materialCode: 'BOM_AUDIT_COLUMN_MATERIAL',
   storageBin: 'BOM_AUDIT_COLUMN_STORAGE_BIN',
   qty: 'BOM_AUDIT_COLUMN_QTY',
+  ydNumber: 'BOM_AUDIT_COLUMN_YD',
+  batch: 'BOM_AUDIT_COLUMN_BATCH',
   operatorId: 'BOM_AUDIT_COLUMN_OPERATOR',
 };
 
@@ -50,10 +54,14 @@ export const BOM_AUDIT_COLUMN_LABELS = {
   materialCode: 'Material',
   storageBin: 'StorageBin',
   qty: 'Qty',
+  ydNumber: 'Cert. No. (YD)',
+  batch: 'Batch',
   operatorId: 'Operator',
 } as const;
 
 export const BOM_AUDIT_MAX_LENGTH = {
+  ydNumber: 255,
+  batch: 255,
   auditName: 255,
   fileName: 500,
   storageBin: 100,

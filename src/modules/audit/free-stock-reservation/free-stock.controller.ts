@@ -33,10 +33,18 @@ export class FreeStockController {
       + 'filterOptions.zones contains Sales Zone options independent of the selected filters. '
       + 'For SALES, myReservations contains count and stockQty for the logged-in user’s active RESERVED rows; '
       + 'it follows search/zone/age independently of status/mine and is null for ADMIN. '
-      + 'Use mine=true&status=RESERVED to list the My Reservations card’s rows.',
+      + 'For status=RESERVED or mine=true, data is grouped by SO Number: each group has soNumber, rowCount, stockQty, reservedQty and items. Pagination counts SO groups. '
+      + 'Other statuses retain the flat stock-row response. mine=true returns RESERVED rows only. '
+      + 'Allocation preview lines contain an allocations array: stockItemId, storageBin, batch, certificateNo, stockQty and allocatedQty. Partial/unavailable quantities remain in pendingQty.',
   })
   list(@Query() query: FreeStockQueryDto, @Req() req: AuthRequest) {
     return this.service.list(query, Number(req.user.userId));
+  }
+
+  @Get('archives')
+  @ApiOperation({ summary: 'Archived Closed stock rows, with paginated search; original detail/history URLs remain available' })
+  archives(@Query() query: FreeStockPageDto, @Req() req: AuthRequest) {
+    return this.service.archives(query, Number(req.user.userId));
   }
 
   @Get('stocks/:id')
@@ -92,7 +100,7 @@ export class FreeStockController {
   }
 
   @Get('reservations/template')
-  @ApiOperation({ summary: 'Download reservation Excel: Storage Bin, Material, Batch, Qty and optional SO Number' })
+  @ApiOperation({ summary: 'Download reservation Excel: MATERIAL, QTY, SO NUMBER (all mandatory; configurable headers)' })
   async template(@Req() req: AuthRequest) {
     const buffer = await this.service.template(Number(req.user.userId));
     return new StreamableFile(buffer, {
@@ -107,7 +115,7 @@ export class FreeStockController {
   @UseInterceptors(FreeStockUploadInterceptor)
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: FILE_BODY })
-  @ApiOperation({ summary: 'Validate every requested reservation row without reserving stock' })
+  @ApiOperation({ summary: 'Preview automatic material allocations without reserving stock' })
   previewReservation(@UploadedFile() file: Express.Multer.File | undefined, @Req() req: AuthRequest) {
     const uploaded = this.file(file);
     return this.service.reservationFile(uploaded.path, Number(req.user.userId), false, this.name(uploaded));
@@ -118,7 +126,7 @@ export class FreeStockController {
   @UseInterceptors(FreeStockUploadInterceptor)
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: FILE_BODY })
-  @ApiOperation({ summary: 'Reserve all Excel rows in the logged-in SALES name, or reject the whole request' })
+  @ApiOperation({ summary: 'Automatically allocate valid MATERIAL/QTY/SO NUMBER requests in file order; partial allocations are permitted' })
   uploadReservation(@UploadedFile() file: Express.Multer.File | undefined, @Req() req: AuthRequest) {
     const uploaded = this.file(file);
     return this.service.reservationFile(uploaded.path, Number(req.user.userId), true, this.name(uploaded));
@@ -126,7 +134,7 @@ export class FreeStockController {
 
   @Post('reservations')
   @Roles('SALES')
-  @ApiOperation({ summary: 'Reserve selected Storage Bin-Material-Batch rows atomically; owner and zone are obtained from login' })
+  @ApiOperation({ summary: 'Automatically allocate material requests by nearest stock quantity, lock chosen rows, and report full/partial/unavailable results' })
   reserve(@Body() dto: ReserveFreeStockDto, @Req() req: AuthRequest) {
     return this.service.reserve(dto, Number(req.user.userId));
   }
@@ -134,7 +142,7 @@ export class FreeStockController {
   @Post('reservations/selected/preview')
   @HttpCode(HttpStatus.OK)
   @Roles('SALES')
-  @ApiOperation({ summary: 'Preview selected rows without saving: full, partial and unavailable allocations by exact Storage Bin+Material+Batch' })
+  @ApiOperation({ summary: 'Preview selected rows without saving: full, partial and unavailable allocations by automatic material-only' })
   previewSelected(@Body() dto: ReserveFreeStockDto, @Req() req: AuthRequest) {
     return this.service.previewSelectedReservation(dto, Number(req.user.userId));
   }
@@ -152,7 +160,7 @@ export class FreeStockController {
   @UseInterceptors(FreeStockUploadInterceptor)
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: FILE_BODY })
-  @ApiOperation({ summary: 'Preview exact Storage Bin+Material+Batch allocations, including partial and unavailable rows; saves nothing' })
+  @ApiOperation({ summary: 'Preview automatic material-only allocations, including partial and unavailable rows; saves nothing' })
   previewBulk(@UploadedFile() file: Express.Multer.File | undefined, @Req() req: AuthRequest) {
     const uploaded = this.file(file);
     return this.service.previewBulkReservation(uploaded.path, Number(req.user.userId), this.name(uploaded));
@@ -166,7 +174,7 @@ export class FreeStockController {
     ...FILE_BODY, required: ['file', 'previewToken'],
     properties: { ...FILE_BODY.properties, previewToken: { type: 'string' } },
   } })
-  @ApiOperation({ summary: 'Confirm the signed bulk preview after checking availability again; reserves allocated quantities only' })
+  @ApiOperation({ summary: 'Confirm the signed bulk preview after checking availability again; reserves allocated quantities only, locking each chosen stock row entirely' })
   confirmBulk(@UploadedFile() file: Express.Multer.File | undefined, @Body() dto: ConfirmBulkFreeStockDto, @Req() req: AuthRequest) {
     const uploaded = this.file(file);
     return this.service.confirmBulkReservation(uploaded.path, dto.previewToken, Number(req.user.userId), this.name(uploaded));

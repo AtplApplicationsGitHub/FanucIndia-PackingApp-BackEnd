@@ -683,6 +683,8 @@ model BomAuditLocation {
   verifiedAt        DateTime? @db.Timestamptz(3)
   uploadedAt        DateTime? @db.Timestamptz(3)
   uploadSubmissionId String?  @db.VarChar(64)
+  skipReason String? @db.VarChar(1000)
+  skippedAt DateTime? @db.Timestamptz(3)
   createdAt         DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -698,6 +700,10 @@ model BomAuditMaterial {
   auditLocationId Int
   auditId         Int
   materialCode    String   @db.VarChar(100)
+  ydNumber        String?  @db.VarChar(255)
+  batch           String?  @db.VarChar(255)
+  operatorRemarks String? @db.VarChar(1000)
+  soNumber String? @db.VarChar(100)
   expectedQty     Int
   actualQty       Int?
   lineStatus      String?   @db.VarChar(20)
@@ -714,7 +720,7 @@ model BomAuditMaterial {
   location BomAuditLocation @relation(fields: [auditLocationId], references: [id], onDelete: Cascade)
   audit    BomAudit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
 
-  @@unique([auditLocationId, materialCode])
+  @@index([auditLocationId, materialCode])
   @@index([auditId])
 }
 
@@ -764,7 +770,7 @@ model FreeStockUpload {
 model FreeStockItem {
   id                 Int             @id @default(autoincrement())
   storageType        String?         @db.VarChar(100)
-  /// Nullable for legacy data; all new stock imports and reservations require Storage Bin.
+  /// Nullable for legacy data; new ADMIN stock imports require Storage Bin.
   storageBin         String?         @db.VarChar(100)
   materialCode       String          @db.VarChar(100)
   plant              String?         @db.VarChar(100)
@@ -795,6 +801,7 @@ model FreeStockItem {
   @@index([status, id])
   @@index([lastSeenUploadId])
   @@index([closedByUploadId])
+  @@index([storageBin, materialCode, batch, certificateNo])
 }
 
 model FreeStockReservation {
@@ -822,6 +829,7 @@ model FreeStockReservation {
   @@index([stockItemId, reservedAt])
   @@index([reservedById, releasedAt, closedAt])
   @@index([bulkReservationId])
+  @@index([soNumber])
 }
 
 
@@ -879,6 +887,8 @@ model CycleCountAuditLocation {
   verifiedAt        DateTime? @db.Timestamptz(3)
   uploadedAt        DateTime? @db.Timestamptz(3)
   uploadSubmissionId String? @db.VarChar(64)
+  skipReason String? @db.VarChar(1000)
+  skippedAt DateTime? @db.Timestamptz(3)
   createdAt         DateTime @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime @updatedAt @db.Timestamptz(3)
 
@@ -895,6 +905,10 @@ model CycleCountAuditMaterial {
   auditLocationId Int
   auditId         Int
   materialCode    String   @db.VarChar(100)
+  ydNumber        String?  @db.VarChar(255)
+  batch           String?  @db.VarChar(255)
+  operatorRemarks String? @db.VarChar(1000)
+  soNumber String? @db.VarChar(100)
   expectedQty     Int
   actualQty       Int?
   lineStatus      String? @db.VarChar(20)
@@ -911,6 +925,69 @@ model CycleCountAuditMaterial {
   location CycleCountAuditLocation @relation(fields: [auditLocationId], references: [id], onDelete: Cascade)
   audit    CycleCountAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
 
-  @@unique([auditLocationId, materialCode])
+  @@index([auditLocationId, materialCode])
   @@index([auditId])
+}
+
+
+model FreeStockItemArchive {
+  archivedAt DateTime @default(now()) @db.Timestamptz(3)
+  id                 Int             @id 
+  storageType        String?         @db.VarChar(100)
+  /// Nullable for legacy data; new ADMIN stock imports require Storage Bin.
+  storageBin         String?         @db.VarChar(100)
+  materialCode       String          @db.VarChar(100)
+  plant              String?         @db.VarChar(100)
+  storageLocation    String?         @db.VarChar(100)
+  availableQty       Decimal?        @db.Decimal(18, 3)
+  batch              String          @db.VarChar(100)
+  stockQty           Decimal         @db.Decimal(18, 3)
+  certificateNo      String?         @db.VarChar(255)
+  grDate             DateTime?       @db.Date
+  grNumber           String?         @db.VarChar(100)
+  delivery           String?         @db.VarChar(255)
+  lastMovementDate   DateTime?       @db.Date
+  lastChanger        String?         @db.VarChar(255)
+
+  status             FreeStockStatus @default(CLOSED)
+  lastSeenUploadId   Int
+  closedByUploadId   Int?
+  closedAt           DateTime?       @db.Timestamptz(3)
+  createdAt          DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime         @db.Timestamptz(3)
+
+  reservations FreeStockReservationArchive[]
+
+  @@index([storageBin, materialCode, batch])
+  @@index([materialCode, batch])
+  @@index([status, id])
+  @@index([lastSeenUploadId])
+  @@index([closedByUploadId])
+  @@index([closedAt])
+}
+
+model FreeStockReservationArchive {
+  archivedAt DateTime @default(now()) @db.Timestamptz(3)
+  id                 Int             @id 
+  bulkReservationId  String          @default(uuid()) @db.VarChar(36)
+  stockItemId        Int
+  reservedQty        Decimal         @db.Decimal(18, 3)
+  soNumber           String?         @db.VarChar(100)
+  reservedById       Int
+  reservedByName     String          @db.VarChar(255)
+  reservedZoneId     Int?
+  reservedZoneName   String          @db.VarChar(255)
+  reservedAt         DateTime        @default(now()) @db.Timestamptz(3)
+  sourceFileName     String?         @db.VarChar(500)
+
+  releasedAt         DateTime?       @db.Timestamptz(3)
+  releasedById       Int?
+  releasedByName     String?         @db.VarChar(255)
+  closedAt           DateTime?       @db.Timestamptz(3)
+
+  stockItem FreeStockItemArchive @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+
+  @@index([stockItemId, reservedAt])
+  @@index([reservedById, releasedAt, closedAt], map: "FreeStockReservationArchive_owner_state_idx")
+  @@index([bulkReservationId])
 }

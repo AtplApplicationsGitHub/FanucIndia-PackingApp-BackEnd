@@ -72,17 +72,7 @@ export class FreeStockReservationLineDto {
   @ApiProperty()
   @IsString()
   @MaxLength(100)
-  storageBin!: string;
-
-  @ApiProperty()
-  @IsString()
-  @MaxLength(100)
   materialCode!: string;
-
-  @ApiProperty()
-  @IsString()
-  @MaxLength(100)
-  batch!: string;
 
   @ApiProperty({ oneOf: [{ type: 'string' }, { type: 'number' }] })
   @Transform(({ value }: { value: unknown }) => typeof value === 'number' ? String(value) : value)
@@ -90,11 +80,10 @@ export class FreeStockReservationLineDto {
   @MaxLength(32)
   qty!: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ description: 'Required SO Number for this material request' })
   @IsString()
   @MaxLength(100)
-  soNumber?: string;
+  soNumber!: string;
 }
 
 export class ReserveFreeStockDto {
