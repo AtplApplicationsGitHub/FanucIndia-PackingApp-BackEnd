@@ -622,6 +622,99 @@ export class FreeStockService {
     };
   }
 
+  async exportSo(soNumber: string, userId: number): Promise<Buffer> {
+    const actor = await this.actor(userId);
+    const so = soNumber?.trim();
+    if (!so) throw new BadRequestException('SO Number is required.');
+
+    const reservations = await this.prisma.freeStockReservation.findMany({
+      where: {
+        soNumber: so,
+        releasedAt: null,
+        closedAt: null,
+        stockItem: { is: { status: 'RESERVED' } },
+        ...(actor.role === 'SALES' ? { reservedById: actor.id } : {}),
+      },
+      select: { stockItemId: true },
+    });
+    const ids = [...new Set(reservations.map((r) => r.stockItemId))];
+    if (!ids.length)
+      throw new NotFoundException('No active rows found for this SO Number.');
+
+    const items = await this.prisma.freeStockItem.findMany({
+      where: { id: { in: ids } },
+      include: STOCK_INCLUDE,
+      orderBy: { id: 'asc' },
+    });
+    const rows = items
+      .map((i) => this.display(i, actor))
+      .filter(
+        (r) =>
+          r.soNumber === so &&
+          (actor.role === 'ADMIN' || r.reservedById === actor.id),
+      );
+
+    const ist = (d: Date | null) =>
+      d
+        ? new Date(d.getTime() + 19800000)
+            .toISOString()
+            .replace('T', ' ')
+            .slice(0, 16)
+        : '';
+    const num = (v: string | null) =>
+      v === null || v === undefined ? '' : Number(v);
+
+    const book = new ExcelJS.Workbook();
+    const sheet = book.addWorksheet('Free Stock');
+    sheet.columns = [
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Typ', key: 'storageType', width: 8 },
+      { header: 'Storage Bin', key: 'storageBin', width: 16 },
+      { header: 'Material', key: 'materialCode', width: 22 },
+      { header: 'Plant', key: 'plant', width: 8 },
+      { header: 'Location', key: 'storageLocation', width: 10 },
+      { header: 'Avail', key: 'availableQty', width: 10 },
+      { header: 'Batch', key: 'batch', width: 14 },
+      { header: 'Stock', key: 'stockQty', width: 10 },
+      { header: 'Cert. No.', key: 'certificateNo', width: 14 },
+      { header: 'GR Date', key: 'grDate', width: 12 },
+      { header: 'GR Number', key: 'grNumber', width: 14 },
+      { header: 'Delivery', key: 'delivery', width: 14 },
+      { header: 'Last Movement', key: 'lastMovementDate', width: 14 },
+      { header: 'Last Changer', key: 'lastChanger', width: 14 },
+      { header: 'Reservation', key: 'reservation', width: 12 },
+      { header: 'Reserved Qty', key: 'reservedQty', width: 12 },
+      { header: 'SO Number', key: 'soNumber', width: 16 },
+      { header: 'Reserved By', key: 'name', width: 18 },
+      { header: 'Zone', key: 'zone', width: 14 },
+      { header: 'Reserved Date', key: 'reservedDate', width: 18 },
+      { header: 'Reserved Days', key: 'reservedDays', width: 14 },
+      { header: 'Age from GR (Days)', key: 'ageFromGrDays', width: 18 },
+      { header: 'Shortage Qty', key: 'shortageQty', width: 12 },
+    ];
+    for (const r of rows) {
+      sheet.addRow({
+        ...r,
+        availableQty: num(r.availableQty),
+        stockQty: num(r.stockQty),
+        reservedQty: num(r.reservedQty),
+        shortageQty: num(r.shortageQty),
+        reservedDate: ist(r.reservedDate),
+      });
+    }
+    // keep codes as text so Excel doesn't drop leading zeros
+    for (const key of ['materialCode', 'batch', 'soNumber', 'storageBin'])
+      sheet.getColumn(key).numFmt = '@';
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFFCC00' },
+    };
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+    return Buffer.from(await book.xlsx.writeBuffer());
+  }
+
   async detail(id: number, userId: number) {
     const actor = await this.actor(userId);
     const item =
