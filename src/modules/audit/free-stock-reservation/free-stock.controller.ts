@@ -41,6 +41,23 @@ export class FreeStockController {
     return this.service.list(query, Number(req.user.userId));
   }
 
+@Get('distinct-so')
+@ApiOperation({
+  summary: 'Get distinct active reserved SO Numbers',
+  description:
+    'ADMIN sees all distinct SO Numbers. ' +
+    'SALES sees only SO Numbers reserved by the logged-in user. ' +
+    'Supports search and pagination.',
+})
+distinctSo(
+  @Query() query: FreeStockPageDto,
+  @Req() req: AuthRequest,
+) {
+  return this.service.distinctSo(
+    query,
+    Number(req.user.userId),
+  );
+}
   @Get('archives')
   @ApiOperation({ summary: 'Archived Closed stock rows, with paginated search; original detail/history URLs remain available' })
   archives(@Query() query: FreeStockPageDto, @Req() req: AuthRequest) {
