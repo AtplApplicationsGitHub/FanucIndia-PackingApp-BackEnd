@@ -1,4 +1,11 @@
-import { Controller, Get, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Header,
+  Req,
+  Res,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AppUpdateService } from './app-update.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -8,6 +15,31 @@ import { Public } from '../auth/public.decorator';
 @Controller('app-update')
 export class AppUpdateController {
   constructor(private readonly appUpdateService: AppUpdateService) {}
+
+  @Public()
+  @Get('mobile-api-url')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Get the public API base URL for mobile app setup' })
+  getMobileApiUrl(): { apiUrl: string } {
+    const apiUrl = process.env.API_SETTINGS?.trim();
+
+    if (!apiUrl || !/^https?:\/\//i.test(apiUrl) || /[\s?#]/.test(apiUrl)) {
+      throw new ServiceUnavailableException('Mobile API URL is unavailable.');
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(apiUrl);
+    } catch {
+      throw new ServiceUnavailableException('Mobile API URL is unavailable.');
+    }
+
+    if (parsedUrl.username || parsedUrl.password) {
+      throw new ServiceUnavailableException('Mobile API URL is unavailable.');
+    }
+
+    return { apiUrl };
+  }
 
   @Public()
   @Get('pick-pack/latest-version')
