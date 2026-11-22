@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
-  ArrayMinSize, ArrayUnique, Equals, IsArray, IsBoolean, IsIn,
+  ArrayMaxSize, ArrayMinSize, ArrayUnique, Equals, IsArray, IsBoolean, IsIn,
   IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -25,6 +25,20 @@ export class FreeStockPageDto {
   @MaxLength(255)
   search?: string;
 
+}
+
+export class FreeStockPreviewActivityQueryDto {
+  @ApiProperty({ type: String, description: 'Comma-separated stock row IDs (up to 200).' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.split(',').map(Number) : undefined,
+  )
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(200)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(2147483647, { each: true })
+  stockItemIds!: number[];
 }
 
 export class FreeStockQueryDto extends FreeStockPageDto {

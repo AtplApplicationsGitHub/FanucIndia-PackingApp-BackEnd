@@ -2,11 +2,13 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
@@ -29,11 +31,13 @@ import {
   ConfirmBulkFreeStockDto,
   ConfirmSelectedFreeStockDto,
   FreeStockPageDto,
+  FreeStockPreviewActivityQueryDto,
   FreeStockQueryDto,
   ReleaseFreeStockDto,
   ReserveFreeStockDto,
   StockSnapshotDto,
 } from './free-stock.dto';
+import { FreeStockPreviewActivityService } from './free-stock-preview-activity.service';
 import { FreeStockService } from './free-stock.service';
 import { FreeStockUploadInterceptor } from './free-stock-upload.interceptor';
 
@@ -48,7 +52,35 @@ const FILE_BODY = {
 @Roles('ADMIN', 'SALES')
 @Controller('free-stock')
 export class FreeStockController {
-  constructor(private readonly service: FreeStockService) {}
+  constructor(
+    private readonly service: FreeStockService,
+    private readonly previewActivity: FreeStockPreviewActivityService,
+  ) {}
+
+  @Get('reservation-preview-activity')
+  @Roles('SALES')
+  @ApiOperation({ summary: 'List visible stock rows being previewed by another Sales user' })
+  async listPreviewActivity(
+    @Query() query: FreeStockPreviewActivityQueryDto,
+    @Req() req: AuthRequest,
+  ) {
+    const stockItemIds = await this.previewActivity.list(
+      query.stockItemIds,
+      Number(req.user.userId),
+    );
+    return { stockItemIds };
+  }
+
+  @Delete('reservation-preview-activity/:previewId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles('SALES')
+  @ApiOperation({ summary: 'Clear the current Sales user’s preview indicator' })
+  async cancelPreviewActivity(
+    @Param('previewId', new ParseUUIDPipe({ version: '4' })) previewId: string,
+    @Req() req: AuthRequest,
+  ): Promise<void> {
+    await this.previewActivity.cancel(previewId, Number(req.user.userId));
+  }
 
   @Get('stocks')
   @ApiOperation({

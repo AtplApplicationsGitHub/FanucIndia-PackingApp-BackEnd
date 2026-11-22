@@ -27,6 +27,8 @@ import { FreeStockColumnConfigService } from './free-stock-column-config.service
 import { planStockSnapshot } from './free-stock-snapshot';
 import { allocateClosestStock } from './free-stock-allocation';
 
+import { FreeStockPreviewActivityService } from './free-stock-preview-activity.service';
+
 const STOCK_INCLUDE = {
   reservations: {
     where: { releasedAt: null },
@@ -47,6 +49,7 @@ export class FreeStockService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly columnConfig: FreeStockColumnConfigService,
+    private readonly previewActivity: FreeStockPreviewActivityService,
   ) {}
 
   private async actor(
@@ -946,17 +949,7 @@ export class FreeStockService {
       );
     if (commit)
       return this.confirmAllocation(actor, lines, null, sourceFileName);
-    return this.locked(async (tx) => {
-      const preview = await this.bulkAllocation(tx, lines);
-      return {
-        message: 'Review the proposed allocations. Nothing has been reserved.',
-        data: {
-          ...preview.data,
-          sourceFileName,
-          previewToken: this.signBulkPreview(actor.id, preview.fingerprint),
-        },
-      };
-    });
+    return this.previewAllocations(actor.id, lines, { sourceFileName });
   }
 
   async previewBulkReservation(
@@ -970,17 +963,7 @@ export class FreeStockService {
         'Your account must have a Sales Zone before reserving stock.',
       );
     const lines = await this.readReservations(path);
-    return this.locked(async (tx) => {
-      const preview = await this.bulkAllocation(tx, lines);
-      return {
-        message: 'Review the proposed allocations. Nothing has been reserved.',
-        data: {
-          ...preview.data,
-          sourceFileName,
-          previewToken: this.signBulkPreview(actor.id, preview.fingerprint),
-        },
-      };
-    });
+    return this.previewAllocations(actor.id, lines, { sourceFileName });
   }
 
   async previewSelectedReservation(dto: ReserveFreeStockDto, userId: number) {
@@ -990,16 +973,36 @@ export class FreeStockService {
         'Your account must have a Sales Zone before reserving stock.',
       );
     const lines = normalizeReservationLines(dto.lines);
-    return this.locked(async (tx) => {
-      const preview = await this.bulkAllocation(tx, lines);
-      return {
-        message: 'Review the proposed allocations. Nothing has been reserved.',
-        data: {
-          ...preview.data,
-          previewToken: this.signBulkPreview(actor.id, preview.fingerprint),
-        },
-      };
-    });
+    return this.previewAllocations(actor.id, lines);
+  }
+
+  private async previewAllocations(
+    userId: number,
+    lines: ReservationInput[],
+    options?: { sourceFileName: string | null },
+  ) {
+    const preview = await this.locked((tx) => this.bulkAllocation(tx, lines));
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const previewToken = this.signBulkPreview(
+      userId,
+      preview.fingerprint,
+      expiresAt,
+    );
+    // Track the advisory badge after the stock transaction has released its lock.
+    const previewActivityId = await this.previewActivity.record(
+      userId,
+      expiresAt,
+      preview.allocationLines.flatMap((line) => line.allocations),
+    );
+    return {
+      message: 'Review the proposed allocations. Nothing has been reserved.',
+      data: {
+        ...preview.data,
+        ...options,
+        previewToken,
+        ...(previewActivityId ? { previewActivityId } : {}),
+      },
+    };
   }
 
   async confirmSelectedReservation(
@@ -1036,6 +1039,7 @@ export class FreeStockService {
       .digest('hex');
     return {
       fingerprint,
+      allocationLines: allocation.lines,
       data: {
         ...allocation,
         lines: allocation.lines.map((line) => ({
@@ -1053,12 +1057,16 @@ export class FreeStockService {
     return secret;
   }
 
-  private signBulkPreview(actorId: number, fingerprint: string): string {
+  private signBulkPreview(
+    actorId: number,
+    fingerprint: string,
+    expiresAt: Date,
+  ): string {
     const payload = Buffer.from(
       JSON.stringify({
         actorId,
         fingerprint,
-        expiresAt: Date.now() + 15 * 60 * 1000,
+        expiresAt: expiresAt.getTime(),
       }),
     ).toString('base64url');
     const signature = createHmac('sha256', this.bulkPreviewKey())

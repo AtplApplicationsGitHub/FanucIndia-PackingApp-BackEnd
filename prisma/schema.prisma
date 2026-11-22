@@ -804,6 +804,18 @@ model FreeStockItem {
   @@index([storageBin, materialCode, batch, certificateNo])
 }
 
+model FreeStockReservationPreviewItem {
+  previewId        String   @db.Uuid
+  stockItemId      Int
+  salesUserId      Int
+  stockUpdatedAt   DateTime @db.Timestamptz(3)
+  expiresAt        DateTime @db.Timestamptz(3)
+
+  @@id([previewId, stockItemId], map: "FreeStockPreview_pkey")
+  @@index([stockItemId, stockUpdatedAt, expiresAt], map: "FreeStockPreview_stock_version_expiry_idx")
+  @@index([expiresAt], map: "FreeStockPreview_expiry_idx")
+}
+
 model FreeStockReservation {
   id                 Int             @id @default(autoincrement())
   bulkReservationId  String          @default(uuid()) @db.VarChar(36)
