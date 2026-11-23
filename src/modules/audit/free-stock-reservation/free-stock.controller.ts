@@ -59,16 +59,15 @@ export class FreeStockController {
 
   @Get('reservation-preview-activity')
   @Roles('SALES')
-  @ApiOperation({ summary: 'List visible stock rows being previewed by another Sales user' })
-  async listPreviewActivity(
+  @ApiOperation({ summary: 'Check preview activity and availability for visible open stock rows' })
+  listPreviewActivity(
     @Query() query: FreeStockPreviewActivityQueryDto,
     @Req() req: AuthRequest,
   ) {
-    const stockItemIds = await this.previewActivity.list(
+    return this.previewActivity.list(
       query.stockItemIds,
       Number(req.user.userId),
     );
-    return { stockItemIds };
   }
 
   @Delete('reservation-preview-activity/:previewId')

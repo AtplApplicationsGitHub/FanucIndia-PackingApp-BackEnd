@@ -48,22 +48,28 @@ export class FreeStockPreviewActivityService {
     }
   }
 
-  async list(stockItemIds: number[], salesUserId: number): Promise<number[]> {
-    const rows = await this.prisma.$queryRaw<{ id: number }[]>`
-      SELECT stock."id"
-      FROM "FreeStockItem" AS stock
-      WHERE stock."id" IN (${Prisma.join(stockItemIds)})
-        AND stock."status" = 'OPEN'
-        AND EXISTS (
+  async list(stockItemIds: number[], salesUserId: number) {
+    const rows = await this.prisma.$queryRaw<
+      { id: number; isOpen: boolean; isBeingPreviewed: boolean }[]
+    >`
+      SELECT stock."id",
+        stock."status" = 'OPEN' AS "isOpen",
+        CASE WHEN stock."status" = 'OPEN' THEN EXISTS (
           SELECT 1
           FROM "FreeStockReservationPreviewItem" AS preview
           WHERE preview."stockItemId" = stock."id"
             AND preview."stockUpdatedAt" = stock."updatedAt"
             AND preview."salesUserId" <> ${salesUserId}
             AND preview."expiresAt" > CURRENT_TIMESTAMP
-        )
+        ) ELSE FALSE END AS "isBeingPreviewed"
+      FROM "FreeStockItem" AS stock
+      WHERE stock."id" IN (${Prisma.join(stockItemIds)})
     `;
-    return rows.map(({ id }) => id);
+    const openIds = new Set(rows.filter((row) => row.isOpen).map((row) => row.id));
+    return {
+      stockItemIds: rows.filter((row) => row.isBeingPreviewed).map((row) => row.id),
+      staleStockItemIds: stockItemIds.filter((id) => !openIds.has(id)),
+    };
   }
 
   async cancel(previewId: string, salesUserId: number): Promise<void> {
