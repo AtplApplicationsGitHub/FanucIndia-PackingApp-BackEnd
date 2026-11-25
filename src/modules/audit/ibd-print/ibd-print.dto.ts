@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { IsArray, IsInt, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
 
 const MAX_POSTGRES_INT = 2147483647;
+const MAX_ZPL_QUANTITY = 99999999;
 
 export class IbdPrintUploadIdDto {
   @ApiProperty({ minimum: 1, maximum: MAX_POSTGRES_INT })
@@ -45,4 +46,27 @@ export class IbdPrintSelectionDto {
   @Min(1, { each: true })
   @Max(MAX_POSTGRES_INT, { each: true })
   rowIds?: number[];
+}
+
+export class IbdPrnPreviewDto extends IbdPrintSelectionDto {
+  @ApiPropertyOptional({
+    type: Number,
+    default: 1,
+    minimum: 1,
+    maximum: MAX_ZPL_QUANTITY,
+    description: 'Copies per selected Excel row.',
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_ZPL_QUANTITY)
+  quantity?: number;
+}
+
+export class IbdLanPrintDto extends IbdPrnPreviewDto {
+  @ApiProperty({ minimum: 1, maximum: MAX_POSTGRES_INT, description: 'Printer ID from GET /lookup/printers.' })
+  @IsInt()
+  @Min(1)
+  @Max(MAX_POSTGRES_INT)
+  printerId!: number;
 }

@@ -19,8 +19,15 @@ import { basename, extname } from 'node:path';
 import { Roles } from '../../auth/roles.decorator';
 import { AuthRequest } from '../../auth/types/auth-request.type';
 import { decodeUploadFileName } from '../shared/audit-excel.util';
-import { IbdPrintQueryDto, IbdPrintSelectionDto, IbdPrintUploadIdDto } from './ibd-print.dto';
+import {
+  IbdLanPrintDto,
+  IbdPrintQueryDto,
+  IbdPrintSelectionDto,
+  IbdPrintUploadIdDto,
+  IbdPrnPreviewDto,
+} from './ibd-print.dto';
 import { IBD_PRINT_FIELDS } from './ibd-print.excel';
+import { IbdPrintLabelService } from './ibd-print-label.service';
 import { IbdPrintService } from './ibd-print.service';
 
 const IbdPrintUpload = FileInterceptor('file', {
@@ -38,7 +45,10 @@ const IbdPrintUpload = FileInterceptor('file', {
 @Roles('ADMIN')
 @Controller('ibd-print/uploads')
 export class IbdPrintController {
-  constructor(private readonly service: IbdPrintService) {}
+  constructor(
+    private readonly service: IbdPrintService,
+    private readonly labels: IbdPrintLabelService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -59,7 +69,13 @@ export class IbdPrintController {
       properties: { file: { type: 'string', format: 'binary' } },
     },
   })
-  @ApiOperation({ summary: 'Import the first worksheet, including incomplete rows' })
+  @ApiOperation({
+    summary: 'Import the first worksheet, including incomplete rows',
+    description:
+      'Row 1 must contain each configured IBD Print header exactly once. ' +
+      'Capitalization, spacing, and punctuation must match. Blank data cells are accepted. ' +
+      'Invalid headers return 400 with missing, unexpected, and duplicate header details.',
+  })
   upload(@UploadedFile() file: Express.Multer.File | undefined, @Req() req: AuthRequest) {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Upload an .xlsx workbook in the file field.');
@@ -93,6 +109,30 @@ export class IbdPrintController {
   })
   printData(@Param() { id }: IbdPrintUploadIdDto, @Body() selection: IbdPrintSelectionDto) {
     return this.service.printData(id, selection?.rowIds);
+  }
+
+  @Post(':id/prn-preview')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Generate the ZPL PRN for Swagger preview',
+    description:
+      'Returns the rendered ZPL in prn. No printer connection is made. ' +
+      'Omit rowIds or send [] for all rows. Quantity defaults to one copy per row.',
+  })
+  prnPreview(@Param() { id }: IbdPrintUploadIdDto, @Body() dto: IbdPrnPreviewDto) {
+    return this.labels.preview(id, dto);
+  }
+
+  @Post(':id/print')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Send IBD labels to a LAN printer',
+    description:
+      'Send a printerId from GET /lookup/printers. The backend sends ZPL to that printer on TCP port 9100. ' +
+      'Omit rowIds or send [] for all rows. Quantity defaults to one copy per row.',
+  })
+  print(@Param() { id }: IbdPrintUploadIdDto, @Body() dto: IbdLanPrintDto) {
+    return this.labels.print(id, dto);
   }
 
   @Delete(':id')

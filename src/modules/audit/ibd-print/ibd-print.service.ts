@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
-import { configuredHeaders } from '../shared/excel-column-config.util';
 import { IbdPrintQueryDto } from './ibd-print.dto';
 import {
   IBD_PRINT_DEFAULT_HEADERS,
@@ -23,11 +22,15 @@ export class IbdPrintService {
   constructor(private readonly prisma: PrismaService) {}
 
   async upload(buffer: Buffer, fileName: string, uploadedById: number, uploadedByName: string) {
-    const headers = await configuredHeaders(
-      this.prisma,
-      IBD_PRINT_HEADER_KEYS,
-      IBD_PRINT_DEFAULT_HEADERS,
-    );
+    const configured = await this.prisma.systemConfig.findMany({
+      where: { key: { in: Object.values(IBD_PRINT_HEADER_KEYS) } },
+      select: { key: true, value: true },
+    });
+    const valuesByKey = new Map(configured.map(({ key, value }) => [key, value]));
+    const headers = { ...IBD_PRINT_DEFAULT_HEADERS };
+    for (const field of IBD_PRINT_FIELDS) {
+      headers[field] = valuesByKey.get(IBD_PRINT_HEADER_KEYS[field]) ?? headers[field];
+    }
     const rows = await readIbdPrintWorkbook(buffer, headers);
 
     return this.prisma.ibdPrintUpload.create({
