@@ -581,37 +581,57 @@ export class FreeStockService {
       ...(actor.role === 'SALES' ? { reservedById: actor.id } : {}),
     };
 
-    // Group all matching reservations by SO Number.
-    const groups = await this.prisma.freeStockReservation.groupBy({
-      by: ['soNumber'],
-      where,
-      _count: {
-        _all: true,
-      },
-      _sum: {
-        reservedQty: true,
-      },
-      orderBy: {
-        soNumber: 'asc',
-      },
-    });
+    const { total, pageGroups, latestBySo } = await this.prisma.$transaction(
+      async (tx) => {
+        const groups = await tx.freeStockReservation.groupBy({
+          by: ['soNumber'],
+          where,
+          _count: { _all: true },
+          _sum: { reservedQty: true },
+          _max: { reservedAt: true },
+          orderBy: { soNumber: 'asc' },
+        });
 
-    // Each group represents one unique SO Number.
-    const total = groups.length;
+        const start = (query.page - 1) * query.limit;
+        const pageGroups = groups.slice(start, start + query.limit);
+        const latestRequests = pageGroups.flatMap((group) =>
+          group.soNumber && group._max.reservedAt
+            ? [{ soNumber: group.soNumber, reservedAt: group._max.reservedAt }]
+            : [],
+        );
+        const latest = latestRequests.length
+          ? await tx.freeStockReservation.findMany({
+              where: { ...where, OR: latestRequests },
+              orderBy: { id: 'desc' },
+              distinct: ['soNumber'],
+              select: { soNumber: true, reservedByName: true, reservedAt: true },
+            })
+          : [];
 
-    const start = (query.page - 1) * query.limit;
-    const pageGroups = groups.slice(start, start + query.limit);
+        return {
+          total: groups.length,
+          pageGroups,
+          latestBySo: new Map(latest.map((request) => [request.soNumber, request])),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
 
     return {
       distinctSoCount: total,
 
-      data: pageGroups.map((group) => ({
-        soNumber: group.soNumber,
-        rowCount: group._count._all,
-        reservedQty: (
-          group._sum.reservedQty ?? new Prisma.Decimal(0)
-        ).toFixed(),
-      })),
+      data: pageGroups.map((group) => {
+        const latest = latestBySo.get(group.soNumber);
+        return {
+          soNumber: group.soNumber,
+          requestedBy: latest?.reservedByName ?? null,
+          requestedAt: latest?.reservedAt ?? null,
+          rowCount: group._count._all,
+          reservedQty: (
+            group._sum.reservedQty ?? new Prisma.Decimal(0)
+          ).toFixed(),
+        };
+      }),
 
       pagination: {
         page: query.page,

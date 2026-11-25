@@ -107,6 +107,7 @@ export class FreeStockController {
     description:
       'ADMIN sees all distinct SO Numbers. ' +
       'SALES sees only SO Numbers reserved by the logged-in user. ' +
+      'Each SO includes requestedBy and requestedAt from its latest visible active reservation. ' +
       'Supports search and pagination.',
   })
   distinctSo(@Query() query: FreeStockPageDto, @Req() req: AuthRequest) {
