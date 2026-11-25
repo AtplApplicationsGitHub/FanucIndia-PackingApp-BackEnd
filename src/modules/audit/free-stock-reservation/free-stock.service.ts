@@ -153,7 +153,7 @@ export class FreeStockService {
         skippedRows: parsed.issues.length,
         insertedRows: plan.insertedRows,
         updatedRows: plan.updatedRows,
-        wouldCloseRows: plan.wouldCloseRows,
+        wouldCloseRows: 0,
         protectedRows: plan.protectedIds.length,
         issues: parsed.issues,
         sample: parsed.rows.slice(0, 25),
@@ -221,27 +221,28 @@ export class FreeStockService {
             data: { lastSeenUploadId: upload.id },
           });
         }
-        const missing: Prisma.FreeStockItemWhereInput = {
-          status: { not: 'CLOSED' },
-          lastSeenUploadId: { not: upload.id },
-        };
         const now = new Date();
-        await tx.freeStockReservation.updateMany({
-          where: {
-            releasedAt: null,
-            closedAt: null,
-            stockItem: { is: missing },
-          },
-          data: { closedAt: now },
-        });
-        const closed = await tx.freeStockItem.updateMany({
-          where: missing,
-          data: {
-            status: 'CLOSED',
-            closedAt: now,
-            closedByUploadId: upload.id,
-          },
-        });
+        // Uploads may omit existing stock. Keep both the stock and its reservation active.
+        // const missing: Prisma.FreeStockItemWhereInput = {
+        //   status: { not: 'CLOSED' },
+        //   lastSeenUploadId: { not: upload.id },
+        // };
+        // await tx.freeStockReservation.updateMany({
+        //   where: {
+        //     releasedAt: null,
+        //     closedAt: null,
+        //     stockItem: { is: missing },
+        //   },
+        //   data: { closedAt: now },
+        // });
+        // const closed = await tx.freeStockItem.updateMany({
+        //   where: missing,
+        //   data: {
+        //     status: 'CLOSED',
+        //     closedAt: now,
+        //     closedByUploadId: upload.id,
+        //   },
+        // });
         const saved = await tx.freeStockUpload.update({
           where: { id: upload.id },
           data: {
@@ -249,7 +250,7 @@ export class FreeStockService {
             totalRows: parsed.totalRows,
             insertedRows: plan.insertedRows,
             updatedRows: plan.updatedRows,
-            closedRows: closed.count,
+            closedRows: 0,
             completedAt: now,
           },
         });
@@ -263,7 +264,7 @@ export class FreeStockService {
       return {
         message: parsed.issues.length
           ? `${parsed.rows.length} valid stock rows imported. ${parsed.issues.length} invalid rows skipped; existing matching stock and reservations were preserved.`
-          : 'Complete SAP stock snapshot imported successfully.',
+          : 'SAP stock file imported successfully.',
         data: result,
       };
     } catch (error) {

@@ -166,7 +166,7 @@ export class FreeStockController {
   @ApiBody({ schema: FILE_BODY })
   @ApiOperation({
     summary:
-      'Preview valid SAP rows, show invalid-row identities/columns/reasons, and estimate updates, protected rows and closures without saving',
+      'Preview valid SAP rows, show invalid-row identities/columns/reasons, and estimate inserts, updates and protected rows without saving',
   })
   previewStock(
     @UploadedFile() file: Express.Multer.File | undefined,
@@ -196,7 +196,7 @@ export class FreeStockController {
   })
   @ApiOperation({
     summary:
-      'Import the reviewed SAP file atomically. skipInvalidRows=true explicitly skips invalid rows and protects matching existing stock; only genuinely absent rows close.',
+      'Import the reviewed SAP file atomically. skipInvalidRows=true explicitly skips invalid rows and protects matching existing stock. Omitted rows keep their current status.',
   })
   uploadStock(
     @UploadedFile() file: Express.Multer.File | undefined,

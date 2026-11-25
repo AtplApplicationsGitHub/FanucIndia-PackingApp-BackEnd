@@ -51,6 +51,7 @@ model User {
   freeStockUploads      FreeStockUpload[]      @relation("FreeStockUploadedBy")
   freeStockReservations FreeStockReservation[] @relation("FreeStockReservedBy")
   freeStockReleases     FreeStockReservation[] @relation("FreeStockReleasedBy")
+  ibdPrintUploads       IbdPrintUpload[]
 
 }
 
@@ -765,6 +766,41 @@ model FreeStockUpload {
 
   @@index([createdAt])
   @@index([status])
+}
+
+model IbdPrintUpload {
+  id             Int           @id @default(autoincrement())
+  fileName       String
+  uploadedById   Int?
+  uploadedByName String
+  uploadedAt     DateTime      @default(now()) @db.Timestamptz(3)
+  rowCount       Int
+  uploadedBy     User?         @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  rows           IbdPrintRow[]
+
+  @@index([uploadedAt, id])
+  @@index([uploadedById])
+}
+
+model IbdPrintRow {
+  id                  Int            @id @default(autoincrement())
+  uploadId            Int
+  rowNumber           Int
+  inboundDelivery     String?
+  materialNumber      String?
+  materialDescription String?
+  customerName        String?
+  customerM           String?
+  filPurchase         String?
+  fjOaNumber          String?
+  fjInvoice           String?
+  invoiceDate         String?
+  caseNumber          String?
+  filSoNumber         String?
+  weightKg            String?
+  upload              IbdPrintUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@unique([uploadId, rowNumber])
 }
 
 model FreeStockItem {

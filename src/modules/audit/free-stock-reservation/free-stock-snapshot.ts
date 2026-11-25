@@ -17,7 +17,7 @@ function signature(row: StockInput | ExistingStock) {
 
 /** Match occurrences, never collapse them. Exact snapshots win, then reserved rows and stable IDs.
  * Identical source rows have no persistent external identity; stable occurrence matching preserves
- * the existing reserved rows whenever copies disappear. No business uniqueness is imposed.
+ * the existing reserved rows when a file contains fewer copies. No business uniqueness is imposed.
  */
 export function planStockSnapshot(parsed: StockFileResult, existing: ExistingStock[]) {
   const groups = new Map<string, { incoming: number[]; saved: ExistingStock[] }>();
@@ -56,7 +56,6 @@ export function planStockSnapshot(parsed: StockFileResult, existing: ExistingSto
     rows: parsed.rows.map((row, index) => ({ row, id: matched.get(index) ?? null })),
     insertedRows: parsed.rows.length - matched.size,
     updatedRows: matched.size,
-    wouldCloseRows: existing.length - used.size - protectedIds.length,
     protectedIds,
   };
 }
