@@ -1005,21 +1005,22 @@ model FreeStockReservationArchive {
 }
 
 model Location {
-  plantCode       String
-  materialBarcode String       @db.VarChar(15)
-  rackNumber       String
-  rack             LocationRack @relation(fields: [plantCode, materialBarcode], references: [plantCode, materialBarcode], onDelete: Restrict, onUpdate: Restrict)
+  plantCode     String
+  masterBarcode String       @db.VarChar(15)
+  rackNumber    String
+  rack          LocationRack @relation(fields: [plantCode, masterBarcode], references: [plantCode, masterBarcode], onDelete: Restrict, onUpdate: Restrict)
 
   @@id([plantCode, rackNumber])
-  @@index([plantCode, materialBarcode])
+  @@index([plantCode, masterBarcode])
 }
 
 model LocationRack {
-  materialBarcode String     @id @db.VarChar(15)
-  plantCode       String
-  rackKey         String
-  levels          Location[]
+  id            Int        @id @default(autoincrement())
+  masterBarcode String     @unique @db.VarChar(15)
+  plantCode     String
+  rackKey       String
+  levels        Location[]
 
   @@unique([plantCode, rackKey])
-  @@unique([plantCode, materialBarcode])
+  @@unique([plantCode, masterBarcode])
 }

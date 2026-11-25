@@ -34,12 +34,12 @@ function validateRowFormat(rows: LocationUploadRow[]): ValidatedLocationRow[] {
   const validRows: ValidatedLocationRow[] = [];
   for (const row of rows) {
     if (row.errors.length) continue;
-    const { plantCode, materialBarcode, rackNumber, errors } = row;
+    const { plantCode, masterBarcode, rackNumber, errors } = row;
     const key = rackKey(rackNumber);
 
     if (!plantCode) errors.push('Plant Code is required.');
-    if (!/^[A-Za-z0-9]{15}$/.test(materialBarcode)) {
-      errors.push('Material Barcode must contain exactly 15 letters or digits.');
+    if (!/^[A-Za-z0-9]{15}$/.test(masterBarcode)) {
+      errors.push('Master Barcode must contain exactly 15 letters or digits.');
     }
     if (!key) errors.push('Rack Number must have three segments, for example 12-A-12.');
 
@@ -54,27 +54,41 @@ export class LocationMasterService {
 
   async list(query: LocationMasterQueryDto) {
     const { page, limit } = query;
-    const search = query.search?.trim().replace(/[\\%_]/g, '\\$&');
-    const where: Prisma.LocationWhereInput = search
+    const search = (query.search ?? '').trim().replace(/[\\%_]/g, '\\$&');
+    const matches = { contains: search, mode: 'insensitive' as const };
+    const where: Prisma.LocationRackWhereInput = search
       ? {
           OR: [
-            { plantCode: { contains: search, mode: 'insensitive' } },
-            { materialBarcode: { contains: search, mode: 'insensitive' } },
-            { rackNumber: { contains: search, mode: 'insensitive' } },
+            { plantCode: matches },
+            { masterBarcode: matches },
+            { levels: { some: { rackNumber: matches } } },
           ],
         }
       : {};
 
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.location.findMany({
+    const [racks, total] = await this.prisma.$transaction([
+      this.prisma.locationRack.findMany({
         where,
-        orderBy: [{ plantCode: 'asc' }, { rackNumber: 'asc' }],
+        orderBy: { id: 'asc' },
         skip: (page - 1) * limit,
         take: limit,
+        select: {
+          id: true,
+          plantCode: true,
+          masterBarcode: true,
+          levels: {
+            orderBy: { rackNumber: 'asc' },
+            select: { rackNumber: true },
+          },
+        },
       }),
-      this.prisma.location.count({ where }),
+      this.prisma.locationRack.count({ where }),
     ], { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 
+    const data = racks.map(({ levels, ...rack }) => ({
+      ...rack,
+      rackNumbers: levels.map((level) => level.rackNumber),
+    }));
     return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
@@ -147,15 +161,15 @@ export class LocationMasterService {
         where: { OR: batch(levelFilters, i) },
       });
       for (const level of savedLevels) {
-        levels.set(locationKey(level.plantCode, level.rackNumber), level.materialBarcode);
+        levels.set(locationKey(level.plantCode, level.rackNumber), level.masterBarcode);
       }
     }
 
     const newRows = validRows.filter((row) => {
       if (row.errors.length) return false;
       const savedBarcode = levels.get(locationKey(row.plantCode, row.rackNumber));
-      if (savedBarcode && savedBarcode !== row.materialBarcode) {
-        row.errors.push(`Rack Number ${row.rackNumber} already exists in plant ${row.plantCode} with Material Barcode ${savedBarcode}.`);
+      if (savedBarcode && savedBarcode !== row.masterBarcode) {
+        row.errors.push(`Rack Number ${row.rackNumber} already exists in plant ${row.plantCode} with Master Barcode ${savedBarcode}.`);
       }
       return !savedBarcode;
     });
@@ -167,7 +181,7 @@ export class LocationMasterService {
         plantCode: row.plantCode,
         rackKey: row.rackKey,
       });
-      requestedBarcodes.add(row.materialBarcode);
+      requestedBarcodes.add(row.masterBarcode);
     }
 
     const racks = Array.from(requestedRacks.values());
@@ -177,12 +191,12 @@ export class LocationMasterService {
     for (let i = 0; i < Math.max(racks.length, barcodes.length); i += BATCH_SIZE) {
       const savedRacks = await tx.locationRack.findMany({
         where: {
-          OR: [...batch(racks, i), { materialBarcode: { in: batch(barcodes, i) } }],
+          OR: [...batch(racks, i), { masterBarcode: { in: batch(barcodes, i) } }],
         },
       });
       for (const rack of savedRacks) {
-        barcodeByRack.set(locationKey(rack.plantCode, rack.rackKey), rack.materialBarcode);
-        rackByBarcode.set(rack.materialBarcode, rack);
+        barcodeByRack.set(locationKey(rack.plantCode, rack.rackKey), rack.masterBarcode);
+        rackByBarcode.set(rack.masterBarcode, rack);
       }
     }
 
@@ -190,19 +204,19 @@ export class LocationMasterService {
     const additionsByBarcode = new Map<string, ValidatedLocationRow[]>();
     const newRacks: Prisma.LocationRackCreateManyInput[] = [];
     for (const row of newRows) {
-      const { plantCode, rackKey: key, materialBarcode, rackNumber, errors } = row;
+      const { plantCode, rackKey: key, masterBarcode, rackNumber, errors } = row;
       const group = locationKey(plantCode, key);
       const assignedBarcode = barcodeByRack.get(group);
-      const assignedRack = rackByBarcode.get(materialBarcode);
-      if (assignedBarcode && assignedBarcode !== materialBarcode) {
-        errors.push(`This rack already uses Material Barcode ${assignedBarcode}. Use it for ${rackNumber}.`);
+      const assignedRack = rackByBarcode.get(masterBarcode);
+      if (assignedBarcode && assignedBarcode !== masterBarcode) {
+        errors.push(`This rack already uses Master Barcode ${assignedBarcode}. Use it for ${rackNumber}.`);
       } else if (assignedRack && locationKey(assignedRack.plantCode, assignedRack.rackKey) !== group) {
-        errors.push(`Material Barcode ${materialBarcode} is already assigned to a different rack in plant ${assignedRack.plantCode}.`);
+        errors.push(`Master Barcode ${masterBarcode} is already assigned to a different rack in plant ${assignedRack.plantCode}.`);
       }
 
       if (!errors.length && !assignedBarcode) {
         addToGroup(additionsByRack, group, row);
-        addToGroup(additionsByBarcode, materialBarcode, row);
+        addToGroup(additionsByBarcode, masterBarcode, row);
       }
     }
 
@@ -223,22 +237,22 @@ export class LocationMasterService {
       for (const rows of rackGroups) {
         if (rows === preferredGroup) continue;
         const message = preferredRack
-          ? `Material Barcode ${barcode} is also used by rack ${preferredRack.rackKey} in plant ${preferredRack.plantCode}. Check the Rack Number or use a different barcode.`
-          : `Material Barcode ${barcode} is assigned to multiple racks in this workbook. Use a different barcode for each rack.`;
+          ? `Master Barcode ${barcode} is also used by rack ${preferredRack.rackKey} in plant ${preferredRack.plantCode}. Check the Rack Number or use a different barcode.`
+          : `Master Barcode ${barcode} is assigned to multiple racks in this workbook. Use a different barcode for each rack.`;
         for (const row of rows) row.errors.push(message);
       }
     }
 
     for (const additions of additionsByRack.values()) {
-      const barcodesInRack = new Set(additions.map((row) => row.materialBarcode));
+      const barcodesInRack = new Set(additions.map((row) => row.masterBarcode));
       if (barcodesInRack.size > 1) {
         for (const row of additions) {
-          row.errors.push('Use one Material Barcode for all levels of this rack.');
+          row.errors.push('Use one Master Barcode for all levels of this rack.');
         }
         continue;
       }
-      const { plantCode, rackKey: key, materialBarcode } = additions[0];
-      newRacks.push({ plantCode, rackKey: key, materialBarcode });
+      const { plantCode, rackKey: key, masterBarcode } = additions[0];
+      newRacks.push({ plantCode, rackKey: key, masterBarcode });
     }
 
     const additions: Prisma.LocationCreateManyInput[] = [];
@@ -249,13 +263,13 @@ export class LocationMasterService {
         return { ...row, status: 'INVALID' as const };
       }
 
-      const { plantCode, rackNumber, materialBarcode } = row;
+      const { plantCode, rackNumber, masterBarcode } = row;
       if (levels.has(locationKey(plantCode, rackNumber))) {
         counts.unchanged++;
         return { ...row, status: 'UNCHANGED' as const };
       }
 
-      additions.push({ plantCode, rackNumber, materialBarcode });
+      additions.push({ plantCode, rackNumber, masterBarcode });
       counts.added++;
       return { ...row, status: 'NEW' as const };
     });

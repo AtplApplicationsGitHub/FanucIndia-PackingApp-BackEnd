@@ -44,7 +44,10 @@ export class LocationMasterController {
   constructor(private readonly service: LocationMasterService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List and search rack levels' })
+  @ApiOperation({
+    summary: 'List racks with their rack numbers',
+    description: 'Pagination counts racks. Each result contains id, plantCode, masterBarcode, and rackNumbers, which is empty for racks with no levels.',
+  })
   list(@Query() query: LocationMasterQueryDto) {
     return this.service.list(query);
   }
@@ -94,7 +97,10 @@ export class LocationMasterController {
 
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete one rack level by Plant Code and Rack Number' })
+  @ApiOperation({
+    summary: 'Delete one rack level by Plant Code and Rack Number',
+    description: 'The rack and its barcode assignment are retained even when its last level is removed.',
+  })
   async deleteLevel(@Query() query: DeleteLocationQueryDto): Promise<void> {
     await this.service.deleteLevel(query);
   }

@@ -3,7 +3,7 @@ import { CellValue, Workbook } from 'exceljs';
 
 const HEADERS = {
   plantCode: 'Plant Code',
-  materialBarcode: 'Material Barcode',
+  masterBarcode: 'Master Barcode',
   rackNumber: 'Rack Number',
 } as const;
 
@@ -13,7 +13,7 @@ function normaliseHeader(value: string): string {
 
 export interface LocationWorkbookEntry {
   plantCode: string;
-  materialBarcode: string;
+  masterBarcode: string;
   rackNumber: string;
 }
 
@@ -46,7 +46,8 @@ export async function readLocationWorkbook(buffer: Buffer): Promise<LocationUplo
 
   const columns = new Map<string, number>();
   sheet.getRow(1).eachCell((cell, column) => {
-    const key = normaliseHeader(cell.text);
+    const header = normaliseHeader(cell.text);
+    const key = header === 'materialbarcode' ? 'masterbarcode' : header;
     if (!key) return;
     if (columns.has(key)) {
       throw new BadRequestException(`Duplicate Excel header: ${cell.text}.`);
@@ -82,12 +83,12 @@ export async function readLocationWorkbook(buffer: Buffer): Promise<LocationUplo
     const values = {
       rowNumber,
       plantCode: read(HEADERS.plantCode),
-      materialBarcode: read(HEADERS.materialBarcode),
+      masterBarcode: read(HEADERS.masterBarcode),
       rackNumber: read(HEADERS.rackNumber),
       errors,
     };
 
-    if (values.plantCode || values.materialBarcode || values.rackNumber || errors.length) {
+    if (values.plantCode || values.masterBarcode || values.rackNumber || errors.length) {
       rows.push(values);
     }
   });
@@ -112,9 +113,9 @@ export async function createLocationWorkbook(entries: LocationWorkbookEntry[]): 
   instructions.getColumn(1).width = 112;
   instructions.addRows([
     ['Add new rows below the saved rows in the Locations sheet. Keep the header and saved rows as they are.'],
-    ['Enter Plant Code, Material Barcode, and Rack Number on every new row.'],
-    ['Use the assigned Material Barcode when adding a level to an existing rack.'],
-    ['Material Barcode must contain exactly 15 letters or digits. Use text cells to preserve leading zeros.'],
+    ['Enter Plant Code, Master Barcode, and Rack Number on every new row.'],
+    ['Use the assigned Master Barcode when adding a level to an existing rack.'],
+    ['Master Barcode must contain exactly 15 letters or digits. Use text cells to preserve leading zeros.'],
     ['Use first-level-last for Rack Number, for example 12-A-12.'],
     ['Use Delete in the Location Master screen to remove a level.'],
   ]);
