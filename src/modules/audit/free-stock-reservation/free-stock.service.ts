@@ -399,18 +399,14 @@ export class FreeStockService {
         some: { ...reservationScope, reservedById: actor.id, closedAt: null },
       },
     };
-    if (query.mine)
-      base.reservations = {
-        some: { ...reservationScope, reservedById: actor.id },
-      };
-    const where: Prisma.FreeStockItemWhereInput = {
-      ...base,
-      ...(query.mine
-        ? { status: 'RESERVED' as const }
-        : query.status && query.status !== 'ALL'
-          ? { status: query.status as FreeStockStatus }
-          : {}),
-    };
+    const where: Prisma.FreeStockItemWhereInput = query.mine
+      ? myReservationsWhere
+      : {
+          ...base,
+          ...(query.status && query.status !== 'ALL'
+            ? { status: query.status as FreeStockStatus }
+            : {}),
+        };
     const groupBySo = query.status === 'RESERVED' || query.mine === true;
     const { rows, total, grouped, mine, zones, reservationGroups } =
       await this.prisma.$transaction(
@@ -468,7 +464,7 @@ export class FreeStockService {
             rows = await tx.freeStockItem.findMany({
               where,
               include: STOCK_INCLUDE,
-              orderBy: { id: 'desc' },
+              orderBy: { id: 'asc' },
               skip: (query.page - 1) * query.limit,
               take: query.limit,
             });

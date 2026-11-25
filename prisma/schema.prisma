@@ -1003,3 +1003,23 @@ model FreeStockReservationArchive {
   @@index([reservedById, releasedAt, closedAt], map: "FreeStockReservationArchive_owner_state_idx")
   @@index([bulkReservationId])
 }
+
+model Location {
+  plantCode       String
+  materialBarcode String       @db.VarChar(15)
+  rackNumber       String
+  rack             LocationRack @relation(fields: [plantCode, materialBarcode], references: [plantCode, materialBarcode], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([plantCode, rackNumber])
+  @@index([plantCode, materialBarcode])
+}
+
+model LocationRack {
+  materialBarcode String     @id @db.VarChar(15)
+  plantCode       String
+  rackKey         String
+  levels          Location[]
+
+  @@unique([plantCode, rackKey])
+  @@unique([plantCode, materialBarcode])
+}
