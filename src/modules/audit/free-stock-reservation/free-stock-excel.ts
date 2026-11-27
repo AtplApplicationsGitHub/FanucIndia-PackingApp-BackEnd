@@ -482,9 +482,10 @@ function validateReservationUploadRow(line: {
 
   if (!so) {
     messages.push('SO Number is required.');
-  } else if (!/^\d{10}$/.test(so)) {
-    messages.push('SO Number must be numeric and exactly 10 digits.');
-  }
+  } 
+  // else if (!/^\d{10}$/.test(so)) {
+  //   messages.push('SO Number must be numeric and exactly 10 digits.');
+  // }
 
   return messages.length ? messages.join(' ') : null;
 }
